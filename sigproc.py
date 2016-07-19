@@ -9,6 +9,7 @@ Copyright (C) Keith Bannister 2011
 import struct
 import os
 import numpy as np
+import warnings
 
 global _verbose
 _verbose = False
@@ -33,19 +34,23 @@ DOUBLE_FORMAT = 'd'
 def unpack(hdr, param, struct_format):
     idx = hdr.find(param)
     if idx < 0:
+        warnings.warn('Could not find parameter {}'.format(param))
         return None
+
     idx += len(param) # idx is thte start of the string
     size = struct.calcsize(struct_format)
     bits = hdr[idx:idx+size]
     value = struct.unpack(struct_format, bits)[0]
     
-    #print 'param', param, 'size', size, 'part', bits, 'value', value
+    print 'param', param, 'size', size, 'part', bits, 'value', value
     return value
 
 def unpack_str(hdr, param):
     idx = hdr.find(param)
     if idx < 0:
+        warnings.warn('Could not find parameter {}'.format(param))
         return None
+
     idx += len(param) # idx is thte start of the string
     
     # The size of the string is given in the next field, then the value of the string
@@ -56,24 +61,56 @@ def unpack_str(hdr, param):
     #print 'param', param, 'start', idx, 'end', end_idx, 'value', value
     return value
 
+def write_str(f, s):
+    n = struct.pack('i', len(s))
+    f.write(n)
+    f.write(s)
+
+def write(f, v, struct_format):
+    f.write(struct.pack(struct_format, v))
+
 class SigprocFile(object):
-    def __init__(self, filename):
+    def __init__(self, filename, mode='r', header=None):
         self.filename = filename
-        self.fin = open(self.filename, 'rb')
-        self._read_header()
+        self.fin = open(self.filename, mode)
+        if header is not None:
+            self._write_header(header)
+            self.header = header
+        else:
+            self._read_header()
+
+    def _write_header(self, header):
+        f = self.fin
+        f.seek(0)
+        write_str(f, 'HEADER_START')
+
+        for k, v in header.iteritems():
+            if k in STRING_PARAMS:
+                write_str(f, k)
+                write_str(f, v)
+            elif k in INT_PARAMS:
+                write_str(f, k)
+                write(f, v, INT_FORMAT)
+            elif k in DOUBLE_PARAMS:
+                write_str(f, k)
+                write(f, v, DOUBLE_FORMAT)
+            else:
+                print 'Cannot write header', k
+
+        write_str(f, 'HEADER_END')
         
     def _read_header(self):
         fin = self.fin
         fin.seek(0)
         hdr = fin.read(HEADER_LENGTH)
-        start_idx = hdr.find("HEADER_START") - 1
+        start_idx = hdr.find("HEADER_START")
         end_idx = hdr.find("HEADER_END")
-        hdr = hdr[start_idx:end_idx+len("HEADER_END")]
+        hdr = hdr[start_idx:end_idx]
         self.data_start_idx = end_idx + len("HEADER_END")
         self.seek_data()
-        self.hdr = hdr
         header = {}
         self.header = header
+        
                     
         for p in STRING_PARAMS:
             header[p] = unpack_str(hdr, p)
@@ -91,6 +128,9 @@ class SigprocFile(object):
         self.file_size_bytes = os.path.getsize(self.filename)
         self.header_size_bytes = self.data_start_idx
         self.data_size_bytes = self.file_size_bytes - self.header_size_bytes
+        assert self.nifs > 0, 'Invalid nifs {}'.format(self.nifs)
+        assert self.nchans > 0, 'Invalid nchans {}'.format(self.nchans)
+        assert self.nbits > 0, 'Invalid nbits {}'.format(self.nbits)
         self.bytes_per_element = self.nifs * self.nchans * self.nbits/8 
         self.file_size_elements = self.data_size_bytes / self.bytes_per_element
         
