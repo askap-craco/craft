@@ -10,6 +10,7 @@ import sigproc
 from plot_dada import Formatter
 import numpy as np
 import pylab
+import sys
 
 
 def _main():
@@ -20,6 +21,12 @@ def _main():
     parser.add_argument('--dtype', help="override dtype", nargs="?")
     parser.add_argument('-n','--normalise', action='store_true', help='Normalise each channel before plotting', default=False)
     parser.add_argument('-p','--period',  help='Folding period', type=float, default=0.089328385024)
+    parser.add_argument('--plot-fft', help='plot fft', action='store_true', default=False)
+    parser.add_argument('--plot-image',help='plot image', action='store_true', default=False)
+    parser.add_argument('--plot-hist',help='plot hist', action='store_true', default=False)
+
+
+    parser.add_argument('--nxy', help='rows & columns', default='1,2')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -74,7 +81,6 @@ def plot_time_series(f, tstart, ntimes, dtype, values):
     pylab.title(f.filename)
     pylab.show()
 
-
 def fold(data, tsamp, period):
     nbins = int(period/tsamp)
     print 'Folding with tsamp {} period {} nbins {} data.shape {}'.format(tsamp, period, nbins, data.shape)
@@ -89,47 +95,72 @@ def fold(data, tsamp, period):
 
     return folded
 
+def mysubplots(nrows, ncols, *args, **kwargs):
+    fig, axes = pylab.subplots(nrows, ncols, *args, **kwargs)
+    if not hasattr(axes, 'flat'):
+        axes = [axes]
+
+    return fig, np.array(axes).flatten()
+    
+
 def plot_spectra(f, tstart, ntimes, dtype, values):
     tend = tstart + ntimes
     nelements = ntimes*f.nifs*f.nchans
 
     f.seek_data(f.bytes_per_element*tstart)
     v = np.fromfile(f.fin, dtype=dtype, count=nelements )
+    v = v.astype(np.float)
     print 'Nelements', nelements, 'Ntimes', ntimes, 'nchans', f.nchans, 'nifs', f.nifs, dtype, 'Actual length', len(v)
     
     v.shape = (ntimes, f.nifs, f.nchans)
+#    v.shape = (ntimes, f.nchans, f.nifs)
+#    v = np.swapaxes(v, 2, 1)
     v = np.ma.masked_array(v, mask=np.isnan(v))
-    nrows = f.nifs/6
-    ncols = 6
-    nrows = 1
-    ncols = 2
-    
-    fig, axes = pylab.subplots(nrows, ncols, sharex=True, sharey=True)
+    #nrows = f.nifs/6
 
-    fft_fig, fft_axes = pylab.subplots(nrows, ncols, sharex=True, sharey=True)
+    nrows, ncols = map(int, values.nxy.split(','))
 
-    hist_fix, hist_axes = pylab.subplots(nrows, ncols, sharex=True, sharey=True)
+    plot_cov(v[:, :, 150:151], f)
     
-    bandpass_fig, bandpass_axes = pylab.subplots(nrows, ncols, sharex=True, sharey=True)
+    fig, axes = mysubplots(nrows, ncols, sharex=True, sharey=True)
+    
+    if values.plot_fft:
+        fft_fig, fft_axes = mysubplots(nrows, ncols, sharex=True, sharey=True)
+
+    hist_fix, hist_axes = mysubplots(nrows, ncols, sharex=True, sharey=True)
+    
+    bandpass_fig, bandpass_axes = mysubplots(nrows, ncols, sharex=True, sharey=True)
+    dm0_fig, dm0_ax = mysubplots(1,1)
+    dm0ax= dm0_ax[0]
+
+    dm0_fig, dm0_axs = mysubplots(1,1)
+    dm0axs = dm0_axs[0]
 
     if values.period > 0:
-        foldfig, foldaxes = pylab.subplots(nrows, ncols, sharex=True, sharey=True)
-        if f.nifs == 1:
-            foldaxes = [foldaxes]
+        foldfig, foldaxes = mysubplots(nrows, ncols, sharex=True, sharey=True)
     else:
-        foldfix, foldaxes = None, None
+        foldfig, foldaxes = None, None
 
+
+    ntimes, nbeams, nchans = v.shape
+
+    beam_mean = v.mean(axis=1)
 
     for ifn in xrange(nrows*ncols):
         ax = axes.flat[ifn]
         hax = hist_axes.flat[ifn]
         bpax = bandpass_axes.flat[ifn]
-        fftax = fft_axes.flat[ifn]
+        #dm0ax = dm0_ax.flat[ifn]
+
+        if values.plot_fft:
+            fftax = fft_axes.flat[ifn]
 
         if foldaxes is not None:
             fax = foldaxes[ifn]
 
         data = v[:,  ifn, :]
+        dm0 = data.mean(axis=1)
+        dm0s = data.std(axis=1)
 
         if values.normalise:
             dmean = data.mean(axis=0)
@@ -150,19 +181,26 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
             vmin = vmid-2*vstd
 
         print 'VMIN', vmin, 'VMAX', vmax, data.shape
-        im = ax.imshow(data.T, aspect='auto', vmin=vmin, vmax=vmax, interpolation='none', origin='lower')
-        ax.text(0, 0, 'ifn %d' % ifn, va='top', ha='left') 
-        ax.format_coord = Formatter(im)
-        ax.set_xlabel('Integration')
-        ax.set_ylabel('Channel')
+        if values.plot_image and ifn > 0:
+            im = ax.imshow(data.T, aspect='auto', vmin=vmin, vmax=vmax, interpolation='none', origin='lower')
+            ax.text(0, 0, 'ifn %d' % ifn, va='top', ha='left') 
+            ax.format_coord = Formatter(im)
+            ax.set_xlabel('Integration')
+            ax.set_ylabel('Channel')
 
         #fig.title(f.filename)
 
-        for c in xrange(f.nchans):
-            hax.hist(v[:,ifn, c].flatten(), label='IF %d'%ifn, bins=100, histtype='step')
+        if values.plot_hist:
+            '''
+            for c in xrange(nchans):
+                hax.hist(data[:, c].flatten(), label='IF %d'%ifn, bins=100, histtype='step')
+            '''
 
-        pylab.title(f.filename)
-        pylab.savefig('{}_hist.png'.format(f.filename))
+            #bins=np.arange(0, 25r5, 1)
+            #bins=256
+            #hax.hist(data[0::2, :].flatten(), bins=bins, histtype='step', color='k')
+            #hax.hist(data[1::2, :].flatten(), bins=bins, histtype='step', color='r')
+            hax.scatter(data.flatten(), beam_mean.flatten(), marker='.')
 
         if values.period > 0:
             vfolded = fold(data, f.tsamp, values.period)
@@ -170,55 +208,124 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
             fax.imshow(vfolded.T, label='IF %s'%ifn, aspect='auto')
             
 
-        T = ntimes*f.tsamp
-        times = np.arange(ntimes)
-        periods = 1.0/times
+        T = ntimes*f.tsamp*1e3
+        #T = float(ntimes)
+        times = np.arange(ntimes)*f.tsamp
+        periods = T/np.arange(ntimes, dtype=np.float)
+        funit='ms'
+        pltharmonics = np.arange(2, 30)*f.tsamp*1e3
 
+        if values.plot_fft:
+            for chan in xrange(0, nchans,16):
+                afixed = (data[:, chan])
+                af = abs(np.fft.rfft(afixed))
+                if np.any(af[1:] > 0):
+                    fftax.loglog(periods[1:len(af)], af[1:])
+                    fftax.set_xlabel('period (%s)' % funit)
 
-        for chan in xrange(f.nchans):
-            fftax.plot(periods, abs(np.fft.fft(v[:, ifn, chan])))
+                #fftax.set_xlim(2,10)
+                #fftax.set_ylim(1,100)
 
         pylab.title(f.filename)
-        pylab.xlabel('Period (s)')
-        pylab.savefig('{}_fft.png'.format(f.filename))
-
-        bpax.plot(v[:, ifn, :].mean(axis=0))
+        bpax.plot(data.mean(axis=0))
         bpax.set_xlabel('Channel')
         bpax.set_ylabel('Mean bandpass')
         bpax2 = bpax.twinx()
-        bpax2.plot(v[:, ifn, :].std(axis=0), 'r:')
+        bpax2.plot(data.std(axis=0), 'r:')
         bpax2.set_ylabel('Bandpass std')
 
-        pylab.figure()
-        dm0 = v[:,ifn,:].mean(axis=1)
-        fig, dm0ax = pylab.subplots(2,1)
-        dm0ax[0].plot(times, dm0);
-        dm0ax[0].set_xlabel('Time (ms)')
-        dm0ax[0].set_ylabel('DM=0 time series')
+        #dm0ax.plot(times, dm0);
+        #dm0ax.set_xlabel('Time (ms)')
+        #dm0ax.set_ylabel('DM=0 time series')
         
-        dm0ax[1].semilogy(np.abs(np.fft.rfft(dm0))**2)
-        dm0ax[1].set_xlabel('Digital frequency / sample')
-        dm0ax[1].set_ylabel('FFT(DM0)**2')
+        dm0f = np.abs(np.fft.rfft(dm0))**2
 
+        dm0ax.semilogy(periods[1:len(dm0f)], dm0f[1:])
+        dm0ax.set_xlabel('Period (%s)' % funit)
+        dm0ax.set_ylabel('FFT(DM0)**2')
         
-        pylab.show()
+        for harmonic in pltharmonics:
+            dm0ax.vlines(harmonic, min(dm0f[1:]), max(dm0f), color='k')
 
+        #dm0ax.set_xlim(0, 30)
+        #dm0ax.set_ylim(1e2, 1e9)
+        
+        dm0sf = np.abs(np.fft.rfft(dm0))**2
+        dm0axs.semilogy(periods[1:len(dm0sf)], dm0sf[1:])
+        dm0axs.set_xlabel('Period (%s)' % funit)
+        dm0axs.set_ylabel('FFT(std(DM0))**2')
+        #dm0axs.set_xlim(0, 30)
 
-    
+            
     fig.savefig('{}_dynspec.png'.format(f.filename))
 
-    for i in xrange(f.nifs):
-        ifv = v[:, i, 0]
-        print 'Channel 0 mean, if=', i, ifv.mean(), ifv.std()
-        ifv = v[:, i, 72]
-        print 'Channel 72 mean, if=', i, ifv.mean(), ifv.std()
+    #for i in xrange(nchans):
+        #ifv = v[:, i, 0]
+   #     print 'Channel 0 mean, if=', i, ifv.mean(), ifv.std()
+        #ifv = v[:, i, 72]
+   #     print 'Channel 72 mean, if=', i, ifv.mean(), ifv.std()
 
 
-    #pylab.subplots_adjust(wspace=0, hspace=0)
+    #mysubplots_adjust(wspace=0, hspace=0)
+    new_tick_locations = np.array([.2, .5, .9])
+
+    def tick_function(X):
+        V = 1/(1+X)
+        return ["%.3f" % z for z in V]
+
+    #dm0axy = dm0ax.twiny()
+    #ax2.set_xlim(ax1.get_xlim())
+    #ax2.set_xticks(new_tick_locations)
+    ##ax2.set_xticklabels(tick_function(new_tick_locations))
+    #ax2.set_xlabel(r"Modified x-axis: $1/(1+X)$")
+
+
     pylab.show()
 
     
-    
+def plot_cov(v, f, save_all=False):
+    vf = np.zeros_like(v)
+    vmax = 0
+    vmin = -3
+
+    ntimes, nbeams, nchans = v.shape
+
+    for c in xrange(nchans):
+        R = np.cov(v[:, :, c].T)
+        lam, evec = np.linalg.eig(R)
+        evec = np.matrix(evec)
+        for t in xrange(v.shape[0]):
+            vf[t, :, c] -= np.dot(v[t, :, c], evec)*lam
+
+        pylab.clf()
+        pylab.imshow(np.log10(R/np.diag(R)), interpolation='none', vmax=vmax, vmin=vmin)
+        pylab.xlabel('Beam number')
+        pylab.ylabel('Beam number')
+        pylab.title('{} channel {}'.format(f.filename, c))
+        cb = pylab.colorbar()
+        cb.set_label('Correlation coefficient (dB)')
+
+        if save_all or c == 0:
+            pylab.savefig('{}_beamr_c{:03d}.png'.format(f.filename, c))
+        #pylab.show()
+
+
+
+def plot_beam_cov(v, f):
+    nchans = f.nchans
+    nchans = 48
+    nbeams = nrows*ncols
+    v = v[:, 0:nbeams, 32:nchans+32]
+    #v = np.swapaxes(v, 1, 2)
+    vr = v.reshape(v.shape[0], v.shape[1]*v.shape[2])
+    print vr.shape
+    vrr = np.cov(vr.T)
+    pylab.imshow(np.log10(vrr/np.diag(vrr)), vmax=0, vmin=-2, aspect='auto', origin='upper', interpolation='none')
+    c = pylab.colorbar()
+    c.set_label('Correlation coefficient (dB)')
+    pylab.xlabel('beam x channel')
+    pylab.ylabel('beam x channel')
+
     
 
 if __name__ == '__main__':
