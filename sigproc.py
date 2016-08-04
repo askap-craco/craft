@@ -42,7 +42,7 @@ def unpack(hdr, param, struct_format):
     bits = hdr[idx:idx+size]
     value = struct.unpack(struct_format, bits)[0]
     
-    print 'param', param, 'size', size, 'part', bits, 'value', value
+    #print 'param', param, 'size', size, 'part', bits, 'value', value
     return value
 
 def unpack_str(hdr, param):
