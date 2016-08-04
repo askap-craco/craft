@@ -5,7 +5,6 @@ Header utility classes
 Copyright (C) CSIRO 2016
 """
 __author__ = 'Keith Bannister <keith.bannister@csiro.au>'
-import askap.time
 import os
 
 from collections import namedtuple, OrderedDict
@@ -57,6 +56,17 @@ class DadaHeader(OrderedDict):
             assert len(s) <= hsize, 'Header size is %s but HDR_SIZE=%s' % (len(s), hsize)
 
         return s
+
+    
+    def tofile(self, fout):
+        self.reset_hdr_size()
+        s = str(self)
+        fout.write(s)
+        hsize = self.get_value('HDR_SIZE')
+        nzeros = hsize - len(s)
+        assert nzeros >= 0
+        fout.write('\x00'*nzeros)
+        return hsize
 
     @staticmethod
     def _fromfile(filename, hdr_size):
