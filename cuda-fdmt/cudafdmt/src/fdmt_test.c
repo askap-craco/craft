@@ -15,13 +15,14 @@ int main(int argc, char* argv[])
 {
     int nd = 511;
     int nf = 511;
+    int nbeams = 1;
     
     float fmax = 1600.;
     float fmin = fmax - (float)nf;
     
     
-    fdmt_dtype* din = malloc(sizeof(fdmt_dtype)*nd*nf);
-    fdmt_dtype* dout = malloc(sizeof(fdmt_dtype)*nd*nf);
+    fdmt_dtype* din = malloc(sizeof(fdmt_dtype)*nd*nf*nbeams);
+    fdmt_dtype* dout = malloc(sizeof(fdmt_dtype)*nd*nf*nbeams);
     printf("Starting!\n");
     
     if (argc != 3) {
@@ -42,7 +43,7 @@ int main(int argc, char* argv[])
     fclose(fin);
     
     fdmt_t fdmt;
-    fdmt_create(&fdmt, fmin, fmax, nf, nd);
+    fdmt_create(&fdmt, fmin, fmax, nf, nd, nbeams);
     
     for(int i = 0; i < 1; i++) {
         fdmt_execute(&fdmt, din, dout);

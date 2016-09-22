@@ -119,11 +119,14 @@ def _main():
             break
 
         fin = open(fname, 'r')
-        theshape =  np.fromfile(fin, dtype=np.int32, count=3)
+        theshape =  np.fromfile(fin, dtype=np.int32, count=4)
+        print theshape
+        
         d = np.fromfile(fin, dtype=np.float32, count=theshape.prod())
         d.shape = theshape
-        myimshow(ax[0], d[:, 0, :], aspect='auto', origin='lower')
-        myimshow(ax[1], d[0, :, :], aspect='auto', origin='lower')
+        beam = 0
+        myimshow(ax[0], d[beam, :, 0, :], aspect='auto', origin='lower')
+        myimshow(ax[1], d[beam, 0, :, :], aspect='auto', origin='lower')
 
         ax[0].set_title(fname)
 
