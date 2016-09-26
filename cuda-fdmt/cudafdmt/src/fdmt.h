@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <string.h>
 #include "array.h"
+#include "cpu_kernels.h"
 
 #define DUMP_STATE 1
 
@@ -166,6 +167,8 @@ int fdmt_initialise(const fdmt_t* fdmt, array3d_t* indata, array4d_t* state)
   
 }
 
+
+
 /**
  * Does an FDMT iteration
  *
@@ -242,9 +245,10 @@ int fdmt_iteration(const fdmt_t* fdmt,
 		  // OUtput state[freq, idx, 0:dtmid] = input_state[2xfreq, dt_middle, 0:dtmin]
 		  // where the DM would have overun the available times
 		  // This needs to be fixed for more careful time overlapping
-		  for (int i = itmin; i < itmax; i++) {
-			outdata->d[outidx + i] = indata->d[inidx1 + i];
-		  }
+		  cpu_copy1(&outdata->d[outidx + itmin], &indata->d[inidx1 + itmin], (itmax - itmin));
+		  //for (int i = itmin; i < itmax; i++) {
+		  //outdata->d[outidx + i] = indata->d[inidx1 + i];
+		  //}
 
 
 		  // Now we work on the remaining times that are guaranteed not to overrun the input dimensions
@@ -260,14 +264,18 @@ int fdmt_iteration(const fdmt_t* fdmt,
 
 			int inidx2 = array4d_idx(indata, beam, 2*iif+1, dt_rest_index, 0) - dt_middle_larger;
 
-			for(int i = itmin; i < itmax; i++) {
-			  outdata->d[outidx + i] = indata->d[inidx1 + i] + indata->d[inidx2 + i];
-			}
-		  } else { // Just copy the input over. TODO: Could probably be done outside the iif loop to save of evalutating IFs, but
+			//for(int i = itmin; i < itmax; i++) {
+			//  outdata->d[outidx + i] = indata->d[inidx1 + i] + indata->d[inidx2 + i];
+			//}
+			cpu_sum1(&outdata->d[outidx + itmin], &indata->d[inidx1+itmin], &indata->d[inidx2+itmin], itmax-itmin);
+
+		  } else { // Just copy the input over. which basically assumes the upper channel is flaggedd/0
+			  // TODO: Could probably be done outside the iif loop to save evalutating IFs, but
 			  // Too tricky for the moment.
-			for(int i = itmin; i < itmax; i++) {
-			  outdata->d[outidx + i] = indata->d[inidx1 + i];
-			}
+			cpu_copy1(&outdata->d[outidx + itmin], &indata->d[inidx1 + itmin], (itmax - itmin));
+			//for(int i = itmin; i < itmax; i++) {
+			//  outdata->d[outidx + i] = indata->d[inidx1 + i];
+			//	}
 		  }
 		}
 	  }
@@ -303,7 +311,7 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
     array4d_t* currstate = &fdmt->states[s];
     array4d_t* newstate;
     
-    // If its' the last iteration, cheekily substitue the output pointer
+    // If it's the last iteration, cheekily substitute the output pointer
     // to save a memcopy
     // if (iter == fdmt->order) {
     s = (s + 1) % 2;
