@@ -8,6 +8,8 @@
 #ifndef CPU_KERNELS_H_
 #define CPU_KERNELS_H_
 
+#import "array.h"
+
 void cpu_copy1(fdmt_dtype* dst, const fdmt_dtype* src, const int count) {
 	assert(count >= 0);
 	for(int i = 0; i < count; i++) {
@@ -26,6 +28,8 @@ void cpu_sum1(fdmt_dtype* dst, const fdmt_dtype* src1, const fdmt_dtype* src2, c
 		dst[i] = src1[i] + src2[i];
 	}
 }
+
+
 
 
 #endif /* CPU_KERNELS_H_ */

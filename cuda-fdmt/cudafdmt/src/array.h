@@ -48,6 +48,19 @@ typedef struct _arraynd
 	fdmt_dtype* d;
 } arraynd_t;
 
+typedef struct _coord3 {
+	int x;
+	int y;
+	int z;
+} coord3_t;
+
+typedef struct _coord4 {
+	int w;
+	int x;
+	int y;
+	int z;
+} coord4_t;
+
 int arraynd_idx(const arraynd_t *a, ...)
 {
 	va_list argp;
