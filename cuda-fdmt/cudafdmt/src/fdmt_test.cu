@@ -21,8 +21,8 @@ int main(int argc, char* argv[])
     float fmin = fmax - (float)nf;
     
     
-    fdmt_dtype* din = malloc(sizeof(fdmt_dtype)*nd*nf*nbeams);
-    fdmt_dtype* dout = malloc(sizeof(fdmt_dtype)*nd*nf*nbeams);
+    fdmt_dtype* din = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*nd*nf*nbeams);
+    fdmt_dtype* dout = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*nd*nf*nbeams);
     printf("Starting!\n");
     
     if (argc != 3) {

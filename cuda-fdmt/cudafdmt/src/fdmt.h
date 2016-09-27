@@ -15,6 +15,7 @@
 #include <string.h>
 #include "array.h"
 #include "cpu_kernels.h"
+#include "gpu_kernels.h"
 
 #define DUMP_STATE 1
 
@@ -100,12 +101,11 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nb
   fdmt->state_size = fdmt->nbeams * fdmt->nf*fdmt->delta_t * fdmt->max_dt;
   fdmt->state_nbytes = fdmt->state_size * sizeof(fdmt_dtype);
   for (int s = 0; s < 2; s++) {
-    fdmt->states[s].d = malloc(fdmt->state_nbytes);
     fdmt->states[s].nw = fdmt->nbeams;
     fdmt->states[s].nx = fdmt->max_dt;
     fdmt->states[s].ny = fdmt->delta_t;
     fdmt->states[s].nz = fdmt->nf;
-    assert(fdmt->states[s].d != NULL);
+    array4d_malloc(&fdmt->states[s]);
   }
   
   return 0;
@@ -192,13 +192,14 @@ int fdmt_iteration(const fdmt_t* fdmt,
   outdata->ny = delta_t + 1;
   outdata->nz = indata->nz;
   
-  assert(outdata->nw * outdata->nx * outdata->ny * outdata->nz <= fdmt->state_size);
+  assert(array4d_size(outdata) <= fdmt->state_size);
   
   //    printf("iteration %d df %f delta_f %f delta_t %d output nx=%d ny=%d nz%d\n",
   //           iteration_num, df, delta_f, delta_t, outdata->nx, outdata->ny, outdata->nz);
   
   // zero that output baby
   bzero(outdata->d, outdata->nw*outdata->nx * outdata->ny * outdata->nz * sizeof(fdmt_dtype));
+  array4d_cuda_memset(outdata, 0);
   
   int shift_input = 0; // ?
   int shift_output = 0; // ?
@@ -249,7 +250,7 @@ int fdmt_iteration(const fdmt_t* fdmt,
 	  // This needs to be fixed for more careful time overlapping
 	  coord3_t dst_start = {.x = iif, .y = idt+shift_output, .z = 0};
 	  coord3_t src1_start = {.x = 2*iif, .y = dt_middle_index, .z = 0};
-	  array_cpu_copy1(outdata, indata, &dst_start, &src1_start, dt_middle_larger);
+	  array_gpu_copy1(outdata, indata, &dst_start, &src1_start, dt_middle_larger);
 	  //cpu_copy2(&outdata->d[outidx + itmin], &indata->d[inidx1 + itmin], (itmax - itmin));
 	  //for (int i = itmin; i < itmax; i++) {
 	  //outdata->d[outidx + i] = indata->d[inidx1 + i];
@@ -275,7 +276,7 @@ int fdmt_iteration(const fdmt_t* fdmt,
 
 		//int inidx2 = array4d_idx(indata, beam, 2*iif+1, dt_rest_index, 0) - dt_middle_larger;
 
-		array_cpu_sum1(outdata, indata, &dst_start, &src1_start, &src2_start, zcount);
+		array_gpu_sum1(outdata, indata, &dst_start, &src1_start, &src2_start, zcount);
 
 		//for(int i = itmin; i < itmax; i++) {
 		//  outdata->d[outidx + i] = indata->d[inidx1 + i] + indata->d[inidx2 + i];
@@ -290,7 +291,7 @@ int fdmt_iteration(const fdmt_t* fdmt,
 		//for(int i = itmin; i < itmax; i++) {
 		//  outdata->d[outidx + i] = indata->d[inidx1 + i];
 		//	}
-		  array_cpu_copy1(outdata, indata, &dst_start, &src1_start, zcount);
+		  array_gpu_copy1(outdata, indata, &dst_start, &src1_start, zcount);
 	  }
 	}
 
@@ -314,7 +315,8 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
   // Start that puppy up
   int s = 0;
   fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
-  
+  array4d_copy_to_device(&fdmt->states[s]);
+
 #ifdef DUMP_STATE
   char buf[128];
   sprintf(buf, "state_s%d.dat", 0);
@@ -332,16 +334,20 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
     s = (s + 1) % 2;
     if (iter == fdmt->order) {
       newstate = &outstate;
-      //printf("Setting outstate\n");
+      newstate->d_device = fdmt->states[s].d_device;
+      printf("Setting outstate\n");
     } else {
       newstate = &fdmt->states[s];
     }
     fdmt_iteration(fdmt, iter, currstate, newstate);
 #ifdef DUMP_STATE
+    array4d_copy_to_host(newstate);
     sprintf(buf, "state_s%d.dat", iter);
     array4d_dump(newstate, buf);
 #endif
     
+
+
     //printf("Finisehd iteration %d\n", iter);
     
   }

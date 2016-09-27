@@ -12,6 +12,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include "cuda_utils.h"
 
 #define MAX_DIMS 5
 
@@ -22,6 +25,7 @@ typedef struct _array2df
   int nx;
   int ny;
   fdmt_dtype* d;
+  fdmt_dtype* d_device;
 } array2d_t;
 
 typedef struct _array3df
@@ -30,6 +34,7 @@ typedef struct _array3df
   int ny;
   int nz;
   fdmt_dtype* d;
+  fdmt_dtype* d_device;
 } array3d_t;
 
 typedef struct _array4df
@@ -39,6 +44,7 @@ typedef struct _array4df
   int ny;
   int nz;
   fdmt_dtype* d;
+  fdmt_dtype* d_device;
 } array4d_t;
 
 typedef struct _arraynd
@@ -46,6 +52,7 @@ typedef struct _arraynd
 	int shape[MAX_DIMS];
 	int ndim;
 	fdmt_dtype* d;
+	fdmt_dtype* d_device;
 } arraynd_t;
 
 typedef struct _coord3 {
@@ -87,12 +94,46 @@ int arraynd_idx(const arraynd_t *a, ...)
 
 int array4d_idx(const array4d_t* a, int w, int x, int y, int z)
 {
-  assert(w >=0 && w < a->nw);
+  //assert(w >=0 && w < a->nw);
   assert(x >=0 && x < a->nx);
   assert(y >=0 && y < a->ny);
   assert(z >=0 && z < a->nz);
   int idx = z + a->nz*(y + a->ny*(x + w*a->nx));
   return idx;
+}
+
+size_t array4d_size(const array4d_t* a)
+{
+	return a->nw * a->nx * a->ny * a->nz;
+}
+
+int array4d_malloc(array4d_t* a)
+{
+	int size = array4d_size(a);
+	a->d = (fdmt_dtype*) malloc(size*sizeof(fdmt_dtype));
+    assert(a->d != NULL);
+    gpuErrchk( cudaMalloc((void**) &a->d_device, size*sizeof(fdmt_dtype) ));
+    return size;
+}
+
+int array4d_copy_to_host(array4d_t* a)
+{
+	size_t size = array4d_size(a);
+	printf("Size %d", size);
+	gpuErrchk(cudaMemcpy(a->d, a->d_device, size*sizeof(fdmt_dtype), cudaMemcpyDeviceToHost));
+	return size;
+}
+
+int array4d_cuda_memset(array4d_t*a, char c) {
+	size_t size = array4d_size(a);
+	gpuErrchk(cudaMemset(a->d_device, c, size*sizeof(fdmt_dtype)));
+}
+
+int array4d_copy_to_device(array4d_t* a)
+{
+	size_t size = array4d_size(a);
+	gpuErrchk(cudaMemcpy(a->d_device, a->d, size*sizeof(fdmt_dtype), cudaMemcpyHostToDevice));
+	return size;
 }
 
 int array3d_idx(const array3d_t* a, int x, int y, int z)
