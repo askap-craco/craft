@@ -19,8 +19,6 @@ __host__ __device__ float isquaref(const float f)
   return 1.0f/(f*f);
 }
 
-
-
 __host__ __device__ float cff(float f1_start, float f1_end, float f2_start, float f2_end)
 {
   float rf = (isquaref(f1_start) - isquaref(f1_end))/(isquaref(f2_start) - isquaref(f2_end));

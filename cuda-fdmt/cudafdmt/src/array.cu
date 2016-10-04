@@ -43,7 +43,7 @@ int array4d_idx(const array4d_t* a, int w, int x, int y, int z)
   return idx;
 }
 
-size_t array4d_size(const array4d_t* a)
+__host__ __device__ size_t array4d_size(const array4d_t* a)
 {
 	return a->nw * a->nx * a->ny * a->nz;
 }

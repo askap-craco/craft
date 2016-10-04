@@ -25,6 +25,9 @@ mode_to_nbits = (16, 8, 2, 1)
 SAMP_RATE = 1e6*32./27.
 NCHANS = 8
 
+def coherent_disperse():
+    h = np.exp(2*pi*1j*d/(f + f0))
+
 
 def _main():
     from argparse import ArgumentParser
@@ -110,7 +113,8 @@ def make_header(values):
     nwords = values.nsamps / nbits_per_samp
     fpga_id = 1
     cardno = 2
-    freqs = np.arange(1200,1200+9)
+    freqs = np.linspace(1200, 1208, NCHANS, endpoint=True)
+    assert len(freqs) == NCHANS
     now = datetime.datetime.utcnow()
     now = now.replace(tzinfo=pytz.UTC)
     now_bat = aktime.utcDt2bat(now)
@@ -132,8 +136,9 @@ def make_header(values):
     h += 'SAMP_RATE', SAMP_RATE, 'Sample rate in samples per second'
     h += 'CRAFT_MODE', values.mode, 'The craft mode which describes the applicable bit depth (hex) among other things'
     h += 'NWORDS', nwords, 'The number of words downloaded'
-    h += 'NSAMPS', values.nsamps, ' The number of individual samples downloaded'
+    h += 'NSAMPS', values.nsamps, ' The number of samples downloaded'
     h += 'NBITS', nbits_per_samp, 'Number of bits per complex sample'
+    h += 'OVERSAMPLING', '32/27', 'Oversampling factor (N/M)'
     h += 'BEAMID', values.beamid, 'The beam ID requested for the download *0-71, I think*'
     h += 'START_WRITE_BAT32', hex(start_bat32), 'Lowest 32 bits of BAT of the start of the buffer (hex) - direct from hardware'
     h += 'FINISH_WRITE_BAT32', hex(finish_bat32), 'Lowest 32 bits of BAT of the end of the buffer (hex)'
@@ -143,8 +148,10 @@ def make_header(values):
     h += 'TRIGGER_FRAMEID', trigger_frameid, 'Frame When the trigger occurred (decimal)'
     h += 'FPGA_ID', fpga_id, 'The FPGA from which this data was downloaded'
     h += 'CARD_NO', cardno, 'The card number from which this data was downloaded'
+    h += 'ANT', 'AK%02d' % values.antenna, 'Antenna name (AKNN)'
     h += 'ANTENNA_NO', values.antenna, 'The antenna number from which this data was downloaded 1-36'
-    h += 'FREQS', ','.join(map(str,freqs)), 'Comma separated list of frequencies applying to each of 8 channels in this file(MHz)'
+    h += 'NCHANS', NCHANS, 'Number of frequency channels'
+    h += 'FREQS', ','.join(map(str,freqs)), 'Comma separated list of frequencies applying to each of channels in this file(MHz)'
     h += 'UTC_NOW', now.isoformat(), 'UTC date stamp for when the file was written (ISO format)'
     h += 'MJD_NOW', now_time.mjd, 'MJD date stamp for when the file was written'
     h += 'BAT_NOW', hex(now_bat), 'Current BAT all bits (hex)'
