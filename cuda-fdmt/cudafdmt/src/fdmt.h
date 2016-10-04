@@ -17,7 +17,7 @@
 #include "cpu_kernels.h"
 #include "gpu_kernels.h"
 
-#define DUMP_STATE 1
+//#define DUMP_STATE 1
 
 
 float squaref(const float f)
@@ -240,9 +240,9 @@ int fdmt_iteration(const fdmt_t* fdmt,
 	  //int inidx1  = array4d_idx(indata, beam, 2*iif, dt_middle_index, 0);
 
 
-	  printf("iteration %d channel %d freq %f idt %d dt_local "
-			  "%d dt_middle %d dt_middle_larger %d dt_rest %d\n",
-			  iteration_num, iif, f_middle, idt, delta_t_local, dt_middle_index, dt_middle_larger, dt_rest_index);
+	  //printf("iteration %d channel %d freq %f idt %d dt_local "
+		//	  "%d dt_middle %d dt_middle_larger %d dt_rest %d\n",
+		//	  iteration_num, iif, f_middle, idt, delta_t_local, dt_middle_index, dt_middle_larger, dt_rest_index);
 
 	  // Here we handle the edge effects and set
 	  // OUtput state[freq, idx, 0:dtmin] = input_state[2xfreq, dt_middle, 0:dtmin]

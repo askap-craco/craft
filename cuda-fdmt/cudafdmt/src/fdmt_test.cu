@@ -8,7 +8,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
 #include "fdmt.h"
+#include "CudaTimer.h"
+
+using namespace std;
 
 
 int main(int argc, char* argv[])
@@ -45,9 +49,16 @@ int main(int argc, char* argv[])
     fdmt_t fdmt;
     fdmt_create(&fdmt, fmin, fmax, nf, nd, nbeams);
     
+    CudaTimer t;
+    t.start();
     for(int i = 0; i < 1; i++) {
         fdmt_execute(&fdmt, din, dout);
     }
+    t.stop();
+    t.sync_stop();
+    cout << "FDMT took " << t << endl;
+
+
     
     FILE* fout = fopen(argv[2], "w");
     if (fout == NULL) {
