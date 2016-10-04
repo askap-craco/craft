@@ -301,7 +301,9 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
       newstate = &fdmt->states[s];
     }
     fdmt_iteration(fdmt, iter, currstate, newstate);
-    cuda_fdmt_iteration<<<fdmt->nbeams, fdmt->max_dt >>>(*fdmt, iter, *currstate, *newstate);
+
+    //cuda_fdmt_iteration<<<fdmt->nbeams, fdmt->max_dt >>>(*fdmt, iter, *currstate, *newstate);
+    gpuErrchk(cudaDeviceSynchronize());
 #ifdef DUMP_STATE
     array4d_copy_to_host(newstate);
     sprintf(buf, "state_s%d.dat", iter);
