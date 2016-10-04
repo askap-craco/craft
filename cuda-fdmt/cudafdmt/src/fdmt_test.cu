@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include "fdmt.h"
+#include "cuda_fdmt.h"
 #include "CudaTimer.h"
 
 using namespace std;
@@ -17,9 +18,9 @@ using namespace std;
 
 int main(int argc, char* argv[])
 {
-    int nd = 511;
-    int nf = 511;
-    int nbeams = 1;
+    int nd = 336;
+    int nf = 336;
+    int nbeams = 36*6;
     
     float fmax = 1600.;
     float fmin = fmax - (float)nf;
@@ -44,6 +45,12 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
     fread(din, sizeof(fdmt_dtype), nd*nf, fin);
+
+    // copy to all beams
+    for(int b = 1; b < nbeams; b++) {
+    	int idx = b*nd*nf;
+    	memcpy(&din[idx], din, nd*nf*sizeof(fdmt_dtype));
+    }
     fclose(fin);
     
     fdmt_t fdmt;

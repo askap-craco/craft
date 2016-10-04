@@ -48,7 +48,7 @@ def make_signal(f_min = 1200., f_max = 1600, N_bins = 40, N_t = 512, N_f = 512, 
     N_total = N_f*N_t*N_bins
     PulseLength = N_f*N_bins
     PulseSig = 0.4
-    PulsePosition = 4134567
+    PulsePosition = 4134567/2
     maxDT = N_t
     
     PDB("Signal preparation")
@@ -84,16 +84,16 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     tint = 0.1
-    nf = 511
-    nt = 511
+    nf = 336
+    nt = 336
     fmin = 1200.
-    fmax = 1600.
+    fmax = fmin + float(nf)
     if os.path.exists('test.in'):
         d = np.fromfile('test.in', dtype=np.float32, count=nf*nt)
         d.shape = (nf, nt)
     else:
         with open('test.in', 'w') as fout:
-            d = make_signal(fmin, fmax, 40, nt, nf, D=5)
+            d = make_signal(fmin, fmax, 40, nt, nf, D=3)
             d.astype(np.float32).tofile(fout)
 
     nf, nt = d.shape
