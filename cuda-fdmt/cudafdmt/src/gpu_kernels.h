@@ -20,7 +20,7 @@ __global__ void delay_sum1(float* in, float* out, int dt)
 	int nchans = gridDim.y;
 }
 
-__global__ void _array_gpu_copy_kernel(float* dst, float* src, int dst_stride, int src_stride)
+__global__ void _array_gpu_copy_kernel(fdmt_dtype* dst, fdmt_dtype* src, int dst_stride, int src_stride)
 {
 	int beam = blockIdx.x;
 	int t = threadIdx.x;
@@ -29,7 +29,7 @@ __global__ void _array_gpu_copy_kernel(float* dst, float* src, int dst_stride, i
 	dst[dstidxi] = src[srcidxi];
 }
 
-__global__ void _array_gpu_sum_kernel(float* dst, float* src1, float* src2, int dst_stride, int src_stride)
+__global__ void _array_gpu_sum_kernel(fdmt_dtype* dst, fdmt_dtype* src1, fdmt_dtype* src2, int dst_stride, int src_stride)
 {
 	int beam = blockIdx.x;
 	int t = threadIdx.x;

@@ -53,7 +53,9 @@ int array4d_malloc(array4d_t* a)
 	int size = array4d_size(a);
 	a->d = (fdmt_dtype*) malloc(size*sizeof(fdmt_dtype));
     assert(a->d != NULL);
+    printf("Before cudamalloc %d\n", size);
     gpuErrchk( cudaMalloc((void**) &a->d_device, size*sizeof(fdmt_dtype) ));
+    printf("after cudamalloc\n");
     return size;
 }
 

@@ -11,12 +11,12 @@
 #include "fdmt.h"
 #include "array.h"
 
-void __global__ cuda_fdmt_iteration(fdmt_t fdmt,
+void __global__ cuda_fdmt_iteration1(fdmt_t fdmt,
                    int iteration_num,
                    array4d_t indata,
                    array4d_t outdata);
 
 
-
+//__host__ void cuda_fdmt_iteration2(fdmt_t* fdmt, const int iteration_num, array4d_t* indata, array4d_t* outdata);
 
 #endif /* CUDA_FDMT_H_ */
