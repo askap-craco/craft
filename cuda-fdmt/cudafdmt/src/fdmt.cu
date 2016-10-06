@@ -210,6 +210,8 @@ int fdmt_iteration(const fdmt_t* fdmt,
 			// This needs to be fixed for more careful time overlapping
 			coord3_t dst_start = {.x = iif, .y = idt+shift_output, .z = 0};
 			coord3_t src1_start = {.x = 2*iif, .y = dt_middle_index, .z = 0};
+			
+			// NB: Thisis run wit zcounts of 0, 1 and 2 - which break
 			array_gpu_copy1(outdata, indata, &dst_start, &src1_start, dt_middle_larger);
 			//cpu_copy2(&outdata->d[outidx + itmin], &indata->d[inidx1 + itmin], (itmax - itmin));
 			//for (int i = itmin; i < itmax; i++) {
@@ -236,7 +238,7 @@ int fdmt_iteration(const fdmt_t* fdmt,
 
 				//int inidx2 = array4d_idx(indata, beam, 2*iif+1, dt_rest_index, 0) - dt_middle_larger;
 
-				array_gpu_sum1(outdata, indata, &dst_start, &src1_start, &src2_start, zcount);
+			        array_gpu_sum1(outdata, indata, &dst_start, &src1_start, &src2_start, zcount);
 
 				//for(int i = itmin; i < itmax; i++) {
 				//  outdata->d[outidx + i] = indata->d[inidx1 + i] + indata->d[inidx2 + i];
@@ -251,7 +253,7 @@ int fdmt_iteration(const fdmt_t* fdmt,
 				//for(int i = itmin; i < itmax; i++) {
 				//  outdata->d[outidx + i] = indata->d[inidx1 + i];
 				//	}
-				array_gpu_copy1(outdata, indata, &dst_start, &src1_start, zcount);
+			        array_gpu_copy1(outdata, indata, &dst_start, &src1_start, zcount);
 			}
 		}
 
@@ -519,6 +521,8 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 
 		dim3 grid_shape(fdmt->nbeams, 1); // grid is (nbeams x nchannels wide)
 		cuda_fdmt_iteration_kernel4<<<grid_shape, fdmt->max_dt>>>(delta_t_local, indata->d_device, outdata->d_device, 1, 1);
+		gpuErrchk(cudaPeekAtLastError());
+
 
 //		// For each DM relevant for this subband
 //		for (int idt = 0; idt < delta_t_local; idt++) {
@@ -622,19 +626,17 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 		} else {
 			newstate = &fdmt->states[s];
 		}
-		fdmt_iteration(fdmt, iter, currstate, newstate);
 
-		//cuda_fdmt_iteration4(fdmt, iter, currstate, newstate);
+		///fdmt_iteration(fdmt, iter, currstate, newstate);
 
+		cuda_fdmt_iteration4(fdmt, iter, currstate, newstate);
+		gpuErrchk(cudaPeekAtLastError());
 		gpuErrchk(cudaDeviceSynchronize());
 #ifdef DUMP_STATE
 		array4d_copy_to_host(newstate);
 		sprintf(buf, "state_s%d.dat", iter);
 		array4d_dump(newstate, buf);
 #endif
-
-
-
 		//printf("Finisehd iteration %d\n", iter);
 
 	}

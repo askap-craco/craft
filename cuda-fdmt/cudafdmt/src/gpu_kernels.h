@@ -9,6 +9,9 @@
 #define GPU_KERNELS_H_
 
 #include <cuda.h>
+#include <iostream>
+
+using namespace std;
 
 // Simple delay & sum over multiple dimensions
 // Assumes BFDT ordering
@@ -40,12 +43,20 @@ __global__ void _array_gpu_sum_kernel(fdmt_dtype* dst, fdmt_dtype* src1, fdmt_dt
 
 __host__ void array_gpu_copy1(array4d_t* dst, const array4d_t* src, coord3_t* dstidx, coord3_t* srcidx, int zcount)
 {
+         // zcount = 0 will crash with "invalid configuration argument" on compute capability 2.0 (e.g. GTX 590)
+         // Catch and return here
+        if (zcount == 0) {
+	  return;
+	}
+        assert(zcount > 1);
 	int src_offset = array4d_idx(src, 0, srcidx->x, srcidx->y, srcidx->z);
 	int src_stride = array4d_idx(src, 1, 0, 0, 0);
 	int dst_offset = array4d_idx(dst, 0, dstidx->x, dstidx->y, dstidx->z);
 	int dst_stride = array4d_idx(dst, 1, 0, 0, 0);
 
 	int nbeams = dst->nw;
+
+	//cout << "array gpu copy nbeams " << nbeams << " zcount " << zcount << endl;
 
 	_array_gpu_copy_kernel<<<nbeams, zcount>>>(dst->d_device + dst_offset, src->d_device + src_offset, dst_stride, src_stride);
 }
@@ -60,6 +71,8 @@ __host__  void array_gpu_sum1(array4d_t* dst, const array4d_t* src, coord3_t* ds
 	int dst_stride = array4d_idx(dst, 1, 0, 0, 0);
 
 	int nbeams = dst->nw;
+
+	///cout << "Array gpu sum1 nbeams " << nbeams << " zcount " << zcount << endl;
 
 	_array_gpu_sum_kernel<<<nbeams, zcount>>>(dst->d_device + dst_offset, src->d_device + src1_offset, src->d_device + src2_offset, dst_stride, src_stride);
 
