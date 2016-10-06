@@ -50,8 +50,9 @@ __host__ __device__ size_t array4d_size(const array4d_t* a)
 
 int array4d_malloc(array4d_t* a)
 {
-	int size = array4d_size(a);
-	a->d = (fdmt_dtype*) malloc(size*sizeof(fdmt_dtype));
+    int size = array4d_size(a);
+    gpuErrchk(cudaMallocHost((void**) &a->d, size*sizeof(fdmt_dtype)));
+    //    a->d = (fdmt_dtype*) malloc(size*sizeof(fdmt_dtype));
     assert(a->d != NULL);
     printf("Before cudamalloc %d\n", size);
     gpuErrchk( cudaMalloc((void**) &a->d_device, size*sizeof(fdmt_dtype) ));
