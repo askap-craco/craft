@@ -33,12 +33,12 @@ int arraynd_idx(const arraynd_t *a, ...)
 	return idx;
 }
 
-int array4d_idx(const array4d_t* a, int w, int x, int y, int z)
+__host__ __device__ int array4d_idx(const array4d_t* a, int w, int x, int y, int z)
 {
   //assert(w >=0 && w < a->nw);
-  assert(x >=0 && x < a->nx);
-  assert(y >=0 && y < a->ny);
-  assert(z >=0 && z < a->nz);
+//  assert(x >=0 && x < a->nx);
+//  assert(y >=0 && y < a->ny);
+//  assert(z >=0 && z < a->nz);
   int idx = z + a->nz*(y + a->ny*(x + w*a->nx));
   return idx;
 }

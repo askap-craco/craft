@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
 {
     int nd = 512;
     int nf = 512;
-    int nbeams = 36*12;
+    int nbeams = 36*6;
     
     float fmax = 1600.;
     float fmin = fmax - (float)nf;
@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
     }
     t.stop();
     t.sync_stop();
-    cout << "FDMT took " << t << endl;
+    cout << "Copy  + FDMT took " << t << endl;
 
 
     
