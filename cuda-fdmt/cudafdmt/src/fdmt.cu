@@ -465,7 +465,7 @@ __global__ void cuda_fdmt_iteration_kernel4(int delta_t_local, fdmt_dtype* indat
 	fdmt_dtype* inp2 = indata + boff;
 	for (int idt = 0; idt < delta_t_local; idt++ ) {
 		// TODO: Lookup offset from texture memory
-		int src2offset = 1;
+                int src2offset = delta_t_local;
 		*outp = (*inp1) + *(inp2 + src2offset);
 		outp += dst_stride;
 		inp1 += src_stride;
@@ -600,7 +600,13 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	// Start that puppy up
 	int s = 0;
 	fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
+	CudaTimer tc;
+	tc.start();
 	array4d_copy_to_device(&fdmt->states[s]);
+	tc.stop();
+	tc.sync_stop();
+	cout << "Copy took " << tc << endl;
+	
 
 #ifdef DUMP_STATE
 	char buf[128];

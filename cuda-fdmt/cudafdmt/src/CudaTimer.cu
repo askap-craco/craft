@@ -23,8 +23,11 @@ void CudaTimer::start() {
 	gpuErrchk(cudaEventRecord(m_start, m_stream));
 }
 
-void CudaTimer::stop() {
+void CudaTimer::stop(bool sync) {
 	gpuErrchk(cudaEventRecord(m_stop, m_stream));
+	if (sync) {
+	   sync_stop();
+	}
 }
 
 void CudaTimer::sync_start() {

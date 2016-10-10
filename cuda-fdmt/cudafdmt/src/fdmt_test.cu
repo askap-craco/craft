@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
     }
     t.stop();
     t.sync_stop();
-    cout << "Copy  + FDMT took " << t << endl;
+    cout << "FDMT Execute loop took " << t << endl;
 
 
     

@@ -20,7 +20,7 @@ public:
 	virtual ~CudaTimer();
 
 	void start();
-	void stop();
+	void stop(bool sync=true);
 	void sync_start();
 	void sync_stop();
 	float get_elapsed_time();
