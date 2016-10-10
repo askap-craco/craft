@@ -28,45 +28,62 @@ using namespace std;
 class FdmtIteration
 {
 public:
-	FdmtIteration::FdmtIteration()
+
+	vector<Array2d<int>* > dt_data;
+	vector<int> delta_ts;
+	coord4_t state_shape;
+
+	FdmtIteration()
 	{
 
 	}
 
-	FdmtIteration::FdmtIteration(int nbeam, int nf, int ndt, int nt) {
-		//dt_middle_larger = vector<Array1d<int> >();
-		//dt_middle_index = vector<Array1d<int> >();
-		//dt_rest_index = vector<Array1d<int> >();
+	FdmtIteration(int nbeam, int nf, int ndt, int nt) {
 		state_shape.w = nbeam;
 		state_shape.x = nf;
 		state_shape.y = ndt;
 		state_shape.z = nt;
 	}
 
-	vector<Array1d<int> > dt_middle_larger;
-	vector<Array1d<int> > dt_middle_index;
-	vector<Array1d<int> > dt_rest_index;
-	vector<int> delta_ts;
-	coord4_t state_shape;
-	void add_subband(int delta_t) {
-		dt_middle_larger.push_back(Array1d<int>(delta_t));
-		dt_middle_index.push_back(Array1d<int>(delta_t));
-		dt_middle_index.push_back(Array1d<int>(delta_t));
+
+	__host__ void add_subband(int delta_t) {
+		printf("Adding subband with dt=%d size=%d\n", delta_t, delta_ts.size());
+		dt_data.push_back(new Array2d<int>(delta_t, 3));
 		delta_ts.push_back(delta_t);
+		printf("Added subband with dt=%d size=%d\n", delta_t, delta_ts.size());
+
 	}
 
-	void save_subband_values(int idt, int _dt_middle_index, int _dt_middle_larger, int _dt_rest_index) {
-		int idx = dt_middle_larger.size() - 1;
-		dt_middle_larger[idx][idt] = _dt_middle_larger;
-		dt_middle_index[idx][idt] = _dt_middle_index;
-		dt_rest_index[idx][idt] = _dt_rest_index;
+	__host__ void save_subband_values(int idt, int _dt_middle_index, int _dt_middle_larger, int _dt_rest_index) {
+		//int idx = dt_middle_larger.size() - 1;
+		//*(dt_middle_larger[idx])[idt] = _dt_middle_larger;
+		//*(dt_middle_index[idx])[idt] = _dt_middle_index;
+		//*(dt_rest_index[idx])[idt] = _dt_rest_index;
+		int idx = dt_data.size() -1;
+
+		printf("Subband %d %d %d = %d %d %d\n", idx, idt, dt_data.size(), _dt_middle_larger, _dt_middle_index, _dt_rest_index);
+
+		Array2d<int>* dts = dt_data.back();
+		//(*dts)(idx, 0) = _dt_middle_larger;
+		//(*dts)(idx, 1) = _dt_middle_index;
+		//(*dts)(idx, 2) = _dt_rest_index;
+		dts->set_host(idt, 0, _dt_middle_larger);
+		dts->set_host(idt, 1, _dt_middle_index);
+		dts->set_host(idt, 2, _dt_rest_index);
+
+		printf("Subband saved %d %d = %d %d %d\n", idx, idt, _dt_middle_larger, _dt_middle_index, _dt_rest_index);
+
+
 	}
 
-	void copy_to_device() {
-		for(int i = 0 ; i < dt_middle_larger.size(); i++) {
-			dt_middle_larger[i].copy_to_device();
-			dt_middle_index[i].copy_to_device();
-			dt_rest_index[i].copy_to_device();
+	__host__ void copy_to_device() {
+		for(int i = 0 ; i < dt_data.size(); i++) {
+//			dt_middle_larger[i]->copy_to_device();
+//			dt_middle_index[i]->copy_to_device();
+//			dt_rest_index[i]->copy_to_device();
+			Array2d<int>* dts = dt_data.at(i);
+			dts->copy_to_device();
+
 		}
 	}
 };
@@ -87,7 +104,8 @@ typedef struct _fdmt_t
 	array4d_t states[2]; // iteration states
 	int state_nbytes; // number of bytes in state
 	int state_size; // number of elements in state
-	FdmtIteration iterations[MAX_ITER]; // description of what happens for each iteration
+	//FdmtIteration* iterations[MAX_ITER]; // description of what happens for each iteration
+	vector<FdmtIteration* > iterations;
 } fdmt_t;
 
 float dm_delay(const float f1, const float f2) ;

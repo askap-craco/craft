@@ -57,9 +57,8 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 	//FdmtIteration* iter = &fdmt->iterations[iteration_num-1];
 	int nf = insize->x/2 + insize->x % 2; // Add 1 to the frequency dimension if it's not divisible by 2
 	int ndt = delta_t + 1;
-
-	fdmt->iterations[iteration_num - 1] = FdmtIteration(insize->w, nf, ndt, insize->z);
-	FdmtIteration* iter = &fdmt->iterations[iteration_num-1];
+	FdmtIteration* iter = new FdmtIteration(insize->w, nf, ndt, insize->z);
+	fdmt->iterations.push_back(iter);
 
 	// Outdata has size (nbeams, o_nf, o_nd1, fdmt->nt
 
@@ -87,6 +86,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 		// Max DM for this subband
 		int delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
+
 		iter->add_subband(delta_t_local);
 
 		// For each DM relevant for this subband
@@ -98,7 +98,6 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			int dt_rest = idt - dt_middle_larger;
 			int dt_rest_index = dt_rest + shift_input;
 			iter->save_subband_values(idt, dt_middle_index, dt_middle_larger, dt_rest_index);
-
 		}
 	}
 	iter->copy_to_device();
@@ -154,9 +153,8 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nb
 	state_shape.w = fdmt->delta_t;
 	state_shape.z = fdmt->max_dt;
 	for (int iiter = 1; iiter < fdmt->order+1; iiter++) {
-//		fdmt_save_iteration(fdmt, iiter, &state_shape);
-//		FdmtIteration* iter = &fdmt->iterations[iiter-1];
-//		state_shape = iter->state_shape;
+		FdmtIteration* iter = fdmt_save_iteration(fdmt, iiter, &state_shape);
+		state_shape = iter->state_shape;
 	}
 
 	return 0;
