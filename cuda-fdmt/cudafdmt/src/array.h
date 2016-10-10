@@ -74,6 +74,9 @@ int array4d_copy_to_host(array4d_t* a);
 int array4d_cuda_memset(array4d_t*a, char c) ;
 int array4d_copy_to_device(array4d_t* a);
 
+int array2d_malloc(array2d_t* a);
+int array2d_copy_to_device(array2d_t* a);
+
 __host__ __device__ size_t array4d_size(const array4d_t* a);
 __host__ __device__ int array4d_idx(const array4d_t* a, int w, int x, int y, int z);
 __host__ __device__ int array3d_idx(const array3d_t* a, int x, int y, int z);

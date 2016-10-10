@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
     int nf = 512;
     int nbeams = 36*6;
     
-    float fmax = 1600.;
+    float fmax = 1400.;
     float fmin = fmax - (float)nf;
     
     

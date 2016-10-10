@@ -48,14 +48,27 @@ __host__ __device__ size_t array4d_size(const array4d_t* a)
 	return a->nw * a->nx * a->ny * a->nz;
 }
 
+__host__ __device__ size_t array2d_size(const array2d_t* a)
+{
+	return  a->nx * a->ny;
+}
+
+
 int array4d_malloc(array4d_t* a)
 {
-	int size = array4d_size(a);
+	size_t size = array4d_size(a);
 	a->d = (fdmt_dtype*) malloc(size*sizeof(fdmt_dtype));
     assert(a->d != NULL);
-    printf("Before cudamalloc %d\n", size);
     gpuErrchk( cudaMalloc((void**) &a->d_device, size*sizeof(fdmt_dtype) ));
-    printf("after cudamalloc\n");
+    return size;
+}
+
+int array2d_malloc(array2d_t* a)
+{
+	int size = array2d_size(a);
+	a->d = (fdmt_dtype*) malloc(size*sizeof(fdmt_dtype));
+    assert(a->d != NULL);
+    gpuErrchk( cudaMalloc((void**) &a->d_device, size*sizeof(fdmt_dtype) ));
     return size;
 }
 
@@ -70,6 +83,13 @@ int array4d_copy_to_host(array4d_t* a)
 int array4d_cuda_memset(array4d_t*a, char c) {
 	size_t size = array4d_size(a);
 	gpuErrchk(cudaMemset(a->d_device, c, size*sizeof(fdmt_dtype)));
+	return size;
+}
+
+int array2d_copy_to_device(array2d_t* a)
+{
+	size_t size = array2d_size(a);
+	gpuErrchk(cudaMemcpy(a->d_device, a->d, size*sizeof(fdmt_dtype), cudaMemcpyHostToDevice));
 	return size;
 }
 

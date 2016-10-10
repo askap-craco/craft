@@ -7,7 +7,7 @@
 
 
 float dm_delay(const float f1, const float f2) {
-	return 4.14e9*(isquaref(f1) - isquaref(f2));
+	return 4.14e9f*(isquaref(f1) - isquaref(f2));
 }
 
 __host__ __device__ float squaref(const float f)
@@ -23,9 +23,19 @@ __host__ __device__ float isquaref(const float f)
 __host__ __device__ float cff(float f1_start, float f1_end, float f2_start, float f2_end)
 {
 	float rf = (isquaref(f1_start) - isquaref(f1_end))/(isquaref(f2_start) - isquaref(f2_end));
-	//  printf("rff %f %f %f %f %f\n", f1_start, f1_end, f2_start, f2_end, rf);
 
 	return rf;
+}
+
+__device__ inline float cff2(const float f1_start, const float f1_end, const float f2_start)
+{
+	//	float if1 = __frcp_rz(f1_start*f1_start);
+	//	float if2 = __frcp_rz(f1_end*f1_end);
+	//	float if3 = __frcp_rz(f2_start*f2_start);
+	//
+	//	float rf = (if1 - if2)/(if3 - if2);
+
+	return 0.0f;
 }
 
 __host__ __device__ int calc_delta_t(const fdmt_t* fdmt, float f_start, float f_end)
@@ -37,6 +47,65 @@ __host__ __device__ int calc_delta_t(const fdmt_t* fdmt, float f_start, float f_
 	//  printf("delta t: rf %f delta_tf %f delta_t %d\n", rf, delta_tf, delta_t);
 	return delta_t;
 }
+
+__host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_num, const coord4_t* insize)
+{
+	float df = fdmt->df; // channel resolution
+	float delta_f = (float)(1 << iteration_num) * df; // Resolution of current iteration
+	int delta_t = calc_delta_t(fdmt, fdmt->fmin, fdmt->fmin+delta_f); // Max DM
+
+	//FdmtIteration* iter = &fdmt->iterations[iteration_num-1];
+	int nf = insize->x/2 + insize->x % 2; // Add 1 to the frequency dimension if it's not divisible by 2
+	int ndt = delta_t + 1;
+
+	fdmt->iterations[iteration_num - 1] = FdmtIteration(insize->w, nf, ndt, insize->z);
+	FdmtIteration* iter = &fdmt->iterations[iteration_num-1];
+
+	// Outdata has size (nbeams, o_nf, o_nd1, fdmt->nt
+
+	//    printf("iteration %d df %f delta_f %f delta_t %d output nx=%d ny=%d nz%d\n",
+	//           iteration_num, df, delta_f, delta_t, outdata->nx, outdata->ny, outdata->nz);
+
+	int shift_input = 0; // ?
+	int shift_output = 0; // ?
+
+	float fjumps = (float)nf; // Output number of channels
+	float frange = fdmt->fmax - fdmt->fmin; // Width of band
+	float fmin = fdmt->fmin; // Bottom of band
+
+	float correction = 0.0;
+	if (iteration_num > 0) {
+		correction = df/2.0;
+	}
+
+	// For each output sub-band
+	for (int iif = 0; iif < nf; iif++) {
+		float f_start = frange/fjumps * (float)iif + fmin; // Top freq of subband
+		float f_end = frange/fjumps*((float)iif + 1) + fmin; // Bottom freq of subband
+		float f_middle = (f_end - f_start)/2.0 + f_start - correction; // Middle freq of subband, less 0.5xresolution
+		float f_middle_larger = (f_end - f_start)/2.0 + f_start + correction; // Middle freq of subband + 0.5x resolution (helps with rounding)
+
+		// Max DM for this subband
+		int delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
+		iter->add_subband(delta_t_local);
+
+		// For each DM relevant for this subband
+		for (int idt = 0; idt < delta_t_local; idt++) {
+			// calculate parameters that take ages to do on the GPU for reasons not yet understood
+			int dt_middle = roundf(idt * cff(f_middle, f_start, f_end, f_start)); // Dt for middle freq less 0.5xresolution
+			int dt_middle_index = dt_middle + shift_input;
+			int dt_middle_larger = roundf(idt * cff(f_middle_larger, f_start, f_end, f_start)); // Dt for middle freq +0.5x resolution
+			int dt_rest = idt - dt_middle_larger;
+			int dt_rest_index = dt_rest + shift_input;
+			iter->save_subband_values(idt, dt_middle_index, dt_middle_larger, dt_rest_index);
+
+		}
+	}
+	iter->copy_to_device();
+
+	return iter;
+}
+
 
 int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nbeams)
 {
@@ -64,24 +133,37 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nb
 	// In the lowest channel. It is equivalent to the number of Dm trials you need to do
 	// In the lowest channel to get out to the highest DM we asked for.
 	fdmt->delta_t = calc_delta_t(fdmt, fdmt->fmin, fdmt->fmin + fdmt->df);
-	fdmt->delta_t += 1; // Siglhtly different definition to origiinal
+	fdmt->delta_t += 1; // Slightly different definition to origiinal
 
 	// Allocate states as ping-pong buffer
 	fdmt->state_size = fdmt->nbeams * fdmt->nf*fdmt->delta_t * fdmt->max_dt;
 	fdmt->state_nbytes = fdmt->state_size * sizeof(fdmt_dtype);
 	for (int s = 0; s < 2; s++) {
 		fdmt->states[s].nw = fdmt->nbeams;
-		fdmt->states[s].nx = fdmt->max_dt;
+		fdmt->states[s].nx = fdmt->nf;
 		fdmt->states[s].ny = fdmt->delta_t;
-		fdmt->states[s].nz = fdmt->nf;
+		fdmt->states[s].nz = fdmt->max_dt;
 		array4d_malloc(&fdmt->states[s]);
+	}
+
+
+	// save iteration settings
+	coord4_t state_shape;
+	state_shape.w = fdmt->nbeams;
+	state_shape.x = fdmt->nf;
+	state_shape.w = fdmt->delta_t;
+	state_shape.z = fdmt->max_dt;
+	for (int iiter = 1; iiter < fdmt->order+1; iiter++) {
+//		fdmt_save_iteration(fdmt, iiter, &state_shape);
+//		FdmtIteration* iter = &fdmt->iterations[iiter-1];
+//		state_shape = iter->state_shape;
 	}
 
 	return 0;
 }
 
 
-int fdmt_initialise(const fdmt_t* fdmt, array3d_t* indata, array4d_t* state)
+int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* state)
 {
 
 	// indata is 3D array: (nbeams, nf, nt)
@@ -210,7 +292,7 @@ int fdmt_iteration(const fdmt_t* fdmt,
 			// This needs to be fixed for more careful time overlapping
 			coord3_t dst_start = {.x = iif, .y = idt+shift_output, .z = 0};
 			coord3_t src1_start = {.x = 2*iif, .y = dt_middle_index, .z = 0};
-			
+
 			// NB: Thisis run wit zcounts of 0, 1 and 2 - which break
 			array_gpu_copy1(outdata, indata, &dst_start, &src1_start, dt_middle_larger);
 			//cpu_copy2(&outdata->d[outidx + itmin], &indata->d[inidx1 + itmin], (itmax - itmin));
@@ -238,7 +320,7 @@ int fdmt_iteration(const fdmt_t* fdmt,
 
 				//int inidx2 = array4d_idx(indata, beam, 2*iif+1, dt_rest_index, 0) - dt_middle_larger;
 
-			        array_gpu_sum1(outdata, indata, &dst_start, &src1_start, &src2_start, zcount);
+				array_gpu_sum1(outdata, indata, &dst_start, &src1_start, &src2_start, zcount);
 
 				//for(int i = itmin; i < itmax; i++) {
 				//  outdata->d[outidx + i] = indata->d[inidx1 + i] + indata->d[inidx2 + i];
@@ -253,7 +335,7 @@ int fdmt_iteration(const fdmt_t* fdmt,
 				//for(int i = itmin; i < itmax; i++) {
 				//  outdata->d[outidx + i] = indata->d[inidx1 + i];
 				//	}
-			        array_gpu_copy1(outdata, indata, &dst_start, &src1_start, zcount);
+				array_gpu_copy1(outdata, indata, &dst_start, &src1_start, zcount);
 			}
 		}
 
@@ -354,7 +436,6 @@ void __global__ cuda_fdmt_iteration_kernel2(float fmin, float frange, float fjum
 // This version is totally hopeless - apparently it uses 44 register/thread, which makes it painfully slow, as the occupancy is low.
 // launch bonds makes no difference. Gee it's so painfully crap, I'm kindof embarrassed.
 void __global__
-__launch_bounds__(256, 36)
 cuda_fdmt_iteration_kernel3(float fmin, float frange, float fjumps, float correction)
 {
 	int beamno = blockIdx.x;
@@ -370,51 +451,6 @@ cuda_fdmt_iteration_kernel3(float fmin, float frange, float fjumps, float correc
 	int delta_t_local = 7; // TODO: Calculate
 	int shift_input = 0;
 	int shift_output = 0;
-
-
-	//	// For each DM relevant for this subband
-	//	for (int idt = 0; idt < delta_t_local; idt++) {
-	//		int dt_middle = roundf(idt * cff(f_middle, f_start, f_end, f_start)); // Dt for middle freq less 0.5xresolution
-	//		int dt_middle_index = dt_middle + shift_input;
-	//		int dt_middle_larger = roundf(idt * cff(f_middle_larger, f_start, f_end, f_start)); // Dt for middle freq +0.5x resolution
-	//		int dt_rest = idt - dt_middle_larger;
-	//		int dt_rest_index = dt_rest + shift_input;
-	//
-	//		int itmin = 0;
-	//		int itmax = dt_middle_larger;
-	//
-	//		//Output[i_F,i_dT + ShiftOutput,i_T_min:i_T_max] = Input[2*i_F, dT_middle_index,i_T_min:i_T_max];
-	//		//int outidx = array4d_idx(outdata, beam, iif, idt+shift_output, 0);
-	//		//int inidx1  = array4d_idx(indata, beam, 2*iif, dt_middle_index, 0);
-	//
-	//
-	//		//printf("iteration %d channel %d freq %f idt %d dt_local "
-	//		//	  "%d dt_middle %d dt_middle_larger %d dt_rest %d\n",
-	//		//	  iteration_num, iif, f_middle, idt, delta_t_local, dt_middle_index, dt_middle_larger, dt_rest_index);
-	//
-	//		// Here we handle the edge effects and set
-	//		// OUtput state[freq, idx, 0:dtmin] = input_state[2xfreq, dt_middle, 0:dtmin]
-	//		// where the DM would have overun the available times
-	//		// This needs to be fixed for more careful time overlapping
-	//		coord3_t dst_start = {.x = iif, .y = idt+shift_output, .z = 0};
-	//		coord3_t src1_start = {.x = 2*iif, .y = dt_middle_index, .z = 0};
-	//		//		array_gpu_copy1(outdata, indata, &dst_start, &src1_start, dt_middle_larger);
-	//		//cpu_copy2(&outdata->d[outidx + itmin], &indata->d[inidx1 + itmin], (itmax - itmin));
-	//		//for (int i = itmin; i < itmax; i++) {
-	//		//outdata->d[outidx + i] = indata->d[inidx1 + i];
-	//		//}
-	//
-	//
-	//		// Now we work on the remaining times that are guaranteed not to overrun the input dimensions
-	//		itmin = dt_middle_larger;
-	//		itmax = max_dt;
-	//
-	//		coord3_t src2_start = {.x = 2*iif + 1, .y = dt_rest_index, .z = 0};
-	//		// src and dst now start from a bit offset
-	//		src1_start.z = dt_middle_larger;
-	//		dst_start.z = dt_middle_larger;
-	//		int zcount = itmax - itmin;
-	//	}
 }
 
 __host__ void cuda_fdmt_iteration3(const fdmt_t* fdmt, const int iteration_num, const array4d_t* indata, array4d_t* outdata)
@@ -453,7 +489,16 @@ __host__ void cuda_fdmt_iteration3(const fdmt_t* fdmt, const int iteration_num, 
 	cuda_fdmt_iteration_kernel3<<<grid_shape, fdmt->max_dt>>>( fmin,  frange,  fjumps,  correction); // loops over all beams, subbands and dts
 }
 
-__global__ void cuda_fdmt_iteration_kernel4(int delta_t_local, fdmt_dtype* indata, fdmt_dtype* outdata, int src_stride, int dst_stride)
+__global__ void cuda_fdmt_iteration_kernel4(int delta_t_local,
+		const fdmt_dtype* __restrict__ indata,
+		fdmt_dtype*  __restrict__ outdata,
+		int src_stride,
+		int dst_stride,
+		float f_middle,
+		float f_middle_larger,
+		float f_start,
+		float f_end)
+
 {
 	int beamno = blockIdx.x;
 	int iif = blockIdx.y;
@@ -461,10 +506,10 @@ __global__ void cuda_fdmt_iteration_kernel4(int delta_t_local, fdmt_dtype* indat
 	int block_stride = blockDim.x;
 	int boff = beamno*block_stride + t;
 	fdmt_dtype* outp = outdata + boff;
-	fdmt_dtype* inp1 = indata + boff;
-	fdmt_dtype* inp2 = indata + boff;
+	const fdmt_dtype* inp1 = indata + boff;
+	const fdmt_dtype* inp2 = indata + boff;
 	for (int idt = 0; idt < delta_t_local; idt++ ) {
-		// TODO: Lookup offset from texture memory
+		// TODO: Lookup from texture memory.
 		int src2offset = 1;
 		*outp = (*inp1) + *(inp2 + src2offset);
 		outp += dst_stride;
@@ -520,66 +565,8 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		int delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
 
 		dim3 grid_shape(fdmt->nbeams, 1); // grid is (nbeams x nchannels wide)
-		cuda_fdmt_iteration_kernel4<<<grid_shape, fdmt->max_dt>>>(delta_t_local, indata->d_device, outdata->d_device, 1, 1);
+		cuda_fdmt_iteration_kernel4<<<grid_shape, fdmt->max_dt>>>(delta_t_local, indata->d_device, outdata->d_device, 1, 1, f_middle, f_middle_larger, f_start, f_end);
 		gpuErrchk(cudaPeekAtLastError());
-
-
-//		// For each DM relevant for this subband
-//		for (int idt = 0; idt < delta_t_local; idt++) {
-//			int dt_middle = roundf(idt * cff(f_middle, f_start, f_end, f_start)); // Dt for middle freq less 0.5xresolution
-//			int dt_middle_index = dt_middle + shift_input;
-//			int dt_middle_larger = roundf(idt * cff(f_middle_larger, f_start, f_end, f_start)); // Dt for middle freq +0.5x resolution
-//			int dt_rest = idt - dt_middle_larger;
-//			int dt_rest_index = dt_rest + shift_input;
-//
-//			int itmin = 0;
-//			int itmax = dt_middle_larger;
-//
-//			// Here we handle the edge effects and set
-//			// OUtput state[freq, idx, 0:dtmin] = input_state[2xfreq, dt_middle, 0:dtmin]
-//			// where the DM would have overun the available times
-//			// This needs to be fixed for more careful time overlapping
-//			coord3_t dst_start = {.x = iif, .y = idt+shift_output, .z = 0};
-//			coord3_t src1_start = {.x = 2*iif, .y = dt_middle_index, .z = 0};
-//			array_gpu_copy1(outdata, indata, &dst_start, &src1_start, dt_middle_larger);
-//
-//			// Now we work on the remaining times that are guaranteed not to overrun the input dimensions
-//			itmin = dt_middle_larger;
-//			itmax = fdmt->max_dt;
-//
-//			coord3_t src2_start = {.x = 2*iif + 1, .y = dt_rest_index, .z = 0};
-//			// src and dst now start from a bit offset
-//			src1_start.z = dt_middle_larger;
-//			dst_start.z = dt_middle_larger;
-//			int zcount = itmax - itmin;
-//
-//
-//			if (2*iif + 1 < indata->nx) { // If the input data has this channel, we'll add it in
-//				//Output[i_F,i_dT + ShiftOutput,i_T_min:i_T_max] = Input[2*i_F, dT_middle_index,i_T_min:i_T_max] + Input[2*i_F+1, dT_rest_index,i_T_min - dT_middle_larger:i_T_max-dT_middle_larger]
-//				// playinga trick here - we're always addign the fastest moving index
-//				// Putting -dt_middle_larger in array3d_idx would have caused an assertion failure
-//				// But ofsetting by dt_middle_larger at the end, we get the best of all worlds
-//
-//				//int inidx2 = array4d_idx(indata, beam, 2*iif+1, dt_rest_index, 0) - dt_middle_larger;
-//
-//				array_gpu_sum1(outdata, indata, &dst_start, &src1_start, &src2_start, zcount);
-//
-//				//for(int i = itmin; i < itmax; i++) {
-//				//  outdata->d[outidx + i] = indata->d[inidx1 + i] + indata->d[inidx2 + i];
-//				//}
-//				//cpu_sum1(&outdata->d[outidx + itmin], &indata->d[inidx1+itmin], &indata->d[inidx2+itmin], itmax-itmin);
-//
-//
-//			} else { // Just copy the input over. which basically assumes the upper channel is flaggedd/0
-//				// TODO: Could probably be done outside the iif loop to save evalutating IFs, but
-//				// Too tricky for the moment.
-//				//cpu_copy2(&outdata->d[outidx + itmin], &indata->d[inidx1 + itmin], (itmax - itmin));
-//				//for(int i = itmin; i < itmax; i++) {
-//				//  outdata->d[outidx + i] = indata->d[inidx1 + i];
-//				//	}
-//				array_gpu_copy1(outdata, indata, &dst_start, &src1_start, zcount);
-//			}
-//		}
 
 	}
 }
