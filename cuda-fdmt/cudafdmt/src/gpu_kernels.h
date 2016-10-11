@@ -48,7 +48,7 @@ __host__ void array_gpu_copy1(array4d_t* dst, const array4d_t* src, coord3_t* ds
         if (zcount == 0) {
 	  return;
 	}
-        assert(zcount > 1);
+        assert(zcount >= 1);
 	int src_offset = array4d_idx(src, 0, srcidx->x, srcidx->y, srcidx->z);
 	int src_stride = array4d_idx(src, 1, 0, 0, 0);
 	int dst_offset = array4d_idx(dst, 0, dstidx->x, dstidx->y, dstidx->z);
