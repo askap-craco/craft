@@ -487,32 +487,33 @@ __host__ void cuda_fdmt_iteration3(const fdmt_t* fdmt, const int iteration_num, 
 	cuda_fdmt_iteration_kernel3<<<grid_shape, fdmt->max_dt>>>( fmin,  frange,  fjumps,  correction); // loops over all beams, subbands and dts
 }
 
-__global__ void cuda_fdmt_iteration_kernel4(int delta_t_local,
-		const fdmt_dtype* __restrict__ indata,
+__global__ void cuda_fdmt_iteration_kernel4(
 		fdmt_dtype*  __restrict__ outdata,
-		int src_stride,
-		int dst_stride,
-		float f_middle,
-		float f_middle_larger,
-		float f_start,
-		float f_end)
+		 fdmt_dtype* __restrict__ indata,
+		 int src_stride,
+		 int dst_stride,
+		 int delta_t_local,
+		const int* __restrict__ ts_data)
 
 {
 	int beamno = blockIdx.x;
-	int iif = blockIdx.y;
 	int t = threadIdx.x;
 	int block_stride = blockDim.x;
 	int boff = beamno*block_stride + t;
 	fdmt_dtype* outp = outdata + boff;
 	const fdmt_dtype* inp1 = indata + boff;
 	const fdmt_dtype* inp2 = indata + boff;
+	const int* ts_ptr = ts_data;
 	for (int idt = 0; idt < delta_t_local; idt++ ) {
-		// TODO: Lookup from texture memory.
-		int src2offset = 1;
+		int dt_middle_larger = ts_ptr[0];
+		int dt_middle_index = ts_ptr[1];
+		int dt_rest_index = ts_ptr[2];
+		int src2offset = dt_middle_larger;
 		*outp = (*inp1) + *(inp2 + src2offset);
 		outp += dst_stride;
 		inp1 += src_stride;
 		inp2 += src_stride;
+		ts_ptr += 3;
 	}
 }
 
@@ -530,40 +531,16 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 
 	assert(array4d_size(outdata) <= fdmt->state_size);
 
-
-	//    printf("iteration %d df %f delta_f %f delta_t %d output nx=%d ny=%d nz%d\n",
-	//           iteration_num, df, delta_f, delta_t, outdata->nx, outdata->ny, outdata->nz);
-
-	// zero that output baby
-	//bzero(outdata->d, outdata->nw*outdata->nx * outdata->ny * outdata->nz * sizeof(fdmt_dtype));
-	array4d_cuda_memset(outdata, 0);
-	float fjumps = (float)outdata->nx; // Output number of channels
-	float frange = fdmt->fmax - fdmt->fmin; // Width of band
-	float fmin = fdmt->fmin; // Bottom of band
-
-	float correction = 0.0;
-	if (iteration_num > 0) {
-		correction = df/2.0;
-	}
-
-	int shift_input = 0;
-	int shift_output = 0;
-
-	assert(indata->nw == fdmt->nbeams);
-
+	FdmtIteration* iter = fdmt->iterations.at(iteration_num-1);
+	assert(outdata->nx == iter->dt_data.size());
+	int src_stride = array4d_idx(indata, 0, 0, 1, 0);
+	int dst_stride = array4d_idx(outdata, 0, 0, 1, 0);
 
 	// For each output sub-band
 	for (int iif = 0; iif < outdata->nx; iif++) {
-		float f_start = frange/fjumps * (float)iif + fmin; // Top freq of subband
-		float f_end = frange/fjumps*((float)iif + 1) + fmin; // Bottom freq of subband
-		float f_middle = (f_end - f_start)/2.0 + f_start - correction; // Middle freq of subband, less 0.5xresolution
-		float f_middle_larger = (f_end - f_start)/2.0 + f_start + correction; // Middle freq of subband + 0.5x resolution (helps with rounding)
-
-		// Max DM for this subband
-		int delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
-
-		dim3 grid_shape(fdmt->nbeams, 1); // grid is (nbeams x nchannels wide)
-		cuda_fdmt_iteration_kernel4<<<grid_shape, fdmt->max_dt>>>(delta_t_local, indata->d_device, outdata->d_device, 1, 1, f_middle, f_middle_larger, f_start, f_end);
+		int* ts_data = iter->dt_data.at(iif)->d_device;
+		int delta_t_local = iter->delta_ts.at(iif);
+		cuda_fdmt_iteration_kernel4<<<fdmt->nbeams, fdmt->max_dt>>>(outdata->d_device, indata->d_device, src_stride, dst_stride, delta_t_local, ts_data);
 		gpuErrchk(cudaPeekAtLastError());
 
 	}
