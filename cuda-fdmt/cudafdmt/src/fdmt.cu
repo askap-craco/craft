@@ -107,6 +107,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 			coord3_t dst_start = {.x = iif, .y = idt+shift_output, .z = 0};
 			coord3_t src1_start = {.x = 2*iif, .y = dt_middle_index, .z = 0};
+			coord3_t src2_start = {.x = 2*iif + 1, .y = dt_rest_index, .z = 0};
 
 			//array_gpu_copy1(outdata, indata, &dst_start, &src1_start, dt_middle_larger);
 
@@ -114,7 +115,6 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			itmin = dt_middle_larger;
 			itmax = fdmt->max_dt;
 
-			coord3_t src2_start = {.x = 2*iif + 1, .y = dt_rest_index, .z = 0};
 			// src and dst now start from a bit offset
 			src1_start.z = dt_middle_larger;
 			dst_start.z = dt_middle_larger;
@@ -122,7 +122,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 			int maxt = dt_middle_larger;
 			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
-			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0);
+			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0) - maxt;
 			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
 //			printf("iter %d iif %03d idt %02d src1_off %06d src2_off %06d out_off %06d maxt %02d dtmid %d dtr %d dtmidlg %d in [%d,%d,%d,%d]\n",
 //					iteration_num, iif, idt, src1_offset, src2_offset, out_offset, maxt, dt_middle_index, dt_rest_index, dt_middle_larger, indata->nw, indata->nx, indata->ny, indata->nz);
@@ -544,10 +544,9 @@ __global__ void cuda_fdmt_iteration_kernel4 (
 		if (t < maxt) {
 			outp[out_offset] = inp[src1_offset];
 		} else {
-			outp[out_offset+maxt] = inp[src1_offset+maxt] + inp[src2_offset];
+			outp[out_offset] = inp[src1_offset] + inp[src2_offset];
 		}
-		//outp[out_offset] = 10;
-		//*(outp + out_offset) = *(inp + src1_offset) + *(inp + src2_offset);
+
 		ts_ptr += 4;
 	}
 }
