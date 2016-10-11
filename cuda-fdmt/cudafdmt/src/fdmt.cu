@@ -509,6 +509,7 @@ __global__ void cuda_fdmt_iteration_kernel4(
 		int dt_middle_index = ts_ptr[1];
 		int dt_rest_index = ts_ptr[2];
 		int src2offset = dt_middle_larger;
+
 		*outp = (*inp1) + *(inp2 + src2offset);
 		outp += dst_stride;
 		inp1 += src_stride;
@@ -562,7 +563,13 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	// Start that puppy up
 	int s = 0;
 	fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
+	CudaTimer tc;
+	tc.start();
 	array4d_copy_to_device(&fdmt->states[s]);
+	tc.stop();
+	tc.sync_stop();
+	cout << "Copy took " << tc << endl;
+	
 
 #ifdef DUMP_STATE
 	char buf[128];

@@ -25,6 +25,8 @@ void CudaTimer::start() {
 
 void CudaTimer::stop() {
 	gpuErrchk(cudaEventRecord(m_stop, m_stream));
+	sync_stop();
+
 }
 
 void CudaTimer::sync_start() {
