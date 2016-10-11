@@ -489,31 +489,32 @@ __host__ void cuda_fdmt_iteration3(const fdmt_t* fdmt, const int iteration_num, 
 
 __global__ void cuda_fdmt_iteration_kernel4(
 		fdmt_dtype*  __restrict__ outdata,
-		 fdmt_dtype* __restrict__ indata,
-		 int src_stride,
-		 int dst_stride,
+		 fdmt_dtype* __restrict__ indata1,
+		 fdmt_dtype* __restrict__ indata2,
+		 int src_dt_stride,
+		 int src_beam_stride,
+		 int dst_dt_stride,
+		 int dst_beam_stride,
 		 int delta_t_local,
 		const int* __restrict__ ts_data)
 
 {
 	int beamno = blockIdx.x;
 	int t = threadIdx.x;
-	int block_stride = blockDim.x;
-	int boff = beamno*block_stride + t;
-	fdmt_dtype* outp = outdata + boff;
-	const fdmt_dtype* inp1 = indata + boff;
-	const fdmt_dtype* inp2 = indata + boff;
+	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
+	const fdmt_dtype* inp1 = indata1 + beamno*src_beam_stride + t;
+	const fdmt_dtype* inp2 = indata2 + beamno*src_beam_stride + t;
 	const int* ts_ptr = ts_data;
 	for (int idt = 0; idt < delta_t_local; idt++ ) {
 		int dt_middle_larger = ts_ptr[0];
 		int dt_middle_index = ts_ptr[1];
 		int dt_rest_index = ts_ptr[2];
-		int src2offset = dt_middle_larger;
+		int src1_offset =  dt_middle_index*src_dt_stride + dt_middle_larger;
+		int src2_offset = dt_rest_index*src_dt_stride;
+		int out_offset = dt_middle_larger;
 
-		*outp = (*inp1) + *(inp2 + src2offset);
-		outp += dst_stride;
-		inp1 += src_stride;
-		inp2 += src_stride;
+
+		*(outp + out_offset) = *(inp1 + src1_offset) + *(inp2 + src2_offset);
 		ts_ptr += 3;
 	}
 }
@@ -534,14 +535,23 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 
 	FdmtIteration* iter = fdmt->iterations.at(iteration_num-1);
 	assert(outdata->nx == iter->dt_data.size());
-	int src_stride = array4d_idx(indata, 0, 0, 1, 0);
-	int dst_stride = array4d_idx(outdata, 0, 0, 1, 0);
+	int src_dt_stride = array4d_idx(indata, 0, 0, 1, 0);
+	int dst_dt_stride = array4d_idx(outdata, 0, 0, 1, 0);
+	int src_beam_stride = array4d_idx(indata, 1, 0, 0, 0);
+	int dst_beam_stride = array4d_idx(outdata, 1, 0, 0, 0);
 
 	// For each output sub-band
 	for (int iif = 0; iif < outdata->nx; iif++) {
 		int* ts_data = iter->dt_data.at(iif)->d_device;
 		int delta_t_local = iter->delta_ts.at(iif);
-		cuda_fdmt_iteration_kernel4<<<fdmt->nbeams, fdmt->max_dt>>>(outdata->d_device, indata->d_device, src_stride, dst_stride, delta_t_local, ts_data);
+		fdmt_dtype* src1_start = &indata->d_device[array4d_idx(indata, 0, 2*iif,   0, 0)];
+		fdmt_dtype* src2_start = &indata->d_device[array4d_idx(indata, 0, 2*iif+1, 0, 0)];
+		fdmt_dtype* dst_start = &indata->d_device[array4d_idx(outdata, 0, iif,     0, 0)];
+
+		cuda_fdmt_iteration_kernel4<<<fdmt->nbeams, fdmt->max_dt>>>(dst_start, src1_start, src2_start,
+				src_dt_stride, src_beam_stride,
+				dst_dt_stride, dst_beam_stride,
+				delta_t_local, ts_data);
 		gpuErrchk(cudaPeekAtLastError());
 
 	}
