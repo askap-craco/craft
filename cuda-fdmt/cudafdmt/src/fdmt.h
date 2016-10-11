@@ -47,40 +47,19 @@ public:
 
 
 	__host__ void add_subband(int delta_t) {
-		printf("Adding subband with dt=%d size=%d\n", delta_t, delta_ts.size());
 		dt_data.push_back(new Array2d<int>(delta_t, 3));
 		delta_ts.push_back(delta_t);
-		printf("Added subband with dt=%d size=%d\n", delta_t, delta_ts.size());
-
 	}
 
 	__host__ void save_subband_values(int idt, int _dt_middle_index, int _dt_middle_larger, int _dt_rest_index) {
-		//int idx = dt_middle_larger.size() - 1;
-		//*(dt_middle_larger[idx])[idt] = _dt_middle_larger;
-		//*(dt_middle_index[idx])[idt] = _dt_middle_index;
-		//*(dt_rest_index[idx])[idt] = _dt_rest_index;
-		int idx = dt_data.size() -1;
-
-		printf("Subband %d %d %d = %d %d %d\n", idx, idt, dt_data.size(), _dt_middle_larger, _dt_middle_index, _dt_rest_index);
-
 		Array2d<int>* dts = dt_data.back();
-		//(*dts)(idx, 0) = _dt_middle_larger;
-		//(*dts)(idx, 1) = _dt_middle_index;
-		//(*dts)(idx, 2) = _dt_rest_index;
 		dts->set_host(idt, 0, _dt_middle_larger);
 		dts->set_host(idt, 1, _dt_middle_index);
 		dts->set_host(idt, 2, _dt_rest_index);
-
-		printf("Subband saved %d %d = %d %d %d\n", idx, idt, _dt_middle_larger, _dt_middle_index, _dt_rest_index);
-
-
 	}
 
 	__host__ void copy_to_device() {
 		for(int i = 0 ; i < dt_data.size(); i++) {
-//			dt_middle_larger[i]->copy_to_device();
-//			dt_middle_index[i]->copy_to_device();
-//			dt_rest_index[i]->copy_to_device();
 			Array2d<int>* dts = dt_data.at(i);
 			dts->copy_to_device();
 

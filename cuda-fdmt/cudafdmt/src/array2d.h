@@ -68,14 +68,10 @@ Array1d<T>::Array1d(size_t sz) {
 		d_device = NULL;
 		m_size = 0;
 	} else {
-		printf("Allocating Array1d size %d\n", sz);
 		d = new T[sz];
 		assert(d != NULL);
-		printf("CUDA Allocating Array1d size %d\n", sz);
-
 		gpuErrchk( cudaMalloc((void**) &d_device, sz*sizeof(T) ));
 		m_size = sz;
-		printf("Alocated Array1d size %d\n", sz);
 
 	}
 
@@ -84,9 +80,7 @@ Array1d<T>::Array1d(size_t sz) {
 template <class T>
 Array1d<T>::~Array1d() {
 	if (d != NULL) {
-		printf("Freeing 0x%x\n", d);
 		delete[] d;
-		printf("Freeed0x%x\n", d);
 	}
 
 	if (d_device != NULL) {
@@ -108,7 +102,6 @@ __host__ size_t Array2d<T>::dump(const char* foutname) const {
 template <class T>
 __host__ size_t Array1d<T>::copy_to_device() {
 	size_t sz = m_size;
-	printf("Copying to ddevive %d host address 0x%x device address: 0x%x\n", sz, d, d_device);
 	gpuErrchk(cudaMemcpy(d_device, d, sz*sizeof(T), cudaMemcpyHostToDevice));
 	return sz*sizeof(T);
 }
@@ -122,7 +115,8 @@ __host__ size_t Array1d<T>::copy_to_host() {
 
 template <class T>
 Array2d<T>::Array2d(int nx, int ny ) : Array1d<T>(nx*ny), m_nx(nx), m_ny(ny) {
-	printf("Array2d %d %d\n", nx, ny);
+	assert(m_nx > 0);
+	assert(m_ny > 0);
 }
 
 
