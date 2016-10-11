@@ -84,10 +84,11 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     tint = 0.1
-    nf = 336
-    nt = 336
-    fmin = 1200.
-    fmax = fmin + float(nf)
+    nf = 512
+    nt = 512
+    fmax = 1440.
+    fmin = fmax - float(nf)
+
     if os.path.exists('test.in'):
         d = np.fromfile('test.in', dtype=np.float32, count=nf*nt)
         d.shape = (nf, nt)

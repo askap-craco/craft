@@ -21,10 +21,8 @@ int main(int argc, char* argv[])
     int nd = 512;
     int nf = 512;
     int nbeams = 36*6;
-    
-    float fmax = 1400.;
+    float fmax = 1440;
     float fmin = fmax - (float)nf;
-    
     
     fdmt_dtype* din = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*nd*nf*nbeams);
     fdmt_dtype* dout = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*nd*nf*nbeams);

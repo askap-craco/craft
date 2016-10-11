@@ -19,7 +19,7 @@
 #include "array.h"
 #include "array2d.h"
 
-//#define DUMP_STATE 1
+#define DUMP_STATE 1
 
 #define MAX_ITER 16
 
@@ -47,22 +47,23 @@ public:
 
 
 	__host__ void add_subband(int delta_t) {
-		dt_data.push_back(new Array2d<int>(delta_t, 3));
+		dt_data.push_back(new Array2d<int>(delta_t, 4));
 		delta_ts.push_back(delta_t);
 	}
 
-	__host__ void save_subband_values(int idt, int _dt_middle_index, int _dt_middle_larger, int _dt_rest_index) {
+	__host__ void save_subband_values(int idt, int src1_offset, int src2_offset, int out_offset, int maxt) {
 		Array2d<int>* dts = dt_data.back();
-		dts->set_host(idt, 0, _dt_middle_larger);
-		dts->set_host(idt, 1, _dt_middle_index);
-		dts->set_host(idt, 2, _dt_rest_index);
+		dts->set_host(idt, 0, src1_offset);
+		dts->set_host(idt, 1, src2_offset);
+		dts->set_host(idt, 2, out_offset);
+		dts->set_host(idt, 3, maxt);
+
 	}
 
 	__host__ void copy_to_device() {
 		for(int i = 0 ; i < dt_data.size(); i++) {
 			Array2d<int>* dts = dt_data.at(i);
 			dts->copy_to_device();
-
 		}
 	}
 };

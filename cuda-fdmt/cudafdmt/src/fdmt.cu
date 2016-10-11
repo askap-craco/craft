@@ -48,26 +48,26 @@ __host__ __device__ int calc_delta_t(const fdmt_t* fdmt, float f_start, float f_
 	return delta_t;
 }
 
-__host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_num, const coord4_t* insize)
+__host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_num, const array4d_t* indata, array4d_t* outdata)
 {
 	float df = fdmt->df; // channel resolution
 	float delta_f = (float)(1 << iteration_num) * df; // Resolution of current iteration
 	int delta_t = calc_delta_t(fdmt, fdmt->fmin, fdmt->fmin+delta_f); // Max DM
 
 	//FdmtIteration* iter = &fdmt->iterations[iteration_num-1];
-	int nf = insize->x/2 + insize->x % 2; // Add 1 to the frequency dimension if it's not divisible by 2
+	int nf = indata->nx/2 + indata->nx % 2; // Add 1 to the frequency dimension if it's not divisible by 2
 	int ndt = delta_t + 1;
-	FdmtIteration* iter = new FdmtIteration(insize->w, nf, ndt, insize->z);
+
+	// Outdata has size (nbeams, o_nf, o_nd1, fdmt->nt)
+	outdata->nw = indata->nw;
+	outdata->nx = nf; // Add 1 to the frequency dimension if it's not divisible by 2
+	outdata->ny = ndt;
+	outdata->nz = indata->nz;
+
+	assert(array4d_size(outdata) <= fdmt->state_size);
+
+	FdmtIteration* iter = new FdmtIteration(outdata->nw, outdata->nx, outdata->ny, outdata->nz);
 	fdmt->iterations.push_back(iter);
-
-	// Outdata has size (nbeams, o_nf, o_nd1, fdmt->nt
-
-	//    printf("iteration %d df %f delta_f %f delta_t %d output nx=%d ny=%d nz%d\n",
-	//           iteration_num, df, delta_f, delta_t, outdata->nx, outdata->ny, outdata->nz);
-
-	int shift_input = 0; // ?
-	int shift_output = 0; // ?
-
 	float fjumps = (float)nf; // Output number of channels
 	float frange = fdmt->fmax - fdmt->fmin; // Width of band
 	float fmin = fdmt->fmin; // Bottom of band
@@ -76,6 +76,10 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 	if (iteration_num > 0) {
 		correction = df/2.0;
 	}
+
+	int shift_input = 0;
+	int shift_output = 0;
+
 
 	// For each output sub-band
 	for (int iif = 0; iif < nf; iif++) {
@@ -97,7 +101,33 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			int dt_middle_larger = roundf(idt * cff(f_middle_larger, f_start, f_end, f_start)); // Dt for middle freq +0.5x resolution
 			int dt_rest = idt - dt_middle_larger;
 			int dt_rest_index = dt_rest + shift_input;
-			iter->save_subband_values(idt, dt_middle_index, dt_middle_larger, dt_rest_index);
+
+			int itmin = 0;
+			int itmax = dt_middle_larger;
+
+			coord3_t dst_start = {.x = iif, .y = idt+shift_output, .z = 0};
+			coord3_t src1_start = {.x = 2*iif, .y = dt_middle_index, .z = 0};
+
+			//array_gpu_copy1(outdata, indata, &dst_start, &src1_start, dt_middle_larger);
+
+			// Now we work on the remaining times that are guaranteed not to overrun the input dimensions
+			itmin = dt_middle_larger;
+			itmax = fdmt->max_dt;
+
+			coord3_t src2_start = {.x = 2*iif + 1, .y = dt_rest_index, .z = 0};
+			// src and dst now start from a bit offset
+			src1_start.z = dt_middle_larger;
+			dst_start.z = dt_middle_larger;
+			int zcount = itmax - itmin;
+
+			int maxt = dt_middle_larger;
+			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
+			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0);
+			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
+//			printf("iter %d iif %03d idt %02d src1_off %06d src2_off %06d out_off %06d maxt %02d dtmid %d dtr %d dtmidlg %d in [%d,%d,%d,%d]\n",
+//					iteration_num, iif, idt, src1_offset, src2_offset, out_offset, maxt, dt_middle_index, dt_rest_index, dt_middle_larger, indata->nw, indata->nx, indata->ny, indata->nz);
+
+			iter->save_subband_values(idt, src1_offset, src2_offset, out_offset, maxt);
 		}
 	}
 	iter->copy_to_device();
@@ -147,14 +177,12 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nb
 
 
 	// save iteration settings
-	coord4_t state_shape;
-	state_shape.w = fdmt->nbeams;
-	state_shape.x = fdmt->nf;
-	state_shape.w = fdmt->delta_t;
-	state_shape.z = fdmt->max_dt;
+	int s = 0;
 	for (int iiter = 1; iiter < fdmt->order+1; iiter++) {
-		FdmtIteration* iter = fdmt_save_iteration(fdmt, iiter, &state_shape);
-		state_shape = iter->state_shape;
+		array4d_t* curr_state = &fdmt->states[s];
+		s = (s + 1) % 2;
+		array4d_t* new_state = &fdmt->states[s];
+		fdmt_save_iteration(fdmt, iiter, curr_state, new_state);
 	}
 
 	return 0;
@@ -308,6 +336,13 @@ int fdmt_iteration(const fdmt_t* fdmt,
 			src1_start.z = dt_middle_larger;
 			dst_start.z = dt_middle_larger;
 			int zcount = itmax - itmin;
+
+			int maxt = dt_middle_larger;
+			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
+			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0);
+			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
+			printf("iter %d iif %03d idt %02d src1_off %06d src2_off %06d out_off %06d maxt %02d dtmid %d dtr %d dtmidlg %d in [%d,%d,%d,%d]\n",
+					iteration_num, iif, idt, src1_offset, src2_offset, out_offset, maxt, dt_middle_index, dt_rest_index, dt_middle_larger, indata->nw, indata->nx, indata->ny, indata->nz);
 
 
 			if (2*iif + 1 < indata->nx) { // If the input data has this channel, we'll add it in
@@ -487,13 +522,10 @@ __host__ void cuda_fdmt_iteration3(const fdmt_t* fdmt, const int iteration_num, 
 	cuda_fdmt_iteration_kernel3<<<grid_shape, fdmt->max_dt>>>( fmin,  frange,  fjumps,  correction); // loops over all beams, subbands and dts
 }
 
-__global__ void cuda_fdmt_iteration_kernel4(
+__global__ void cuda_fdmt_iteration_kernel4 (
 		fdmt_dtype*  __restrict__ outdata,
-		 fdmt_dtype* __restrict__ indata1,
-		 fdmt_dtype* __restrict__ indata2,
-		 int src_dt_stride,
+		 const fdmt_dtype* __restrict__ indata,
 		 int src_beam_stride,
-		 int dst_dt_stride,
 		 int dst_beam_stride,
 		 int delta_t_local,
 		const int* __restrict__ ts_data)
@@ -502,55 +534,52 @@ __global__ void cuda_fdmt_iteration_kernel4(
 	int beamno = blockIdx.x;
 	int t = threadIdx.x;
 	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
-	const fdmt_dtype* inp1 = indata1 + beamno*src_beam_stride + t;
-	const fdmt_dtype* inp2 = indata2 + beamno*src_beam_stride + t;
+	const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
 	const int* ts_ptr = ts_data;
 	for (int idt = 0; idt < delta_t_local; idt++ ) {
-		int dt_middle_larger = ts_ptr[0];
-		int dt_middle_index = ts_ptr[1];
-		int dt_rest_index = ts_ptr[2];
-		int src1_offset =  dt_middle_index*src_dt_stride + dt_middle_larger;
-		int src2_offset = dt_rest_index*src_dt_stride;
-		int out_offset = dt_middle_larger;
-
-
-		*(outp + out_offset) = *(inp1 + src1_offset) + *(inp2 + src2_offset);
-		ts_ptr += 3;
+		int src1_offset = ts_ptr[0];
+		int src2_offset = ts_ptr[1];
+		int out_offset = ts_ptr[2];
+		int maxt = ts_ptr[3];
+		if (t < maxt) {
+			outp[out_offset] = inp[src1_offset];
+		} else {
+			outp[out_offset+maxt] = inp[src1_offset+maxt] + inp[src2_offset];
+		}
+		//outp[out_offset] = 10;
+		//*(outp + out_offset) = *(inp + src1_offset) + *(inp + src2_offset);
+		ts_ptr += 4;
 	}
 }
 
 __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, const array4d_t* indata, array4d_t* outdata)
 {
-	float df = fdmt->df; // channel resolution
-	float delta_f = (float)(1 << iteration_num) * df; // Resolution of current iteration
-	int delta_t = calc_delta_t(fdmt, fdmt->fmin, fdmt->fmin+delta_f); // Max DM
-
-	// Outdata has size (nbeams, o_nf, o_nd1, fdmt->nt)
-	outdata->nw = indata->nw;
-	outdata->nx = indata->nx/2 + indata->nx % 2; // Add 1 to the frequency dimension if it's not divisible by 2
-	outdata->ny = delta_t + 1;
-	outdata->nz = indata->nz;
+	FdmtIteration* iter = fdmt->iterations.at(iteration_num-1);
+	outdata->nw = iter->state_shape.w;
+	outdata->nx = iter->state_shape.x;
+	outdata->ny = iter->state_shape.y;
+	outdata->nz = iter->state_shape.z;
+	assert(indata->nz == outdata->nz);
+	int nt = indata->nz;
 
 	assert(array4d_size(outdata) <= fdmt->state_size);
-
-	FdmtIteration* iter = fdmt->iterations.at(iteration_num-1);
 	assert(outdata->nx == iter->dt_data.size());
-	int src_dt_stride = array4d_idx(indata, 0, 0, 1, 0);
-	int dst_dt_stride = array4d_idx(outdata, 0, 0, 1, 0);
+
 	int src_beam_stride = array4d_idx(indata, 1, 0, 0, 0);
 	int dst_beam_stride = array4d_idx(outdata, 1, 0, 0, 0);
+
+	array4d_cuda_memset(outdata, 0);
 
 	// For each output sub-band
 	for (int iif = 0; iif < outdata->nx; iif++) {
 		int* ts_data = iter->dt_data.at(iif)->d_device;
 		int delta_t_local = iter->delta_ts.at(iif);
-		fdmt_dtype* src1_start = &indata->d_device[array4d_idx(indata, 0, 2*iif,   0, 0)];
-		fdmt_dtype* src2_start = &indata->d_device[array4d_idx(indata, 0, 2*iif+1, 0, 0)];
-		fdmt_dtype* dst_start = &indata->d_device[array4d_idx(outdata, 0, iif,     0, 0)];
+		const fdmt_dtype* src_start = &indata->d_device[0];
+		fdmt_dtype* dst_start = &outdata->d_device[0];
 
-		cuda_fdmt_iteration_kernel4<<<fdmt->nbeams, fdmt->max_dt>>>(dst_start, src1_start, src2_start,
-				src_dt_stride, src_beam_stride,
-				dst_dt_stride, dst_beam_stride,
+		cuda_fdmt_iteration_kernel4<<<fdmt->nbeams, nt>>>(dst_start, src_start,
+				src_beam_stride,
+				dst_beam_stride,
 				delta_t_local, ts_data);
 		gpuErrchk(cudaPeekAtLastError());
 
@@ -606,7 +635,7 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 			newstate = &fdmt->states[s];
 		}
 
-		///fdmt_iteration(fdmt, iter, currstate, newstate);
+		//fdmt_iteration(fdmt, iter, currstate, newstate);
 
 		cuda_fdmt_iteration4(fdmt, iter, currstate, newstate);
 		gpuErrchk(cudaPeekAtLastError());
