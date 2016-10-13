@@ -124,8 +124,8 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
 			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0) - maxt;
 			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
-//			printf("iter %d iif %03d idt %02d src1_off %06d src2_off %06d out_off %06d maxt %02d dtmid %d dtr %d dtmidlg %d in [%d,%d,%d,%d]\n",
-//					iteration_num, iif, idt, src1_offset, src2_offset, out_offset, maxt, dt_middle_index, dt_rest_index, dt_middle_larger, indata->nw, indata->nx, indata->ny, indata->nz);
+			//			printf("iter %d iif %03d idt %02d src1_off %06d src2_off %06d out_off %06d maxt %02d dtmid %d dtr %d dtmidlg %d in [%d,%d,%d,%d]\n",
+			//					iteration_num, iif, idt, src1_offset, src2_offset, out_offset, maxt, dt_middle_index, dt_rest_index, dt_middle_larger, indata->nw, indata->nx, indata->ny, indata->nz);
 
 			iter->save_subband_values(idt, src1_offset, src2_offset, out_offset, maxt);
 		}
@@ -522,12 +522,12 @@ __host__ void cuda_fdmt_iteration3(const fdmt_t* fdmt, const int iteration_num, 
 	cuda_fdmt_iteration_kernel3<<<grid_shape, fdmt->max_dt>>>( fmin,  frange,  fjumps,  correction); // loops over all beams, subbands and dts
 }
 
-__global__ void cuda_fdmt_iteration_kernel4 (
+__global__ void cuda_fdmt_iteration_kernel4_sum (
 		fdmt_dtype*  __restrict__ outdata,
-		 const fdmt_dtype* __restrict__ indata,
-		 int src_beam_stride,
-		 int dst_beam_stride,
-		 int delta_t_local,
+		const fdmt_dtype* __restrict__ indata,
+		int src_beam_stride,
+		int dst_beam_stride,
+		int delta_t_local,
 		const int* __restrict__ ts_data)
 
 {
@@ -547,6 +547,28 @@ __global__ void cuda_fdmt_iteration_kernel4 (
 			outp[out_offset] = inp[src1_offset] + inp[src2_offset];
 		}
 
+		ts_ptr += 4;
+	}
+}
+
+__global__ void cuda_fdmt_iteration_kernel4_copy (
+		fdmt_dtype*  __restrict__ outdata,
+		const fdmt_dtype* __restrict__ indata,
+		int src_beam_stride,
+		int dst_beam_stride,
+		int delta_t_local,
+		const int* __restrict__ ts_data)
+
+{
+	int beamno = blockIdx.x;
+	int t = threadIdx.x;
+	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
+	const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
+	const int* ts_ptr = ts_data;
+	for (int idt = 0; idt < delta_t_local; idt++ ) {
+		int src1_offset = ts_ptr[0];
+		int out_offset = ts_ptr[2];
+		outp[out_offset] = inp[src1_offset];
 		ts_ptr += 4;
 	}
 }
@@ -575,12 +597,19 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		int delta_t_local = iter->delta_ts.at(iif);
 		const fdmt_dtype* src_start = &indata->d_device[0];
 		fdmt_dtype* dst_start = &outdata->d_device[0];
-
-		cuda_fdmt_iteration_kernel4<<<fdmt->nbeams, nt>>>(dst_start, src_start,
-				src_beam_stride,
-				dst_beam_stride,
-				delta_t_local, ts_data);
-		gpuErrchk(cudaPeekAtLastError());
+		if(2*iif + 1 < indata->nx) { // do sum if there's a channel to sum
+			cuda_fdmt_iteration_kernel4_sum<<<fdmt->nbeams, nt>>>(dst_start, src_start,
+					src_beam_stride,
+					dst_beam_stride,
+					delta_t_local, ts_data);
+			gpuErrchk(cudaPeekAtLastError());
+		} else { // Do copy if there's no channel to do
+			cuda_fdmt_iteration_kernel4_copy<<<fdmt->nbeams, nt>>>(dst_start, src_start,
+					src_beam_stride,
+					dst_beam_stride,
+					delta_t_local, ts_data);
+			gpuErrchk(cudaPeekAtLastError());
+		}
 
 	}
 }
@@ -606,7 +635,7 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	array4d_copy_to_device(&fdmt->states[s]);
 	tc.stop();
 	cout << "Copy took " << tc << endl;
-	
+
 
 #ifdef DUMP_STATE
 	char buf[128];
@@ -648,6 +677,12 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	}
 	t.stop();
 	cout << "FDMT Iterations only took " << t << endl;
+
+	CudaTimer tback;
+	tback.start();
+	array4d_copy_to_host(&outstate);
+	tback.stop();
+	cout << "Copy back to host took " << tback << endl;
 
 	//printf("Returing form execute\n");
 

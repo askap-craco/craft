@@ -84,8 +84,8 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     tint = 0.1
-    nf = 512
-    nt = 512
+    nf = 336
+    nt = 336
     fmax = 1440.
     fmin = fmax - float(nf)
 
