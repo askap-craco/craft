@@ -18,14 +18,15 @@ using namespace std;
 
 int main(int argc, char* argv[])
 {
-    int nd = 336;
-    int nf = 336;
-    int nbeams = 36*2;
+    int nd = 512;
+    int nt = 256;
+    int nf = 512;
+    int nbeams = 1;
     float fmax = 1440;
     float fmin = fmax - (float)nf;
     
     fdmt_dtype* din = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*nd*nf*nbeams);
-    fdmt_dtype* dout = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*nd*nf*nbeams);
+    fdmt_dtype* dout = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*nd*nt*nbeams);
     printf("Starting!\n");
     
     if (argc != 3) {
@@ -52,7 +53,7 @@ int main(int argc, char* argv[])
     fclose(fin);
     
     fdmt_t fdmt;
-    fdmt_create(&fdmt, fmin, fmax, nf, nd, nbeams);
+    fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
     
     CudaTimer t;
     t.start();

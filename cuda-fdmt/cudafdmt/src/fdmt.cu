@@ -149,6 +149,7 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	assert(nf > 0);
 	assert(max_dt > 0);
 	assert(nt > 0);
+	assert(fdmt->max_dt >= fdmt->nt);
 	assert(1<<fdmt->order >= fdmt->nf);
 	assert(nbeams >= 1);
 
@@ -174,7 +175,7 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 		fdmt->states[s].nw = fdmt->nbeams;
 		fdmt->states[s].nx = fdmt->nf;
 		fdmt->states[s].ny = fdmt->delta_t;
-		fdmt->states[s].nz = fdmt->max_dt;
+		fdmt->states[s].nz = fdmt->nt;
 		array4d_malloc(&fdmt->states[s]);
 	}
 
@@ -200,22 +201,21 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 
 	assert(indata->nx == fdmt->nbeams);
 	assert(indata->ny == fdmt->nf);
-	assert(indata->nz == fdmt->max_dt);
+	assert(indata->nz == fdmt->nt);
 
 	state->nw = fdmt->nbeams;
 	state->nx = fdmt->nf;
 	state->ny = fdmt->delta_t;
-	state->nz = fdmt->max_dt;
+	state->nz = fdmt->nt;
 
 	// zero off the state
 	bzero(state->d, state->nw*state->nx*state->ny*state->nz*sizeof(fdmt_dtype));
-
 	// Assign initial data to the state at delta_t=0
 	for(int beam = 0 ; beam < fdmt->nbeams; beam++) {
 		for (int c = 0; c < fdmt->nf; c++) {
 			int outidx = array4d_idx(state, beam, c, 0, 0);
 			int inidx = array3d_idx(indata, beam, c, 0);
-			for (int t = 0; t < fdmt->max_dt; t++) {
+			for (int t = 0; t < fdmt->nt; t++) {
 				state->d[outidx + t] = indata->d[inidx + t];
 			}
 		}
@@ -236,7 +236,7 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 				// The state for dt=d = the state for dt=(d-1) + the time-reversed input sample
 				// for each time
 				// (TODO: Not including a missing overlap here)
-				for (int j = idt; j < fdmt->max_dt; j++) {
+				for (int j = idt; j < fdmt->nt; j++) {
 					state->d[outidx + j] = state->d[iidx + j] + indata->d[imidx - j];
 				}
 			}
@@ -606,7 +606,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 					dst_beam_stride,
 					delta_t_local, ts_data);
 			gpuErrchk(cudaPeekAtLastError());
-		} else { // Do copy if there's no channel to do
+		} else { // Do copy if there's no channel to add
 			cuda_fdmt_iteration_kernel4_copy<<<fdmt->nbeams, nt>>>(dst_start, src_start,
 					src_beam_stride,
 					dst_beam_stride,
@@ -615,11 +615,13 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		}
 
 	}
+
+
 }
 
 int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 {
-	array3d_t inarr = {.nx = fdmt->nbeams, .ny = fdmt->nf, .nz = fdmt->max_dt};
+	array3d_t inarr = {.nx = fdmt->nbeams, .ny = fdmt->nf, .nz = fdmt->nt};
 	inarr.d = indata;
 
 	// Make the final outstate - this saves a memcpy on the final iteration
@@ -632,7 +634,12 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 
 	// Start that puppy up
 	int s = 0;
+
+	CudaTimer tinit;
+	tinit.start();
 	fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
+	tinit.stop();
+	cout << "Initialisation took " << tinit << endl;
 	CudaTimer tc;
 	tc.start();
 	array4d_copy_to_device(&fdmt->states[s]);

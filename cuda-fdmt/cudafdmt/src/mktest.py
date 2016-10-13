@@ -24,6 +24,8 @@ class Formatter(object):
         return 'x={:.01f}, y={:.01f}, z={:.01f}'.format(x, y, z)
 
 def myimshow(ax, *args, **kwargs):
+    kwargs['aspect'] = 'auto'
+    kwargs['interpolation'] = 'None'
     im = ax.imshow(*args, **kwargs)
     ax.format_coord = Formatter(im)
     return im
@@ -48,7 +50,7 @@ def make_signal(f_min = 1200., f_max = 1600, N_bins = 40, N_t = 512, N_f = 512, 
     N_total = N_f*N_t*N_bins
     PulseLength = N_f*N_bins
     PulseSig = 0.4
-    PulsePosition = 4134567/2
+    PulsePosition = 4134567/4
     maxDT = N_t
     
     PDB("Signal preparation")
@@ -84,8 +86,10 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     tint = 0.1
-    nf = 336
-    nt = 336
+    nf = 512
+    nt_sim = 512
+    nt = 256
+    tstart = nt
     fmax = 1440.
     fmin = fmax - float(nf)
 
@@ -94,8 +98,11 @@ def _main():
         d.shape = (nf, nt)
     else:
         with open('test.in', 'w') as fout:
-            d = make_signal(fmin, fmax, 40, nt, nf, D=3)
+            d = make_signal(fmin, fmax, 40, nt_sim, nf, D=5)
+            d = d[:, tstart:tstart+nt]
             d.astype(np.float32).tofile(fout)
+
+    print 'signal shape', d.shape
 
     nf, nt = d.shape
 
