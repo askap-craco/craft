@@ -136,9 +136,10 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 }
 
 
-int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nbeams)
+int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt, int nbeams)
 {
 	fdmt->max_dt = max_dt;
+	fdmt->nt = nt;
 	fdmt->fmin = fmin;
 	fdmt->fmax = fmax;
 	fdmt->nf = nf;
@@ -147,10 +148,12 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nb
 	fdmt->nbeams = nbeams;
 	assert(nf > 0);
 	assert(max_dt > 0);
+	assert(nt > 0);
 	assert(1<<fdmt->order >= fdmt->nf);
 	assert(nbeams >= 1);
 
 	// TODO: CHeck it's important that fmin < fmax??
+	assert(fmin < fmax);
 	assert(fmin > 0);
 	assert(fmax > 0);
 
@@ -228,7 +231,7 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 			for (int idt = 1; idt < fdmt->delta_t; idt++) {
 				int outidx = array4d_idx(state, beam, c, idt, 0);
 				int iidx = array4d_idx(state, beam, c, idt-1, 0);
-				int imidx = array3d_idx(indata, beam, c, indata->ny - 1);
+				int imidx = array3d_idx(indata, beam, c, indata->nz - 1);
 
 				// The state for dt=d = the state for dt=(d-1) + the time-reversed input sample
 				// for each time
