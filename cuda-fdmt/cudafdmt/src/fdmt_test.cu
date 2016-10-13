@@ -60,7 +60,6 @@ int main(int argc, char* argv[])
         fdmt_execute(&fdmt, din, dout);
     }
     t.stop();
-    t.sync_stop();
     cout << "FDMT Execute loop took " << t << endl;
 
 

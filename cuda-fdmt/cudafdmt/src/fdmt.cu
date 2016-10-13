@@ -605,7 +605,6 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	tc.start();
 	array4d_copy_to_device(&fdmt->states[s]);
 	tc.stop();
-	tc.sync_stop();
 	cout << "Copy took " << tc << endl;
 	
 
@@ -648,7 +647,6 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 
 	}
 	t.stop();
-	t.sync_stop();
 	cout << "FDMT Iterations only took " << t << endl;
 
 	//printf("Returing form execute\n");
