@@ -620,7 +620,10 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		const fdmt_dtype* src_start = &indata->d_device[0];
 		fdmt_dtype* dst_start = &outdata->d_device[0];
 		int tmax = min(nt + delta_t_local, indata->nz-1);
+		//printf("iter %d iif %d TMAX %d nt  %d delta_t_local %d %d \n", iteration_num, iif, tmax, nt, delta_t_local, indata->nz);
+
 		assert(tmax < indata->nz);
+
 
 		// WARNING: This is sub-optimal as it doesn't use an integral number of warps, and
 		// Can exceed teh maximum thread limit of the GPU , and use the threads sub-optimally.

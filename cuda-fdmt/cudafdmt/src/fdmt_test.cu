@@ -19,9 +19,9 @@ using namespace std;
 int main(int argc, char* argv[])
 {
     int nd = 512;
-    int nt = 256;
+    int nt = 512;
     int nf = 512;
-    int nbeams = 1;
+    int nbeams = 36*6;
     float fmax = 1440;
     float fmin = fmax - (float)nf;
     
