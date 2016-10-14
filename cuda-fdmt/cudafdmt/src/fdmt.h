@@ -51,12 +51,12 @@ public:
 		delta_ts.push_back(delta_t);
 	}
 
-	__host__ void save_subband_values(int idt, int src1_offset, int src2_offset, int out_offset, int maxt) {
+	__host__ void save_subband_values(int idt, int src1_offset, int src2_offset, int out_offset, int mint) {
 		Array2d<int>* dts = dt_data.back();
 		dts->set_host(idt, 0, src1_offset);
 		dts->set_host(idt, 1, src2_offset);
 		dts->set_host(idt, 2, out_offset);
-		dts->set_host(idt, 3, maxt);
+		dts->set_host(idt, 3, mint);
 
 	}
 
@@ -78,6 +78,7 @@ typedef struct _fdmt_t
 	int order; // Order of the FMDT == log2(nf)
 	int max_dt; // Maximum number of time integrations
 	int nf; // Number of frequency bins
+	int nt; // Number of integrations per block
 	int delta_t; // Initial delta_t for the initialisation
 	int nbeams; // Number of beams
 	int verbose; // 1 for verbose
@@ -98,7 +99,7 @@ __host__ __device__ float cff(float f1_start, float f1_end, float f2_start, floa
 
 __host__ __device__ int calc_delta_t(const fdmt_t* fdmt, float f_start, float f_end);
 
-int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nbeams);
+int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt,  int nbeams);
 
 int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata);
 
