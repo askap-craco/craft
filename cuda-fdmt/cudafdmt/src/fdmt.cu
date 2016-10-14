@@ -556,7 +556,7 @@ __global__ void cuda_fdmt_iteration_kernel4_sum (
 	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
 	const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
 	const int* ts_ptr = ts_data;
-	if (t >= nt + delta_t_local) {
+	if (t >= nt + delta_t_local) { // strictly could be the actuall delta_t for the out_offset, but who's counting?
 		return;
 	}
 	for (int idt = 0; idt < delta_t_local; idt++ ) {
@@ -604,8 +604,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 	outdata->ny = iter->state_shape.y;
 	outdata->nz = iter->state_shape.z;
 	assert(indata->nz == outdata->nz);
-	int nt = indata->nz;
-
+	int nt = fdmt->nt;
 	assert(array4d_size(outdata) <= fdmt->state_size);
 	assert(outdata->nx == iter->dt_data.size());
 
@@ -620,14 +619,22 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		int delta_t_local = iter->delta_ts.at(iif);
 		const fdmt_dtype* src_start = &indata->d_device[0];
 		fdmt_dtype* dst_start = &outdata->d_device[0];
+		int tmax = min(nt + delta_t_local, indata->nz-1);
+		assert(tmax < indata->nz);
+
+		// WARNING: This is sub-optimal as it doesn't use an integral number of warps, and
+		// Can exceed teh maximum thread limit of the GPU , and use the threads sub-optimally.
+		// More thought required to do this right.
+		int nthreads = tmax;
+
 		if(2*iif + 1 < indata->nx) { // do sum if there's a channel to sum
-			cuda_fdmt_iteration_kernel4_sum<<<fdmt->nbeams, fdmt->max_dt>>>(dst_start, src_start,
+			cuda_fdmt_iteration_kernel4_sum<<<fdmt->nbeams, tmax>>>(dst_start, src_start,
 					src_beam_stride,
 					dst_beam_stride,
 					delta_t_local, ts_data);
 			gpuErrchk(cudaPeekAtLastError());
 		} else { // Do copy if there's no channel to add
-			cuda_fdmt_iteration_kernel4_copy<<<fdmt->nbeams, fdmt->max_dt>>>(dst_start, src_start,
+			cuda_fdmt_iteration_kernel4_copy<<<fdmt->nbeams, tmax>>>(dst_start, src_start,
 					src_beam_stride,
 					dst_beam_stride,
 					delta_t_local, ts_data);
