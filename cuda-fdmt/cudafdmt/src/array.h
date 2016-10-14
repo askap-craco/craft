@@ -17,7 +17,7 @@
 
 #define MAX_DIMS 5
 
-typedef float fdmt_dtype;
+typedef char fdmt_dtype;
 
 typedef struct _array2df
 {

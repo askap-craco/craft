@@ -136,10 +136,9 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 }
 
 
-int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt, int nbeams)
+int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nbeams)
 {
 	fdmt->max_dt = max_dt;
-	fdmt->nt = nt;
 	fdmt->fmin = fmin;
 	fdmt->fmax = fmax;
 	fdmt->nf = nf;
@@ -148,7 +147,6 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	fdmt->nbeams = nbeams;
 	assert(nf > 0);
 	assert(max_dt > 0);
-	assert(nt > 0);
 	assert(1<<fdmt->order >= fdmt->nf);
 	assert(nbeams >= 1);
 
