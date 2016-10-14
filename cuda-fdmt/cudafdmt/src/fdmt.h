@@ -51,12 +51,12 @@ public:
 		delta_ts.push_back(delta_t);
 	}
 
-	__host__ void save_subband_values(int idt, int src1_offset, int src2_offset, int out_offset, int maxt) {
+	__host__ void save_subband_values(int idt, int src1_offset, int src2_offset, int out_offset, int mint) {
 		Array2d<int>* dts = dt_data.back();
 		dts->set_host(idt, 0, src1_offset);
 		dts->set_host(idt, 1, src2_offset);
 		dts->set_host(idt, 2, out_offset);
-		dts->set_host(idt, 3, maxt);
+		dts->set_host(idt, 3, mint);
 
 	}
 

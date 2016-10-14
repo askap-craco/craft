@@ -120,14 +120,14 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			dst_start.z = dt_middle_larger;
 			int zcount = itmax - itmin;
 
-			int maxt = dt_middle_larger;
+			int mint = dt_middle_larger;
 			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
-			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0) - maxt;
+			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0) - mint;
 			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
 			//			printf("iter %d iif %03d idt %02d src1_off %06d src2_off %06d out_off %06d maxt %02d dtmid %d dtr %d dtmidlg %d in [%d,%d,%d,%d]\n",
 			//					iteration_num, iif, idt, src1_offset, src2_offset, out_offset, maxt, dt_middle_index, dt_rest_index, dt_middle_larger, indata->nw, indata->nx, indata->ny, indata->nz);
 
-			iter->save_subband_values(idt, src1_offset, src2_offset, out_offset, maxt);
+			iter->save_subband_values(idt, src1_offset, src2_offset, out_offset, mint);
 		}
 	}
 	iter->copy_to_device();
@@ -191,6 +191,24 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 
 	return 0;
 }
+
+//int fdmt_copy_state(const fdmt_t* fdmt, array3d_t* oldstate, array4d_t* newstate)
+//{
+//	// Copy & shift oldstate into new state so the next execution of the FDMT does the right thign
+//	// First thing is: fdmt_initialise only initialises the t 0..fdmt->nt - 1, so we'll be doing the rest
+//	for(int beam = 0; beam < fdmt->nbeams; ++beam) {
+//		for(int idt = 0 ; idt < fdmt->max_dt; idt++) {
+//			for(int it = fdmt->nt; t < max_dt; t++) {
+//				int outidx = array3d_idx(outidx, beam, idt, it);
+//				int new_chan = 0; //???
+//				int new_dt = idt; // ???
+//				int new_it = it - fdmt->nt; // shift left by nt
+//				int newidx = array4d_idx(newstate, beam, new_chan, new_dt, new_it);
+//			    newstate[newidx] = outstate[outidx];
+//			}
+//		}
+//	}
+//}
 
 int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* state)
 {
@@ -534,15 +552,19 @@ __global__ void cuda_fdmt_iteration_kernel4_sum (
 {
 	int beamno = blockIdx.x;
 	int t = threadIdx.x;
+	int nt = blockDim.x;
 	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
 	const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
 	const int* ts_ptr = ts_data;
+	if (t >= nt + delta_t_local) {
+		return;
+	}
 	for (int idt = 0; idt < delta_t_local; idt++ ) {
 		int src1_offset = ts_ptr[0];
 		int src2_offset = ts_ptr[1];
 		int out_offset = ts_ptr[2];
-		int maxt = ts_ptr[3];
-		if (t < maxt) {
+		int mint = ts_ptr[3];
+		if (t < mint) {
 			outp[out_offset] = inp[src1_offset];
 		} else {
 			outp[out_offset] = inp[src1_offset] + inp[src2_offset];
