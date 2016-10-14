@@ -89,7 +89,7 @@ def _main():
     nf = 512
     nt_sim = 512
     nt = 256
-    tstart = nt
+    tstart = 0
     fmax = 1440.
     fmin = fmax - float(nf)
 

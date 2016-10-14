@@ -175,7 +175,7 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 		fdmt->states[s].nw = fdmt->nbeams;
 		fdmt->states[s].nx = fdmt->nf;
 		fdmt->states[s].ny = fdmt->delta_t;
-		fdmt->states[s].nz = fdmt->nt;
+		fdmt->states[s].nz = fdmt->max_dt;
 		array4d_malloc(&fdmt->states[s]);
 	}
 
@@ -192,7 +192,6 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	return 0;
 }
 
-
 int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* state)
 {
 
@@ -206,7 +205,7 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 	state->nw = fdmt->nbeams;
 	state->nx = fdmt->nf;
 	state->ny = fdmt->delta_t;
-	state->nz = fdmt->nt;
+	state->nz = fdmt->max_dt;
 
 	// zero off the state
 	bzero(state->d, state->nw*state->nx*state->ny*state->nz*sizeof(fdmt_dtype));
@@ -246,7 +245,6 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 	return 0;
 
 }
-
 
 int fdmt_iteration(const fdmt_t* fdmt,
 		const int iteration_num,
@@ -601,13 +599,13 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		const fdmt_dtype* src_start = &indata->d_device[0];
 		fdmt_dtype* dst_start = &outdata->d_device[0];
 		if(2*iif + 1 < indata->nx) { // do sum if there's a channel to sum
-			cuda_fdmt_iteration_kernel4_sum<<<fdmt->nbeams, nt>>>(dst_start, src_start,
+			cuda_fdmt_iteration_kernel4_sum<<<fdmt->nbeams, fdmt->max_dt>>>(dst_start, src_start,
 					src_beam_stride,
 					dst_beam_stride,
 					delta_t_local, ts_data);
 			gpuErrchk(cudaPeekAtLastError());
 		} else { // Do copy if there's no channel to add
-			cuda_fdmt_iteration_kernel4_copy<<<fdmt->nbeams, nt>>>(dst_start, src_start,
+			cuda_fdmt_iteration_kernel4_copy<<<fdmt->nbeams, fdmt->max_dt>>>(dst_start, src_start,
 					src_beam_stride,
 					dst_beam_stride,
 					delta_t_local, ts_data);
