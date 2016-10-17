@@ -71,7 +71,10 @@ def _main():
 
     if values.plot:
         print 'xf shape', xf.shape, 'xshape', x.shape
-        pylab.imshow(abs(xf**2).T, aspect='auto')
+        ex = (0, xf.shape[0], freqs[0], freqs[-1])
+        pylab.imshow(abs(xf**2).T, aspect='auto', interpolation='nearest', origin='lower', extent=ex)
+        pylab.xlabel('Sample')
+        pylab.ylabel('Frequency (MHz)')
         pylab.show()
 
 
