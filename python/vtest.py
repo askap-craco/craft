@@ -18,16 +18,15 @@ import astropy
 from astropy.time import Time
 import aktime
 import pytz
+import filterbank
+import craftsim
+import FDMT
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 mode_to_nbits = (16, 8, 2, 1)
 SAMP_RATE = 1e6*32./27.
-NCHANS = 8
-
-def coherent_disperse():
-    h = np.exp(2*pi*1j*d/(f + f0))
-
+DEFAULT_NCHANS = 8 # number of channels per FPGA
 
 def _main():
     from argparse import ArgumentParser
@@ -38,8 +37,14 @@ def _main():
     parser.add_argument('-n','--nsamps', help='Number of samples', type=int, default=1024)
     parser.add_argument('-b','--beamid', help='Beam ID downloaded', type=int, default=0)
     parser.add_argument('-a','--antenna', help='Antenna number', type=int, default=1)
-
+    parser.add_argument('--nchans', help='Number of channels', type=int, default=DEFAULT_NCHANS)
+    parser.add_argument('--fmin', type=float, default=1200., help='Frequency of lowest channel (MHz)')
+    parser.add_argument('--pulse-width', type=int, default=1000, help='Pulse width in (samples)')
+    parser.add_argument('--pulse-start', type=int, default=3000, help='Pulse start time (samples)')
+    parser.add_argument('--pulse-dm', type=float, default=15.0, help='Dipsersion measure (pc/cm^3')
+    parser.add_argument('--pulse-sn', type=float, default=100., help='Pulse single-channel S/N')
     parser.add_argument(dest='file', help='Output file', type=argparse.FileType('w'))
+    parser.add_argument('--plot', action='store_true', help='Plot dynamic spectrum')
     parser.add_argument('--ascii-output', help='Output file as ascii', type=argparse.FileType('w'), default=None)
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -48,10 +53,32 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    hdr = make_header(values)
+    fmax = values.fmin + float(values.nchans) - 1
+
+    freqs = np.linspace(values.fmin, fmax, values.nchans, endpoint=True)
+
+    x = craftsim.dispersed_voltage(values.fmin, fmax, values.pulse_width, 
+                                   values.nsamps*values.nchans, values.pulse_dm,
+                                   values.pulse_sn, values.pulse_start)
+    #d = np.random.randn(values.nsamps, NCHANS) + 1j*np.random.randn(values.nsamps, NCHANS)
+    #d *= 2*14
+
+    NCHANS = values.nchans
+
+    fb = filterbank.FftFilterbank(NCHANS)
+    xf = fb.analysis(x).T
+    assert xf.shape == (values.nsamps, NCHANS), 'Unexpected shape. xfshape={} expected {}'.format(xf.shape, (values.nsamps, NCHANS))
+
+    if values.plot:
+        print 'xf shape', xf.shape, 'xshape', x.shape
+        pylab.imshow(abs(xf**2).T, aspect='auto')
+        pylab.show()
+
+
+    hdr = make_header(values, freqs)
     print hdr
-    d = np.random.randn(values.nsamps, NCHANS) + 1j*np.random.randn(values.nsamps, NCHANS)
-    d *= 2*14
+    d = xf*32
+    
     # INJECT SIGNALS HERE ON A PER CHANNEL BASIS
     hdr.tofile(values.file)
     enc_func = mode_funcs[values.mode & 0x3]
@@ -107,13 +134,12 @@ def encode_1b1b(d):
 mode_funcs = [encode_16b16b, encode_8b8b, encode_4b4b, encode_1b1b]
 
 
-def make_header(values):
+def make_header(values, freqs):
     mode = values.mode
     nbits_per_samp = mode_to_nbits[mode & 0x3] * 2
     nwords = values.nsamps / nbits_per_samp
     fpga_id = 1
     cardno = 2
-    freqs = np.linspace(1200, 1208, NCHANS, endpoint=True)
     assert len(freqs) == NCHANS
     now = datetime.datetime.utcnow()
     now = now.replace(tzinfo=pytz.UTC)
@@ -133,6 +159,7 @@ def make_header(values):
     h += 'HDR_SIZE', 8192, 'Header size'
     h += 'DATA_TYPE', 'CRAFT_VOLTAGES', 'CRAFT_VOLTAGES'
     h += 'CMD_ARGS',  ' '.join(sys.argv), 'Command line arguments'
+    h += 'CMD_NAMESPACE', str(values), 'Arguments including defaults'
     h += 'SAMP_RATE', SAMP_RATE, 'Sample rate in samples per second'
     h += 'CRAFT_MODE', values.mode, 'The craft mode which describes the applicable bit depth (hex) among other things'
     h += 'NWORDS', nwords, 'The number of words downloaded'
