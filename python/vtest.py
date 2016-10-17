@@ -65,7 +65,7 @@ def _main():
 
     NCHANS = values.nchans
 
-    fb = filterbank.FftFilterbank(NCHANS)
+    fb = filterbank.ResampleFilterbank(NCHANS, 32, 27)
     xf = fb.analysis(x).T
     assert xf.shape == (values.nsamps, NCHANS), 'Unexpected shape. xfshape={} expected {}'.format(xf.shape, (values.nsamps, NCHANS))
 
@@ -77,7 +77,7 @@ def _main():
 
     hdr = make_header(values, freqs)
     print hdr
-    d = xf*32
+    d = xf*32 # scale to better look like 16 bit numbers. TODO: find a approprite scaling factor
     
     # INJECT SIGNALS HERE ON A PER CHANNEL BASIS
     hdr.tofile(values.file)

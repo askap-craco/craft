@@ -13,6 +13,7 @@ import sys
 import logging
 import scipy
 import scipy.io
+import scipy.signal
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -92,6 +93,25 @@ class FftFilterbank(object):
         xout = np.reshape(x, (nframes, self.N))
         dout = np.fft.fft(xout, axis=1).T
         return dout
+
+class ResampleFilterbank(object):
+    def __init__(self, N, num, den, window=('kaiser', 0.5)):
+        self.N = N
+        self.num = num
+        self.den = den
+        self.window = window
+
+    def analysis(self, x):
+        nframes = len(x)/self.N
+        xout = np.reshape(x, (nframes, self.N))
+        dout = np.fft.fft(xout, axis=1).T
+        for c in xrange(dout.shape[0]):
+            df = scipy.signal.resample_poly(dout[c, :], self.num, self.den, window=self.window)
+            start = len(df) - dout.shape[1]
+            dout[c, :] = df[start:] # discard first few samples
+            
+        return dout
+
 
 def _main():
     from argparse import ArgumentParser

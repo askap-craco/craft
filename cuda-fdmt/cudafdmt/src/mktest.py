@@ -45,24 +45,6 @@ def stft(X, N_f, N_t, N_bins):
 
     return XX
 
-def make_signal(f_min = 1200., f_max = 1600, N_bins = 40, N_t = 512, N_f = 512, D=5):
-    ''' COpied from FDMT.py'''
-    N_total = N_f*N_t*N_bins
-    PulseLength = N_f*N_bins
-    PulseSig = 0.4
-    PulsePosition = 4134567/4
-    maxDT = N_t
-    
-    PDB("Signal preparation")
-    practicalD = DispersionConstant * D
-    I = np.random.normal(0,1,N_total)
-    I[PulsePosition:PulsePosition+PulseLength] += np.random.normal(0,PulseSig,PulseLength)*10
-    print "MAX Thoretical SNR:", np.sum(np.abs(I[PulsePosition:PulsePosition+PulseLength])**2 - np.mean(abs(I)**2)) / (np.sqrt(PulseLength*np.var(abs(I)**2)))
-    
-    X = CoherentDedispersion(I, -D, f_min,f_max,False)    
-
-    return stft(X, N_f, N_t, N_bins)
-
 
 def make_signal2():
     freq = np.linspace(fmin, fmax, nf)
