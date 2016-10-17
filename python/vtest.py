@@ -140,7 +140,6 @@ def make_header(values, freqs):
     nwords = values.nsamps / nbits_per_samp
     fpga_id = 1
     cardno = 2
-    assert len(freqs) == NCHANS
     now = datetime.datetime.utcnow()
     now = now.replace(tzinfo=pytz.UTC)
     now_bat = aktime.utcDt2bat(now)
@@ -177,7 +176,7 @@ def make_header(values, freqs):
     h += 'CARD_NO', cardno, 'The card number from which this data was downloaded'
     h += 'ANT', 'AK%02d' % values.antenna, 'Antenna name (AKNN)'
     h += 'ANTENNA_NO', values.antenna, 'The antenna number from which this data was downloaded 1-36'
-    h += 'NCHANS', NCHANS, 'Number of frequency channels'
+    h += 'NCHANS', len(freqs), 'Number of frequency channels'
     h += 'FREQS', ','.join(map(str,freqs)), 'Comma separated list of frequencies applying to each of channels in this file(MHz)'
     h += 'UTC_NOW', now.isoformat(), 'UTC date stamp for when the file was written (ISO format)'
     h += 'MJD_NOW', now_time.mjd, 'MJD date stamp for when the file was written'
