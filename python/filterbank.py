@@ -17,6 +17,10 @@ import scipy.signal
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+def mreshape(x, shape):
+    '''Matlab-compatible reshape command. Grrr'''
+    return np.reshape(x, shape, order='F')
+
 class PolyphaseFilterbank(object):
     def __init__(self, coeffs, num, den, paths):
         self.c = coeffs
@@ -31,8 +35,11 @@ class PolyphaseFilterbank(object):
         self.stride = self.paths * self.den / self.num
         self.overlap = paths - self.stride
         self.fft_shifts = np.mod(np.arange(self.num)*(self.paths-self.stride), self.paths);
+        self.fft_shifts_rev = self.fft_shifts[::-1]
         
-        self.hh1 = np.reshape(self.c[::-1], (self.paths, self.taps)) # reshape analysis filter into polyphase
+        self.h1 = self.c # analysis filter
+        self.h2 = self.c # Syntehsis filter
+        self.hh1 = mreshape(self.c[::-1], (self.paths, self.taps)) # reshape analysis filter into polyphase
 
 
     def __str__(self):
@@ -43,6 +50,10 @@ class PolyphaseFilterbank(object):
     __repr__ = __str__
 
     def analysis(self, x, dtype=None):
+        '''
+        Does an analysis filterbank with commutation
+        :returns: [paths, nframes] array
+        '''
         if dtype is None:
             dtype = x.dtype
 
@@ -60,18 +71,64 @@ class PolyphaseFilterbank(object):
         for f in xrange(nframes):
             afin[stride:K] = afin[0:off]
             afin[0:stride] = x[off+(f+1)*stride:off+f*stride:-1]
-            reg1 = np.reshape(afin, (self.paths, self.taps))
+            reg1 = mreshape(afin, (self.paths, self.taps))
             
             for k in xrange(self.paths):
                 v1[k] = np.dot(reg1[k, :], self.hh1[k, :])
 
             v1 = v1[::-1]
             shift_indx = self.fft_shifts[f % len(self.fft_shifts)]
-            v1 = np.roll(v1, shift_indx)
+            v1 = np.roll(v1, -shift_indx)
             v2 = np.fft.fft(v1)
             dout[:, f] = v2
 
         return dout
+
+    def synthesis(self, x):
+        raise NotImplemented('Synthesis doesnt work well - you get spikes everywhere from the spike in the coefficients - weird')
+        npaths, nframes = x.shape
+        if npaths != self.paths:
+            raise ValueError('Invalid input')
+            
+        reg = np.zeros(self.paths * self.taps)
+        stride = self.stride
+        sf_state = np.zeros(self.K + self.stride*(nframes - 1), dtype=np.complex)
+        sf_out = np.zeros((nframes-1)*self.stride, dtype=np.complex)
+
+        for f in xrange(nframes):
+            ind = x[:, f]
+            temp = np.fft.ifft(ind)
+            shift_indx = self.fft_shifts_rev[f % len(self.fft_shifts_rev)]
+            temp = np.roll(temp, -shift_indx)
+            for lp1 in xrange(self.taps): # Could this be implemented as a tile & reshape?
+                reg[lp1*self.paths:(lp1+1)*self.paths] = temp 
+
+            reg *= self.h2
+            sf_state[f*stride:self.K + f*stride] += reg
+
+            if f > 0:
+                sf_out[(f-1)*stride:f*stride] = sf_state[(f-1)*stride:f*stride]
+
+
+            fig, axes = pylab.subplots(4, 1)
+            axes = axes.flatten()
+
+            axes[0].plot(sf_state)
+            axes[1].plot(sf_out)
+            #axes[1].set_xlim(0, 8192)
+            axes[2].plot(reg)
+            axes[3].plot(temp)
+
+            #axes[0].set_xlim(0, 8192)
+            fig.savefig('frame_{:02d}.png'.format(f))
+        
+            pylab.show()
+            
+
+            
+
+        return sf_out
+                    
 
 
 
@@ -80,7 +137,6 @@ class AdeFilterbank(PolyphaseFilterbank):
         this_dir = os.path.dirname(os.path.abspath(__file__))
         coeff_file = os.path.join(this_dir, 'ADE_R6_OSFIR.mat')
         c = scipy.io.loadmat(coeff_file)['c'][0, :] 
-        c[-1]  = 0 # for some reason there's a dodgey sample on the end?
         PolyphaseFilterbank.__init__(self, c, 32, 27, 1536)
 
 
@@ -131,7 +187,7 @@ def _main():
 
     snr = 10.
     N = 10*fb.K
-    x = np.random.randn(N)*0 + np.cos(2*np.pi*np.arange(N)*22./fb.paths)
+    x = np.random.randn(N)*0 + np.cos(2*np.pi*np.arange(N)*21./fb.paths)
     xfb = fb.analysis(x, x.dtype)
     spec = np.real(xfb*np.conj(xfb)).sum(axis=1)
     
@@ -139,11 +195,18 @@ def _main():
     print spec.shape, spec
     pylab.figure()
     pylab.plot(spec)
-    fb2 = FftFilterbank(fb.paths)
+    fb2 = ResampleFilterbank(fb.paths, 32, 27)
     xfb2 = fb2.analysis(x)
     spec2 = np.real(xfb2*np.conj(xfb2)).sum(axis=1)
     pylab.plot(spec2)
     #pylab.xlim(0, 50)
+
+    pylab.figure()
+    xfbb = fb.synthesis(xfb)
+
+    pylab.plot(x)
+    pylab.plot(xfbb)
+
     pylab.show()
     
 
