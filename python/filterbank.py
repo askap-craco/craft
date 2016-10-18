@@ -85,7 +85,7 @@ class PolyphaseFilterbank(object):
         return dout
 
     def synthesis(self, x):
-        raise NotImplemented('Synthesis doesnt work well - you get spikes everywhere from the spike in the coefficients - weird')
+        raise NotImplementedError('Synthesis doesnt work well - you get spikes everywhere from the spike in the coefficients - weird')
         npaths, nframes = x.shape
         if npaths != self.paths:
             raise ValueError('Invalid input')
@@ -109,7 +109,7 @@ class PolyphaseFilterbank(object):
             if f > 0:
                 sf_out[(f-1)*stride:f*stride] = sf_state[(f-1)*stride:f*stride]
 
-
+                
             fig, axes = pylab.subplots(4, 1)
             axes = axes.flatten()
 
@@ -123,9 +123,6 @@ class PolyphaseFilterbank(object):
             fig.savefig('frame_{:02d}.png'.format(f))
         
             pylab.show()
-            
-
-            
 
         return sf_out
                     
