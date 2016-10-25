@@ -150,6 +150,7 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	assert(max_dt > 0);
 	assert(nt > 0);
 	assert(fdmt->max_dt >= fdmt->nt);
+	assert(fdmt->max_dt % fdmt->nt == 0); // max_dt needs to be a multipel of nt
 	assert(1<<fdmt->order >= fdmt->nf);
 	assert(nbeams >= 1);
 
@@ -179,8 +180,14 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 		array4d_malloc(&fdmt->states[s]);
 	}
 
+	fdmt->ostate.nw = fdmt->nbeams;
+	fdmt->ostate.nx = 1;
+	fdmt->ostate.ny = fdmt->max_dt;
+	fdmt->ostate.nz = fdmt->max_dt;
+	array4d_malloc(&fdmt->ostate);
+	array4d_cuda_memset(&fdmt->ostate, 0);
 
-	// save iteration settings
+	// save iteration setup
 	int s = 0;
 	for (int iiter = 1; iiter < fdmt->order+1; iiter++) {
 		array4d_t* curr_state = &fdmt->states[s];
@@ -189,26 +196,10 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 		fdmt_save_iteration(fdmt, iiter, curr_state, new_state);
 	}
 
+	fdmt->execute_count = 0;
+
 	return 0;
 }
-
-//int fdmt_copy_state(const fdmt_t* fdmt, array3d_t* oldstate, array4d_t* newstate)
-//{
-//	// Copy & shift oldstate into new state so the next execution of the FDMT does the right thign
-//	// First thing is: fdmt_initialise only initialises the t 0..fdmt->nt - 1, so we'll be doing the rest
-//	for(int beam = 0; beam < fdmt->nbeams; ++beam) {
-//		for(int idt = 0 ; idt < fdmt->max_dt; idt++) {
-//			for(int it = fdmt->nt; t < max_dt; t++) {
-//				int outidx = array3d_idx(outidx, beam, idt, it);
-//				int new_chan = 0; //???
-//				int new_dt = idt; // ???
-//				int new_it = it - fdmt->nt; // shift left by nt
-//				int newidx = array4d_idx(newstate, beam, new_chan, new_dt, new_it);
-//			    newstate[newidx] = outstate[outidx];
-//			}
-//		}
-//	}
-//}
 
 int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* state)
 {
@@ -631,13 +622,13 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		int nthreads = tmax;
 
 		if(2*iif + 1 < indata->nx) { // do sum if there's a channel to sum
-			cuda_fdmt_iteration_kernel4_sum<<<fdmt->nbeams, tmax>>>(dst_start, src_start,
+			cuda_fdmt_iteration_kernel4_sum<<<fdmt->nbeams, nthreads>>>(dst_start, src_start,
 					src_beam_stride,
 					dst_beam_stride,
 					delta_t_local, ts_data);
 			gpuErrchk(cudaPeekAtLastError());
 		} else { // Do copy if there's no channel to add
-			cuda_fdmt_iteration_kernel4_copy<<<fdmt->nbeams, tmax>>>(dst_start, src_start,
+			cuda_fdmt_iteration_kernel4_copy<<<fdmt->nbeams, nthreads>>>(dst_start, src_start,
 					src_beam_stride,
 					dst_beam_stride,
 					delta_t_local, ts_data);
@@ -649,58 +640,101 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 
 }
 
-int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
+__global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
+										const fdmt_dtype* __restrict__ indata)
 {
-	array3d_t inarr = {.nx = fdmt->nbeams, .ny = fdmt->nf, .nz = fdmt->nt};
-	inarr.d = indata;
+	// Adds the indata into the ostate and shifts the ostate where the's some to add
+	// shape of both arrays is [nbeams, max_dt, max_dt]
+	// The time axis is the last one (it just has a big shape)
+	// Where nbeams = gridDim.x
+	// max_dt = gridDim.y
+	// nt = blockDim.x = number of threads
+	// Elsewhere we check that max_dt is a multiple of nt
+	int ibeam = blockIdx.x;
+	int nbeams = gridDim.x;
 
-	// Make the final outstate - this saves a memcpy on the final iteration
-	array4d_t outstate;
-	outstate.nw = fdmt->states[0].nw;
-	outstate.nx = fdmt->states[0].nx;
-	outstate.ny = fdmt->states[0].ny;
-	outstate.nz = fdmt->states[0].nz;
-	outstate.d = outdata;
+	int idt = blockIdx.y;
+	int max_dt = gridDim.y;
+
+	int nt = blockDim.x;
+	int off = max_dt*(idt + ibeam*nbeams);
+	int t = threadIdx.x;
+	fdmt_dtype* optr = ostate + off;
+	const fdmt_dtype* iptr = indata + off;
+
+	// Add the new state for all but the last block
+	while (t < max_dt - nt) {
+		optr[t] = iptr[t] + optr[t + nt];
+
+		// sync threads before doing the next block otherwise we don't copy the ostate correctly
+		__syncthreads();
+		t += nt;
+	}
+	// just copy the last block
+	optr[t] = iptr[t];
+}
+
+
+__host__ void fdmt_update_ostate(fdmt_t* fdmt)
+{
+	// Run this after fdmt_execute_iterations when you want to take the output of the FDMT and update
+	// the output state . i.e. do the delay and sum operation
+	assert(fdmt->max_dt % fdmt->nt == 0);
+	int s = fdmt->curr_state_idx;
+	array4d_t* currstate = &fdmt->states[s];
+	printf("w %d x %d y %d z %d\n", currstate->nw, currstate->nx, currstate->ny , currstate->nz);
+	assert(currstate->nw == fdmt->ostate.nw);
+	assert(currstate->nx == fdmt->ostate.nx);
+	assert(currstate->ny == fdmt->ostate.ny);
+	assert(currstate->nz == fdmt->ostate.nz);
+
+	dim3 grid_shape(fdmt->nbeams, fdmt->max_dt);
+	cuda_fdmt_update_ostate<<<grid_shape, fdmt->nt>>>(fdmt->ostate.d_device,
+			currstate->d_device);
+
+	gpuErrchk(cudaDeviceSynchronize());
+}
+
+__host__ void fdmt_copy_valid_ostate(fdmt_t* fdmt, fdmt_dtype* out)
+{ // Copies only the first nt elemtns of the ostate to the output
+	for(int b = 0; b < fdmt->nbeams; ++b) {
+		for(int idt = 0; idt < fdmt->max_dt; ++idt) {
+			int idx = array4d_idx(&fdmt->ostate, b, 0, idt, 0);
+			gpuErrchk(cudaMemcpyAsync(out + idx, fdmt->ostate.d_device + idx, sizeof(fdmt_dtype)*fdmt->nt, cudaMemcpyDeviceToHost));
+		}
+	}
+	gpuErrchk(cudaDeviceSynchronize());
+
+}
+
+__host__ void fdmt_copy_valid_ostate2(const fdmt_t* fdmt, fdmt_dtype* dst)
+{ // Copies only the first nt elemtns of the ostate to the output
+	size_t dpitch = sizeof(fdmt_dtype)*fdmt->nt;
+	size_t spitch = sizeof(fdmt_dtype)*fdmt->max_dt;
+	size_t width = sizeof(fdmt_dtype)*fdmt->nt;
+	size_t height = fdmt->max_dt;
+	for(int b = 0; b < fdmt->nbeams; ++b) {
+		int idx = array4d_idx(&fdmt->ostate, b, 0, 0, 0);
+		gpuErrchk(cudaMemcpy2DAsync(&dst[idx], dpitch,
+				&fdmt->ostate.d_device[idx], spitch,
+				width, height, cudaMemcpyDeviceToHost));
+	}
+	gpuErrchk(cudaDeviceSynchronize());
+
+}
+
+int fdmt_execute_iterations(fdmt_t* fdmt)
+{
+	// Assumes data have been initialised into state[0]
 
 	// Start that puppy up
 	int s = 0;
-
-	CudaTimer tinit;
-	tinit.start();
-	fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
-	tinit.stop();
-	cout << "Initialisation took " << tinit << endl;
-	CudaTimer tc;
-	tc.start();
-	array4d_copy_to_device(&fdmt->states[s]);
-	tc.stop();
-	cout << "Copy took " << tc << endl;
-
-
-#ifdef DUMP_STATE
-	char buf[128];
-	sprintf(buf, "state_s%d.dat", 0);
-	array4d_dump(&fdmt->states[s], buf);
-#endif
-
 	CudaTimer t;
 	t.start();
 	for (int iter = 1; iter < fdmt->order+1; iter++) {
-		//printf("Iteration %d\n", iter);
 		array4d_t* currstate = &fdmt->states[s];
-		array4d_t* newstate;
-
-		// If it's the last iteration, cheekily substitute the output pointer
-		// to save a memcopy
-		// if (iter == fdmt->order) {
 		s = (s + 1) % 2;
-		if (iter == fdmt->order) {
-			newstate = &outstate;
-			newstate->d_device = fdmt->states[s].d_device;
-			printf("Setting outstate\n");
-		} else {
-			newstate = &fdmt->states[s];
-		}
+		array4d_t* newstate = &fdmt->states[s];
 
 		//fdmt_iteration(fdmt, iter, currstate, newstate);
 
@@ -708,6 +742,7 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 		gpuErrchk(cudaPeekAtLastError());
 		gpuErrchk(cudaDeviceSynchronize());
 #ifdef DUMP_STATE
+		char buf[128];
 		array4d_copy_to_host(newstate);
 		sprintf(buf, "state_s%d.dat", iter);
 		array4d_dump(newstate, buf);
@@ -717,14 +752,76 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	}
 	t.stop();
 	cout << "FDMT Iterations only took " << t << endl;
+	fdmt->curr_state_idx = s; // Tell people where to find the current state
+}
+
+int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
+{
+	array3d_t inarr = {.nx = fdmt->nbeams, .ny = fdmt->nf, .nz = fdmt->nt};
+	inarr.d = indata;
+
+	// Make the final outstate - this saves a memcpy on the final iteration
+	array4d_t outstate;
+	outstate.nw = fdmt->ostate.nw;
+	outstate.nx = fdmt->ostate.nx;
+	outstate.ny = fdmt->ostate.ny;
+	outstate.nz = fdmt->ostate.nz;
+	outstate.d = outdata;
+	outstate.d_device = fdmt->ostate.d_device;
+
+	// Initialise state
+	CudaTimer tinit;
+	tinit.start();
+	int s = 0;
+	fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
+	tinit.stop();
+	cout << "Initialisation took " << tinit << endl;
+
+#ifdef DUMP_STATE
+	// dump init state to disk
+	char buf[128];
+	sprintf(buf, "state_s%d.dat", 0);
+	array4d_dump(&fdmt->states[s], buf);
+	sprintf(buf, "initstate_e%d.dat", fdmt->execute_count);
+	array4d_dump(&fdmt->states[s], buf);
+#endif
+
+	// copy initialised data to device
+	CudaTimer tc;
+	tc.start();
+	array4d_copy_to_device(&fdmt->states[s]);
+	tc.stop();
+	cout << "Copy took " << tc << endl;
+
+	// actually execute the iterations on the GPU
+	fdmt_execute_iterations(fdmt);
+
+	CudaTimer tupdate;
+	tupdate.start();
+	fdmt_update_ostate(fdmt);
+	tupdate.stop();
+	cout << "Delay and sum update took " << tupdate << endl;
+
+
+#ifdef DUMP_STATE
+	sprintf(buf, "ostate_e%d.dat", fdmt->execute_count);
+	array4d_copy_to_host(&fdmt->ostate);
+	array4d_dump(&fdmt->ostate, buf);
+	array4d_t* currstate = &fdmt->states[fdmt->curr_state_idx];
+	sprintf(buf, "finalstate_e%d.dat", fdmt->execute_count);
+	array4d_copy_to_host(currstate);
+	array4d_dump(currstate, buf);
+#endif
 
 	CudaTimer tback;
 	tback.start();
-	array4d_copy_to_host(&outstate);
+	fdmt_copy_valid_ostate2(fdmt, outdata);
 	tback.stop();
 	cout << "Copy back to host took " << tback << endl;
 
 	//printf("Returing form execute\n");
+
+	fdmt->execute_count += 1;
 
 	return 0;
 }

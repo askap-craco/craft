@@ -19,7 +19,7 @@
 #include "array.h"
 #include "array2d.h"
 
-#define DUMP_STATE 1
+//#define DUMP_STATE 1
 
 #define MAX_ITER 16
 
@@ -82,9 +82,12 @@ typedef struct _fdmt_t
 	int delta_t; // Initial delta_t for the initialisation
 	int nbeams; // Number of beams
 	int verbose; // 1 for verbose
+	int curr_state_idx; // index of the current state in the states[] array
 	array4d_t states[2]; // iteration states
+	array4d_t ostate; // Special state for output delay and sum
 	int state_nbytes; // number of bytes in state
 	int state_size; // number of elements in state
+	int execute_count; //  number of times execute() has been called
 	//FdmtIteration* iterations[MAX_ITER]; // description of what happens for each iteration
 	vector<FdmtIteration* > iterations;
 } fdmt_t;

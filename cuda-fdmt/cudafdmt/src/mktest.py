@@ -26,7 +26,7 @@ class Formatter(object):
 
 def myimshow(ax, *args, **kwargs):
     kwargs['aspect'] = 'auto'
-    kwargs['interpolation'] = 'None'
+    kwargs['interpolation'] = 'nearest'
     im = ax.imshow(*args, **kwargs)
     ax.format_coord = Formatter(im)
     return im
@@ -44,6 +44,33 @@ def make_signal2():
     N_total = N_f*N_t*N_bins
     PulseLength = N_f*N_bins
 
+def load4d(fname, dtype=np.float32):
+    fin = open(fname, 'r')
+    theshape =  np.fromfile(fin, dtype=np.int32, count=4)
+    d = np.fromfile(fin, dtype=dtype, count=theshape.prod())
+    d.shape = theshape
+    fin.close()
+    return d
+
+def file_series(prefix):
+    i = 0
+    while True:
+        fname = prefix % i
+        if os.path.exists(fname):
+            yield fname
+        else:
+            break
+        i += 1
+
+def show_series(prefix, theslice):
+    for fname in file_series(prefix):
+        ostate = load4d(fname)
+        pylab.figure()
+        v = ostate[theslice]
+        print fname, ostate.shape, 'zeros?', np.all(ostate == 0), 'max', v.max(), np.unravel_index(v.argmax(), v.shape)
+        myimshow(pylab.gca(), v, aspect='auto', origin='lower')
+        pylab.title(fname)
+
 
 def _main():
     from argparse import ArgumentParser
@@ -58,12 +85,13 @@ def _main():
 
     tint = 0.1
     nf = 512
-    nt_sim = 512
     nt = 512
+    nt_sim = 512
     nd = 512
     tstart = 0
     fmax = 1440.
     fmin = fmax - float(nf)
+    np.random.seed(42)
 
     if os.path.exists('test.in'):
         d = np.fromfile('test.in', dtype=np.float32, count=nf*nt)
@@ -72,7 +100,7 @@ def _main():
         with open('test.in', 'w') as fout:
             d = dispersed_stft(fmin, fmax, nt_sim, nf, N_bins=40, D=5., PulseSig=4.)
             d = d[:, tstart:tstart+nt]
-            d.astype(np.float32).tofile(fout)
+            d.astype(np.float32).T.tofile(fout)
 
     print 'signal shape', d.shape
 
@@ -81,9 +109,8 @@ def _main():
     with open('test.out', 'r') as fin:
         dout = np.fromfile(fin, dtype=np.float32, count=nd*nt)
         print 'test.out length', len(dout), nd, nt
-        assert len(dout) == nd*nt
-
-        dout.shape = (nd, nt)
+        #assert len(dout) == nd*nt
+        dout.shape = (nd, len(dout)/nd)
 
     fig, ax  = pylab.subplots(1,2)
     ex = (0, nt*tint, fmin, fmax)
@@ -91,22 +118,17 @@ def _main():
     myimshow(ax[0], d, origin='lower', extent=ex)
     myimshow(ax[1], dout, origin='lower', extent=ex)
     ax[0].set_title('test.out')
-    print 'Dout max', dout.max()
+    #print 'Dout max', dout.max()
 
+    show_series('ostate_e%d.dat', [0, 0, slice(None), slice(None)])
+    show_series('finalstate_e%d.dat', [0,0,slice(None),slice(None)])
+    show_series('initstate_e%d.dat',[0,slice(None),0,slice(None)])
 
-    i = 0
-    while True:
+    for i, fname in enumerate(file_series('state_s%d.dat')):
+        if 0 < i < 9:
+            continue
+        d = load4d(fname)
         fig, ax = pylab.subplots(1,2)
-        fname = 'state_s%d.dat' % i
-        if not os.path.exists(fname):
-            break
-
-        fin = open(fname, 'r')
-        theshape =  np.fromfile(fin, dtype=np.int32, count=4)
-        print theshape
-        
-        d = np.fromfile(fin, dtype=np.float32, count=theshape.prod())
-        d.shape = theshape
         beam = 0
         myimshow(ax[0], d[beam, :, 0, :], aspect='auto', origin='lower')
         myimshow(ax[1], d[beam, 0, :, :], aspect='auto', origin='lower')
@@ -114,8 +136,6 @@ def _main():
         ax[0].set_title(fname)
 
         print fname, d.shape, np.prod(d.shape)
-        fin.close()
-        i += 1
 
     pylab.show()
     
