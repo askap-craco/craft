@@ -15,6 +15,7 @@ import itertools
 import re
 from craftobs import load_beams
 from plotutil import subplots as mysubplots
+import plotutil
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -45,14 +46,15 @@ def _main():
         tstart = 0
         ntimes = 128*8
 
-    nrows = 1
-    ncols = 1
+    nrows = 2
+    ncols = 5
     
-    fig1, axes1 = mysubplots(nrows, ncols)
-    fig2, axes2 = mysubplots(nrows, ncols)
-    fig3, axes3 = mysubplots(nrows, ncols)
-    fig4, axes4 = mysubplots(nrows, ncols)
-    fig5, axes5 = mysubplots(nrows, ncols)
+    fig1, axes1 = mysubplots(nrows, ncols, sharex=True, sharey=True)
+    fig2, axes2 = mysubplots(nrows, ncols, sharex=True, sharey=True)
+    fig3, axes3 = mysubplots(nrows, ncols, sharex=True, sharey=True) 
+    fig4, axes4 = mysubplots(nrows, ncols, sharex=True, sharey=True)
+    fig5, axes5 = mysubplots(nrows, ncols, sharex=True, sharey=True)
+    fig6, axes6 = mysubplots(nrows, ncols, sharex=True, sharey=True)
 
 
     antbeams = {}
@@ -62,10 +64,16 @@ def _main():
     axes3.flat[0].set_ylabel('Bandpass std')
     axes4.flat[0].set_ylabel('FFT(DM0)')
     axes5.flat[0].set_ylabel('Channel')
+    axes6.flat[0].set_ylabel('FFT(chans)')
 
-    chan = 300
-    beamno = 0 
-    
+    chan = 10
+    beamno = 0
+
+    fs = 1e6*32./27.
+    tint = 1500./fs # seconds
+    fint = 1./tint
+    print 'fs', fs, 'Tint', tint, fint
+
     
     for i, antdir in enumerate(values.files):
         antpath = os.path.join(antdir, 'C000/')
@@ -79,9 +87,10 @@ def _main():
         # shape is time, beam, freq
         
         print beams.shape
-        dm0 = beams.mean(axis=2)
+        ntimes, nbeams, nfreqs = beams.shape
+        #dm0 = beams.mean(axis=2)
 
-        #dm0 = beams[:, :, chan]
+        dm0 = beams[:, :, 280:336].mean(axis=2)
         cov = np.cov(dm0.T)
         cov /= np.diag(cov)
         antname = antdir.replace('/','')
@@ -99,28 +108,41 @@ def _main():
         #ax2b = ax2.twinx()
 
         ax3 = axes3.flat[i]
-        ax3.plot(beams.std(axis=0).T)
+        beam_std = beams.std(axis=0).T
+        for b in xrange(nbeams):
+            ax3.plot(beam_std[:, b], label='Beam %d' % b, picker=3)
+
         ax3.set_title(antname)
 
         ax4 = axes4.flat[i]
-        dm0 = beams.mean(axis=2)
-        df = np.abs(np.fft.rfft(dm0.T))**2
-        ax4.semilogy(df[1:].T)
-        #ax4.plot(dm0)
+        df = np.abs(np.fft.rfft(dm0, axis=0))**2
+        nft = df.shape[0]
+        freqs = np.arange(nft)/float(nft)*fint/2.
+        print 'Freqs', freqs.shape, df.shape
+        for b in xrange(nbeams):
+            ax4.loglog(freqs[1:], df[1:, b], label='Beam %d' % b, picker=3)
+
         ax4.set_title(antname)
 
         ax5 = axes5.flat[i]
         b0 = beams[:, beamno, :]
         print b0.shape
-        ax5.imshow(beams[:,0,:].T, aspect='auto')
+        ax5.imshow(b0.T, aspect='auto')
         ax5.set_title(antname)
 
+        ax6 = axes6.flat[i]
+        bf = np.abs(np.fft.rfft(b0, axis=0))**2
+        ax6.imshow(np.log10(df), aspect='auto')
+        ax6.set_title(antname)
 
 
     ax.set_xlabel('Beam number')
     ax.set_ylabel('Beam nunber')
     ax2.set_xlabel('Channel')
     ax3.set_xlabel('Channel')
+    ax4.set_xlabel('Frequency (Hz)')
+    ax5.set_xlabel('Integration number')
+    ax6.set_xlabel('Channel number')
 
     #cb = ax.colorbar()
     #cb.set_label('Covariance (dB)')
@@ -129,6 +151,10 @@ def _main():
     fig2.savefig('ant_bpmean.png')
     fig3.savefig('ant_bpstd.png')
     fig4.savefig('ant_dm0fft.png')
+
+    for f in (fig2, fig3, fig4):
+        f.canvas.mpl_connect('pick_event', plotutil.onpick)
+
 
 
     pylab.show()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Template for making scripts to run from the command line
+Plots a lot of beams
 
 Copyright (C) CSIRO 2015
 """
@@ -23,6 +23,12 @@ def onpick(event):
     ind = event.ind
 
     print thisline.get_label(), xdata[ind], ydata[ind]
+
+def annotate(fig, title, xlabel, ylable):
+    fig.add_text(title, 0.5, 0.98, ha='center', va='top')
+    fig.add_text(xlabel, 0.5, 0.02, ha='center', va='bottom')
+    fig.add_text(ylabel, 0.02, 0.5, angle=90, ha='center', va='top')
+    
 
 def _main():
     from argparse import ArgumentParser
@@ -59,7 +65,6 @@ def _main():
     fig3, axes3 = subplots(nrows, ncols, sharex=True, sharey=True)
     fig4, axes4 = subplots(nrows, ncols, sharex=True, sharey=True)
     fig5, axes5 = subplots(nrows, ncols, sharex=True, sharey=True)
-
 
     beams = load_beams(values.files[0], tstart, ntimes)
     print 'Loaded beams', beams.shape
@@ -109,7 +114,13 @@ def _main():
         ax5.plot(np.log10(dm0f[1:]))
 
     
-        
+
+    annotate(fig1, 'Dynamic spectrum', 'Time', 'Channel')
+    annotate(fig2, 'Mean bandpass', 'Channel','Mean bandpass')
+    annotate(fig3, 'Bandpass stdDev', 'Channel','Bandpass StdDev')
+    annotate(fig4, 'FFT of all channels', 'Digital frequency ', 'Channel')
+    annotate(fig5, 'FFT of DM0', 'Digital Frequency', 'FFT (dB)')
+
 
     pylab.show()
 

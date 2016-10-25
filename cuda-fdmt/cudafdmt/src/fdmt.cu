@@ -136,9 +136,10 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 }
 
 
-int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nbeams)
+int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt, int nbeams)
 {
 	fdmt->max_dt = max_dt;
+	fdmt->nt = nt;
 	fdmt->fmin = fmin;
 	fdmt->fmax = fmax;
 	fdmt->nf = nf;
@@ -359,8 +360,8 @@ int fdmt_iteration(const fdmt_t* fdmt,
 			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
 			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0);
 			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
-			printf("iter %d iif %03d idt %02d src1_off %06d src2_off %06d out_off %06d maxt %02d dtmid %d dtr %d dtmidlg %d in [%d,%d,%d,%d]\n",
-					iteration_num, iif, idt, src1_offset, src2_offset, out_offset, maxt, dt_middle_index, dt_rest_index, dt_middle_larger, indata->nw, indata->nx, indata->ny, indata->nz);
+			//printf("iter %d iif %03d idt %02d src1_off %06d src2_off %06d out_off %06d maxt %02d dtmid %d dtr %d dtmidlg %d in [%d,%d,%d,%d]\n",
+			//		iteration_num, iif, idt, src1_offset, src2_offset, out_offset, maxt, dt_middle_index, dt_rest_index, dt_middle_larger, indata->nw, indata->nx, indata->ny, indata->nz);
 
 
 			if (2*iif + 1 < indata->nx) { // If the input data has this channel, we'll add it in

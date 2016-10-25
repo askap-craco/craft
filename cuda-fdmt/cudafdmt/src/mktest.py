@@ -12,6 +12,7 @@ import os
 import sys
 import logging
 import subprocess
+from craftsim import dispersed_voltage, dispersed_stft
 from FDMT import *
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -30,22 +31,6 @@ def myimshow(ax, *args, **kwargs):
     ax.format_coord = Formatter(im)
     return im
 
-def stft(X, N_f, N_t, N_bins):
-    ''' Copied from FDMT.py'''
-    XX = np.abs(np.fft.fft(X.reshape([N_f,N_t*N_bins]),axis = 1))**2
-    XX = np.transpose(XX)
-    XX = np.sum(XX.reshape(N_f,N_bins,N_t),axis=1)
-    
-    E = np.mean(XX[:,:10])
-    XX -= E
-    V = np.var(XX[:,:10])
-    
-    XX /= (0.25*np.sqrt(V))
-    V = np.var(XX[:,:10])
-
-    return XX
-
-
 def make_signal2():
     freq = np.linspace(fmin, fmax, nf)
     dm = 150
@@ -54,6 +39,10 @@ def make_signal2():
     d = np.zeros((nf, nt), dtype=np.float32)
     d += np.random.randn(nf, nt)
     return d
+
+
+    N_total = N_f*N_t*N_bins
+    PulseLength = N_f*N_bins
 
 
 def _main():
@@ -70,7 +59,8 @@ def _main():
     tint = 0.1
     nf = 512
     nt_sim = 512
-    nt = 256
+    nt = 512
+    nd = 512
     tstart = 0
     fmax = 1440.
     fmin = fmax - float(nf)
@@ -80,7 +70,7 @@ def _main():
         d.shape = (nf, nt)
     else:
         with open('test.in', 'w') as fout:
-            d = make_signal(fmin, fmax, 40, nt_sim, nf, D=5)
+            d = dispersed_stft(fmin, fmax, nt_sim, nf, N_bins=40, D=5., PulseSig=4.)
             d = d[:, tstart:tstart+nt]
             d.astype(np.float32).tofile(fout)
 
@@ -89,8 +79,11 @@ def _main():
     nf, nt = d.shape
 
     with open('test.out', 'r') as fin:
-        dout = np.fromfile(fin, dtype=np.float32, count=nf*nt)
-        dout.shape = (nf, nt)
+        dout = np.fromfile(fin, dtype=np.float32, count=nd*nt)
+        print 'test.out length', len(dout), nd, nt
+        assert len(dout) == nd*nt
+
+        dout.shape = (nd, nt)
 
     fig, ax  = pylab.subplots(1,2)
     ex = (0, nt*tint, fmin, fmax)

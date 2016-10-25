@@ -16,7 +16,7 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 
 def load_beams(path, tstart, ntimes):
-    files = sorted(glob.glob(os.path.join(path, '*.fil')))
+    files = sorted(glob.glob(os.path.join(path, '*.fil_sum')))
     if len(files) == 0:
         raise ValueError('No files in path  %s' % path)
     data = None

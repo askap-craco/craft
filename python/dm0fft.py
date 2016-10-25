@@ -80,7 +80,7 @@ def _main():
             dtype = np.float32
         v = np.fromfile(f.fin, dtype=dtype, count=nelements )
         v = v.astype(np.float)
-        print 'Nelements', nelements, 'Ntimes', ntimes, 'nchans', f.nchans, 'nifs', f.nifs, dtype, 'Actual length', len(v)
+        print 'Nelements', nelements, 'Ntimes', ntimes, 'nchans', f.nchans, 'nifs', f.nifs, dtype, 'Actual length', len(v), 'Tsamp', f.tsamp
     
         v.shape = (ntimes, f.nifs, f.nchans)
         beam = 0
@@ -123,7 +123,7 @@ def _main():
         ax1.imshow(np.log10(ffts), aspect='auto')
         ax1.set_title('AK%02d' % ant)
 
-        #ax2.semilogy(freqs[1:], x.T[1:, :])
+        ax2.semilogy(freqs[1:], ffts[:, 1:].T)
         ax2.set_title('AK%02d' % ant)
 
         maxfreqs = [freqs[np.argmax(ffts[i, 1:])] for i in xrange(ffts.shape[0])]

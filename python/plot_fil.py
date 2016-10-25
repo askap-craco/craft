@@ -120,7 +120,7 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
 
     nrows, ncols = map(int, values.nxy.split(','))
 
-    plot_cov(v[:, :, 150:151], f)
+    #plot_cov(v[:, :, 150:151], f)
     
     fig, axes = mysubplots(nrows, ncols, sharex=True, sharey=True)
     

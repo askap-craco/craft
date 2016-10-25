@@ -12,13 +12,14 @@ import os
 import sys
 import logging
 import scipy.signal
-from FDMT import CoherentDedispersion, DispersionConstant
+from FDMT import CoherentDedispersion, DispersionConstant, STFT
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 
 def dispersed_voltage(f_min, f_max, n_pulse, n_samps, D=5, PulseSig = 0.4, PulsePosition = 4134567/4):
     ''' Modified from FDMT.py'''
+    print locals()
     N_total = n_samps
     PulseLength = n_pulse
     practicalD = DispersionConstant * D
@@ -30,9 +31,28 @@ def dispersed_voltage(f_min, f_max, n_pulse, n_samps, D=5, PulseSig = 0.4, Pulse
 
     return X
 
-def dispersed_stft(f_min, f_max, N_t, N_f, D=5, PulseSig=0.4, PulsePosition=4134567/4):
-    x = dispersed_voltage(f_min, f_max, N_t, N_f, D, PulseSig, PulsePosition)
-    return stft(X, N_f, N_t, N_bins)
+def stft(X, N_f, N_t, N_bins):
+    ''' Copied from FDMT.py'''
+    XX = np.abs(np.fft.fft(X.reshape([N_f,N_t*N_bins]),axis = 1))**2
+    XX = np.transpose(XX)
+    XX = np.sum(XX.reshape(N_f,N_bins,N_t),axis=1)
+    
+    E = np.mean(XX[:,:10])
+    XX -= E
+    V = np.var(XX[:,:10])
+    
+    XX /= (0.25*np.sqrt(V))
+    V = np.var(XX[:,:10])
+
+    return XX
+
+
+
+def dispersed_stft(f_min, f_max, N_t, N_f, N_bins, D=5, PulseSig=0.4, PulsePosition=4134567/4):
+    n_pulse = N_f * N_bins
+    n_samps = N_t * n_pulse
+    x = dispersed_voltage(f_min, f_max, n_pulse, n_samps, D, PulseSig, PulsePosition)
+    return stft(x, N_f, N_t, N_bins)
 
 def resample(x, axis=0, window=('kaiser', 5.0)):
     '''

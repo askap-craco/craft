@@ -18,13 +18,12 @@ using namespace std;
 
 int main(int argc, char* argv[])
 {
-    int nd = 512;
-    int nt = 512;
-    int nf = 512;
-    int nbeams = 36*6;
+    const int nd = 512;
+    const int nt = 512;
+    const int nf = 512;
+    int nbeams = 36;
     float fmax = 1440;
     float fmin = fmax - (float)nf;
-    
     fdmt_dtype* din = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*nd*nf*nbeams);
     fdmt_dtype* dout = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*nd*nt*nbeams);
     printf("Starting!\n");
@@ -63,15 +62,13 @@ int main(int argc, char* argv[])
     t.stop();
     cout << "FDMT Execute loop took " << t << endl;
 
-
-    
     FILE* fout = fopen(argv[2], "w");
     if (fout == NULL) {
         perror("Could not open output file");
         exit(EXIT_FAILURE);
     }
-    fwrite(dout, sizeof(fdmt_dtype), nd*nf, fout);
+    fwrite(dout, sizeof(fdmt_dtype), nd*nt, fout);
     fclose(fout);
-    printf("Wrote output file %s\n", argv[2]);
+    printf("Wrote output file %s with %d elements\n", argv[2], nd*nt);
     
 }
