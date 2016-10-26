@@ -125,17 +125,19 @@ class PolyphaseFilterbank(object):
             pylab.show()
 
         return sf_out
-                    
-
-
-
+      
 class AdeFilterbank(PolyphaseFilterbank):
     def __init__(self):
         this_dir = os.path.dirname(os.path.abspath(__file__))
         coeff_file = os.path.join(this_dir, 'ADE_R6_OSFIR.mat')
         c = scipy.io.loadmat(coeff_file)['c'][0, :] 
+        # From John Tuthill: the coefficients have rediculous values
+        # at the start and end. This is probably a bug in how
+        # the coefficients are calculated. Needs research.
+        # He reckons it's harmless to set them to zero, so ...
+        c[0] = 0
+        c[-1] = 0
         PolyphaseFilterbank.__init__(self, c, 32, 27, 1536)
-
 
 class FftFilterbank(object):
     def __init__(self, N):
