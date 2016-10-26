@@ -107,7 +107,7 @@ def _main():
     nf, nt = d.shape
 
     with open('test.out', 'r') as fin:
-        dout = np.fromfile(fin, dtype=np.float32, count=nd*nt)
+        dout = np.fromfile(fin, dtype=np.float32, count=-1)
         print 'test.out length', len(dout), nd, nt
         #assert len(dout) == nd*nt
         dout.shape = (nd, len(dout)/nd)

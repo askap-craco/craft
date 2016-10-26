@@ -118,6 +118,7 @@ int main(int argc, char* argv[])
 		t.stop();
 		cout << "FDMT Execute loop took " << t << endl;
 		fwrite(dout, sizeof(fdmt_dtype), blockout, fout);
+		cout << "Wrote " << blockout << " elements to outfile. First two are:" << dout[0] << dout[1] << endl;
 	}
 	fclose(fin);
 	fclose(fout);

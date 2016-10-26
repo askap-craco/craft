@@ -700,11 +700,27 @@ __host__ void fdmt_copy_valid_ostate(fdmt_t* fdmt, fdmt_dtype* out)
 	for(int b = 0; b < fdmt->nbeams; ++b) {
 		for(int idt = 0; idt < fdmt->max_dt; ++idt) {
 			int idx = array4d_idx(&fdmt->ostate, b, 0, idt, 0);
-			gpuErrchk(cudaMemcpyAsync(out + idx, fdmt->ostate.d_device + idx, sizeof(fdmt_dtype)*fdmt->nt, cudaMemcpyDeviceToHost));
+			gpuErrchk(cudaMemcpy(out + idx, fdmt->ostate.d_device + idx, sizeof(fdmt_dtype)*fdmt->nt, cudaMemcpyDeviceToHost));
 		}
 	}
-	gpuErrchk(cudaDeviceSynchronize());
 
+}
+
+__host__ void fdmt_copy_valid_ostate3(fdmt_t* fdmt, fdmt_dtype* out)
+{ // Copies only the first nt elemtns of the ostate to the output
+	bzero(out, sizeof(fdmt_dtype)*fdmt->nbeams*fdmt->max_dt*fdmt->nt);
+	array4d_copy_to_host(&fdmt->ostate);
+	int i = 0;
+	for (int b = 0; b < fdmt->nbeams; ++b) {
+		for(int idt = 0; idt < fdmt->max_dt; ++idt) {
+			for (int t = 0; t < fdmt->nt; ++t) {
+				int inidx = array4d_idx(&fdmt->ostate, b, 0, idt, t);
+				int outidx = array4d_idx(&fdmt->ostate, b, 0, t, idt);
+				out[outidx] = fdmt->ostate.d[inidx];
+				i += 1;
+			}
+		}
+	}
 }
 
 __host__ void fdmt_copy_valid_ostate2(const fdmt_t* fdmt, fdmt_dtype* dst)
@@ -815,7 +831,7 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 
 	CudaTimer tback;
 	tback.start();
-	fdmt_copy_valid_ostate2(fdmt, outdata);
+	fdmt_copy_valid_ostate3(fdmt, outdata);
 	tback.stop();
 	cout << "Copy back to host took " << tback << endl;
 
