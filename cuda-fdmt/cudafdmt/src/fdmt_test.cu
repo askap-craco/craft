@@ -11,15 +11,15 @@
 #include <unistd.h>
 #include <iostream>
 #include "fdmt.h"
-#include "cuda_fdmt.h"
 #include "array.h"
 #include "boxcar.h"
 #include "CudaTimer.h"
+#include "SigprocFile.h"
 
 
 using namespace std;
 
-void usage() {
+void runtest_usage() {
 	fprintf(stderr,
 			"fdmt_test [options] infile outfile\n"
 			"	-d Number of dispersion trials\n"
@@ -33,6 +33,50 @@ void usage() {
 }
 
 int main(int argc, char* argv[])
+{
+	printf("Test!");
+	int nd = 512;
+	int nt = 256;
+	int nf = 512;
+	int nbeams = 1;
+	float fmax = 1440;
+	char ch;
+	while ((ch = getopt(argc, argv, "d:t:f:b:x:g:h")) != -1) {
+		switch (ch) {
+		case 'd':
+			nd = atoi(optarg);
+			break;
+		case 't':
+			nt = atoi(optarg);
+			break;
+		case 'f':
+			nf = atoi(optarg);
+			break;
+		case 'b':
+			nbeams = atoi(optarg);
+			break;
+		case 'x':
+			fmax = atof(optarg);
+			break;
+		case '?':
+		case 'h':
+		default:
+			runtest_usage();
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 0) {
+		printf("Not enough arguments\n");
+		exit(EXIT_FAILURE);
+	}
+
+	SigprocFile spf(argv[0]);
+	cout << "spf " << spf.header("tsamp");
+}
+
+int runtest(int argc, char* argv[])
 {
 	int nd = 512;
 	int nt = 256;
@@ -60,7 +104,7 @@ int main(int argc, char* argv[])
 		case '?':
 		case 'h':
 		default:
-			usage();
+			runtest_usage();
 		}
 	}
 	argc -= optind;
