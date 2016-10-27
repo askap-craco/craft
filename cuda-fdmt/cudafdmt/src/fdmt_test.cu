@@ -73,7 +73,8 @@ int main(int argc, char* argv[])
 	}
 
 	SigprocFile spf(argv[0]);
-	cout << "spf " << spf.header("tsamp");
+	cout << "spf tsamp " << spf.header_double("tsamp") << " nifs " << spf.header_int("nifs") << " fch1 " << spf.header_double("fch1")
+			 << "foff " << spf.header_double("foff") << endl;
 }
 
 int runtest(int argc, char* argv[])

@@ -17,7 +17,10 @@ class SigprocFile {
 public:
 	SigprocFile(const char* filename);
 	virtual ~SigprocFile();
-	float header(const char* hname);
+	const char* header_find(const char* hname) const;
+	int header_int(const char* hname) const;
+	double header_double(const char* hname) const;
+
 
 private:
 	FILE* m_file;
