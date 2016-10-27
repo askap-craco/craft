@@ -12,6 +12,8 @@
 #include <iostream>
 #include "fdmt.h"
 #include "cuda_fdmt.h"
+#include "array.h"
+#include "boxcar.h"
 #include "CudaTimer.h"
 
 
@@ -94,6 +96,14 @@ int main(int argc, char* argv[])
 	fdmt_t fdmt;
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
 
+	int nbox = 32;
+	array4d_t boxout;
+	boxout.nw = nbeams;
+	boxout.nx = nd;
+	boxout.ny = nt;
+	boxout.nz = nbox;
+	array4d_malloc(&boxout);
+
 	// read input file until exhausted
 	while (fread(din_tmp, sizeof(fdmt_dtype), blockin, fin) == blockin) {
 
@@ -115,6 +125,9 @@ int main(int argc, char* argv[])
 		for(int i = 0; i < 1; i++) {
 			fdmt_execute(&fdmt, din, dout);
 		}
+
+		boxcar_do(&fdmt.states[fdmt.curr_state_idx], &boxout);
+
 		t.stop();
 		cout << "FDMT Execute loop took " << t << endl;
 		fwrite(dout, sizeof(fdmt_dtype), blockout, fout);

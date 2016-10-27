@@ -3,6 +3,7 @@
 	<name>cudafdmt</name>
 	<comment></comment>
 	<projects>
+		<project>cudafdmt</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

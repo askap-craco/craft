@@ -3,6 +3,7 @@
 #include "gpu_kernels.h"
 //#include "cuda_fdmt.h"
 #include "fdmt.h"
+#include "fdmt_utils.h"
 #include "CudaTimer.h"
 
 
@@ -650,6 +651,7 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 	// max_dt = gridDim.y
 	// nt = blockDim.x = number of threads
 	// Elsewhere we check that max_dt is a multiple of nt
+
 	int ibeam = blockIdx.x;
 	int nbeams = gridDim.x;
 
@@ -658,6 +660,7 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 
 	int nt = blockDim.x;
 	int off = max_dt*(idt + ibeam*nbeams);
+
 	int t = threadIdx.x;
 	fdmt_dtype* optr = ostate + off;
 	const fdmt_dtype* iptr = indata + off;
