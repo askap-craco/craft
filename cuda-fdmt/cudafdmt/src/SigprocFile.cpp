@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <stdint.h>
+#include <math.h>
 
 /* Same as strstr but goes through *all* the string - even if it contains nulls
  *
@@ -130,4 +131,13 @@ double SigprocFile::last_sample_mjd()
 {
 	double mjd = m_tstart + last_sample_elapsed_seconds()/86400.0;
 	return mjd;
+}
+
+float SigprocFile::dm_of_idt(int idt)
+{
+	float nu1 = m_fch1;
+	float nu2 = m_fch1 + m_foff*m_nchans;
+	float dm = fabs(idt*m_tsamp / 4.15e-3 / (nu1*nu1 - nu2*nu2));
+
+	return dm;
 }

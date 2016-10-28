@@ -4,6 +4,7 @@
 
 #include "fdmt_utils.h"
 #include "array.h"
+#include "CandidateSink.h"
 
 const int NBOX = 32; // Needs to be the warp size actually
 
@@ -117,4 +118,28 @@ int boxcar_do(array4d_t* indata, array4d_t* outdata)
 	// outshape: [nbeams, ndt, nt, nbox=32]
 	return 0;
 
+}
+
+int boxcar_threshonly(const array4d_t* indata, fdmt_dtype thresh,
+		CandidateSink& sink) {
+	int nbeams = indata->nw;
+	assert(indata->nx == 1);
+	int ndt = indata->ny;
+	int nt = indata->nz;
+	int ncand = 0;
+
+	for(int b = 0; b < nbeams; ++b) {
+		for(int idt = 0; idt < ndt; ++idt) {
+			for(int t = 0; t < nt; ++t) {
+				int inidx = array4d_idx(indata, b, 0, idt, t);
+				fdmt_dtype v = indata->d[inidx];
+				if (v > thresh) {
+					sink.add_candidate(b, idt, t, 0, v);
+					ncand += 1;
+				}
+			}
+		}
+	}
+
+	return ncand;
 }

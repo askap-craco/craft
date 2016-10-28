@@ -32,6 +32,7 @@ public:
 	double last_sample_elapsed_seconds();
 	double last_sample_mjd();
 	size_t seek_sample(size_t t);
+	float dm_of_idt(int idt);
 
 	double m_fch1;
 	double m_foff;
@@ -43,7 +44,6 @@ public:
 
 	size_t m_samples_read;
 
-private:
 	FILE* m_file;
 	char* m_filename;
 	char m_hdr[MAX_HDR_SIZE];

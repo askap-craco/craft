@@ -15,6 +15,7 @@
 #include "boxcar.h"
 #include "CudaTimer.h"
 #include "SigprocFile.h"
+#include "rescale.h"
 
 
 using namespace std;
@@ -37,14 +38,26 @@ int main(int argc, char* argv[])
 	printf("Test!");
 	int nd = 512;
 	int nt = 256;
+	float decay_timescale = 10.0; // Seconds?
 	char ch;
-	while ((ch = getopt(argc, argv, "d:t:h")) != -1) {
+	float thresh = 10.0;
+	char* out_filename = "fredda.cand";
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
 			break;
 		case 't':
 			nt = atoi(optarg);
+			break;
+		case 's':
+			decay_timescale = atof(optarg);
+			break;
+		case 'o':
+			out_filename = optarg;
+			break;
+		case 'x':
+			thresh = atof(optarg);
 			break;
 		case '?':
 		case 'h':
@@ -62,18 +75,29 @@ int main(int argc, char* argv[])
 
 	// Load sigproc file
 	SigprocFile spf(argv[0]);
+	CandidateSink sink(&spf, out_filename);
 	cout << "spf tsamp " << spf.header_double("tsamp") << " nifs " << spf.header_int("nifs") << " fch1 " << spf.header_double("fch1")
 							 << "foff " << spf.header_double("foff") << endl;
 	int nbeams = spf.m_nifs;
 	int nf = spf.m_nchans;
-	size_t chunk_size = nbeams*nf*nt;
+	size_t in_chunk_size = nbeams*nf*nt;
 
 	// Create read buffer
-	uint8_t* read_buf = (uint8_t*) malloc(sizeof(uint8_t) * chunk_size);
+	uint8_t* read_buf = (uint8_t*) malloc(sizeof(uint8_t) * in_chunk_size);
 	assert(read_buf);
 
-	float* in_buf = (float*) malloc(sizeof(float) * chunk_size);
+	float* in_buf = (float*) malloc(sizeof(float) * in_chunk_size);
 	assert(in_buf);
+
+	array4d_t out_buf;
+	out_buf.d = (float*) malloc(sizeof(float)*nt*nbeams*nd);
+
+	// create rescaler
+	rescale_t rescale;
+	rescale.target_mean = 0.0;
+	rescale.target_stdev = 1.0;
+	rescale.decay_constant = 0.35 * decay_timescale / spf.m_tsamp; // This is how the_decimator.C does it, I think.
+	rescale_allocate(&rescale, in_chunk_size);
 
 	// Create FDMT
 	float fmax = (float) spf.m_fch1;
@@ -84,20 +108,31 @@ int main(int argc, char* argv[])
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
 
 	const int num_skip_blocks = 4;
+	const int num_rescale_blocks = 4;
 	spf.seek_sample(num_skip_blocks*nt);
 
-	while (spf.read_samples_uint8(nt, read_buf) == chunk_size) {
+
+	while (spf.read_samples_uint8(nt, read_buf) == in_chunk_size) {
 		// File is in TBF order
 		// Output needs to be BFT order
 		// Do transpose and cast to float on the way through
+		// TODO: Optimisation: cast to float and do rescaling in SIMD
 		for(int t = 0; t < nt; ++t) {
 			for (int b = 0; b < nbeams; ++b) {
 				for (int f = 0; f < nf; ++f) {
 					int inidx = f + nf*(b + nbeams*nt);
 					int outidx = t + nt*(f + nf*b);
-					in_buf[outidx] = (float) read_buf[inidx];
+					// writes to inbuf
+					rescale_update_decay_float_single(&rescale, outidx, (float) read_buf[inidx], in_buf);
 				}
 			}
+		}
+		rescale_update_scaleoffset(&rescale);
+
+		fdmt_execute(&fdmt, in_buf, out_buf.d);
+
+		if (spf.m_samples_read > nt*num_rescale_blocks) {
+			boxcar_threshonly(&out_buf, thresh, sink);
 		}
 	}
 }

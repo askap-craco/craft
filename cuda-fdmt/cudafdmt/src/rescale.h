@@ -27,6 +27,7 @@ void rescale_update_uint8(rescale_t* rescale, float* fdata, uint8_t* sampbuf, un
 void rescale_update_uint8_polsum(rescale_t* rescale, float* fdata, uint8_t* sampbuf, unsigned istart);
 void rescale_update_int8(rescale_t* rescale, float* in, int8_t*  out);
 void rescale_update_decay_float(rescale_t* rescale, float* in, float* out);
+void rescale_update_decay_float_single(rescale_t* rescale, int i, float in, float* __restrict__ out);
 void rescale_update_decay_uint8(rescale_t* rescale, float* in, uint8_t* out);
 
 #endif
