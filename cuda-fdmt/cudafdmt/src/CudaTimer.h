@@ -27,7 +27,8 @@ public:
 
 	friend ostream &operator<<(ostream & output,  CudaTimer &t)
 	{
-		output << t.get_elapsed_time() << " ms";
+		output << "total: " << t.m_total_time << " ms" << " last: "
+				<< t.get_elapsed_time() << " ms";
 		return output;
 	}
 
@@ -35,6 +36,7 @@ private:
 	cudaEvent_t m_start;
 	cudaEvent_t m_stop;
 	cudaStream_t m_stream;
+	float m_total_time;
 };
 
 #endif /* CUDATIMER_H_ */

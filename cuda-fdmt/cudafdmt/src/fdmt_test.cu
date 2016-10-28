@@ -187,6 +187,7 @@ int main(int argc, char* argv[])
 	}
 
 	printf("FREDDA Finished\n");
+	fdmt_print_timing(&fdmt);
 }
 int runtest(int argc, char* argv[])
 {

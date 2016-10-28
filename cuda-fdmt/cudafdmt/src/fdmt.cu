@@ -753,8 +753,8 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 
 	// Start that puppy up
 	int s = 0;
-	CudaTimer t;
-	t.start();
+
+	fdmt->t_iterations.start();
 	for (int iter = 1; iter < fdmt->order+1; iter++) {
 		array4d_t* currstate = &fdmt->states[s];
 		s = (s + 1) % 2;
@@ -774,7 +774,7 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 		//printf("Finisehd iteration %d\n", iter);
 
 	}
-	t.stop();
+	fdmt->t_iterations.stop();
 	//cout << "FDMT Iterations only took " << t << endl;
 	fdmt->curr_state_idx = s; // Tell people where to find the current state
 }
@@ -794,12 +794,10 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	outstate.d_device = fdmt->ostate.d_device;
 
 	// Initialise state
-	CudaTimer tinit;
-	tinit.start();
+	fdmt->t_init.start();
 	int s = 0;
 	fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
-	tinit.stop();
-	//cout << "Initialisation took " << tinit << endl;
+	fdmt->t_init.stop();
 
 #ifdef DUMP_STATE
 	// dump init state to disk
@@ -811,19 +809,17 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 #endif
 
 	// copy initialised data to device
-	CudaTimer tc;
-	tc.start();
+	fdmt->t_copy_in.start();
 	array4d_copy_to_device(&fdmt->states[s]);
-	tc.stop();
+	fdmt->t_copy_in.stop();
 	//cout << "Copy took " << tc << endl;
 
 	// actually execute the iterations on the GPU
 	fdmt_execute_iterations(fdmt);
 
-	CudaTimer tupdate;
-	tupdate.start();
+	fdmt->t_update_ostate.start();
 	fdmt_update_ostate(fdmt);
-	tupdate.stop();
+	fdmt->t_update_ostate.stop();
 	//cout << "Delay and sum update took " << tupdate << endl;
 
 
@@ -843,13 +839,23 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	outarray.nx = fdmt->nbeams;
 	outarray.ny = fdmt->max_dt;
 	outarray.nz = fdmt->nt;
-	CudaTimer tback;
-	tback.start();
+	fdmt->t_copy_back.start();
 	fdmt_copy_valid_ostate3(fdmt, &outarray);
-	tback.stop();
+	fdmt->t_copy_back.stop();
 	//cout << "Copy back to host took " << tback << endl;
 
 	fdmt->execute_count += 1;
 
 	return 0;
+}
+
+void fdmt_print_timing(fdmt_t* fdmt)
+{
+	cout << "FDMT Timings:" << endl;
+	cout << "Initialisation: " << fdmt->t_init << endl;
+	cout << "Copy in:" << fdmt->t_copy_in << endl;
+	cout << "Execute: " << fdmt->t_iterations << endl;
+	cout << "Update Ostate: " << fdmt->t_update_ostate << endl;
+	cout << "Copy back: " << fdmt->t_copy_back << endl;
+
 }

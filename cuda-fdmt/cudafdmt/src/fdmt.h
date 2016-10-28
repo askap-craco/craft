@@ -18,6 +18,7 @@
 #include <vector>
 #include "array.h"
 #include "array2d.h"
+#include "CudaTimer.h"
 
 //#define DUMP_STATE 1
 
@@ -90,6 +91,12 @@ typedef struct _fdmt_t
 	int execute_count; //  number of times execute() has been called
 	//FdmtIteration* iterations[MAX_ITER]; // description of what happens for each iteration
 	vector<FdmtIteration* > iterations;
+	CudaTimer t_init;
+	CudaTimer t_iterations;
+	CudaTimer t_copy_in;
+	CudaTimer t_update_ostate;
+	CudaTimer t_copy_back;
+
 } fdmt_t;
 
 float dm_delay(const float f1, const float f2) ;
@@ -123,8 +130,7 @@ int fdmt_iteration(const fdmt_t* fdmt,
 
 int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* state);
 
-
-
+void fdmt_print_timing(fdmt_t* fdmt);
 
 #endif
 
