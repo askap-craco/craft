@@ -14,6 +14,7 @@ import logging
 import subprocess
 from craftsim import dispersed_voltage, dispersed_stft
 from FDMT import *
+import matplotlib.gridspec as gridspec
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -65,14 +66,15 @@ def file_series(prefix, start=0):
 def show_inbuf_series(prefix, theslice, start=0, maxn=10):
     for ifname, fname in enumerate(file_series(prefix, start)):
         ostate = load4d(fname)
-        fig, axes = pylab.subplots(1,2)
-        axes = axes.flatten()
+        fig = pylab.figure()
         v = ostate[theslice]
         print fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), 'max', v.max(), np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
+        
         v = np.ma.masked_invalid(v)
         nfreq, ntime = v.shape
         vmid = np.ma.median(v)
         voff = np.std((v - vmid))
+
         
 
         myimshow(axes[0], (v), aspect='auto', origin='lower')
@@ -93,42 +95,50 @@ def show_inbuf_series(prefix, theslice, start=0, maxn=10):
 def show_fdmt_series(prefix, theslice, start=0, maxn=10):
     for ifname, fname in enumerate(file_series(prefix, start)):
         ostate = load4d(fname)
-        fig, axes = pylab.subplots(1,5)
-        axes = axes.flat
-        ax = axes[0]
+        gs = gridspec.GridSpec(2,5)
+        p = plt.subplot
+        
+        rawax = p(gs[0, 0:2])
+
+        rawname = fname.replace('fdmt','inbuf')
+        rawdat = load4d(rawname)
+        rawd = rawdat[0, :, 0, :]
+        nchans, ntimes = rawd.shape
+        myimshow(rawax, rawd, aspect='auto', origin='lower')
+
+        fdmtax = p(gs[1, 0:2])
         v = ostate[theslice]
         v = np.ma.masked_invalid(v)
         nfreq, ntime = v.shape
 
         print fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), 'max', v.max(), np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
-
         vmid = np.ma.median(v)
         voff = np.std((v - vmid))
+        myimshow(fdmtax, (v), aspect='auto', origin='lower')
+        fdmtax.set_title(fname)
+        fdmtax.set_ylabel('Delta_t')
+        fdmtax.set_xlabel('Sample')
+        rawax.set_title(rawname)
+        rawax.set_ylabel('Channel')
 
-        myimshow(ax, (v), aspect='auto', origin='lower')
+        specax = p(gs[0,2])
+        chans = np.arange(nchans)
+        specax.plot(rawd.std(axis=1), chans)
+        specax.plot(rawd.mean(axis=1), chans)
 
-        rawname = fname.replace('fdmt','inbuf')
-        rawdat = load4d(rawname)
-        rawd = rawdat[0, :, 0, :]
-        myimshow(axes[1], rawd, aspect='auto', origin='lower')
-                        
-        axes[0].set_title(fname)
-        axes[1].set_title(rawname)
-        specax = axes[2]
-        specax.plot(rawd.std(axis=1))
-        specax.plot(rawd.mean(axis=1))
-        specax.set_xlabel('Channel')
-        specax.set_ylabel('Channel RMS/mean')
+        dmax2 = p(gs[1,2])
+        ndt, _ = v.shape
+        dts = np.arange(ndt)
+        dmax2.plot(v.std(axis=1), dts)
+        dmax2.plot(v.mean(axis=1), dts)
+        dmax2.set_ylabel('Delta_t')
+        dmax2.set_xlabel('StdDev/Mean')
         
-        dmax = axes[3]
+        dmax = p(gs[:, 3:6])
         dmax.plot(v[80:120, :].T)
-        dmax.set_xlabel('Time')
-        dmax.set_ylabel('Amplitude')
+        dmax.set_xlabel('Sample')
+        dmax.set_ylabel('S/N')
         
-        dmax2 = axes[4]
-        dmax2.plot(v.std(axis=1))
-        dmax2.set_xlabel('Delta_t')
-        dmax2.set_ylabel('StdDev')
 
         pylab.show()
 
