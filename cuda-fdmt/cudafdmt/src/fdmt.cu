@@ -56,7 +56,6 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 	// Add 1 to the frequency dimension if it's not divisible by 2 to handle non-power-of-two nf
 	int nf = indata->nx/2 + indata->nx % 2;
 
-
 	// Barak's calculation of the frequency resolution of current iteration was like this:
 	//float delta_f = (float)(1 << iteration_num) * df;
 	// that version gives  array dimensions that are larger than the requested max_dt for
