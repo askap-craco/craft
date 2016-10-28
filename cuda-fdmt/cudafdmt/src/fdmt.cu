@@ -62,7 +62,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 	// that version gives  array dimensions that are larger than the requested max_dt for
 	// non-power-of-2 nf, by the time the Iterations finished.
 	// Doing
-	// float delta_f = (fdmt->fmax - fdmt->fmin)/((float) nf);
+	float delta_f = (fdmt->fmax - fdmt->fmin)/((float) nf);
 	/// gives the correct dimensions
 	// BUT: The DM resolution is weird (i.e. higher than expected).
 	// E.g. for 336 x 1 MHc channels max at 1440 MHz, Tint=1.265625ms vela arrives at dt=105 samples,
