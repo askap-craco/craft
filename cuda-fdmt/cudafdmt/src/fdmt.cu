@@ -119,9 +119,9 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			int itmin = 0;
 			int itmax = dt_middle_larger;
 
-			coord3_t dst_start = {.x = iif, .y = idt+shift_output, .z = 0};
-			coord3_t src1_start = {.x = 2*iif, .y = dt_middle_index, .z = 0};
-			coord3_t src2_start = {.x = 2*iif + 1, .y = dt_rest_index, .z = 0};
+			dim3 dst_start(iif, idt+shift_output,0);
+			dim3 src1_start(2*iif, dt_middle_index, 0);
+			dim3 src2_start(2*iif + 1, dt_rest_index, .0);
 
 			//array_gpu_copy1(outdata, indata, &dst_start, &src1_start, dt_middle_larger);
 
@@ -132,7 +132,6 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			// src and dst now start from a bit offset
 			src1_start.z = dt_middle_larger;
 			dst_start.z = dt_middle_larger;
-			int zcount = itmax - itmin;
 
 			int mint = dt_middle_larger;
 			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
