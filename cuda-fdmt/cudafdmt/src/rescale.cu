@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <math.h>
+#include <stdio.h>
 
 void* rescale_malloc(size_t sz)
 {
@@ -18,7 +19,7 @@ void* rescale_malloc(size_t sz)
 
 void rescale_update_scaleoffset(rescale_t* rescale)
 {
-	assert(rescale->interval_samps >= 0);
+	//assert(rescale->interval_samps >= 0);
 	assert(rescale->target_stdev > 0);
 	float nsamp = (float) rescale->sampnum;
 	for (unsigned i = 0; i < rescale->num_elements; i++) {
@@ -167,15 +168,26 @@ void rescale_update_int8(rescale_t* rescale, float* __restrict__ in, int8_t* __r
 
 }
 
-void rescale_update_decay_float_single(rescale_t* rescale, int i, float vin, float* __restrict__ out)
+float rescale_update_decay_float_single(rescale_t* rescale, uint64_t i, float vin)
 {
+	assert(i < rescale->num_elements);
 	float k = rescale->decay_constant;
+	assert(k >= 0);
 
 	rescale->sum[i] += vin;
 	rescale->sumsq[i] += vin*vin;
 	float vout = (vin + rescale->offset[i]) * rescale->scale[i];
 	rescale->decay_offset[i] = (vout + rescale->decay_offset[i]*k) / (1.0 + k);
-	out[i] = vout - rescale->decay_offset[i];
+
+	float out = vout - rescale->decay_offset[i];
+	//float out = vout;
+	if (i == 32) {
+			printf("Rescale i=%d vin=%f sum=%f sumsq=%f vout=%f out=%f off=%f decay off=%f scale=%f\n",
+					i, vin, rescale->sum[i], rescale->sumsq[i], vout, out,
+					rescale->offset[i], rescale->decay_offset[i], rescale->scale[i]);
+	}
+
+	return out;
 }
 
 void rescale_update_decay_float(rescale_t* rescale, float* __restrict__ in, float* __restrict__ out)
@@ -235,6 +247,14 @@ rescale_t* rescale_allocate(rescale_t* rescale, uint64_t nelements)
 	rescale->decay_offset = (float*) rescale_malloc(sz);
 	rescale->sampnum = 0;
 	rescale->num_elements = nelements;
+
+	for(uint64_t i = 0; i < nelements; ++i) {
+		rescale->sum[i] = 0;
+		rescale->sumsq[i] = 0;
+		rescale->scale[i] = 1.0;
+		rescale->offset[i] = 0.0;
+		rescale->decay_offset[i] = 0.0;
+	}
 
 	//rescale_update_scaleoffset(rescale);
 	return rescale;

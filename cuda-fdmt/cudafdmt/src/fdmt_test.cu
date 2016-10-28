@@ -36,9 +36,11 @@ void runtest_usage() {
 int main(int argc, char* argv[])
 {
 	printf("Test!");
-	int nd = 1024;
+	int nd = 512;
 	int nt = 256;
-	float decay_timescale = 10.0; // Seconds?
+	const int num_skip_blocks = 4;
+	const int num_rescale_blocks = 2;
+	float decay_timescale = 0.2; // Seconds?
 	char ch;
 	float thresh = 10.0;
 	const char* out_filename = "fredda.cand";
@@ -84,14 +86,20 @@ int main(int argc, char* argv[])
 
 	// Create read buffer
 	uint8_t* read_buf = (uint8_t*) malloc(sizeof(uint8_t) * in_chunk_size);
+	array4d_t read_arr;
+	read_arr.nw = 1;
+	read_arr.nx = nt;
+	read_arr.ny = nbeams;
+	read_arr.nz = nf;
+
 	assert(read_buf);
 
-	array4d_t in_buf;
-	in_buf.nw = 1;
-	in_buf.nx = nt;
-	in_buf.ny = spf.m_nifs;
-	in_buf.nz = spf.m_nchans;
-	array4d_malloc_hostonly(&in_buf);
+	array4d_t rescale_buf;
+	rescale_buf.nw = nbeams;
+	rescale_buf.nx = nf;
+	rescale_buf.ny = 1;
+	rescale_buf.nz = nt;
+	array4d_malloc_hostonly(&rescale_buf);
 
 	array4d_t out_buf;
 	out_buf.nw = nbeams;
@@ -103,9 +111,9 @@ int main(int argc, char* argv[])
 	// create rescaler
 	rescale_t rescale;
 	rescale.target_mean = 0.0;
-	rescale.target_stdev = 1.0;
+	rescale.target_stdev = 1.0/sqrt((float) nf);
 	rescale.decay_constant = 0.35 * decay_timescale / spf.m_tsamp; // This is how the_decimator.C does it, I think.
-	rescale_allocate(&rescale, in_chunk_size);
+	rescale_allocate(&rescale, nbeams*nf);
 
 	// Create FDMT
 	float fmax = (float) spf.m_fch1;
@@ -116,9 +124,8 @@ int main(int argc, char* argv[])
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
 	printf("FDMT created\n");
 
-	const int num_skip_blocks = 2;
-	const int num_rescale_blocks = 2;
 	spf.seek_sample(num_skip_blocks*nt);
+	int blocknum = 0;
 
 	while (spf.read_samples_uint8(nt, read_buf) == nt) {
 		printf("In read loop\n");
@@ -129,24 +136,52 @@ int main(int argc, char* argv[])
 		for(int t = 0; t < nt; ++t) {
 			for (int b = 0; b < nbeams; ++b) {
 				for (int f = 0; f < nf; ++f) {
-					int inidx = f + nf*(b + nbeams*nt);
-
 					// NOTE: FDMT expects channel[0] at fmin
-					// so invert the frequency axis
-					int outf = nf - f;
-					int outidx = t + nt*(outf + nf*b);
+					// so invert the frequency axis if the frequency offset is negative
+					int outf = f;
+					if (spf.m_foff < 0) {
+						outf = nf - f - 1;
+					}
+					int inidx = array4d_idx(&read_arr, 0, t, b, f);
+					int outidx = array4d_idx(&rescale_buf, b, outf, 0, t);
+
+					//printf("t=%d b=%d f=%d inidx=%d outidx=%d\n", t, b, f, inidx, outidx);
 					// writes to inbuf
-					rescale_update_decay_float_single(&rescale, outidx, (float) read_buf[inidx], in_buf.d);
+					size_t rs_idx = outf + nf*b;
+					float v_rescale;
+					v_rescale = rescale_update_decay_float_single(&rescale, rs_idx, (float) read_buf[inidx]);
+					//float v_rescale = (((float) read_buf[inidx]) - 128.0f)*0.125;
+					//v_rescale = (float) read_buf[inidx] - 128.;
+					if (outf > 312) {
+						v_rescale = 0;
+					}
+					rescale_buf.d[outidx] = v_rescale;
 				}
 			}
+			rescale.sampnum += 1; // WARNING: Need to do this because we're calling rescale*single. THink harder about how to do this beter
 		}
-		rescale_update_scaleoffset(&rescale);
 
-		fdmt_execute(&fdmt, in_buf.d, out_buf.d);
+		char fbuf[1024];
+		sprintf(fbuf, "inbuf_e%d.dat", blocknum);
+		array4d_dump(&rescale_buf, fbuf);
 
-		if (spf.m_samples_read > nt*num_rescale_blocks) {
+		if (blocknum % num_rescale_blocks == 0) {
+			rescale_update_scaleoffset(&rescale);
+		}
+
+		if (blocknum > num_rescale_blocks) {
+			fdmt_execute(&fdmt, rescale_buf.d, out_buf.d);
+			sprintf(fbuf, "fdmt_e%d.dat", blocknum);
+			array4d_dump(&out_buf, fbuf);
 			boxcar_threshonly(&out_buf, thresh, sink);
 		}
+
+
+		if (blocknum >= 40) {
+			exit(EXIT_SUCCESS);
+		}
+
+		blocknum++;
 	}
 }
 int runtest(int argc, char* argv[])
