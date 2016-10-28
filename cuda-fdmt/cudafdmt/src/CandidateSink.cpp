@@ -30,7 +30,7 @@ CandidateSink::~CandidateSink() {
 
 void CandidateSink::add_candidate(int ibeam, int idt, int t, int ibc, float sn)
 {
-	// Typical thing: 11.1591 7505890 9499.64 12      178     736.883 6       7505720 7507042
+	// Typical line: 11.1591 7505890 9499.64 12      178     736.883 6       7505720 7507042
 	// S/N sample_number dunno width dunno dm dunno dunno dunno
 	// dt = 4.15ms * DM * (nu1**-2 - nu2**-2)
 	// DM =

@@ -53,10 +53,26 @@ __host__ __device__ size_t array2d_size(const array2d_t* a)
 	return  a->nx * a->ny;
 }
 
-
-int array4d_malloc(array4d_t* a)
+size_t array4d_malloc_hostonly(array4d_t* a)
 {
 	size_t size = array4d_size(a);
+	a->d = (fdmt_dtype*) malloc(size*sizeof(fdmt_dtype));
+	assert(a->d != NULL);
+	return size;
+}
+
+size_t array4d_malloc(array4d_t* a)
+{
+	size_t size = array4d_malloc_hostonly(a);
+    gpuErrchk( cudaMalloc((void**) &a->d_device, size*sizeof(fdmt_dtype) ));
+    return size;
+}
+
+
+
+int array2d_malloc_hostonly(array2d_t* a)
+{
+	int size = array2d_size(a);
 	a->d = (fdmt_dtype*) malloc(size*sizeof(fdmt_dtype));
     assert(a->d != NULL);
     gpuErrchk( cudaMalloc((void**) &a->d_device, size*sizeof(fdmt_dtype) ));
@@ -141,6 +157,12 @@ int array3d_dump(const array3d_t* a, const char* foutname)
   fclose(fout);
   return 0;
 }
+
+void array4d_print_shape(array4d_t* a)
+{
+	printf("nw=%d nx=%d ny=%d nz=%d\b", a->nw, a->nx, a->ny, a->nz);
+}
+
 int array4d_dump(const array4d_t* a, const char* foutname)
 {
   FILE* fout = fopen(foutname, "w");

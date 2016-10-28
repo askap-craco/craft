@@ -38,7 +38,7 @@ SigprocFile::SigprocFile(const char* filename) {
 	m_samples_read = 0;
 
 	if (! m_file) {
-		printf("SigprocFile: could not open file: %s - \n",filename, strerror(errno));
+		printf("SigprocFile: could not open file: %s - %s\n",filename, strerror(errno));
 		assert(m_file);
 		exit(EXIT_FAILURE);
 	}
@@ -106,7 +106,7 @@ int SigprocFile::header_int(const char* hname) const {
 size_t SigprocFile::seek_sample(size_t t)
 {
 	size_t boff = t*m_nifs*m_nchans + m_hdr_nbytes;
-	if(!fseek(m_file, boff, SEEK_SET)) {
+	if(fseek(m_file, boff, SEEK_SET) < 0) {
 		printf("SigprocFile: Could not seek to offset of file %s\n. Error: %s", m_filename, strerror(errno));
 		assert(0);
 	}
@@ -116,9 +116,12 @@ size_t SigprocFile::seek_sample(size_t t)
 size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
 {
 	assert(m_nbits == 8);
-	size_t nelements = fread(output, nt*m_nifs*m_nchans, sizeof(uint8_t), m_file);
-	m_samples_read += nt;
-	return nelements;
+	size_t nreq = nt*m_nifs*m_nchans;
+	size_t nelements = fread(output, sizeof(uint8_t), nt*m_nifs*m_nchans, m_file);
+	size_t ont = nelements/m_nifs/m_nchans;
+	m_samples_read += ont;
+	printf("Read %d elements, %ont total read: %d\n", nelements, ont, m_samples_read);
+	return ont;
 }
 
 double SigprocFile::last_sample_elapsed_seconds()

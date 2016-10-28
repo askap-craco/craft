@@ -52,11 +52,10 @@ __host__ __device__ int calc_delta_t(const fdmt_t* fdmt, float f_start, float f_
 __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_num, const array4d_t* indata, array4d_t* outdata)
 {
 	float df = fdmt->df; // channel resolution
-	float delta_f = (float)(1 << iteration_num) * df; // Resolution of current iteration
-	int delta_t = calc_delta_t(fdmt, fdmt->fmin, fdmt->fmin+delta_f); // Max DM
-
-	//FdmtIteration* iter = &fdmt->iterations[iteration_num-1];
 	int nf = indata->nx/2 + indata->nx % 2; // Add 1 to the frequency dimension if it's not divisible by 2
+	float delta_f = (fdmt->fmax - fdmt->fmin)/((float) nf);
+	//float delta_f = (float)(1 << iteration_num) * df; // Resolution of current iteration
+	int delta_t = calc_delta_t(fdmt, fdmt->fmin, fdmt->fmin+delta_f); // Max DM
 	int ndt = delta_t + 1;
 
 	// Outdata has size (nbeams, o_nf, o_nd1, fdmt->nt)
@@ -64,6 +63,9 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 	outdata->nx = nf; // Add 1 to the frequency dimension if it's not divisible by 2
 	outdata->ny = ndt;
 	outdata->nz = indata->nz;
+	printf("Iteration %d shape max_dt %d ", iteration_num, fdmt->max_dt);
+	array4d_print_shape(outdata);
+	printf("\n");
 
 	assert(array4d_size(outdata) <= fdmt->state_size);
 
@@ -125,9 +127,6 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
 			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0) - mint;
 			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
-			//			printf("iter %d iif %03d idt %02d src1_off %06d src2_off %06d out_off %06d maxt %02d dtmid %d dtr %d dtmidlg %d in [%d,%d,%d,%d]\n",
-			//					iteration_num, iif, idt, src1_offset, src2_offset, out_offset, maxt, dt_middle_index, dt_rest_index, dt_middle_larger, indata->nw, indata->nx, indata->ny, indata->nz);
-
 			iter->save_subband_values(idt, src1_offset, src2_offset, out_offset, mint);
 		}
 	}
@@ -709,17 +708,24 @@ __host__ void fdmt_copy_valid_ostate(fdmt_t* fdmt, fdmt_dtype* out)
 
 }
 
-__host__ void fdmt_copy_valid_ostate3(fdmt_t* fdmt, fdmt_dtype* out)
-{ // Copies only the first nt elemtns of the ostate to the output
-	bzero(out, sizeof(fdmt_dtype)*fdmt->nbeams*fdmt->max_dt*fdmt->nt);
+__host__ void fdmt_copy_valid_ostate3(fdmt_t* fdmt, array4d_t* out)
+{   // Copies only the first nt elemtns of the ostate to the output
+	// Transposes data to beam, idt, t order
+	// NOTE: THis is extremely inefficient! (it copies waay to much data over)
+	// But: It works.
 	array4d_copy_to_host(&fdmt->ostate);
 	int i = 0;
+	assert(out->nw == 1);
+	assert(out->nx == fdmt->nbeams);
+	assert(out->ny == fdmt->max_dt);
+	assert(out->nz == fdmt->nt);
+
 	for (int b = 0; b < fdmt->nbeams; ++b) {
 		for(int idt = 0; idt < fdmt->max_dt; ++idt) {
 			for (int t = 0; t < fdmt->nt; ++t) {
 				int inidx = array4d_idx(&fdmt->ostate, b, 0, idt, t);
-				int outidx = array4d_idx(&fdmt->ostate, b, 0, t, idt);
-				out[outidx] = fdmt->ostate.d[inidx];
+				int outidx = array4d_idx(out, b, 0, idt, t);
+				out->d[outidx] = fdmt->ostate.d[inidx];
 				i += 1;
 			}
 		}
@@ -834,7 +840,13 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 
 	CudaTimer tback;
 	tback.start();
-	fdmt_copy_valid_ostate3(fdmt, outdata);
+	array4d_t outarray;
+	outarray.d = outdata;
+	outarray.nw = 1;
+	outarray.nx = fdmt->nbeams;
+	outarray.ny = fdmt->max_dt;
+	outarray.nz = fdmt->nt;
+	fdmt_copy_valid_ostate3(fdmt, &outarray);
 	tback.stop();
 	cout << "Copy back to host took " << tback << endl;
 

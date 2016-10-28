@@ -36,12 +36,12 @@ void runtest_usage() {
 int main(int argc, char* argv[])
 {
 	printf("Test!");
-	int nd = 512;
+	int nd = 1024;
 	int nt = 256;
 	float decay_timescale = 10.0; // Seconds?
 	char ch;
 	float thresh = 10.0;
-	char* out_filename = "fredda.cand";
+	const char* out_filename = "fredda.cand";
 	while ((ch = getopt(argc, argv, "d:t:s:o:x:h")) != -1) {
 		switch (ch) {
 		case 'd':
@@ -86,11 +86,19 @@ int main(int argc, char* argv[])
 	uint8_t* read_buf = (uint8_t*) malloc(sizeof(uint8_t) * in_chunk_size);
 	assert(read_buf);
 
-	float* in_buf = (float*) malloc(sizeof(float) * in_chunk_size);
-	assert(in_buf);
+	array4d_t in_buf;
+	in_buf.nw = 1;
+	in_buf.nx = nt;
+	in_buf.ny = spf.m_nifs;
+	in_buf.nz = spf.m_nchans;
+	array4d_malloc_hostonly(&in_buf);
 
 	array4d_t out_buf;
-	out_buf.d = (float*) malloc(sizeof(float)*nt*nbeams*nd);
+	out_buf.nw = nbeams;
+	out_buf.nx = 1;
+	out_buf.ny = nd;
+	out_buf.nz = nt;
+	array4d_malloc_hostonly(&out_buf);
 
 	// create rescaler
 	rescale_t rescale;
@@ -106,13 +114,14 @@ int main(int argc, char* argv[])
 	float fmin = fmax + spf.m_nchans*foff;
 	fdmt_t fdmt;
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
+	printf("FDMT created\n");
 
-	const int num_skip_blocks = 4;
-	const int num_rescale_blocks = 4;
+	const int num_skip_blocks = 2;
+	const int num_rescale_blocks = 2;
 	spf.seek_sample(num_skip_blocks*nt);
 
-
-	while (spf.read_samples_uint8(nt, read_buf) == in_chunk_size) {
+	while (spf.read_samples_uint8(nt, read_buf) == nt) {
+		printf("In read loop\n");
 		// File is in TBF order
 		// Output needs to be BFT order
 		// Do transpose and cast to float on the way through
@@ -121,15 +130,19 @@ int main(int argc, char* argv[])
 			for (int b = 0; b < nbeams; ++b) {
 				for (int f = 0; f < nf; ++f) {
 					int inidx = f + nf*(b + nbeams*nt);
-					int outidx = t + nt*(f + nf*b);
+
+					// NOTE: FDMT expects channel[0] at fmin
+					// so invert the frequency axis
+					int outf = nf - f;
+					int outidx = t + nt*(outf + nf*b);
 					// writes to inbuf
-					rescale_update_decay_float_single(&rescale, outidx, (float) read_buf[inidx], in_buf);
+					rescale_update_decay_float_single(&rescale, outidx, (float) read_buf[inidx], in_buf.d);
 				}
 			}
 		}
 		rescale_update_scaleoffset(&rescale);
 
-		fdmt_execute(&fdmt, in_buf, out_buf.d);
+		fdmt_execute(&fdmt, in_buf.d, out_buf.d);
 
 		if (spf.m_samples_read > nt*num_rescale_blocks) {
 			boxcar_threshonly(&out_buf, thresh, sink);
@@ -140,7 +153,7 @@ int runtest(int argc, char* argv[])
 {
 	int nd = 512;
 	int nt = 256;
-	int nf = 512;
+	int nf = 336;
 	int nbeams = 1;
 	float fmax = 1440;
 	char ch;
