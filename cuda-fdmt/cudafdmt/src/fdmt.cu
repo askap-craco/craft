@@ -52,9 +52,21 @@ __host__ __device__ int calc_delta_t(const fdmt_t* fdmt, float f_start, float f_
 __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_num, const array4d_t* indata, array4d_t* outdata)
 {
 	float df = fdmt->df; // channel resolution
-	int nf = indata->nx/2 + indata->nx % 2; // Add 1 to the frequency dimension if it's not divisible by 2
-	float delta_f = (fdmt->fmax - fdmt->fmin)/((float) nf);
-	//float delta_f = (float)(1 << iteration_num) * df; // Resolution of current iteration
+
+	// Add 1 to the frequency dimension if it's not divisible by 2 to handle non-power-of-two nf
+	int nf = indata->nx/2 + indata->nx % 2;
+
+
+	// Barak's calculation of the frequency resolution of current iteration was like this:
+	//float delta_f = (float)(1 << iteration_num) * df;
+	// that version gives  array dimensions that are larger than the requested max_dt for
+	// non-power-of-2 nf, by the time the Iterations finished.
+	// Doing
+	// float delta_f = (fdmt->fmax - fdmt->fmin)/((float) nf);
+	/// gives the correct dimensions
+	// BUT: The DM resolution is weird (i.e. higher than expected).
+	// E.g. for 336 x 1 MHc channels max at 1440 MHz, Tint=1.265625ms vela arrives at dt=105 samples,
+    // Butit's DM of 69 pc/cm^-3 should have a dt of around, I dunno, 75 samples. So.... Errr?
 	int delta_t = calc_delta_t(fdmt, fdmt->fmin, fdmt->fmin+delta_f); // Max DM
 	int ndt = delta_t + 1;
 

@@ -137,9 +137,9 @@ double SigprocFile::last_sample_mjd()
 
 float SigprocFile::dm_of_idt(int idt)
 {
-	float nu1 = m_fch1;
-	float nu2 = m_fch1 + m_foff*m_nchans;
-	float dm = fabs(idt*m_tsamp / 4.15e-3 / (nu1*nu1 - nu2*nu2));
+	float nu1 = m_fch1/1e3;
+	float nu2 = (m_fch1 + m_foff*m_nchans)/1e3;
+	float dm = fabs(idt*m_tsamp / 4.15e-3 / (1.0/(nu1*nu1) - 1.0/(nu2*nu2)));
 
 	return dm;
 }
