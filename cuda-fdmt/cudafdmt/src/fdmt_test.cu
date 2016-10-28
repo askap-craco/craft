@@ -44,7 +44,8 @@ int main(int argc, char* argv[])
 	char ch;
 	float thresh = 10.0;
 	const char* out_filename = "fredda.cand";
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:h")) != -1) {
+	bool dump_data = false;
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:D:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -60,6 +61,9 @@ int main(int argc, char* argv[])
 			break;
 		case 'x':
 			thresh = atof(optarg);
+			break;
+		case 'D':
+			dump_data = true;
 			break;
 		case '?':
 		case 'h':
@@ -128,7 +132,6 @@ int main(int argc, char* argv[])
 	int blocknum = 0;
 
 	while (spf.read_samples_uint8(nt, read_buf) == nt) {
-		printf("In read loop\n");
 		// File is in TBF order
 		// Output needs to be BFT order
 		// Do transpose and cast to float on the way through
@@ -162,8 +165,10 @@ int main(int argc, char* argv[])
 		}
 
 		char fbuf[1024];
-		sprintf(fbuf, "inbuf_e%d.dat", blocknum);
-		array4d_dump(&rescale_buf, fbuf);
+		if (dump_data) {
+			sprintf(fbuf, "inbuf_e%d.dat", blocknum);
+			array4d_dump(&rescale_buf, fbuf);
+		}
 
 		if (blocknum % num_rescale_blocks == 0) {
 			rescale_update_scaleoffset(&rescale);
@@ -171,18 +176,17 @@ int main(int argc, char* argv[])
 
 		if (blocknum > num_rescale_blocks) {
 			fdmt_execute(&fdmt, rescale_buf.d, out_buf.d);
-			sprintf(fbuf, "fdmt_e%d.dat", blocknum);
-			array4d_dump(&out_buf, fbuf);
+			if (dump_data) {
+				sprintf(fbuf, "fdmt_e%d.dat", blocknum);
+				array4d_dump(&out_buf, fbuf);
+			}
 			boxcar_threshonly(&out_buf, thresh, sink);
-		}
-
-
-		if (blocknum >= 40) {
-			exit(EXIT_SUCCESS);
 		}
 
 		blocknum++;
 	}
+
+	printf("FREDDA Finished\n");
 }
 int runtest(int argc, char* argv[])
 {

@@ -684,7 +684,6 @@ __host__ void fdmt_update_ostate(fdmt_t* fdmt)
 	assert(fdmt->max_dt % fdmt->nt == 0);
 	int s = fdmt->curr_state_idx;
 	array4d_t* currstate = &fdmt->states[s];
-	printf("w %d x %d y %d z %d\n", currstate->nw, currstate->nx, currstate->ny , currstate->nz);
 	assert(currstate->nw == fdmt->ostate.nw);
 	assert(currstate->nx == fdmt->ostate.nx);
 	assert(currstate->ny == fdmt->ostate.ny);
@@ -776,7 +775,7 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 
 	}
 	t.stop();
-	cout << "FDMT Iterations only took " << t << endl;
+	//cout << "FDMT Iterations only took " << t << endl;
 	fdmt->curr_state_idx = s; // Tell people where to find the current state
 }
 
@@ -800,7 +799,7 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	int s = 0;
 	fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
 	tinit.stop();
-	cout << "Initialisation took " << tinit << endl;
+	//cout << "Initialisation took " << tinit << endl;
 
 #ifdef DUMP_STATE
 	// dump init state to disk
@@ -816,7 +815,7 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	tc.start();
 	array4d_copy_to_device(&fdmt->states[s]);
 	tc.stop();
-	cout << "Copy took " << tc << endl;
+	//cout << "Copy took " << tc << endl;
 
 	// actually execute the iterations on the GPU
 	fdmt_execute_iterations(fdmt);
@@ -825,7 +824,7 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	tupdate.start();
 	fdmt_update_ostate(fdmt);
 	tupdate.stop();
-	cout << "Delay and sum update took " << tupdate << endl;
+	//cout << "Delay and sum update took " << tupdate << endl;
 
 
 #ifdef DUMP_STATE
@@ -838,19 +837,17 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	array4d_dump(currstate, buf);
 #endif
 
-	CudaTimer tback;
-	tback.start();
 	array4d_t outarray;
 	outarray.d = outdata;
 	outarray.nw = 1;
 	outarray.nx = fdmt->nbeams;
 	outarray.ny = fdmt->max_dt;
 	outarray.nz = fdmt->nt;
+	CudaTimer tback;
+	tback.start();
 	fdmt_copy_valid_ostate3(fdmt, &outarray);
 	tback.stop();
-	cout << "Copy back to host took " << tback << endl;
-
-	//printf("Returing form execute\n");
+	//cout << "Copy back to host took " << tback << endl;
 
 	fdmt->execute_count += 1;
 

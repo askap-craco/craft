@@ -120,7 +120,6 @@ size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
 	size_t nelements = fread(output, sizeof(uint8_t), nt*m_nifs*m_nchans, m_file);
 	size_t ont = nelements/m_nifs/m_nchans;
 	m_samples_read += ont;
-	printf("Read %d elements, %ont total read: %d\n", nelements, ont, m_samples_read);
 	return ont;
 }
 

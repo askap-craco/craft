@@ -180,12 +180,6 @@ float rescale_update_decay_float_single(rescale_t* rescale, uint64_t i, float vi
 	rescale->decay_offset[i] = (vout + rescale->decay_offset[i]*k) / (1.0 + k);
 
 	float out = vout - rescale->decay_offset[i];
-	//float out = vout;
-	if (i == 32) {
-			printf("Rescale i=%d vin=%f sum=%f sumsq=%f vout=%f out=%f off=%f decay off=%f scale=%f\n",
-					i, vin, rescale->sum[i], rescale->sumsq[i], vout, out,
-					rescale->offset[i], rescale->decay_offset[i], rescale->scale[i]);
-	}
 
 	return out;
 }
