@@ -37,26 +37,14 @@ int main(int argc, char* argv[])
 	printf("Test!");
 	int nd = 512;
 	int nt = 256;
-	int nf = 512;
-	int nbeams = 1;
-	float fmax = 1440;
 	char ch;
-	while ((ch = getopt(argc, argv, "d:t:f:b:x:g:h")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
 			break;
 		case 't':
 			nt = atoi(optarg);
-			break;
-		case 'f':
-			nf = atoi(optarg);
-			break;
-		case 'b':
-			nbeams = atoi(optarg);
-			break;
-		case 'x':
-			fmax = atof(optarg);
 			break;
 		case '?':
 		case 'h':
@@ -72,11 +60,47 @@ int main(int argc, char* argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	// Load sigproc file
 	SigprocFile spf(argv[0]);
 	cout << "spf tsamp " << spf.header_double("tsamp") << " nifs " << spf.header_int("nifs") << " fch1 " << spf.header_double("fch1")
-			 << "foff " << spf.header_double("foff") << endl;
-}
+							 << "foff " << spf.header_double("foff") << endl;
+	int nbeams = spf.m_nifs;
+	int nf = spf.m_nchans;
+	size_t chunk_size = nbeams*nf*nt;
 
+	// Create read buffer
+	uint8_t* read_buf = (uint8_t*) malloc(sizeof(uint8_t) * chunk_size);
+	assert(read_buf);
+
+	float* in_buf = (float*) malloc(sizeof(float) * chunk_size);
+	assert(in_buf);
+
+	// Create FDMT
+	float fmax = (float) spf.m_fch1;
+	float foff =  (float) spf.m_foff;
+	assert(foff < 0);
+	float fmin = fmax + spf.m_nchans*foff;
+	fdmt_t fdmt;
+	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
+
+	const int num_skip_blocks = 4;
+	spf.seek_sample(num_skip_blocks*nt);
+
+	while (spf.read_samples_uint8(nt, read_buf) == chunk_size) {
+		// File is in TBF order
+		// Output needs to be BFT order
+		// Do transpose and cast to float on the way through
+		for(int t = 0; t < nt; ++t) {
+			for (int b = 0; b < nbeams; ++b) {
+				for (int f = 0; f < nf; ++f) {
+					int inidx = f + nf*(b + nbeams*nt);
+					int outidx = t + nt*(f + nf*b);
+					in_buf[outidx] = (float) read_buf[inidx];
+				}
+			}
+		}
+	}
+}
 int runtest(int argc, char* argv[])
 {
 	int nd = 512;

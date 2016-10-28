@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <stdint.h>
 
 /* Same as strstr but goes through *all* the string - even if it contains nulls
  *
@@ -33,6 +34,7 @@ SigprocFile::SigprocFile(const char* filename) {
 	m_file = fopen(filename, "r");
 	m_filename = new char[strlen(filename)];
 	m_filename = strcpy(m_filename, filename);
+	m_samples_read = 0;
 
 	if (! m_file) {
 		printf("SigprocFile: could not open file: %s - \n",filename, strerror(errno));
@@ -49,11 +51,18 @@ SigprocFile::SigprocFile(const char* filename) {
 		exit(EXIT_FAILURE);
 	}
 	// TODO: Check it starts with HEADER_START
-	size_t hdr_nbytes = (hdr_end - m_hdr) + strlen("HEADER_END");
-	assert(hdr_nbytes < MAX_HDR_SIZE);
-	m_hdr[hdr_nbytes] = 0;
-	fseek(m_file, hdr_nbytes, SEEK_SET);
-	printf("File %s has header %d bytes long\n", filename, hdr_nbytes);
+	m_hdr_nbytes = (hdr_end - m_hdr) + strlen("HEADER_END");
+	assert(m_hdr_nbytes < MAX_HDR_SIZE);
+	m_hdr[m_hdr_nbytes] = 0;
+	seek_sample(0);
+	printf("File %s has header %d bytes long\n", filename, m_hdr_nbytes);
+	m_nbits = header_int("nbits");
+	m_nifs = header_int("nifs");
+	m_nchans = header_int("nchans");
+	m_fch1 = header_double("fch1");
+	m_foff = header_double("foff");
+	m_tstart = header_double("tstart");
+	m_tsamp = header_double("tsamp");
 }
 
 SigprocFile::~SigprocFile() {
@@ -93,4 +102,32 @@ int SigprocFile::header_int(const char* hname) const {
 	return value;
 }
 
+size_t SigprocFile::seek_sample(size_t t)
+{
+	size_t boff = t*m_nifs*m_nchans + m_hdr_nbytes;
+	if(!fseek(m_file, boff, SEEK_SET)) {
+		printf("SigprocFile: Could not seek to offset of file %s\n. Error: %s", m_filename, strerror(errno));
+		assert(0);
+	}
+	return boff;
+}
 
+size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
+{
+	assert(m_nbits == 8);
+	size_t nelements = fread(output, nt*m_nifs*m_nchans, sizeof(uint8_t), m_file);
+	m_samples_read += nt;
+	return nelements;
+}
+
+double SigprocFile::last_sample_elapsed_seconds()
+{
+	double toff_sec = ((double) m_samples_read) * m_tsamp;
+	return toff_sec;
+}
+
+double SigprocFile::last_sample_mjd()
+{
+	double mjd = m_tstart + last_sample_elapsed_seconds()/86400.0;
+	return mjd;
+}
