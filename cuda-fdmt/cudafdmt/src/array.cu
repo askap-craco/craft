@@ -111,6 +111,8 @@ int array2d_copy_to_device(array2d_t* a)
 int array4d_copy_to_device(array4d_t* a)
 {
 	size_t size = array4d_size(a);
+	assert(a->d_device != NULL);
+	assert(a->d != NULL);
 	gpuErrchk(cudaMemcpy(a->d_device, a->d, size*sizeof(fdmt_dtype), cudaMemcpyHostToDevice));
 	return size;
 }

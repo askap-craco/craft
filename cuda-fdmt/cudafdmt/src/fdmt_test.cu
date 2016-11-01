@@ -151,11 +151,6 @@ int main(int argc, char* argv[])
 					size_t rs_idx = outf + nf*b;
 					float v_rescale;
 					v_rescale = rescale_update_decay_float_single(&rescale, rs_idx, (float) read_buf[inidx]);
-					//float v_rescale = (((float) read_buf[inidx]) - 128.0f)*0.125;
-					//v_rescale = (float) read_buf[inidx] - 128.;
-					if (outf > 312) {
-						v_rescale = 0;
-					}
 					rescale_buf.d[outidx] = v_rescale;
 				}
 			}

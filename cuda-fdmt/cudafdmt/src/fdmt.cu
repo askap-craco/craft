@@ -82,19 +82,15 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 	FdmtIteration* iter = new FdmtIteration(outdata->nw, outdata->nx, outdata->ny, outdata->nz);
 	fdmt->iterations.push_back(iter);
-	float fjumps = (float)nf_running; // Output number of channels
-	float frange = fdmt->fmax - fdmt->fmin; // Width of band
 	float fmin = fdmt->fmin; // Bottom of band
-	//float fres = frange/fjumps; // Frequency resolution of output subbands
-	float fres = fdmt->_f_width*2.0; //
+	float fres = fdmt->_f_width*2.0; // Frequency resolution of the output subbands
 	fdmt->_f_width = fres;
 
-	printf("Iteration %d max_dt %d delta_f =%f nf=%d fjumps=%f frange=%f fres=%f fmin=%f inshape=",
+	printf("Iteration %d max_dt %d delta_f =%f nf=%d fres=%f fmin=%f inshape: [%d, %d, %d, %d] outshape: [%d, %d, %d, %d]\n",
 			iteration_num, fdmt->max_dt, delta_f,
-				nf, fjumps, frange, fres, fmin);
-	array4d_print_shape(indata);
-	array4d_print_shape(outdata);
-	printf("\n");
+				nf, fres, fmin,
+				indata->nw, indata->nx, indata->ny, indata->nz,
+				outdata->nw, outdata->nx, outdata->ny, outdata->nz);
 
 	float correction = 0.0;
 	if (iteration_num > 0) {
@@ -112,17 +108,17 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 		if (iif < nf - 1) { // all the bottom subbands
 			f_end = f_start + fres;
 		} else  { // if this is final subband
-			printf("iif %d final subband\n", iif);
+//			printf("iif %d final subband\n", iif);
 			if (2*iif + 1 < indata->nx) { // There are 2 subbands available in the input data
 				// The width of the output subband is the sum of the input suband (which is fres/2.0)
 				// plus whatever the previous output was
 				float out_width = fdmt->_last_f_width + fres/2.0;
 				f_end = f_start + out_width;
-				printf("2 subbands available: fdmt->_last_f_width=%f. New Width: %f\n", fdmt->_last_f_width, out_width);
+//				printf("2 subbands available: fdmt->_last_f_width=%f. New Width: %f\n", fdmt->_last_f_width, out_width);
 				fdmt->_last_f_width = out_width;
 			} else { // there is not subband above this one in the input data
 				// the output channel width equals the input channel width
-				printf("no Subband avilable. Copy: fdmt->_last_f_width=%f\n", fdmt->_last_f_width);
+//				printf("no Subband avilable. Copy: fdmt->_last_f_width=%f\n", fdmt->_last_f_width);
 				f_end = f_start + fdmt->_last_f_width;
 			}
 
@@ -134,8 +130,8 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 		// Max DM for this subband
 		int delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
 		iter->add_subband(delta_t_local);
-		printf("iif %d oif1=%d oif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
-					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
+//		printf("iif %d oif1=%d oif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
+//					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
 		if (iif == 0) {
 			//assert(delta_t_local == ndt);// Should populate all delta_t in the lowest band????
 		}
@@ -226,8 +222,8 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	for (int s = 0; s < 2; s++) {
 		fdmt->states[s].nw = fdmt->nbeams;
 		fdmt->states[s].nx = fdmt->nf;
-		fdmt->states[s].ny = fdmt->delta_t;
-		fdmt->states[s].nz = fdmt->nt;
+		fdmt->states[s].ny = fdmt->max_dt;
+		fdmt->states[s].nz = fdmt->max_dt;
 		array4d_malloc(&fdmt->states[s]);
 	}
 
@@ -849,6 +845,7 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	// Initialise state
 	fdmt->t_init.start();
 	int s = 0;
+
 	fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
 	fdmt->t_init.stop();
 
@@ -865,7 +862,6 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	fdmt->t_copy_in.start();
 	array4d_copy_to_device(&fdmt->states[s]);
 	fdmt->t_copy_in.stop();
-	//cout << "Copy took " << tc << endl;
 
 	// actually execute the iterations on the GPU
 	fdmt_execute_iterations(fdmt);
