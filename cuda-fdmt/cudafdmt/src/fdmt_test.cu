@@ -14,7 +14,10 @@
 #include "array.h"
 #include "boxcar.h"
 #include "CudaTimer.h"
+#include "DataSource.h"
 #include "SigprocFile.h"
+#include "FileGroup.h"
+
 #include "rescale.h"
 
 
@@ -80,10 +83,11 @@ int main(int argc, char* argv[])
 	}
 
 	// Load sigproc file
-	SigprocFile spf(argv[0]);
+	FileGroup spf(argc, argv);
+
 	CandidateSink sink(&spf, out_filename);
-	cout << "spf tsamp " << spf.header_double("tsamp") << " nifs " << spf.header_int("nifs") << " fch1 " << spf.header_double("fch1")
-							 << "foff " << spf.header_double("foff") << endl;
+	cout << "spf tsamp " << spf.tsamp()<< " nbeams " << spf.nbeams() << " fch1 " << spf.fch1() << " nchans "
+			<< spf.nchans() << "foff " << spf.foff() << endl;
 	int nbeams = spf.nbeams();
 	int nf = spf.nchans();
 	size_t in_chunk_size = nbeams*nf*nt;
@@ -152,6 +156,7 @@ int main(int argc, char* argv[])
 					float v_rescale;
 					v_rescale = rescale_update_decay_float_single(&rescale, rs_idx, (float) read_buf[inidx]);
 					rescale_buf.d[outidx] = v_rescale;
+					printf("t=%d b=%d f=%d vin=%d vout=%f\n", t, b, f, read_buf[inidx], v_rescale);
 				}
 			}
 			rescale.sampnum += 1; // WARNING: Need to do this because we're calling rescale*single. THink harder about how to do this beter

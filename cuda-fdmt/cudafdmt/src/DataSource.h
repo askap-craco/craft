@@ -27,6 +27,7 @@ public:
 	virtual size_t seek_sample(size_t t) = 0;
 	virtual size_t samples_read() =0;
 	virtual char* name() = 0;
+	virtual float dm_of_idt(int idt) = 0;
 
 };
 

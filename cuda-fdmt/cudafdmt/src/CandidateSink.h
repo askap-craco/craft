@@ -8,17 +8,17 @@
 #ifndef CANDIDATESINK_H_
 #define CANDIDATESINK_H_
 
-#include "SigprocFile.h"
+#include "FileGroup.h"
 #include <stdio.h>
 
 class CandidateSink {
 public:
-	CandidateSink(SigprocFile* srcfile, const char* filename);
+	CandidateSink(FileGroup* srcfile, const char* filename);
 	virtual ~CandidateSink();
 
 	void add_candidate(int beam, int idt, int t, int ibc, float sn);
 
-	SigprocFile* m_srcfile;
+	FileGroup* m_srcfile;
 	FILE* m_candfile;
 };
 
