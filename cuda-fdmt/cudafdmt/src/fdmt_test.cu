@@ -84,8 +84,8 @@ int main(int argc, char* argv[])
 	CandidateSink sink(&spf, out_filename);
 	cout << "spf tsamp " << spf.header_double("tsamp") << " nifs " << spf.header_int("nifs") << " fch1 " << spf.header_double("fch1")
 							 << "foff " << spf.header_double("foff") << endl;
-	int nbeams = spf.m_nifs;
-	int nf = spf.m_nchans;
+	int nbeams = spf.nbeams();
+	int nf = spf.nchans();
 	size_t in_chunk_size = nbeams*nf*nt;
 
 	// Create read buffer
@@ -116,12 +116,12 @@ int main(int argc, char* argv[])
 	rescale_t rescale;
 	rescale.target_mean = 0.0;
 	rescale.target_stdev = 1.0/sqrt((float) nf);
-	rescale.decay_constant = 0.35 * decay_timescale / spf.m_tsamp; // This is how the_decimator.C does it, I think.
+	rescale.decay_constant = 0.35 * decay_timescale / spf.tsamp(); // This is how the_decimator.C does it, I think.
 	rescale_allocate(&rescale, nbeams*nf);
 
-	float foff =  (float) spf.m_foff;
+	float foff =  (float) spf.foff();
 	assert(foff < 0);
-	float fmax = (float) spf.m_fch1 - foff; // The FDMT seems to want this to make sense of the world. Not sure why.
+	float fmax = (float) spf.fch1() - foff; // The FDMT seems to want this to make sense of the world. Not sure why.
 	float fmin = fmax + nf*foff;
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
@@ -140,7 +140,7 @@ int main(int argc, char* argv[])
 					// NOTE: FDMT expects channel[0] at fmin
 					// so invert the frequency axis if the frequency offset is negative
 					int outf = f;
-					if (spf.m_foff < 0) {
+					if (spf.foff() < 0) {
 						outf = nf - f - 1;
 					}
 					int inidx = array4d_idx(&read_arr, 0, t, b, f);

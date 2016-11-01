@@ -13,7 +13,7 @@ CandidateSink::CandidateSink(SigprocFile* srcfile, const char* filename) {
 	m_srcfile = srcfile;
 	if (filename == NULL) {
 		char fname[4096];
-		sprintf(fname, "%s.cand", srcfile->m_filename);
+		sprintf(fname, "%s.cand", srcfile->name());
 		m_candfile = fopen(fname, "w");
 	} else {
 		m_candfile = fopen(filename, "w");
@@ -36,6 +36,8 @@ void CandidateSink::add_candidate(int ibeam, int idt, int t, int ibc, float sn)
 	// DM =
 
 	float  dm = m_srcfile->dm_of_idt(idt);
-	fprintf(m_candfile, "%f %d %f %d %d %0.3f %d %d %d %d\n", sn, t + m_srcfile->m_samples_read,
-				0, ibc, 0, dm, 0, 0, 0, ibeam);
+	size_t sampno = t + m_srcfile->samples_read();
+	double time_from_file = sampno*m_srcfile->tsamp();
+	fprintf(m_candfile, "%f %d %f %d %d %0.3f %d %d %d %d\n", sn, sampno, time_from_file,
+			ibc, 0, dm, 0, 0, 0, ibeam);
 }
