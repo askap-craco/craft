@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
 	float thresh = 10.0;
 	const char* out_filename = "fredda.cand";
 	bool dump_data = false;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:D:h")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:Dh")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -119,15 +119,13 @@ int main(int argc, char* argv[])
 	rescale.decay_constant = 0.35 * decay_timescale / spf.m_tsamp; // This is how the_decimator.C does it, I think.
 	rescale_allocate(&rescale, nbeams*nf);
 
-	// Create FDMT
-	float fmax = (float) spf.m_fch1;
 	float foff =  (float) spf.m_foff;
 	assert(foff < 0);
-	float fmin = fmax + spf.m_nchans*foff;
+	float fmax = (float) spf.m_fch1 - foff; // The FDMT seems to want this to make sense of the world. Not sure why.
+	float fmin = fmax + nf*foff;
 	fdmt_t fdmt;
+	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
-	printf("FDMT created\n");
-
 	spf.seek_sample(num_skip_blocks*nt);
 	int blocknum = 0;
 
@@ -168,6 +166,7 @@ int main(int argc, char* argv[])
 		if (dump_data) {
 			sprintf(fbuf, "inbuf_e%d.dat", blocknum);
 			array4d_dump(&rescale_buf, fbuf);
+			printf("Dumping input buffer %s\n", fbuf);
 		}
 
 		if (blocknum % num_rescale_blocks == 0) {
@@ -178,6 +177,7 @@ int main(int argc, char* argv[])
 			fdmt_execute(&fdmt, rescale_buf.d, out_buf.d);
 			if (dump_data) {
 				sprintf(fbuf, "fdmt_e%d.dat", blocknum);
+				printf("Dumping fdmt buffer %s\n", fbuf);
 				array4d_dump(&out_buf, fbuf);
 			}
 			boxcar_threshonly(&out_buf, thresh, sink);

@@ -55,6 +55,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 	// Add 1 to the frequency dimension if it's not divisible by 2 to handle non-power-of-two nf
 	int nf = indata->nx/2 + indata->nx % 2;
+	int nf_running = indata->nx/2;
 
 	// Barak's calculation of the frequency resolution of current iteration was like this:
 	//float delta_f = (float)(1 << iteration_num) * df;
@@ -66,25 +67,34 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 	// BUT: The DM resolution is weird (i.e. higher than expected).
 	// E.g. for 336 x 1 MHc channels max at 1440 MHz, Tint=1.265625ms vela arrives at dt=105 samples,
     // Butit's DM of 69 pc/cm^-3 should have a dt of around, I dunno, 75 samples. So.... Errr?
+	// Tracking it properly gives:
+
 	int delta_t = calc_delta_t(fdmt, fdmt->fmin, fdmt->fmin+delta_f); // Max DM
 	int ndt = delta_t + 1;
 
 	// Outdata has size (nbeams, o_nf, o_nd1, fdmt->nt)
 	outdata->nw = indata->nw;
-	outdata->nx = nf; // Add 1 to the frequency dimension if it's not divisible by 2
+	outdata->nx = nf;
 	outdata->ny = ndt;
 	outdata->nz = indata->nz;
-	printf("Iteration %d shape max_dt %d ", iteration_num, fdmt->max_dt);
-	array4d_print_shape(outdata);
-	printf("\n");
 
 	assert(array4d_size(outdata) <= fdmt->state_size);
 
 	FdmtIteration* iter = new FdmtIteration(outdata->nw, outdata->nx, outdata->ny, outdata->nz);
 	fdmt->iterations.push_back(iter);
-	float fjumps = (float)nf; // Output number of channels
+	float fjumps = (float)nf_running; // Output number of channels
 	float frange = fdmt->fmax - fdmt->fmin; // Width of band
 	float fmin = fdmt->fmin; // Bottom of band
+	//float fres = frange/fjumps; // Frequency resolution of output subbands
+	float fres = fdmt->_f_width*2.0; //
+	fdmt->_f_width = fres;
+
+	printf("Iteration %d max_dt %d delta_f =%f nf=%d fjumps=%f frange=%f fres=%f fmin=%f inshape=",
+			iteration_num, fdmt->max_dt, delta_f,
+				nf, fjumps, frange, fres, fmin);
+	array4d_print_shape(indata);
+	array4d_print_shape(outdata);
+	printf("\n");
 
 	float correction = 0.0;
 	if (iteration_num > 0) {
@@ -94,18 +104,41 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 	int shift_input = 0;
 	int shift_output = 0;
 
-
 	// For each output sub-band
 	for (int iif = 0; iif < nf; iif++) {
-		float f_start = frange/fjumps * (float)iif + fmin; // Top freq of subband
-		float f_end = frange/fjumps*((float)iif + 1) + fmin; // Bottom freq of subband
-		float f_middle = (f_end - f_start)/2.0 + f_start - correction; // Middle freq of subband, less 0.5xresolution
-		float f_middle_larger = (f_end - f_start)/2.0 + f_start + correction; // Middle freq of subband + 0.5x resolution (helps with rounding)
+		float f_start = fres * (float)iif + fmin - df/2.0f; // Freq of bottom output subband
+		float f_end;
+
+		if (iif < nf - 1) { // all the bottom subbands
+			f_end = f_start + fres;
+		} else  { // if this is final subband
+			printf("iif %d final subband\n", iif);
+			if (2*iif + 1 < indata->nx) { // There are 2 subbands available in the input data
+				// The width of the output subband is the sum of the input suband (which is fres/2.0)
+				// plus whatever the previous output was
+				float out_width = fdmt->_last_f_width + fres/2.0;
+				f_end = f_start + out_width;
+				printf("2 subbands available: fdmt->_last_f_width=%f. New Width: %f\n", fdmt->_last_f_width, out_width);
+				fdmt->_last_f_width = out_width;
+			} else { // there is not subband above this one in the input data
+				// the output channel width equals the input channel width
+				printf("no Subband avilable. Copy: fdmt->_last_f_width=%f\n", fdmt->_last_f_width);
+				f_end = f_start + fdmt->_last_f_width;
+			}
+
+		}
+
+		float f_middle = (f_end - f_start)/2.0f + f_start - correction; // Middle freq of subband, less 0.5xresolution
+		float f_middle_larger = (f_end - f_start)/2.0f + f_start + correction; // Middle freq of subband + 0.5x resolution (helps with rounding)
 
 		// Max DM for this subband
 		int delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
-
 		iter->add_subband(delta_t_local);
+		printf("iif %d oif1=%d oif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
+					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
+		if (iif == 0) {
+			//assert(delta_t_local == ndt);// Should populate all delta_t in the lowest band????
+		}
 
 		// For each DM relevant for this subband
 		for (int idt = 0; idt < delta_t_local; idt++) {
@@ -118,6 +151,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 			int itmin = 0;
 			int itmax = dt_middle_larger;
+			//printf("idt %d dtmid %d dt_mid_l %d dt_rest %d\n", idt, dt_middle_index, dt_middle_larger, dt_rest);
 
 			dim3 dst_start(iif, idt+shift_output,0);
 			dim3 src1_start(2*iif, dt_middle_index, 0);
@@ -133,7 +167,13 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			src1_start.z = dt_middle_larger;
 			dst_start.z = dt_middle_larger;
 
+			// We shouldn't overrun the incoming array
+//			assert(dt_middle_index < indata->ny);
+//			assert(dt_rest_index < indata->ny);
+			// TODO: ADD MORE BOUNDS CHECKS
+
 			int mint = dt_middle_larger;
+
 			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
 			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0) - mint;
 			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
@@ -148,12 +188,13 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt, int nbeams)
 {
+	// Expect center frequencies on the input here. Interanlly use the bottom edge frequency
 	fdmt->max_dt = max_dt;
 	fdmt->nt = nt;
+	fdmt->nf = nf;
+	fdmt->df = (fmax - fmin)/((float) fdmt->nf);
 	fdmt->fmin = fmin;
 	fdmt->fmax = fmax;
-	fdmt->nf = nf;
-	fdmt->df = (fdmt->fmax - fdmt->fmin)/((float) fdmt->nf);
 	fdmt->order = (int)ceil(log(fdmt->nf)/log(2.0));
 	fdmt->nbeams = nbeams;
 	assert(nf > 0);
@@ -176,17 +217,17 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	// Delta_t here is the number of time samples the maximum DM trajectory traverses
 	// In the lowest channel. It is equivalent to the number of Dm trials you need to do
 	// In the lowest channel to get out to the highest DM we asked for.
-	fdmt->delta_t = calc_delta_t(fdmt, fdmt->fmin, fdmt->fmin + fdmt->df);
-	fdmt->delta_t += 1; // Slightly different definition to origiinal
+	fdmt->delta_t = calc_delta_t(fdmt, fdmt->fmin-fdmt->df/2., fdmt->fmin + fdmt->df/2.);
+	fdmt->delta_t += 1; // Slightly different definition to original
 
 	// Allocate states as ping-pong buffer
-	fdmt->state_size = fdmt->nbeams * fdmt->nf*fdmt->delta_t * fdmt->max_dt;
+	fdmt->state_size = fdmt->nbeams * fdmt->nf*fdmt->max_dt * fdmt->max_dt;
 	fdmt->state_nbytes = fdmt->state_size * sizeof(fdmt_dtype);
 	for (int s = 0; s < 2; s++) {
 		fdmt->states[s].nw = fdmt->nbeams;
 		fdmt->states[s].nx = fdmt->nf;
 		fdmt->states[s].ny = fdmt->delta_t;
-		fdmt->states[s].nz = fdmt->max_dt;
+		fdmt->states[s].nz = fdmt->nt;
 		array4d_malloc(&fdmt->states[s]);
 	}
 
@@ -199,6 +240,8 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 
 	// save iteration setup
 	int s = 0;
+	fdmt->_f_width = fdmt->df;
+	fdmt->_last_f_width = fdmt->df;
 	for (int iiter = 1; iiter < fdmt->order+1; iiter++) {
 		array4d_t* curr_state = &fdmt->states[s];
 		s = (s + 1) % 2;

@@ -158,7 +158,7 @@ int array3d_dump(const array3d_t* a, const char* foutname)
   return 0;
 }
 
-void array4d_print_shape(array4d_t* a)
+void array4d_print_shape(const array4d_t* a)
 {
 	printf("nw=%d nx=%d ny=%d nz=%d\b", a->nw, a->nx, a->ny, a->nz);
 }
