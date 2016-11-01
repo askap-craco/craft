@@ -55,7 +55,6 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 	// Add 1 to the frequency dimension if it's not divisible by 2 to handle non-power-of-two nf
 	int nf = indata->nx/2 + indata->nx % 2;
-	int nf_running = indata->nx/2;
 
 	// Barak's calculation of the frequency resolution of current iteration was like this:
 	//float delta_f = (float)(1 << iteration_num) * df;
@@ -233,13 +232,16 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	}
 	fdmt->state_size = array4d_size(&fdmt->states[0]);
 	fdmt->state_nbytes = fdmt->state_size * sizeof(fdmt_dtype);
-
 	fdmt->ostate.nw = fdmt->nbeams;
 	fdmt->ostate.nx = 1;
 	fdmt->ostate.ny = fdmt->max_dt;
 	fdmt->ostate.nz = fdmt->max_dt;
 	array4d_malloc(&fdmt->ostate);
 	array4d_cuda_memset(&fdmt->ostate, 0);
+
+	printf("FDMT State site: %d Bytes\n", fdmt->state_nbytes);
+
+
 
 	// save iteration setup
 	int s = 0;
