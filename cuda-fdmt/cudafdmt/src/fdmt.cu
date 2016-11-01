@@ -129,11 +129,17 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 		// Max DM for this subband
 		int delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
+
+		// Note; we must not overwrite the max ndt - doign too many down low will give us too much resolution
+		// Up high.
+		if (delta_t_local > ndt) {
+			delta_t_local = ndt;
+		}
 		iter->add_subband(delta_t_local);
-//		printf("iif %d oif1=%d oif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
-//					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
+		printf("iif %d oif1=%d oif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
+					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
 		if (iif == 0) {
-			//assert(delta_t_local == ndt);// Should populate all delta_t in the lowest band????
+			assert(delta_t_local == ndt);// Should populate all delta_t in the lowest band????
 		}
 
 		// For each DM relevant for this subband
@@ -217,15 +223,16 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	fdmt->delta_t += 1; // Slightly different definition to original
 
 	// Allocate states as ping-pong buffer
-	fdmt->state_size = fdmt->nbeams * fdmt->nf*fdmt->max_dt * fdmt->max_dt;
-	fdmt->state_nbytes = fdmt->state_size * sizeof(fdmt_dtype);
+
 	for (int s = 0; s < 2; s++) {
 		fdmt->states[s].nw = fdmt->nbeams;
 		fdmt->states[s].nx = fdmt->nf;
-		fdmt->states[s].ny = fdmt->max_dt;
+		fdmt->states[s].ny = fdmt->delta_t;
 		fdmt->states[s].nz = fdmt->max_dt;
 		array4d_malloc(&fdmt->states[s]);
 	}
+	fdmt->state_size = array4d_size(&fdmt->states[0]);
+	fdmt->state_nbytes = fdmt->state_size * sizeof(fdmt_dtype);
 
 	fdmt->ostate.nw = fdmt->nbeams;
 	fdmt->ostate.nx = 1;
