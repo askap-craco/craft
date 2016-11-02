@@ -14,133 +14,56 @@ import logging
 import subprocess
 from craftsim import dispersed_voltage, dispersed_stft
 from FDMT import *
+import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
-class Formatter(object):
-    def __init__(self, im):
-        self.im = im
-    def __call__(self, x, y):
-        z = self.im.get_array()[int(y), int(x)]
-        return 'x={:.01f}, y={:.01f}, z={:.01f}'.format(x, y, z)
-
-def myimshow(ax, *args, **kwargs):
-    kwargs['aspect'] = 'auto'
-    kwargs['interpolation'] = 'nearest'
-    im = ax.imshow(*args, **kwargs)
-    ax.format_coord = Formatter(im)
-    return im
-
-def make_signal2():
-    freq = np.linspace(fmin, fmax, nf)
-    dm = 150
-    assert(len(freq) == nf)
-    #d = np.ones((nf, nt), dtype=np.float32)
-    d = np.zeros((nf, nt), dtype=np.float32)
-    d += np.random.randn(nf, nt)
-    return d
-
-
-    N_total = N_f*N_t*N_bins
-    PulseLength = N_f*N_bins
-
-def load4d(fname, dtype=np.float32):
-    fin = open(fname, 'r')
-    theshape =  np.fromfile(fin, dtype=np.int32, count=4)
-    d = np.fromfile(fin, dtype=dtype, count=theshape.prod())
-    d.shape = theshape
-    fin.close()
-    return d
-
-def file_series(prefix):
-    i = 0
-    while True:
-        fname = prefix % i
-        if os.path.exists(fname):
-            yield fname
-        else:
-            break
-        i += 1
-
-def show_series(prefix, theslice):
-    for fname in file_series(prefix):
-        ostate = load4d(fname)
-        pylab.figure()
-        v = ostate[theslice]
-        print fname, ostate.shape, 'zeros?', np.all(ostate == 0), 'max', v.max(), np.unravel_index(v.argmax(), v.shape)
-        myimshow(pylab.gca(), v, aspect='auto', origin='lower')
-        pylab.title(fname)
 
 
 def _main():
     from argparse import ArgumentParser
-    parser = ArgumentParser(description='Script description')
+    parser = ArgumentParser(description='Makes a filterbank with a dispersed pulse in it')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-b','--beam', type=float, help='beam number')
-    parser.set_defaults(verbose=False, beam=0)
+    parser.add_argument('-f', '--fch1', type=float, help='First channel frequency MHz')
+    parser.add_argument('-c', '--foff', type=float, help='Frequency offset MHz')
+    parser.add_argument('-n', '--nchan', type=int, help='Number of channels')
+    parser.add_argument('-b', '--nbins', type=int, help='Number of bins to integrate')
+    parser.add_argument('-D', '--dispersion', type=float, help='Dispersion Measure')
+    parser.add_argument('-t','--ntimes', type=int, help='Number of samples')
+    parser.add_argument('-s','--pulsesig', type=float, help='Pulse S/N')
+    parser.add_argument(dest='file', help='Output sigproc filterbank file name')
+
+    parser.set_defaults(verbose=False, fch1=1440., foff=-1., nchan=256, nbins=40, dispersion=5.0, pulsesig=40.0, ntimes=2048)
     values = parser.parse_args()
     if values.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
 
-    tint = 0.1
-    nf = 512
-    nt = 512
-    nt_sim = 512
-    nd = 512
+    nf = values.nchan
+    nt_sim = values.ntimes
     tstart = 0
-    fmax = 1440.
-    fmin = fmax - float(nf)
+    fmax = values.fch1
+    fmin = fmax + values.nchan * values.foff
+    assert fmin < fmax
+    tint = values.nbins/((fmax - fmin)*1e6)
+    hdr = {'fch1': fmax, 'foff':values.foff, 'nchans': values.nchan, 'nifs':1,'tstart':55000.0, 'tsamp':tint, 'nbits':8,
+           'data_type':1}
+    spfile = sigproc.SigprocFile(values.file, 'w', hdr)
+
     np.random.seed(42)
 
-    if os.path.exists('test.in'):
-        d = np.fromfile('test.in', dtype=np.float32, count=nf*nt)
-        d.shape = (nf, nt)
-    else:
-        with open('test.in', 'w') as fout:
-            d = dispersed_stft(fmin, fmax, nt_sim, nf, N_bins=40, D=5., PulseSig=4.)
-            d = d[:, tstart:tstart+nt]
-            d.astype(np.float32).T.tofile(fout)
-
-    print 'signal shape', d.shape
-
-    nf, nt = d.shape
-
-    with open('test.out', 'r') as fin:
-        dout = np.fromfile(fin, dtype=np.float32, count=-1)
-        print 'test.out length', len(dout), nd, nt
-        #assert len(dout) == nd*nt
-        dout.shape = (nd, len(dout)/nd)
-
-    beam = values.beam
-    fig, ax  = pylab.subplots(1,2)
-    ex = (0, nt*tint, fmin, fmax)
-    ex = None
-    myimshow(ax[0], d, origin='lower', extent=ex)
-    myimshow(ax[1], dout, origin='lower', extent=ex)
-    ax[0].set_title('test.out')
-    #print 'Dout max', dout.max()
-
-    show_series('ostate_e%d.dat', [beam, 0, slice(None), slice(None)])
-    show_series('finalstate_e%d.dat', [beam, 0, slice(None), slice(None)])
-    show_series('initstate_e%d.dat',[beam, slice(None),0, slice(None)])
-
-    for i, fname in enumerate(file_series('state_s%d.dat')):
-        if 0 < i < 9:
-            continue
-
-        d = load4d(fname)
-        fig, ax = pylab.subplots(1,2)
-        myimshow(ax[0], d[beam, :, 0, :], aspect='auto', origin='lower')
-        myimshow(ax[1], d[beam, 0, :, :], aspect='auto', origin='lower')
-
-        ax[0].set_title(fname)
-
-        print fname, d.shape, np.prod(d.shape)
-
+    d = dispersed_stft(fmin, fmax, nt_sim, nf, N_bins=values.nbins, D=values.dispersion, PulseSig=values.pulsesig)
+    #d = d[:, tstart:tstart+nt]
+    d *= 2
+    d += 128
+    pylab.imshow(d)
     pylab.show()
-    
+    d[0:nf, :] = d[nf::-1, :]
+
+    print 'D mean=', d.flatten().mean(), 'D stdev', d.flatten().std(), 'shape', d.shape
+    d.astype(np.uint8).tofile(spfile.fin)
+
 
 
 

@@ -156,7 +156,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 			dim3 dst_start(iif, idt+shift_output,0);
 			dim3 src1_start(2*iif, dt_middle_index, 0);
-			dim3 src2_start(2*iif + 1, dt_rest_index, .0);
+			dim3 src2_start(2*iif + 1, dt_rest_index, 0);
 
 			//array_gpu_copy1(outdata, indata, &dst_start, &src1_start, dt_middle_larger);
 
@@ -169,8 +169,8 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			dst_start.z = dt_middle_larger;
 
 			// We shouldn't overrun the incoming array
-//			assert(dt_middle_index < indata->ny);
-//			assert(dt_rest_index < indata->ny);
+			assert(dt_middle_index < indata->ny);
+			assert(dt_rest_index < indata->ny);
 			// TODO: ADD MORE BOUNDS CHECKS
 
 			int mint = dt_middle_larger;
@@ -711,13 +711,11 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 
 	int ibeam = blockIdx.x;
 	int nbeams = gridDim.x;
-
-	int idt = blockIdx.y;
-	int max_dt = gridDim.y;
-
 	int nt = blockDim.x;
-	int off = nt*(idt + max_dt*ibeam);
+	int max_dt = gridDim.y;
+	int idt = blockIdx.y;
 
+	int off = max_dt*(idt + max_dt*ibeam);
 	int t = threadIdx.x;
 	fdmt_dtype* optr = ostate + off;
 	const fdmt_dtype* iptr = indata + off;
@@ -725,12 +723,19 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 	while (t < max_dt - nt) {
 		optr[t] = iptr[t] + optr[t + nt];
 
+		if (off == 0 && t == 0) {
+			printf("ibeam = %d nbeams=%d nt=%d max_dt=%d nt=%d\n", ibeam, nbeams, nt, max_dt, nt);
+		}
+
 		// sync threads before doing the next block otherwise we don't copy the ostate correctly
 		__syncthreads();
 		t += nt;
 	}
 	// just copy the last block
-	optr[t] = iptr[t];
+	if (t < max_dt) {
+		optr[t] = iptr[t];
+	}
+
 }
 
 
@@ -867,21 +872,22 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 
 	// actually execute the iterations on the GPU
 	fdmt_execute_iterations(fdmt);
+
+#ifdef DUMP_STATE
+	array4d_t* currstate = &fdmt->states[fdmt->curr_state_idx];
+	sprintf(buf, "finalstate_e%d.dat", fdmt->execute_count);
+	array4d_copy_to_host(currstate);
+	array4d_dump(currstate, buf);
+#endif
+
 	fdmt->t_update_ostate.start();
 	fdmt_update_ostate(fdmt);
-
 	fdmt->t_update_ostate.stop();
-	//cout << "Delay and sum update took " << tupdate << endl;
-
 
 #ifdef DUMP_STATE
 	sprintf(buf, "ostate_e%d.dat", fdmt->execute_count);
 	array4d_copy_to_host(&fdmt->ostate);
 	array4d_dump(&fdmt->ostate, buf);
-	array4d_t* currstate = &fdmt->states[fdmt->curr_state_idx];
-	sprintf(buf, "finalstate_e%d.dat", fdmt->execute_count);
-	array4d_copy_to_host(currstate);
-	array4d_dump(currstate, buf);
 #endif
 
 	array4d_t outarray;

@@ -42,7 +42,7 @@ int main(int argc, char* argv[])
 	int nd = 512;
 	int nt = 256;
 	const int num_skip_blocks = 4;
-	const int num_rescale_blocks = 2;
+	const int num_rescale_blocks = 10;
 	float decay_timescale = 0.2; // Seconds?
 	char ch;
 	float thresh = 10.0;
@@ -158,12 +158,12 @@ int main(int argc, char* argv[])
 					// writes to inbuf
 					size_t rs_idx = outf + nf*b;
 					float v_rescale;
-//					printf("Rescaling to mean=%f stdev=%f decay constant=%f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant);
+					//printf("Rescaling to mean=%f stdev=%f decay constant=%f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant);
 
 					v_rescale = rescale_update_decay_float_single(&rescale, rs_idx, (float) read_buf[inidx]);
 					rescale_buf.d[outidx] = v_rescale;
-//					printf("block=%d t=%d b=%d f=%d vin=%d vout=%f vin2%d\n", blocknum, t, b, f, read_buf[inidx], v_rescale, read_buf2[inidx]);
-					//assert(read_buf[inidx] == read_buf2[inidx]);
+					//printf("block=%d t=%d b=%d f=%d vin=%d vout=%f \n", blocknum, t, b, f, read_buf[inidx], v_rescale);
+
 				}
 			}
 			rescale.sampnum += 1; // WARNING: Need to do this because we're calling rescale*single. THink harder about how to do this beter
@@ -175,6 +175,8 @@ int main(int argc, char* argv[])
 			array4d_dump(&rescale_buf, fbuf);
 			printf("Dumping input buffer %s\n", fbuf);
 		}
+
+		assert(num_rescale_blocks > 0);
 
 		if (blocknum % num_rescale_blocks == 0) {
 			rescale_update_scaleoffset(&rescale);
@@ -193,7 +195,7 @@ int main(int argc, char* argv[])
 
 		blocknum++;
 
-		if (blocknum > 6) {
+		if (blocknum > num_rescale_blocks + 2) {
 			break;
 		}
 	}
