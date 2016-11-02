@@ -1,6 +1,8 @@
 #ifndef _RESCALE_H
 #define _RESCALE_H
 
+#include <stdint.h>
+
 typedef struct {
   /* stuff for rescaling */
   float* sum;
