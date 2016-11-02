@@ -723,10 +723,6 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 	while (t < max_dt - nt) {
 		optr[t] = iptr[t] + optr[t + nt];
 
-		if (off == 0 && t == 0) {
-			printf("ibeam = %d nbeams=%d nt=%d max_dt=%d nt=%d\n", ibeam, nbeams, nt, max_dt, nt);
-		}
-
 		// sync threads before doing the next block otherwise we don't copy the ostate correctly
 		__syncthreads();
 		t += nt;

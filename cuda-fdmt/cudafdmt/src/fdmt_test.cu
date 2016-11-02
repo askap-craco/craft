@@ -41,14 +41,14 @@ int main(int argc, char* argv[])
 	printf("Test!");
 	int nd = 512;
 	int nt = 256;
-	const int num_skip_blocks = 4;
-	const int num_rescale_blocks = 10;
+	int num_skip_blocks = 4;
+	int num_rescale_blocks = 2;
 	float decay_timescale = 0.2; // Seconds?
 	char ch;
 	float thresh = 10.0;
 	const char* out_filename = "fredda.cand";
 	bool dump_data = false;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:Dh")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dh")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -67,6 +67,12 @@ int main(int argc, char* argv[])
 			break;
 		case 'D':
 			dump_data = true;
+			break;
+		case 'r':
+			num_rescale_blocks = atoi(optarg);
+			break;
+		case 'S':
+			num_skip_blocks = atoi(optarg);
 			break;
 		case '?':
 		case 'h':
@@ -194,10 +200,6 @@ int main(int argc, char* argv[])
 		}
 
 		blocknum++;
-
-		if (blocknum > num_rescale_blocks + 2) {
-			break;
-		}
 	}
 
 	printf("FREDDA Finished\n");
