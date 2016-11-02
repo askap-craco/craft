@@ -85,11 +85,11 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 	float fres = fdmt->_f_width*2.0; // Frequency resolution of the output subbands
 	fdmt->_f_width = fres;
 
-	printf("Iteration %d max_dt %d delta_f =%f nf=%d fres=%f fmin=%f inshape: [%d, %d, %d, %d] outshape: [%d, %d, %d, %d]\n",
-			iteration_num, fdmt->max_dt, delta_f,
-				nf, fres, fmin,
-				indata->nw, indata->nx, indata->ny, indata->nz,
-				outdata->nw, outdata->nx, outdata->ny, outdata->nz);
+//	printf("Iteration %d max_dt %d delta_f =%f nf=%d fres=%f fmin=%f inshape: [%d, %d, %d, %d] outshape: [%d, %d, %d, %d]\n",
+//			iteration_num, fdmt->max_dt, delta_f,
+//				nf, fres, fmin,
+//				indata->nw, indata->nx, indata->ny, indata->nz,
+//				outdata->nw, outdata->nx, outdata->ny, outdata->nz);
 
 	float correction = 0.0;
 	if (iteration_num > 0) {
@@ -135,8 +135,8 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			delta_t_local = ndt;
 		}
 		iter->add_subband(delta_t_local);
-		printf("iif %d oif1=%d oif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
-					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
+//		printf("iif %d oif1=%d oif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
+//					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
 		if (iif == 0) {
 			assert(delta_t_local == ndt);// Should populate all delta_t in the lowest band????
 		}
@@ -239,7 +239,7 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	array4d_malloc(&fdmt->ostate);
 	array4d_cuda_memset(&fdmt->ostate, 0);
 
-	printf("FDMT State site: %d Bytes\n", fdmt->state_nbytes);
+	printf("FDMT State size: %d Bytes\n", fdmt->state_nbytes);
 
 
 
