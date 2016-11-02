@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <iostream>
+#include <omp.h>
 #include "fdmt.h"
 #include "array.h"
 #include "boxcar.h"
@@ -48,7 +49,8 @@ int main(int argc, char* argv[])
 	float thresh = 10.0;
 	const char* out_filename = "fredda.cand";
 	bool dump_data = false;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dh")) != -1) {
+	int cuda_device = 0;
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:D:g:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -74,6 +76,9 @@ int main(int argc, char* argv[])
 		case 'S':
 			num_skip_blocks = atoi(optarg);
 			break;
+		case 'g':
+			cuda_device = atoi(optarg);
+			break;
 		case '?':
 		case 'h':
 		default:
@@ -87,6 +92,9 @@ int main(int argc, char* argv[])
 		printf("Not enough arguments\n");
 		exit(EXIT_FAILURE);
 	}
+
+	printf("Setting cuda device to %d\n", cuda_device);
+	gpuErrchk( cudaSetDevice(cuda_device));
 
 	// Load sigproc file
 	SigprocFileSet source(argc, argv);
@@ -150,6 +158,7 @@ int main(int argc, char* argv[])
 		// TODO: Optimisation: cast to float and do rescaling in SIMD
 		#pragma omp parallel for
 		for(int t = 0; t < nt; ++t) {
+			#pragma omp parallel for
 			for (int b = 0; b < nbeams; ++b) {
 				for (int f = 0; f < nf; ++f) {
 					// NOTE: FDMT expects channel[0] at fmin
@@ -175,7 +184,6 @@ int main(int argc, char* argv[])
 			}
 		}
 		rescale.sampnum += nt; // WARNING: Need to do this because we're calling rescale*single. THink harder about how to do this beter
-
 
 		char fbuf[1024];
 		if (dump_data) {
