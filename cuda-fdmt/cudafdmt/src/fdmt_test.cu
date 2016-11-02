@@ -148,13 +148,14 @@ int main(int argc, char* argv[])
 		// Output needs to be BFT order
 		// Do transpose and cast to float on the way through
 		// TODO: Optimisation: cast to float and do rescaling in SIMD
+		#pragma omp parallel for
 		for(int t = 0; t < nt; ++t) {
 			for (int b = 0; b < nbeams; ++b) {
 				for (int f = 0; f < nf; ++f) {
 					// NOTE: FDMT expects channel[0] at fmin
 					// so invert the frequency axis if the frequency offset is negative
 					int outf = f;
-					if (source.foff() < 0) {
+					if (foff < 0) {
 						outf = nf - f - 1;
 					}
 					int inidx = array4d_idx(&read_arr, 0, b, t, f);
@@ -172,8 +173,9 @@ int main(int argc, char* argv[])
 
 				}
 			}
-			rescale.sampnum += 1; // WARNING: Need to do this because we're calling rescale*single. THink harder about how to do this beter
 		}
+		rescale.sampnum += nt; // WARNING: Need to do this because we're calling rescale*single. THink harder about how to do this beter
+
 
 		char fbuf[1024];
 		if (dump_data) {
