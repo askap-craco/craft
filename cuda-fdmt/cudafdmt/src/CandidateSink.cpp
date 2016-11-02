@@ -23,6 +23,7 @@ CandidateSink::CandidateSink(SigprocFileSet* srcfile, const char* filename) {
 		perror("Could not open candidate file");
 		exit(EXIT_FAILURE);
 	}
+	fprintf(m_candfile, "# S/N, sampno, time from file start, boxcar, dm, beamno\n");
 }
 
 CandidateSink::~CandidateSink() {
@@ -39,6 +40,6 @@ void CandidateSink::add_candidate(int ibeam, int idt, int t, int ibc, float sn)
 	float  dm = m_srcfile->dm_of_idt(idt);
 	size_t sampno = t + m_srcfile->samples_read();
 	double time_from_file = sampno*m_srcfile->tsamp();
-	fprintf(m_candfile, "%f %d %f %d %d %0.3f %d %d %d %d\n", sn, sampno, time_from_file,
-			ibc, 0, dm, 0, 0, 0, ibeam);
+	fprintf(m_candfile, "%f %lu %f %d %0.3f %d\n", sn, sampno, time_from_file,
+			ibc, dm, ibeam);
 }

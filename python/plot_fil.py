@@ -20,13 +20,13 @@ def _main():
     parser.add_argument('-t', '--times', help='Integration range to plot')
     parser.add_argument('--dtype', help="override dtype", nargs="?")
     parser.add_argument('-n','--normalise', action='store_true', help='Normalise each channel before plotting', default=False)
-    parser.add_argument('-p','--period',  help='Folding period', type=float, default=0.089328385024)
+    parser.add_argument('-p','--period',  help='Folding period vela=0.089328385024)', type=float,default=0)
     parser.add_argument('--plot-fft', help='plot fft', action='store_true', default=False)
     parser.add_argument('--plot-image',help='plot image', action='store_true', default=False)
     parser.add_argument('--plot-hist',help='plot hist', action='store_true', default=False)
 
 
-    parser.add_argument('--nxy', help='rows & columns', default='1,2')
+    parser.add_argument('--nxy', help='rows & columns', default='1,1')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -181,7 +181,7 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
             vmin = vmid-2*vstd
 
         print 'VMIN', vmin, 'VMAX', vmax, data.shape
-        if values.plot_image and ifn > 0:
+        if values.plot_image:
             im = ax.imshow(data.T, aspect='auto', vmin=vmin, vmax=vmax, interpolation='none', origin='lower')
             ax.text(0, 0, 'ifn %d' % ifn, va='top', ha='left') 
             ax.format_coord = Formatter(im)
