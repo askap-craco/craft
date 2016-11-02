@@ -13,11 +13,11 @@
 #include "SigprocFile.h"
 
 //class FileGroup : public fdmt::DataSource { // GOD I hate C++ classes
-class FileGroup {
+class SigprocFileSet {
 
 public:
-	FileGroup(int argc, char* filenames[]);
-	virtual ~FileGroup();
+	SigprocFileSet(int argc, char* filenames[]);
+	virtual ~SigprocFileSet();
 
 	float dm_of_idt(int idt) {
 		return first_file->dm_of_idt(idt);

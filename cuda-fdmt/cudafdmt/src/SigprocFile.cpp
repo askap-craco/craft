@@ -106,8 +106,6 @@ int SigprocFile::header_int(const char* hname) const {
 size_t SigprocFile::seek_sample(size_t t)
 {
 	size_t boff = t*nifs()*nchans() + m_hdr_nbytes;
-	//printf("Seek t=%d nifs=%d nchans%d m_hdr_nbytes %d\n", t, nifs(), nchans(), m_hdr_nbytes);
-	printf("Seek nifs=%d\n", nifs());
 	if(fseek(m_file, boff, SEEK_SET) < 0) {
 		printf("SigprocFile: Could not seek to offset of file %s\n. Error: %s", m_filename, strerror(errno));
 		assert(0);

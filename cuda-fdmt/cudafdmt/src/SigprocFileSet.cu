@@ -6,11 +6,11 @@
  */
 
 #include <assert.h>
-#include "FileGroup.h"
+#include "SigprocFileSet.h"
 #include "SigprocFile.h"
 
 
-FileGroup::FileGroup(int argc, char* filenames[]) {
+SigprocFileSet::SigprocFileSet(int argc, char* filenames[]) {
 	m_nbeams = 0;
 	for(int i = 0; i < argc; i++) {
 		SigprocFile* curr_file = new SigprocFile(filenames[i]);
@@ -31,11 +31,13 @@ FileGroup::FileGroup(int argc, char* filenames[]) {
 
 }
 
-FileGroup::~FileGroup() {
-	// TODO Auto-generated destructor stub
+SigprocFileSet::~SigprocFileSet() {
+	for(int i = 0; i < m_files.size(); i++) {
+		delete m_files.at(i);
+	}
 }
 
-size_t FileGroup::read_samples_uint8(size_t nt, uint8_t* output)
+size_t SigprocFileSet::read_samples_uint8(size_t nt, uint8_t* output)
 {
 	int beamno = 0;
 	size_t nread;

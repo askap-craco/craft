@@ -669,7 +669,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		const fdmt_dtype* src_start = &indata->d_device[0];
 		fdmt_dtype* dst_start = &outdata->d_device[0];
 		int tmax = min(nt + delta_t_local, indata->nz-1);
-		//printf("iter %d iif %d TMAX %d nt  %d delta_t_local %d %d \n", iteration_num, iif, tmax, nt, delta_t_local, indata->nz);
+		printf("iter %d iif %d TMAX %d nt  %d delta_t_local %d %d \n", iteration_num, iif, tmax, nt, delta_t_local, indata->nz);
 
 		assert(tmax < indata->nz);
 
@@ -781,7 +781,7 @@ __host__ void fdmt_copy_valid_ostate3(fdmt_t* fdmt, array4d_t* out)
 		for(int idt = 0; idt < fdmt->max_dt; ++idt) {
 			for (int t = 0; t < fdmt->nt; ++t) {
 				int inidx = array4d_idx(&fdmt->ostate, b, 0, idt, t);
-				int outidx = array4d_idx(out, b, 0, idt, t);
+				int outidx = array4d_idx(out, 0, b, idt, t);
 				out->d[outidx] = fdmt->ostate.d[inidx];
 				i += 1;
 			}
@@ -811,6 +811,7 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 
 	// Start that puppy up
 	int s = 0;
+	printf("Got here: %s:%d\n", __FILE__, __LINE__);
 
 	fdmt->t_iterations.start();
 	for (int iter = 1; iter < fdmt->order+1; iter++) {
@@ -819,8 +820,11 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 		array4d_t* newstate = &fdmt->states[s];
 
 		//fdmt_iteration(fdmt, iter, currstate, newstate);
+		printf("Got here: %s:%d iter=%d s=%d\n", __FILE__, __LINE__, iter, s);
 
 		cuda_fdmt_iteration4(fdmt, iter, currstate, newstate);
+		printf("Got here: %s:%d\n", __FILE__, __LINE__);
+
 		gpuErrchk(cudaPeekAtLastError());
 		gpuErrchk(cudaDeviceSynchronize());
 #ifdef DUMP_STATE
@@ -829,8 +833,6 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 		sprintf(buf, "state_s%d.dat", iter);
 		array4d_dump(newstate, buf);
 #endif
-		//printf("Finisehd iteration %d\n", iter);
-
 	}
 	fdmt->t_iterations.stop();
 	//cout << "FDMT Iterations only took " << t << endl;
@@ -850,13 +852,13 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	outstate.nz = fdmt->ostate.nz;
 	outstate.d = outdata;
 	outstate.d_device = fdmt->ostate.d_device;
-
 	// Initialise state
 	fdmt->t_init.start();
 	int s = 0;
-
 	fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
 	fdmt->t_init.stop();
+
+
 
 #ifdef DUMP_STATE
 	// dump init state to disk
@@ -873,12 +875,17 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	fdmt->t_copy_in.stop();
 
 	// actually execute the iterations on the GPU
+	printf("Got here: %s:%d\n", __FILE__, __LINE__);
 	fdmt_execute_iterations(fdmt);
+	printf("Got here: %s:%d\n", __FILE__, __LINE__);
 
 	fdmt->t_update_ostate.start();
 	fdmt_update_ostate(fdmt);
+	printf("Got here: %s:%d\n", __FILE__, __LINE__);
+
 	fdmt->t_update_ostate.stop();
 	//cout << "Delay and sum update took " << tupdate << endl;
+	printf("Got here: %s:%d\n", __FILE__, __LINE__);
 
 
 #ifdef DUMP_STATE
@@ -898,7 +905,11 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	outarray.ny = fdmt->max_dt;
 	outarray.nz = fdmt->nt;
 	fdmt->t_copy_back.start();
+	printf("Got here: %s:%d\n", __FILE__, __LINE__);
+
 	fdmt_copy_valid_ostate3(fdmt, &outarray);
+	printf("Got here: %s:%d\n", __FILE__, __LINE__);
+
 	fdmt->t_copy_back.stop();
 	//cout << "Copy back to host took " << tback << endl;
 

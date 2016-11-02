@@ -16,7 +16,7 @@
 #include "CudaTimer.h"
 #include "DataSource.h"
 #include "SigprocFile.h"
-#include "FileGroup.h"
+#include "SigprocFileSet.h"
 
 #include "rescale.h"
 
@@ -83,13 +83,13 @@ int main(int argc, char* argv[])
 	}
 
 	// Load sigproc file
-	FileGroup spf(argc, argv);
+	SigprocFileSet source(argc, argv);
 
-	CandidateSink sink(&spf, out_filename);
-	cout << "spf tsamp " << spf.tsamp()<< " nbeams " << spf.nbeams() << " fch1 " << spf.fch1() << " nchans "
-			<< spf.nchans() << "foff " << spf.foff() << endl;
-	int nbeams = spf.nbeams();
-	int nf = spf.nchans();
+	CandidateSink sink(&source, out_filename);
+	cout << "spf tsamp " << source.tsamp()<< " nbeams " << source.nbeams() << " fch1 " << source.fch1() << " nchans "
+			<< source.nchans() << "foff " << source.foff() << endl;
+	int nbeams = source.nbeams();
+	int nf = source.nchans();
 	size_t in_chunk_size = nbeams*nf*nt;
 
 	// Create read buffer
@@ -99,8 +99,8 @@ int main(int argc, char* argv[])
 	read_arr.nx = nt;
 	read_arr.ny = nbeams;
 	read_arr.nz = nf;
-
 	assert(read_buf);
+
 
 	array4d_t rescale_buf;
 	rescale_buf.nw = nbeams;
@@ -118,22 +118,26 @@ int main(int argc, char* argv[])
 
 	// create rescaler
 	rescale_t rescale;
+	rescale.interval_samps = nt;
 	rescale.target_mean = 0.0;
 	rescale.target_stdev = 1.0/sqrt((float) nf);
-	rescale.decay_constant = 0.35 * decay_timescale / spf.tsamp(); // This is how the_decimator.C does it, I think.
+	rescale.decay_constant = 0.35 * decay_timescale / source.tsamp(); // This is how the_decimator.C does it, I think.
+	printf("Rescaling to mean=%f stdev=%f decay constant=%f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant);
 	rescale_allocate(&rescale, nbeams*nf);
 
-	float foff =  (float) spf.foff();
+	float foff =  (float) source.foff();
 	assert(foff < 0);
-	float fmax = (float) spf.fch1() - foff; // The FDMT seems to want this to make sense of the world. Not sure why.
+	float fmax = (float) source.fch1() - foff; // The FDMT seems to want this to make sense of the world. Not sure why.
 	float fmin = fmax + nf*foff;
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
-	spf.seek_sample(num_skip_blocks*nt);
+	source.seek_sample(num_skip_blocks*nt);
 	int blocknum = 0;
 
-	while (spf.read_samples_uint8(nt, read_buf) == nt) {
+	while (source.read_samples_uint8(nt, read_buf) == nt) {
+		//size_t nt2 = fin.read_samples_uint8(nt, read_buf2);
+		//assert(nt2 = nt);
 		// File is in TBF order
 		// Output needs to be BFT order
 		// Do transpose and cast to float on the way through
@@ -144,7 +148,7 @@ int main(int argc, char* argv[])
 					// NOTE: FDMT expects channel[0] at fmin
 					// so invert the frequency axis if the frequency offset is negative
 					int outf = f;
-					if (spf.foff() < 0) {
+					if (source.foff() < 0) {
 						outf = nf - f - 1;
 					}
 					int inidx = array4d_idx(&read_arr, 0, t, b, f);
@@ -154,9 +158,12 @@ int main(int argc, char* argv[])
 					// writes to inbuf
 					size_t rs_idx = outf + nf*b;
 					float v_rescale;
+//					printf("Rescaling to mean=%f stdev=%f decay constant=%f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant);
+
 					v_rescale = rescale_update_decay_float_single(&rescale, rs_idx, (float) read_buf[inidx]);
 					rescale_buf.d[outidx] = v_rescale;
-					printf("t=%d b=%d f=%d vin=%d vout=%f\n", t, b, f, read_buf[inidx], v_rescale);
+//					printf("block=%d t=%d b=%d f=%d vin=%d vout=%f vin2%d\n", blocknum, t, b, f, read_buf[inidx], v_rescale, read_buf2[inidx]);
+					//assert(read_buf[inidx] == read_buf2[inidx]);
 				}
 			}
 			rescale.sampnum += 1; // WARNING: Need to do this because we're calling rescale*single. THink harder about how to do this beter
@@ -170,10 +177,12 @@ int main(int argc, char* argv[])
 		}
 
 		if (blocknum % num_rescale_blocks == 0) {
+			printf("Doing rescale update block=%d\n", blocknum);
 			rescale_update_scaleoffset(&rescale);
 		}
 
 		if (blocknum > num_rescale_blocks) {
+			printf("Doing FDMT execute block%d\n", blocknum);
 			fdmt_execute(&fdmt, rescale_buf.d, out_buf.d);
 			if (dump_data) {
 				sprintf(fbuf, "fdmt_e%d.dat", blocknum);

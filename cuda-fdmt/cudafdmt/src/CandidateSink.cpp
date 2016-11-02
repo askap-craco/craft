@@ -6,11 +6,11 @@
  */
 
 #include "CandidateSink.h"
-#include "FileGroup.h"
+#include "SigprocFileSet.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-CandidateSink::CandidateSink(FileGroup* srcfile, const char* filename) {
+CandidateSink::CandidateSink(SigprocFileSet* srcfile, const char* filename) {
 	m_srcfile = srcfile;
 	if (filename == NULL) {
 		char fname[4096];

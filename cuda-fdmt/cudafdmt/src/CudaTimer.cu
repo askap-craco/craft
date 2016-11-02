@@ -11,6 +11,7 @@
 CudaTimer::CudaTimer(cudaStream_t stream) {
 	gpuErrchk(cudaEventCreate(&m_start));
 	gpuErrchk(cudaEventCreate(&m_stop));
+
 	m_stream = stream;
 	m_total_time = 0;
 }
@@ -21,7 +22,10 @@ CudaTimer::~CudaTimer() {
 }
 
 void CudaTimer::start() {
+	printf("Got here: %s:%d\n", __FILE__, __LINE__);
 	gpuErrchk(cudaEventRecord(m_start, m_stream));
+	printf("Got here: %s:%d\n", __FILE__, __LINE__);
+
 }
 
 void CudaTimer::stop() {
