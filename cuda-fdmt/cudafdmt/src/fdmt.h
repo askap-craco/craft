@@ -20,7 +20,7 @@
 #include "array2d.h"
 #include "CudaTimer.h"
 
-//#define DUMP_STATE 1
+#define DUMP_STATE 1
 
 #define MAX_ITER 16
 

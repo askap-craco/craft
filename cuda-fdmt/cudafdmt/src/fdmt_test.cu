@@ -151,7 +151,7 @@ int main(int argc, char* argv[])
 					if (source.foff() < 0) {
 						outf = nf - f - 1;
 					}
-					int inidx = array4d_idx(&read_arr, 0, t, b, f);
+					int inidx = array4d_idx(&read_arr, 0, b, t, f);
 					int outidx = array4d_idx(&rescale_buf, b, outf, 0, t);
 
 					//printf("t=%d b=%d f=%d inidx=%d outidx=%d\n", t, b, f, inidx, outidx);
@@ -188,9 +188,14 @@ int main(int argc, char* argv[])
 				array4d_dump(&out_buf, fbuf);
 			}
 			boxcar_threshonly(&out_buf, thresh, sink);
+
 		}
 
 		blocknum++;
+
+		if (blocknum > 6) {
+			break;
+		}
 	}
 
 	printf("FREDDA Finished\n");

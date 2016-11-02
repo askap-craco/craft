@@ -115,6 +115,8 @@ size_t SigprocFile::seek_sample(size_t t)
 
 size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
 {
+	// RETURNS TBF ordering. WARNING: This will deeply confuse the output if nbeams != 1
+	assert(nifs() == 1); // Otherwise users will be confused. TODO: get sources to tell user what data order is
 	assert(m_nbits == 8);
 	size_t nreq = nt*m_nifs*m_nchans;
 	size_t nelements = fread(output, sizeof(uint8_t), nreq, m_file);

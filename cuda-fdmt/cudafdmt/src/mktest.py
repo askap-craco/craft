@@ -76,7 +76,8 @@ def _main():
     from argparse import ArgumentParser
     parser = ArgumentParser(description='Script description')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.set_defaults(verbose=False)
+    parser.add_argument('-b','--beam', type=float, help='beam number')
+    parser.set_defaults(verbose=False, beam=0)
     values = parser.parse_args()
     if values.verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -112,6 +113,7 @@ def _main():
         #assert len(dout) == nd*nt
         dout.shape = (nd, len(dout)/nd)
 
+    beam = values.beam
     fig, ax  = pylab.subplots(1,2)
     ex = (0, nt*tint, fmin, fmax)
     ex = None
@@ -120,16 +122,16 @@ def _main():
     ax[0].set_title('test.out')
     #print 'Dout max', dout.max()
 
-    show_series('ostate_e%d.dat', [0, 0, slice(None), slice(None)])
-    show_series('finalstate_e%d.dat', [0,0,slice(None),slice(None)])
-    show_series('initstate_e%d.dat',[0,slice(None),0,slice(None)])
+    show_series('ostate_e%d.dat', [beam, 0, slice(None), slice(None)])
+    show_series('finalstate_e%d.dat', [beam, 0, slice(None), slice(None)])
+    show_series('initstate_e%d.dat',[beam, slice(None),0, slice(None)])
 
     for i, fname in enumerate(file_series('state_s%d.dat')):
         if 0 < i < 9:
             continue
+
         d = load4d(fname)
         fig, ax = pylab.subplots(1,2)
-        beam = 0
         myimshow(ax[0], d[beam, :, 0, :], aspect='auto', origin='lower')
         myimshow(ax[1], d[beam, 0, :, :], aspect='auto', origin='lower')
 

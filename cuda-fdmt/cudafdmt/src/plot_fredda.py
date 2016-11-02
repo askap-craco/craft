@@ -92,7 +92,7 @@ def show_inbuf_series(prefix, theslice, start=0, maxn=10):
             print 'Quitting as maxn exceeded'
             break
 
-def show_fdmt_series(prefix, theslice, start=0, maxn=10):
+def show_fdmt_series(prefix, theslice, start=0, maxn=10, ibeam=0):
     for ifname, fname in enumerate(file_series(prefix, start)):
         ostate = load4d(fname)
         gs = gridspec.GridSpec(2,5)
@@ -102,7 +102,7 @@ def show_fdmt_series(prefix, theslice, start=0, maxn=10):
 
         rawname = fname.replace('fdmt','inbuf')
         rawdat = load4d(rawname)
-        rawd = rawdat[0, :, 0, :]
+        rawd = rawdat[ibeam, :, 0, :]
         nchans, ntimes = rawd.shape
         myimshow(rawax, rawd, aspect='auto', origin='lower')
 
@@ -152,7 +152,8 @@ def _main():
     from argparse import ArgumentParser
     parser = ArgumentParser(description='Script description')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.set_defaults(verbose=False)
+    parser.add_argument('-b','--beam', type=float, help='beam number')
+    parser.set_defaults(verbose=False, beam=0)
     values = parser.parse_args()
     if values.verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -161,7 +162,7 @@ def _main():
 
 
     #show_inbuf_series('inbuf_e%d.dat', [0, slice(None), 0, slice(None)], start=20, maxn=1)
-    show_fdmt_series('fdmt_e%d.dat', [0, 0, slice(None), slice(None)], start=4, maxn=40)
+    show_fdmt_series('fdmt_e%d.dat', [values.beam, 0, slice(None), slice(None)], start=4, maxn=40, ibeam=values.beam)
 
     #pylab.show()
     

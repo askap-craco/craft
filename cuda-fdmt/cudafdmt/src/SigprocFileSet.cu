@@ -25,7 +25,7 @@ SigprocFileSet::SigprocFileSet(int argc, char* filenames[]) {
 			assert(first_file->fch1() == curr_file->fch1());
 			assert(first_file->foff() == curr_file->foff());
 		}
-
+		assert(curr_file->nifs() == 1); // Otherwise the ordering will be funny
 		m_nbeams += curr_file->nbeams();
 	}
 
@@ -39,6 +39,7 @@ SigprocFileSet::~SigprocFileSet() {
 
 size_t SigprocFileSet::read_samples_uint8(size_t nt, uint8_t* output)
 {
+	// Returns BFT ordering
 	int beamno = 0;
 	size_t nread;
 	for(int i = 0; i < m_files.size(); i++) {
