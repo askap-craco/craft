@@ -48,7 +48,8 @@ int main(int argc, char* argv[])
 	float thresh = 10.0;
 	const char* out_filename = "fredda.cand";
 	bool dump_data = false;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dh")) != -1) {
+	int cuda_device = 0;
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:D:g:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -74,6 +75,9 @@ int main(int argc, char* argv[])
 		case 'S':
 			num_skip_blocks = atoi(optarg);
 			break;
+		case 'g':
+			cuda_device = atoi(optarg);
+			break;
 		case '?':
 		case 'h':
 		default:
@@ -87,6 +91,9 @@ int main(int argc, char* argv[])
 		printf("Not enough arguments\n");
 		exit(EXIT_FAILURE);
 	}
+
+	printf("Setting cuda device to %d\n", cuda_device);
+	gpuErrchk( cudaSetDevice(cuda_device));
 
 	// Load sigproc file
 	SigprocFileSet source(argc, argv);
