@@ -33,7 +33,7 @@ char* mystrnstr(const char* s1, const char* s2, size_t n)
 
 SigprocFile::SigprocFile(const char* filename) {
 	m_file = fopen(filename, "r");
-	m_filename = new char[strlen(filename)];
+	m_filename = new char[strlen(filename) + 1];
 	m_filename = strcpy(m_filename, filename);
 	m_samples_read = 0;
 
@@ -52,7 +52,7 @@ SigprocFile::SigprocFile(const char* filename) {
 		exit(EXIT_FAILURE);
 	}
 	// TODO: Check it starts with HEADER_START
-	m_hdr_nbytes = (hdr_end - m_hdr) + strlen("HEADER_END");
+	m_hdr_nbytes = (size_t)((hdr_end - m_hdr) + strlen("HEADER_END") + 1);
 	assert(m_hdr_nbytes < MAX_HDR_SIZE);
 	m_hdr[m_hdr_nbytes] = 0;
 	seek_sample(0);
@@ -105,7 +105,9 @@ int SigprocFile::header_int(const char* hname) const {
 
 size_t SigprocFile::seek_sample(size_t t)
 {
-	size_t boff = t*m_nifs*m_nchans + m_hdr_nbytes;
+	size_t boff = t*nifs()*nchans() + m_hdr_nbytes;
+	//printf("Seek t=%d nifs=%d nchans%d m_hdr_nbytes %d\n", t, nifs(), nchans(), m_hdr_nbytes);
+	printf("Seek nifs=%d\n", nifs());
 	if(fseek(m_file, boff, SEEK_SET) < 0) {
 		printf("SigprocFile: Could not seek to offset of file %s\n. Error: %s", m_filename, strerror(errno));
 		assert(0);
@@ -117,7 +119,7 @@ size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
 {
 	assert(m_nbits == 8);
 	size_t nreq = nt*m_nifs*m_nchans;
-	size_t nelements = fread(output, sizeof(uint8_t), nt*m_nifs*m_nchans, m_file);
+	size_t nelements = fread(output, sizeof(uint8_t), nreq, m_file);
 	size_t ont = nelements/m_nifs/m_nchans;
 	m_samples_read += ont;
 	return ont;
