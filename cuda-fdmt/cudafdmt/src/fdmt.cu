@@ -716,12 +716,11 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 	int max_dt = gridDim.y;
 
 	int nt = blockDim.x;
-	int off = max_dt*(idt + ibeam*nbeams);
+	int off = nt*(idt + max_dt*ibeam);
 
 	int t = threadIdx.x;
 	fdmt_dtype* optr = ostate + off;
 	const fdmt_dtype* iptr = indata + off;
-
 	// Add the new state for all but the last block
 	while (t < max_dt - nt) {
 		optr[t] = iptr[t] + optr[t + nt];
