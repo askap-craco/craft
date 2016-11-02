@@ -22,9 +22,7 @@ CudaTimer::~CudaTimer() {
 }
 
 void CudaTimer::start() {
-	printf("Got here: %s:%d\n", __FILE__, __LINE__);
 	gpuErrchk(cudaEventRecord(m_start, m_stream));
-	printf("Got here: %s:%d\n", __FILE__, __LINE__);
 
 }
 

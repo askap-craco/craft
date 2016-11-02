@@ -177,12 +177,10 @@ int main(int argc, char* argv[])
 		}
 
 		if (blocknum % num_rescale_blocks == 0) {
-			printf("Doing rescale update block=%d\n", blocknum);
 			rescale_update_scaleoffset(&rescale);
 		}
 
 		if (blocknum > num_rescale_blocks) {
-			printf("Doing FDMT execute block%d\n", blocknum);
 			fdmt_execute(&fdmt, rescale_buf.d, out_buf.d);
 			if (dump_data) {
 				sprintf(fbuf, "fdmt_e%d.dat", blocknum);
