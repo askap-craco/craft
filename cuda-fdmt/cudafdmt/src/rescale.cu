@@ -343,17 +343,19 @@ __global__ void rescale_update_and_transpose_float_kernel(
 	rescale_dtype offset = offsetarr[rsidx]; // read from global
 	rescale_dtype scale = scalearr[rsidx]; // read from global
 
+	int outc;
+	if (invert_freq) {
+		outc = nf - 1 - c;
+	} else {
+		outc = c;
+	}
+
 	// input = BTF order
 	// output = BFT order
 	// Rescale order: BF
 	for (int t = 0; t < nt; ++t) {
 		int inidx = c + nf*(t + nt*ibeam);
-		int outidx;
-		if (invert_freq) {
-			outidx = t + nt*((nf - c - 1) + nf*ibeam);
-		} else {
-			outidx = t + nt*(c + nf*ibeam);
-		}
+		int outidx = t + nt*(outc + nf*ibeam);
 		// coalesced read from global
 		rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
 		sum += vin;
@@ -362,7 +364,9 @@ __global__ void rescale_update_and_transpose_float_kernel(
 		decay_offset = (vout + decay_offset*k)/(1.0 + k);
 
 		// non-coalesced write (transpose. Sorry)
-		outarr[outidx] = vout - decay_offset;
+		rescale_dtype sout = vout - decay_offset;
+		outarr[outidx] = sout;
+
 	}
 
 	// write everything back to global memory -- all coalesced
@@ -390,6 +394,8 @@ void rescale_update_and_transpose_float_gpu(rescale_t& rescale, array4d_t& resca
 			nt,
 			invert_freq);
 	rescale.sampnum += nt;
+	gpuErrchk(cudaDeviceSynchronize());
+
 }
 
 __global__ void rescale_update_scaleoffset_kernel(
@@ -426,7 +432,7 @@ __global__ void rescale_update_scaleoffset_kernel(
 void rescale_update_scaleoffset_gpu(rescale_t& rescale)
 {
 	assert(rescale.interval_samps > 0);
-	int nthreads = 256;
+	int nthreads = 336;
 	assert(rescale.num_elements % nthreads == 0);
 	int nblocks = rescale.num_elements / nthreads;
 	rescale_update_scaleoffset_kernel<<<nblocks, nthreads>>>(

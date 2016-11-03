@@ -131,7 +131,7 @@ int main(int argc, char* argv[])
 	rescale_buf.nx = nf;
 	rescale_buf.ny = 1;
 	rescale_buf.nz = nt;
-	array4d_malloc_hostonly(&rescale_buf);
+	array4d_malloc(&rescale_buf); // Can do GPU only maybe??
 
 	array4d_t out_buf;
 	out_buf.nw = nbeams;
@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
 		char fbuf[1024];
 		if (dump_data) {
 			sprintf(fbuf, "inbuf_e%d.dat", blocknum);
-			array4d_copy_to_device(&rescale_buf);
+			array4d_copy_to_host	(&rescale_buf);
 			array4d_dump(&rescale_buf, fbuf);
 			printf("Dumping input buffer %s\n", fbuf);
 		}

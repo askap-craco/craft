@@ -866,7 +866,7 @@ __host__ void fdmt_copy_valid_ostate2(const fdmt_t* fdmt, array4d_t* out)
 	for(int b = 0; b < fdmt->nbeams; ++b) {
 		int inidx = array4d_idx(&fdmt->ostate, b, 0, 0, 0);
 		int oidx = array4d_idx(out, 0, b, 0, 0);
-		gpuErrchk(cudaMemcpy2D(&out->d_device[oidx], dpitch,
+		gpuErrchk(cudaMemcpy2D(&out->d[oidx], dpitch,
 				&fdmt->ostate.d_device[inidx], spitch,
 				width, height, cudaMemcpyDeviceToHost));
 	}
