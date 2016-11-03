@@ -916,13 +916,14 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	inarr.nx = fdmt->nf;
 	inarr.ny = 1;
 	inarr.nz = fdmt->nt;
-	inarr.d = indata;
+	//inarr.d = indata;
+	inarr.d_device = indata;
 
 	// Copy input data to state1 and initialise into start 0
-	inarr.d_device = fdmt->states[1].d_device;
-	fdmt->t_copy_in.start();
-	array4d_copy_to_device(&inarr);
-	fdmt->t_copy_in.stop();
+//	inarr.d_device = fdmt->states[1].d_device;
+//	fdmt->t_copy_in.start();
+//	array4d_copy_to_device(&inarr);
+//	fdmt->t_copy_in.stop();
 
 	// Initialise state
 	fdmt->t_init.start();
