@@ -30,9 +30,7 @@
 								<option id="nvcc.compiler.maxregcount.885786137" name="Maximum number of registers (-maxrregcount)" superClass="nvcc.compiler.maxregcount" value="" valueType="string"/>
 								<option id="nvcc.compiler.usefastmath.923887117" name="Make use of fast math library (-use_fast_math)" superClass="nvcc.compiler.usefastmath" value="true" valueType="boolean"/>
 								<option id="nvcc.compiler.compileroptions.1742772468" name="Preprocessor options (-Xcompiler)" superClass="nvcc.compiler.compileroptions"/>
-								<option id="nvcc.compiler.def.symbols.1641456189" superClass="nvcc.compiler.def.symbols" valueType="definedSymbols">
-									<listOptionValue builtIn="false" value="DUMP_STATE=1"/>
-								</option>
+								<option id="nvcc.compiler.def.symbols.1641456189" name="Defined symbols (-D)" superClass="nvcc.compiler.def.symbols" valueType="definedSymbols"/>
 								<inputType id="nvcc.compiler.input.cu.1489551541" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.1617973910" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.1795090693" superClass="nvcc.compiler.input.c"/>
