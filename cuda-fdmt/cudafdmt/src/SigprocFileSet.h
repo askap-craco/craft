@@ -11,6 +11,8 @@
 #include <vector>
 #include "DataSource.h"
 #include "SigprocFile.h"
+#include "CpuTimer.h"
+
 
 //class FileGroup : public fdmt::DataSource { // GOD I hate C++ classes
 class SigprocFileSet {
@@ -56,6 +58,9 @@ public:
 	}
 
 	size_t read_samples_uint8(size_t nt, uint8_t* output);
+
+	CpuTimer read_timer;
+
 
 private:
 	std::vector<SigprocFile*> m_files;

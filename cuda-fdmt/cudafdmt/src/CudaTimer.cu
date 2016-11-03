@@ -24,7 +24,7 @@ CudaTimer::~CudaTimer() {
 
 void CudaTimer::start() {
 	gpuErrchk(cudaEventRecord(m_start, m_stream));
-
+	cputimer.start();
 }
 
 void CudaTimer::stop() {
@@ -32,6 +32,7 @@ void CudaTimer::stop() {
 	sync_stop();
 	m_total_time += get_elapsed_time();
 	m_ncalls += 1;
+	cputimer.stop();
 }
 
 void CudaTimer::sync_start() {

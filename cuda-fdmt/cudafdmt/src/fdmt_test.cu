@@ -17,6 +17,7 @@
 #include "array.h"
 #include "boxcar.h"
 #include "CudaTimer.h"
+#include "CpuTimer.h"
 #include "DataSource.h"
 #include "SigprocFile.h"
 #include "SigprocFileSet.h"
@@ -52,6 +53,11 @@ int main(int argc, char* argv[])
 	const char* out_filename = "fredda.cand";
 	bool dump_data = false;
 	int cuda_device = 0;
+	CpuTimer tall;
+	CpuTimer trescale;
+	CpuTimer tboxcar;
+
+	tall.start();
 	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:D:g:h")) != -1) {
 		switch (ch) {
 		case 'd':
@@ -159,6 +165,8 @@ int main(int argc, char* argv[])
 		// Output needs to be BFT order
 		// Do transpose and cast to float on the way through
 		// TODO: Optimisation: cast to float and do rescaling in SIMD
+
+		trescale.start();
 		#pragma omp parallel for
 		for(int t = 0; t < nt; ++t) {
 			#pragma omp parallel for
@@ -186,6 +194,7 @@ int main(int argc, char* argv[])
 				}
 			}
 		}
+		trescale.stop();
 		rescale.sampnum += nt; // WARNING: Need to do this because we're calling rescale*single. THink harder about how to do this beter
 
 		char fbuf[1024];
@@ -208,7 +217,9 @@ int main(int argc, char* argv[])
 				printf("Dumping fdmt buffer %s\n", fbuf);
 				array4d_dump(&out_buf, fbuf);
 			}
+			tboxcar.start();
 			boxcar_threshonly(&out_buf, thresh, sink);
+			tboxcar.stop();
 
 		}
 
@@ -216,10 +227,16 @@ int main(int argc, char* argv[])
 	}
 
 	printf("FREDDA Finished\n");
+	tall.stop();
+	cout << "FREDDA CPU "<< tall << endl;
+	cout << "Rescale CPU "<< trescale << endl;
+	cout << "Boxcar CPU "<< tboxcar << endl;
+	cout << "File reading " << source.read_timer << endl;
 	fdmt_print_timing(&fdmt);
+
 	struct rusage usage;
 	getrusage(RUSAGE_SELF, &usage);
-	cout << "User: " << usage.ru_utime.tv_sec <<
+	cout << "Resources User: " << usage.ru_utime.tv_sec <<
 			"s System:" << usage.ru_stime.tv_sec << "s MaxRSS:" << usage.ru_maxrss/1024/1024 << "MB" << endl;
 }
 int runtest(int argc, char* argv[])
