@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <iostream>
+#include <sys/time.h>
+#include <sys/resource.h>
 //#include <omp.h>
 #include "fdmt.h"
 #include "array.h"
@@ -215,6 +217,10 @@ int main(int argc, char* argv[])
 
 	printf("FREDDA Finished\n");
 	fdmt_print_timing(&fdmt);
+	struct rusage usage;
+	getrusage(RUSAGE_SELF, &usage);
+	cout << "User: " << usage.ru_utime.tv_sec <<
+			"s System:" << usage.ru_stime.tv_sec << "s MaxRSS:" << usage.ru_maxrss/1024/1024 << "MB" << endl;
 }
 int runtest(int argc, char* argv[])
 {
