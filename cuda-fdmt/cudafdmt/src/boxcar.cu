@@ -128,12 +128,14 @@ int boxcar_threshonly(const array4d_t* indata, fdmt_dtype thresh,
 	int nt = indata->nz;
 	int ncand = 0;
 
+#pragma omp parallel for shared(ncand)
 	for(int b = 0; b < nbeams; ++b) {
 		for(int idt = 0; idt < ndt; ++idt) {
 			for(int t = 0; t < nt; ++t) {
 				int inidx = array4d_idx(indata, b, 0, idt, t);
 				fdmt_dtype v = indata->d[inidx];
 				if (v > thresh) {
+#pragma omp single
 					sink.add_candidate(b, idt, t, 0, v);
 					ncand += 1;
 				}
