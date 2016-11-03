@@ -10,7 +10,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <iostream>
-//#include <omp.h>
+#if defined (ENABLE_OPENMP)
+#include <omp.h>
+#endif
 #include "fdmt.h"
 #include "array.h"
 #include "boxcar.h"
