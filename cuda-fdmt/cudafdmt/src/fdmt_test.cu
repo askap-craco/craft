@@ -55,11 +55,6 @@ int main(int argc, char* argv[])
 	const char* out_filename = "fredda.cand";
 	bool dump_data = false;
 	int cuda_device = 0;
-	CpuTimer tall;
-	CpuTimer trescale;
-	CpuTimer tboxcar;
-
-	tall.start();
 	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:D:g:h")) != -1) {
 		switch (ch) {
 		case 'd':
@@ -105,6 +100,11 @@ int main(int argc, char* argv[])
 
 	printf("Setting cuda device to %d\n", cuda_device);
 	gpuErrchk( cudaSetDevice(cuda_device));
+
+	CpuTimer tall;
+	CpuTimer trescale;
+	CpuTimer tboxcar;
+	tall.start();
 
 	// Load sigproc file
 	SigprocFileSet source(argc, argv);

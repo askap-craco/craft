@@ -69,7 +69,7 @@ CpuTimer::~CpuTimer() {
 }
 
 void CpuTimer::start() {
-	current_time(CLOCK_THREAD_CPUTIME_ID, &m_thread_start);
+     	current_time(CLOCK_THREAD_CPUTIME_ID, &m_thread_start);
 	current_time(CLOCK_PROCESS_CPUTIME_ID, &m_cpu_start);
 	current_time(CLOCK_MONOTONIC, &m_mono_start);
 }
