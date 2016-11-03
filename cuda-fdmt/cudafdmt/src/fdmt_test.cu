@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <iostream>
-#include <omp.h>
+//#include <omp.h>
 #include "fdmt.h"
 #include "array.h"
 #include "boxcar.h"
@@ -146,6 +146,7 @@ int main(int argc, char* argv[])
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
+	printf("Seeking to start of data: nblocks=%d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source.tsamp());
 	source.seek_sample(num_skip_blocks*nt);
 	int blocknum = 0;
 
@@ -156,6 +157,7 @@ int main(int argc, char* argv[])
 		// Output needs to be BFT order
 		// Do transpose and cast to float on the way through
 		// TODO: Optimisation: cast to float and do rescaling in SIMD
+		#pragma omp parallel for
 		for(int t = 0; t < nt; ++t) {
 			#pragma omp parallel for
 			for (int b = 0; b < nbeams; ++b) {
