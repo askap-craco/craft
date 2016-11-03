@@ -11,6 +11,7 @@
 #include <iostream>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include "CpuTimer.h"
 
 using namespace std;
 
@@ -27,13 +28,15 @@ public:
 
 	friend ostream &operator<<(ostream & output,  CudaTimer &t)
 	{
-		output << "total: " << t.m_total_time
+		output << "\tCPU " << t.cputimer <<
+				"\n\tCUDA total: " << t.m_total_time
 				<< " average: " << t.m_total_time/t.m_ncalls
-				<< " last: " << t.get_elapsed_time() << " ms"
+				<< " last: " << t.get_elapsed_time() << "ms"
 				<< " ncalls:" <<	t.m_ncalls;
 
 		return output;
 	}
+	CpuTimer cputimer;
 
 private:
 	cudaEvent_t m_start;
