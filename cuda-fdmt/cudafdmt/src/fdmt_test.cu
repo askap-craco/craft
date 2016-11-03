@@ -159,14 +159,16 @@ int main(int argc, char* argv[])
 		for(int t = 0; t < nt; ++t) {
 			#pragma omp parallel for
 			for (int b = 0; b < nbeams; ++b) {
+				int instart = array4d_idx(&read_arr, 0, b, t, 0);
+
 				for (int f = 0; f < nf; ++f) {
 					// NOTE: FDMT expects channel[0] at fmin
 					// so invert the frequency axis if the frequency offset is negative
 					int outf = f;
-					if (source.foff() < 0) {
+					if (foff < 0) {
 						outf = nf - f - 1;
 					}
-					int inidx = array4d_idx(&read_arr, 0, b, t, f);
+					int inidx = instart + f;
 					int outidx = array4d_idx(&rescale_buf, b, outf, 0, t);
 
 					//printf("t=%d b=%d f=%d inidx=%d outidx=%d\n", t, b, f, inidx, outidx);
