@@ -121,7 +121,7 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None):
         ax.set_ylabel('DM (delta_t)')
 
     if title:
-        ax.title(fin)
+        ax.set_title(fin)
 
 
     return vin

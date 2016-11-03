@@ -92,7 +92,7 @@ def show_inbuf_series(prefix, theslice, start=0, maxn=10):
             print 'Quitting as maxn exceeded'
             break
 
-def show_fdmt_series(prefix, theslice, start=0, maxn=10, ibeam=0):
+def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
     for ifname, fname in enumerate(file_series(prefix, start)):
         ostate = load4d(fname)
         gs = gridspec.GridSpec(2,5)
@@ -111,7 +111,8 @@ def show_fdmt_series(prefix, theslice, start=0, maxn=10, ibeam=0):
         v = np.ma.masked_invalid(v)
         nfreq, ntime = v.shape
 
-        print fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), 'max', v.max(), np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
+        maxpos = np.unravel_index(v.argmax(), v.shape)
+        print fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), 'max', v.max(), maxpos , 'NaNs?', np.sum(np.isnan(v))
         vmid = np.ma.median(v)
         voff = np.std((v - vmid))
         myimshow(fdmtax, (v), aspect='auto', origin='lower')
@@ -135,7 +136,12 @@ def show_fdmt_series(prefix, theslice, start=0, maxn=10, ibeam=0):
         dmax2.set_xlabel('StdDev/Mean')
         
         dmax = p(gs[:, 3:6])
-        dmax.plot(v[80:120, :].T)
+        maxdm, maxt = maxpos
+        if values.dmrange is None:
+            dmrange = slice(maxdm-10, maxdm+10)
+        else:
+            dmrange = slice(*values.dmrange)
+        dmax.plot(v[dmrange, :].T)
         dmax.set_xlabel('Sample')
         dmax.set_ylabel('S/N')
         
@@ -146,6 +152,8 @@ def show_fdmt_series(prefix, theslice, start=0, maxn=10, ibeam=0):
             print 'Quitting as maxn exceeded'
             break
 
+def comma_list(s):
+    return map(int, s.split(','))
 
 
 def _main():
@@ -153,7 +161,10 @@ def _main():
     parser = ArgumentParser(description='Script description')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-b','--beam', type=float, help='beam number')
-    parser.set_defaults(verbose=False, beam=0)
+    parser.add_argument('-d','--dmrange', type=comma_list, help='Dm range to show in time series plot')
+    parser.add_argument('-s','--start', type=int, help='Start block')
+    parser.add_argument('-n','--maxn', type=int, help='max number of blocks ot plot')
+    parser.set_defaults(verbose=False, beam=0, start=4, maxn=10)
     values = parser.parse_args()
     if values.verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -162,7 +173,7 @@ def _main():
 
 
     #show_inbuf_series('inbuf_e%d.dat', [0, slice(None), 0, slice(None)], start=20, maxn=1)
-    show_fdmt_series('fdmt_e%d.dat', [values.beam, 0, slice(None), slice(None)], start=4, maxn=40, ibeam=values.beam)
+    show_fdmt_series('fdmt_e%d.dat', [values.beam, 0, slice(None), slice(None)], values, start=values.start, maxn=values.maxn, ibeam=values.beam)
 
     #pylab.show()
     
