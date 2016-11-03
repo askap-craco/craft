@@ -7,7 +7,7 @@ NVCC=$(CUDA_PATH)/bin/nvcc
 # See http://stackoverflow.com/questions/1704907/how-can-i-get-my-c-code-to-automatically-print-out-its-git-version-hash
 GIT_VERSION := $(shell git describe --abbrev=4 --dirty --always --tags)
 
-NVCCFLAGS=-G -g -O3 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_20,code=compute_20 -gencode arch=compute_20,code=sm_20  -x cu -DVERSION=\"$(GIT_VERSION)\"
+NVCCFLAGS=-G -g -O0 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_20,code=compute_20 -gencode arch=compute_20,code=sm_20  -x cu -DVERSION=\"$(GIT_VERSION)\"
 
 NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=compute_20,code=compute_20 -gencode arch=compute_20,code=sm_20 -link -Xcompiler -fopenmp
 
