@@ -147,7 +147,8 @@ int main(int argc, char* argv[])
 	rescale.target_stdev = 1.0/sqrt((float) nf);
 	rescale.decay_constant = 0.35 * decay_timescale / source.tsamp(); // This is how the_decimator.C does it, I think.
 	printf("Rescaling to mean=%f stdev=%f decay constant=%f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant);
-	rescale_allocate(&rescale, nbeams*nf);
+	//rescale_allocate(&rescale, nbeams*nf);
+	rescale_allocate_gpu(&rescale, nbeams*nf);
 
 	float foff =  (float) source.foff();
 	assert(foff < 0);
@@ -168,42 +169,23 @@ int main(int argc, char* argv[])
 		// Do transpose and cast to float on the way through
 		// TODO: Optimisation: cast to float and do rescaling in SIMD
 
+		// copy raw data to state. Here we're a little dodgey
+
+		bool invert_freq = (foff < 0);
+		array4d_t* inarr = &fdmt.states[1];
+		uint8_t* read_buf_device = (uint8_t*) fdmt.states[0].d_device;
+		fdmt.t_copy_in.start();
+		gpuErrchk(cudaMemcpy(read_buf_device, read_buf, in_chunk_size*sizeof(uint8_t), cudaMemcpyHostToDevice));
+		fdmt.t_copy_in.stop();
 		trescale.start();
-		#pragma omp parallel for
-		for(int t = 0; t < nt; ++t) {
-			#pragma omp parallel for
-			for (int b = 0; b < nbeams; ++b) {
-				int instart = array4d_idx(&read_arr, 0, b, t, 0);
-
-				for (int f = 0; f < nf; ++f) {
-					// NOTE: FDMT expects channel[0] at fmin
-					// so invert the frequency axis if the frequency offset is negative
-					int outf = f;
-					if (foff < 0) {
-						outf = nf - f - 1;
-					}
-					int inidx = instart + f;
-					int outidx = array4d_idx(&rescale_buf, b, outf, 0, t);
-
-					//printf("t=%d b=%d f=%d inidx=%d outidx=%d\n", t, b, f, inidx, outidx);
-					// writes to inbuf
-					size_t rs_idx = outf + nf*b;
-					float v_rescale;
-					//printf("Rescaling to mean=%f stdev=%f decay constant=%f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant);
-
-					v_rescale = rescale_update_decay_float_single(&rescale, rs_idx, (float) read_buf[inidx]);
-					rescale_buf.d[outidx] = v_rescale;
-					//printf("block=%d t=%d b=%d f=%d vin=%d vout=%f \n", blocknum, t, b, f, read_buf[inidx], v_rescale);
-
-				}
-			}
-		}
+		//rescale_update_and_transpose_float(rescale, read_arr, rescale_buf,read_buf, invert_freq);
+		rescale_update_and_transpose_float_gpu(rescale, rescale_buf, read_buf_device, invert_freq);
 		trescale.stop();
-		rescale.sampnum += nt; // WARNING: Need to do this because we're calling rescale*single. THink harder about how to do this beter
 
 		char fbuf[1024];
 		if (dump_data) {
 			sprintf(fbuf, "inbuf_e%d.dat", blocknum);
+			array4d_copy_to_device(&rescale_buf);
 			array4d_dump(&rescale_buf, fbuf);
 			printf("Dumping input buffer %s\n", fbuf);
 		}
@@ -211,11 +193,11 @@ int main(int argc, char* argv[])
 		assert(num_rescale_blocks > 0);
 
 		if (blocknum % num_rescale_blocks == 0) {
-			rescale_update_scaleoffset(&rescale);
+			rescale_update_scaleoffset_gpu(rescale);
 		}
 
 		if (blocknum > num_rescale_blocks) {
-			fdmt_execute(&fdmt, rescale_buf.d, out_buf.d);
+			fdmt_execute(&fdmt, rescale_buf.d_device, out_buf.d);
 			if (dump_data) {
 				sprintf(fbuf, "fdmt_e%d.dat", blocknum);
 				printf("Dumping fdmt buffer %s\n", fbuf);

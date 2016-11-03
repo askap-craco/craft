@@ -10,6 +10,8 @@
 #include <math.h>
 #include <stdio.h>
 
+typedef float rescale_dtype;
+
 void* rescale_malloc(size_t sz)
 {
 	void* ptr = malloc(sz);
@@ -254,3 +256,188 @@ rescale_t* rescale_allocate(rescale_t* rescale, uint64_t nelements)
 	return rescale;
 
 }
+
+rescale_dtype* rescale_cumalloc(uint64_t sz)
+{
+	rescale_dtype* ptr;
+	gpuErrchk(cudaMalloc((void**) &ptr, sz));
+	gpuErrchk(cudaMemset(ptr, 0, sz));
+	return ptr;
+}
+rescale_t* rescale_allocate_gpu(rescale_t* rescale, uint64_t nelements)
+{
+	size_t sz = nelements*sizeof(rescale_dtype);
+
+	rescale->sum = rescale_cumalloc(sz);
+	rescale->sumsq = rescale_cumalloc(sz);
+	rescale->scale = rescale_cumalloc(sz);
+	rescale->offset = rescale_cumalloc(sz);
+	rescale->decay_offset = rescale_cumalloc(sz);
+	rescale->sampnum = 0;
+	rescale->num_elements = nelements;
+
+	return rescale;
+
+}
+
+void rescale_update_and_transpose_float(rescale_t& rescale, array4d_t& read_arr, array4d_t& rescale_buf, uint8_t* read_buf, bool invert_freq)
+{
+	int nbeams = rescale_buf.nw;
+	int nf = rescale_buf.nx;
+	int nt = rescale_buf.nz;
+	assert(rescale_buf.ny == 1);
+	rescale.sampnum += nt;
+	for(int t = 0; t < nt; ++t) {
+#pragma omp parallel for
+		for (int b = 0; b < nbeams; ++b) {
+			int instart = array4d_idx(&read_arr, 0, b, t, 0);
+
+			for (int f = 0; f < nf; ++f) {
+				// NOTE: FDMT expects channel[0] at fmin
+				// so invert the frequency axis if the frequency offset is negative
+				int outf = f;
+				if (invert_freq) {
+					outf = nf - f - 1;
+				}
+				int inidx = instart + f;
+				int outidx = array4d_idx(&rescale_buf, b, outf, 0, t);
+
+				//printf("t=%d b=%d f=%d inidx=%d outidx=%d\n", t, b, f, inidx, outidx);
+				// writes to inbuf
+				size_t rs_idx = outf + nf*b;
+				float v_rescale;
+				//printf("Rescaling to mean=%f stdev=%f decay constant=%f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant);
+
+				v_rescale = rescale_update_decay_float_single(&rescale, rs_idx, (float) read_buf[inidx]);
+				rescale_buf.d[outidx] = v_rescale;
+				//printf("block=%d t=%d b=%d f=%d vin=%d vout=%f \n", blocknum, t, b, f, read_buf[inidx], v_rescale);
+
+			}
+		}
+	}
+}
+
+
+__global__ void rescale_update_and_transpose_float_kernel(
+		const uint8_t* __restrict__ inarr,
+		rescale_dtype* __restrict__ sumarr,
+		rescale_dtype* __restrict__ sumsqarr,
+		rescale_dtype* __restrict__ decay_offsetarr,
+		const rescale_dtype* __restrict__ offsetarr,
+		const rescale_dtype* __restrict__ scalearr,
+		rescale_dtype* __restrict__ outarr,
+		float decay_constant,
+		int nt,
+		bool invert_freq)
+{
+	int ibeam = blockIdx.x;
+	int c = threadIdx.x;
+	int nf = blockDim.x;
+	const rescale_dtype k = decay_constant;
+
+	int rsidx = c + nf*ibeam;
+	// all these reads are nice and coalesced
+	rescale_dtype sum = sumarr[rsidx]; // read from global memory
+	rescale_dtype sumsq = sumsqarr[rsidx]; // read from globa.
+	rescale_dtype decay_offset = decay_offsetarr[rsidx];  // read from globa.
+	rescale_dtype offset = offsetarr[rsidx]; // read from global
+	rescale_dtype scale = scalearr[rsidx]; // read from global
+
+	// input = BTF order
+	// output = BFT order
+	// Rescale order: BF
+	for (int t = 0; t < nt; ++t) {
+		int inidx = c + nf*(t + nt*ibeam);
+		int outidx;
+		if (invert_freq) {
+			outidx = t + nt*((nf - c - 1) + nf*ibeam);
+		} else {
+			outidx = t + nt*(c + nf*ibeam);
+		}
+		// coalesced read from global
+		rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
+		sum += vin;
+		sumsq +=  vin*vin;
+		rescale_dtype vout = (vin + offset) * scale;
+		decay_offset = (vout + decay_offset*k)/(1.0 + k);
+
+		// non-coalesced write (transpose. Sorry)
+		outarr[outidx] = vout - decay_offset;
+	}
+
+	// write everything back to global memory -- all coalesced
+	sumarr[rsidx] = sum;
+	sumsqarr[rsidx] = sumsq;
+	decay_offsetarr[rsidx] = decay_offset;
+
+}
+
+void rescale_update_and_transpose_float_gpu(rescale_t& rescale, array4d_t& rescale_buf, const uint8_t* read_buf, bool invert_freq)
+{
+	int nbeams = rescale_buf.nw;
+	int nf = rescale_buf.nx;
+	int nt = rescale_buf.nz;
+	assert(rescale_buf.ny == 1);
+	rescale_update_and_transpose_float_kernel<<<nbeams, nf>>>(
+			read_buf,
+			rescale.sum,
+			rescale.sumsq,
+			rescale.decay_offset,
+			rescale.offset,
+			rescale.scale,
+			rescale_buf.d_device,
+			rescale.decay_constant,
+			nt,
+			invert_freq);
+	rescale.sampnum += nt;
+}
+
+__global__ void rescale_update_scaleoffset_kernel(
+		rescale_dtype* __restrict__ sum,
+		rescale_dtype* __restrict__ sumsq,
+		rescale_dtype* __restrict__ offset,
+		rescale_dtype* __restrict__ scalearr,
+		rescale_dtype nsamp,
+		rescale_dtype target_stdev,
+		rescale_dtype target_mean)
+{
+	int c = threadIdx.x;
+	int nf = blockDim.x;
+	int ibeam = blockIdx.x;
+	int i = c + nf*ibeam;
+	rescale_dtype mean = sum[i]/nsamp;
+	rescale_dtype meansq = sumsq[i]/nsamp;
+	rescale_dtype variance = meansq - mean*mean;
+	rescale_dtype scale;
+
+	if (variance == 0.0) {
+		scale = target_stdev;
+	} else {
+		scale = target_stdev / sqrt(variance);
+	}
+
+	offset[i] = -mean + target_mean/scale;
+	scalearr[i] = scale;
+
+	// reset values to zero
+	sum[i] = 0.0;
+	sumsq[i] = 0.0;
+}
+void rescale_update_scaleoffset_gpu(rescale_t& rescale)
+{
+	assert(rescale.interval_samps > 0);
+	int nthreads = 256;
+	assert(rescale.num_elements % nthreads == 0);
+	int nblocks = rescale.num_elements / nthreads;
+	rescale_update_scaleoffset_kernel<<<nblocks, nthreads>>>(
+			rescale.sum,
+			rescale.sumsq,
+			rescale.offset,
+			rescale.scale,
+			(rescale_dtype) rescale.sampnum,
+			rescale.target_stdev,
+			rescale.target_mean);
+	gpuErrchk(cudaDeviceSynchronize());
+	rescale.sampnum = 0;
+}
+
