@@ -232,6 +232,7 @@ int main(int argc, char* argv[])
 
 	printf("FREDDA Finished\n");
 	tall.stop();
+	cout << "Processed " << blocknum*nt << " samples = " << blocknum*nt*source.tsamp() << " seconds" << endl;
 	cout << "FREDDA CPU "<< tall << endl;
 	cout << "Rescale CPU "<< trescale << endl;
 	cout << "Boxcar CPU "<< tboxcar << endl;

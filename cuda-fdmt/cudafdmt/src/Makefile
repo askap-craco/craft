@@ -13,14 +13,14 @@ NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=compute_2
 
 # Force rebuild on git change:http://stackoverflow.com/questions/3236145/force-gnu-make-to-rebuild-objects-affected-by-compiler-definition
 
-.PHONY: force
-git_version: force
-	echo '$(GIT_VERSION)' | cmp -s - $@ || echo '$(GIT_VERSION)' > $@
+#.PHONY: force
+#git_version: force
+#	echo '$(GIT_VERSION)' | cmp -s - $@ || echo '$(GIT_VERSION)' > $@
 
 cudafdmt: $(objects)
 	$(NVCC) $(NVLDFLAGS) -o cudafdmt $(objects)
 
-$(objects): %o  : %cu git_version
+$(objects): %o  : %cu
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
 .PHONY : clean
