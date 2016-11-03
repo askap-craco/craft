@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
 	const char* out_filename = "fredda.cand";
 	bool dump_data = false;
 	int cuda_device = 0;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:D:g:h")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);

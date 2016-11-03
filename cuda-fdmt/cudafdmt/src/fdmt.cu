@@ -263,7 +263,7 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 {
 
 	// indata is 3D array: (nbeams, nf, nt)
-	// State is a 4D array: (nbeams, nf, deltat, nt) ( for the moment)
+	// State is a 4D array: (nbeams, nf, deltat, max_dt) ( for the moment)
 
 	assert(indata->nx == fdmt->nbeams);
 	assert(indata->ny == fdmt->nf);
@@ -313,6 +313,67 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 
 }
 
+void __global__ fdmt_initialise_kernel(const fdmt_dtype* __restrict__ indata, fdmt_dtype* __restrict__ state, int delta_t, int max_dt)
+{
+	// indata is 4D array: (nbeams, nf, 1, nt): index [ibeam, c, 0, t] = t + nt*(0 + 1*(c + nf*ibeam))
+	// State is a 4D array: (nbeams, nf, delta_t, max_dt) ( for the moment)
+	// full index [ibeam, c, idt, t] is t + max_dt*(idt + delta_t*(c + nf*ibeam))
+
+	int ibeam = blockIdx.x; // beam number
+	int c = blockIdx.y; // Channel number
+
+	int nf = gridDim.y; // Number of frequencies
+
+	int nt = blockDim.x; // Number of samples
+	int t = threadIdx.x; // sample number
+
+	// assign initial data to delta_t = 0
+	int outidx = 0 + max_dt*(0 + delta_t*(c + nf*ibeam));
+	int inidx = 0 + nt*(0 + 1*(c + nf*ibeam));
+	fdmt_dtype mystate = indata[inidx + t];
+	state[outidx + t] = mystate;
+	__syncthreads();
+	// Do partial sums initialisation recursively (Equation 20.)
+	for (int idt = 1; idt < delta_t; ++idt) {
+		// output index [beam, c, idt, 0]
+		outidx = 0 + max_dt*(idt + delta_t*(c + nf*ibeam));
+
+		// input index [beam, c, 0, nt-1]
+		int imidx = nt - 1 + nt*(0 + 1*(c + nf*ibeam));
+		if (t >= idt && t < nt) {
+			mystate += indata[imidx - t];
+			state[outidx+t] = mystate;
+		}
+		__syncthreads();
+	}
+}
+
+int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* state)
+{
+	// indata is 4D array: (nbeams, nf, 1, nt)
+	// State is a 4D array: (nbeams, nf, deltat, max_dt) ( for the moment)
+
+	assert(indata->nw == fdmt->nbeams);
+	assert(indata->nx == fdmt->nf);
+	assert(indata->ny == 1);
+	assert(indata->nz == fdmt->nt);
+
+	state->nw = fdmt->nbeams;
+	state->nx = fdmt->nf;
+	state->ny = fdmt->delta_t;
+	state->nz = fdmt->max_dt;
+
+	// zero off the state
+	array4d_cuda_memset(state, 0);
+	gpuErrchk(cudaDeviceSynchronize());
+
+	dim3 grid_shape(fdmt->nbeams, fdmt->nf);
+	fdmt_initialise_kernel<<<grid_shape, fdmt->nt>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt);
+	gpuErrchk(cudaDeviceSynchronize());
+
+	return 0;
+
+}
 int fdmt_iteration(const fdmt_t* fdmt,
 		const int iteration_num,
 		const array4d_t* indata,
@@ -835,9 +896,6 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 
 int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 {
-	array3d_t inarr = {.nx = fdmt->nbeams, .ny = fdmt->nf, .nz = fdmt->nt};
-	inarr.d = indata;
-
 	// Make the final outstate - this saves a memcpy on the final iteration
 	array4d_t outstate;
 	outstate.nw = fdmt->ostate.nw;
@@ -846,25 +904,38 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	outstate.nz = fdmt->ostate.nz;
 	outstate.d = outdata;
 	outstate.d_device = fdmt->ostate.d_device;
+
+	array4d_t inarr;
+	inarr.nw = fdmt->nbeams;
+	inarr.nx = fdmt->nf;
+	inarr.ny = 1;
+	inarr.nz = fdmt->nt;
+	inarr.d = indata;
+
+	// Copy input data to state1 and initialise into start 0
+	inarr.d_device = fdmt->states[1].d_device;
+	fdmt->t_copy_in.start();
+	array4d_copy_to_device(&inarr);
+	fdmt->t_copy_in.stop();
+
 	// Initialise state
 	fdmt->t_init.start();
 	int s = 0;
-	fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
+	//fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
+	fdmt_initialise_gpu(fdmt, &inarr, &fdmt->states[s]);
 	fdmt->t_init.stop();
 
 #ifdef DUMP_STATE
 	// dump init state to disk
 	char buf[128];
+	array4d_copy_to_host(&fdmt->states[s]);
 	sprintf(buf, "state_s%d.dat", 0);
 	array4d_dump(&fdmt->states[s], buf);
 	sprintf(buf, "initstate_e%d.dat", fdmt->execute_count);
 	array4d_dump(&fdmt->states[s], buf);
 #endif
 
-	// copy initialised data to device
-	fdmt->t_copy_in.start();
-	array4d_copy_to_device(&fdmt->states[s]);
-	fdmt->t_copy_in.stop();
+
 
 	// actually execute the iterations on the GPU
 	fdmt_execute_iterations(fdmt);
