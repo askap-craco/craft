@@ -27,6 +27,7 @@ CandidateSink::CandidateSink(SigprocFileSet* srcfile, const char* filename) {
 }
 
 CandidateSink::~CandidateSink() {
+	fflush(m_candfile);
 	fclose(m_candfile);
 }
 
