@@ -31,12 +31,16 @@ using namespace std;
 
 void runtest_usage() {
 	fprintf(stderr,
-			"fdmt_test [options] infile outfile\n"
+			"cudafdmt [options] [infile [infile[ ...]]\n"
 			"	-d Number of dispersion trials\n"
 			"	-t Samples per block\n"
-			"	-f Number of frequency channels\n"
-			"	-b Number of beams\n"
-			"	-x Maximum frequency (MHz)\n"
+			"  	-s Decay timescale\n"
+			"   -o Candidate filename\n"
+			"   -x threshold S/N\n"
+			"   -D dump intermediate data to disk\n"
+			"   -r Blocks per rescale update\n"
+			"   -S Number of blocks to skip\n"
+			"   -g CUDA device\n"
 			"	-h Print this message\n"
 	);
 	exit(EXIT_FAILURE);
