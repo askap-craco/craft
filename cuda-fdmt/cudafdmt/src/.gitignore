@@ -1,0 +1,6 @@
+*.dat
+test.in
+test.out
+*.o
+cudafdmt
+
