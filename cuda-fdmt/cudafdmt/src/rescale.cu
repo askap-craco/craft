@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include "array.h"
 
 typedef float rescale_dtype;
 
@@ -264,21 +265,41 @@ rescale_dtype* rescale_cumalloc(uint64_t sz)
 	gpuErrchk(cudaMemset(ptr, 0, sz));
 	return ptr;
 }
-rescale_t* rescale_allocate_gpu(rescale_t* rescale, uint64_t nelements)
+
+void rescale_arraymalloc(array4d_t* arr, uint64_t sz)
+{
+	arr->nw = 1;
+	arr->nx = 1;
+	arr->ny = 1;
+	arr->nz = sz;
+	array4d_malloc(arr);
+	array4d_set(arr, 0);
+}
+
+rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nelements)
 {
 	size_t sz = nelements*sizeof(rescale_dtype);
+	rescale_arraymalloc(&rescale->sum, nelements);
+	rescale_arraymalloc(&rescale->sumsq, nelements);
+	rescale_arraymalloc(&rescale->scale, nelements);
+	rescale_arraymalloc(&rescale->offset, nelements);
+	rescale_arraymalloc(&rescale->decay_offset, nelements);
+	array4d_set(&rescale->scale, 1.0);
 
-	rescale->sum = rescale_cumalloc(sz);
-	rescale->sumsq = rescale_cumalloc(sz);
-	rescale->scale = rescale_cumalloc(sz);
-	rescale->offset = rescale_cumalloc(sz);
-	rescale->decay_offset = rescale_cumalloc(sz);
 	rescale->sampnum = 0;
 	rescale->num_elements = nelements;
 
 	return rescale;
 
 }
+
+void rescale_set_scale_offset_gpu(rescale_gpu_t* rescale, float scale, float offset)
+{
+	array4d_set(&rescale->scale, scale);
+	array4d_set(&rescale->offset, offset);
+}
+
+
 
 void rescale_update_and_transpose_float(rescale_t& rescale, array4d_t& read_arr, array4d_t& rescale_buf, uint8_t* read_buf, bool invert_freq)
 {
@@ -376,7 +397,7 @@ __global__ void rescale_update_and_transpose_float_kernel(
 
 }
 
-void rescale_update_and_transpose_float_gpu(rescale_t& rescale, array4d_t& rescale_buf, const uint8_t* read_buf, bool invert_freq)
+void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& rescale_buf, const uint8_t* read_buf, bool invert_freq)
 {
 	int nbeams = rescale_buf.nw;
 	int nf = rescale_buf.nx;
@@ -384,11 +405,11 @@ void rescale_update_and_transpose_float_gpu(rescale_t& rescale, array4d_t& resca
 	assert(rescale_buf.ny == 1);
 	rescale_update_and_transpose_float_kernel<<<nbeams, nf>>>(
 			read_buf,
-			rescale.sum,
-			rescale.sumsq,
-			rescale.decay_offset,
-			rescale.offset,
-			rescale.scale,
+			rescale.sum.d_device,
+			rescale.sumsq.d_device,
+			rescale.decay_offset.d_device,
+			rescale.offset.d_device,
+			rescale.scale.d_device,
 			rescale_buf.d_device,
 			rescale.decay_constant,
 			nt,
@@ -429,17 +450,17 @@ __global__ void rescale_update_scaleoffset_kernel(
 	sum[i] = 0.0;
 	sumsq[i] = 0.0;
 }
-void rescale_update_scaleoffset_gpu(rescale_t& rescale)
+void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale)
 {
 	assert(rescale.interval_samps > 0);
 	int nthreads = 336;
 	assert(rescale.num_elements % nthreads == 0);
 	int nblocks = rescale.num_elements / nthreads;
 	rescale_update_scaleoffset_kernel<<<nblocks, nthreads>>>(
-			rescale.sum,
-			rescale.sumsq,
-			rescale.offset,
-			rescale.scale,
+			rescale.sum.d_device,
+			rescale.sumsq.d_device,
+			rescale.offset.d_device,
+			rescale.scale.d_device,
 			(rescale_dtype) rescale.sampnum,
 			rescale.target_stdev,
 			rescale.target_mean);

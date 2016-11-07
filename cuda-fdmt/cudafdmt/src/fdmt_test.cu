@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
 	argv += optind;
 
 	if (argc == 0) {
-		printf("Not enough arguments: %d\n", argc);
+		printf("Not enough arguments: %d\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -145,7 +145,7 @@ int main(int argc, char* argv[])
 	array4d_malloc_hostonly(&out_buf);
 
 	// create rescaler
-	rescale_t rescale;
+	rescale_gpu_t rescale;
 	rescale.interval_samps = nt;
 	rescale.target_mean = 0.0;
 	rescale.target_stdev = 1.0/sqrt((float) nf);
@@ -153,6 +153,7 @@ int main(int argc, char* argv[])
 	printf("Rescaling to mean=%f stdev=%f decay constant=%f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant);
 	//rescale_allocate(&rescale, nbeams*nf);
 	rescale_allocate_gpu(&rescale, nbeams*nf);
+	//rescale_set_scale_offset_gpu(&rescale, 1.0/8.0, -128.0); // Set initial scale and offset
 
 	float foff =  (float) source.foff();
 	assert(foff < 0);

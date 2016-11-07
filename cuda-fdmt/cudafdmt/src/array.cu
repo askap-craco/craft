@@ -165,6 +165,14 @@ void array4d_print_shape(const array4d_t* a)
 	printf("nw=%d nx=%d ny=%d nz=%d\b", a->nw, a->nx, a->ny, a->nz);
 }
 
+void array4d_set(array4d_t* a, fdmt_dtype v)
+{
+	for(int i = 0; i < array4d_size(a); ++i) {
+		a->d[i] = v;
+	}
+	array4d_copy_to_device(a);
+}
+
 int array4d_dump(const array4d_t* a, const char* foutname)
 {
   FILE* fout = fopen(foutname, "w");
