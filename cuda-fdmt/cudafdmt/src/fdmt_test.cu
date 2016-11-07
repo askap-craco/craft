@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <iostream>
+#include <signal.h>
 #if defined (ENABLE_OPENMP)
 #include <omp.h>
 #endif
@@ -44,6 +45,15 @@ void runtest_usage() {
 			"	-h Print this message\n"
 	);
 	exit(EXIT_FAILURE);
+}
+
+volatile bool stopped;
+
+//typedef void (*sig_t) (int);
+
+void handle_signal(int signal)
+{
+	stopped = true;
 }
 
 int main(int argc, char* argv[])
@@ -153,7 +163,7 @@ int main(int argc, char* argv[])
 	printf("Rescaling to mean=%f stdev=%f decay constant=%f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant);
 	//rescale_allocate(&rescale, nbeams*nf);
 	rescale_allocate_gpu(&rescale, nbeams*nf);
-	//rescale_set_scale_offset_gpu(&rescale, 1.0/8.0, -128.0); // Set initial scale and offset
+	rescale_set_scale_offset_gpu(&rescale, 1.0, 0.0); // Set initial scale and offset
 
 	float foff =  (float) source.foff();
 	assert(foff < 0);
@@ -166,7 +176,15 @@ int main(int argc, char* argv[])
 	source.seek_sample(num_skip_blocks*nt);
 	int blocknum = 0;
 
+	// add signal handler
+	signal(SIGHUP, &handle_signal);
+	signal(SIGINT, &handle_signal);
+
 	while (source.read_samples_uint8(nt, read_buf) == nt) {
+		if (stopped) {
+			printf("Stopped due to signal received\n");
+			break;
+		}
 		//size_t nt2 = fin.read_samples_uint8(nt, read_buf2);
 		//assert(nt2 = nt);
 		// File is in TBF order
@@ -195,9 +213,9 @@ int main(int argc, char* argv[])
 			printf("Dumping input buffer %s\n", fbuf);
 		}
 
-		assert(num_rescale_blocks > 0);
+		assert(num_rescale_blocks >= 0);
 
-		if (blocknum % num_rescale_blocks == 0) {
+		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
 			rescale_update_scaleoffset_gpu(rescale);
 		}
 
