@@ -359,8 +359,8 @@ __global__ void rescale_update_and_transpose_float_kernel(
 	int rsidx = c + nf*ibeam;
 	// all these reads are nice and coalesced
 	rescale_dtype sum = sumarr[rsidx]; // read from global memory
-	rescale_dtype sumsq = sumsqarr[rsidx]; // read from globa.
-	rescale_dtype decay_offset = decay_offsetarr[rsidx];  // read from globa.
+	rescale_dtype sumsq = sumsqarr[rsidx]; // read from global
+	rescale_dtype decay_offset = decay_offsetarr[rsidx];  // read from global
 	rescale_dtype offset = offsetarr[rsidx]; // read from global
 	rescale_dtype scale = scalearr[rsidx]; // read from global
 
@@ -383,9 +383,9 @@ __global__ void rescale_update_and_transpose_float_kernel(
 		sumsq +=  vin*vin;
 		rescale_dtype vout = (vin + offset) * scale;
 		decay_offset = (vout + decay_offset*k)/(1.0 + k);
+		rescale_dtype sout = vout - decay_offset;
 
 		// non-coalesced write (transpose. Sorry)
-		rescale_dtype sout = vout - decay_offset;
 		outarr[outidx] = sout;
 
 	}

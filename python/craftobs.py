@@ -15,13 +15,23 @@ import heimdall
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 
-def load_beams(path, tstart, ntimes):
-    files = sorted(glob.glob(os.path.join(path, '*.fil_sum')))
+def load_beams(path, tstart, ntimes, pattern='*.fil', return_files=False):
+    if os.path.isdir(path[0]):
+        files = sorted(glob.glob(os.path.join(path, pattern)))
+    elif isinstance(path, str):
+        files = [path]
+    else:
+        files = path
+        
     if len(files) == 0:
         raise ValueError('No files in path  %s' % path)
+
     data = None
-    for fname in files:
+    sigfiles = []
+
+    for ifname, fname in enumerate(files):
         f = sigproc.SigprocFile(fname)
+        sigfiles.append(f)
         tend = tstart + ntimes
         nelements = ntimes*f.nifs*f.nchans
         
@@ -40,15 +50,18 @@ def load_beams(path, tstart, ntimes):
             if data is None:
                 data = np.zeros((ntimes, nifs, f.nchans))
 
-            ifnum = int(fname.split('.')[-2])
+            #ifnum = int(fname.split('.')[-2])
+            ifnum = ifname
+            
             data[:, ifnum, :] = v[:, 0, :]
 
         else:
             data = v
 
-
-        
-    return data
+    if return_files:
+        return data, sigfiles
+    else:
+        return data
 
 
 def find_hdrs(root):

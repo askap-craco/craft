@@ -208,7 +208,7 @@ int main(int argc, char* argv[])
 		char fbuf[1024];
 		if (dump_data) {
 			sprintf(fbuf, "inbuf_e%d.dat", blocknum);
-			array4d_copy_to_host	(&rescale_buf);
+			array4d_copy_to_host(&rescale_buf);
 			array4d_dump(&rescale_buf, fbuf);
 			printf("Dumping input buffer %s\n", fbuf);
 		}
@@ -219,7 +219,7 @@ int main(int argc, char* argv[])
 			rescale_update_scaleoffset_gpu(rescale);
 		}
 
-		if (blocknum > num_rescale_blocks) {
+		if (blocknum >= num_rescale_blocks) {
 			fdmt_execute(&fdmt, rescale_buf.d_device, out_buf.d);
 			if (dump_data) {
 				sprintf(fbuf, "fdmt_e%d.dat", blocknum);

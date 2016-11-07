@@ -24,19 +24,28 @@ def onpick(event):
 
     print thisline.get_label(), xdata[ind], ydata[ind]
 
-def annotate(fig, title, xlabel, ylable):
-    fig.add_text(title, 0.5, 0.98, ha='center', va='top')
-    fig.add_text(xlabel, 0.5, 0.02, ha='center', va='bottom')
-    fig.add_text(ylabel, 0.02, 0.5, angle=90, ha='center', va='top')
+def annotate(fig, title, xlabel, ylabel):
+    fig.text( 0.5, 0.98,title, ha='center', va='top')
+    fig.text(0.5, 0.02, xlabel, ha='center', va='bottom')
+    fig.text(0.02, 0.5, ylabel, rotation=90, ha='center', va='top')
     
 
+def commasep(s):
+    return map(int, s.split(','))
+
+def floatcommasep(s):
+    return map(float, s.split(','))
+
+
 def _main():
-    from argparse import ArgumentParser
-    parser = ArgumentParser(description='Script description')
+    from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+    parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument(dest='files', nargs='+')
-    parser.add_argument('-t', '--times', help='Integration range to plot')
-    parser.set_defaults(verbose=False)
+    parser.add_argument('-t', '--times', help='Integration range to plot', type=commasep)
+    parser.add_argument('--nxy', help='number of rows,columns in plots', type=commasep)
+    parser.add_argument('--imzrange', help='Z range for dynamic spectrum', type=floatcommasep)
+    parser.set_defaults(verbose=False, nxy="3,3")
     values = parser.parse_args()
     if values.verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -44,7 +53,7 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     if values.times:
-        bits = map(int, values.times.split(','))
+        bits = values.times
         if len(bits) == 1:
             tstart = bits[0]
             ntimes = 128*8
@@ -56,19 +65,41 @@ def _main():
         tstart = 0
         ntimes = 128*8
 
+    nrows, ncols = values.nxy
+
     ffts = []
-    nrows = 6
-    ncols = 12
+    if values.imzrange is None:
+        imzmin = None
+        imzmax = None
+    else:
+        imzmin, imzmax = values.imzrange
+
+    beams, files = load_beams(values.files, tstart, ntimes, return_files=True)
+    print 'Loaded beams', beams.shape
+    ntimes, nbeams, nfreq = beams.shape
+
+    f0 = files[0]
+    mjdstart = f0.tstart
+    tsamp = f0.tsamp
+    fch1 = f0.fch1
+    foff = f0.foff
+    src_raj = f0.src_raj
+    src_dej = f0.src_dej
+    freqs = np.linspace(fch1, fch1 + nfreq*foff, nfreq, endpoint=True)
+    assert(len(freqs) == nfreq)
+
+    if foff < 0:
+        origin = 'upper'
+        im_extent = (0, ntimes*tsamp, fch1 + foff*nfreq, fch1)
+    else:
+        origin = 'lower'
+        im_extent = (0, ntimes*tsamp, fch1, fch1 + foff*nfreq)
 
     fig1, axes1 = subplots(nrows, ncols, sharex=True, sharey=True)
     fig2, axes2 = subplots(nrows, ncols, sharex=True, sharey=True)
     fig3, axes3 = subplots(nrows, ncols, sharex=True, sharey=True)
     fig4, axes4 = subplots(nrows, ncols, sharex=True, sharey=True)
     fig5, axes5 = subplots(nrows, ncols, sharex=True, sharey=True)
-
-    beams = load_beams(values.files[0], tstart, ntimes)
-    print 'Loaded beams', beams.shape
-    ntimes, nbeams, nfreq = beams.shape
 
     pylab.figure()
     chan = 150
@@ -87,6 +118,7 @@ def _main():
 
     nplots = min(nrows*ncols, nbeams)
 
+
     for i in xrange(nplots):
 
         ax1 = axes1.flat[i]
@@ -98,11 +130,12 @@ def _main():
         print 'bi', bi.shape
         ntimes, nfreq = bi.shape
         
-        ax1.imshow(bi.T, aspect='auto')
-        ax1.set_title('Beam {}'.format(i))
 
-        ax2.plot(bi.mean(axis=0))
-        ax3.plot(bi.std(axis=0))
+        ax1.imshow(bi.T, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent)
+        ax1.text(0.98, 0.98, 'B{:02d}'.format(i), va='top', ha='right', transform=ax1.transAxes)
+
+        ax2.plot(freqs, bi.mean(axis=0))
+        ax3.plot(freqs, bi.std(axis=0))
         dm0 = bi.mean(axis=1)
 
         dm0f = abs(np.fft.rfft(dm0, axis=0))**2
@@ -113,11 +146,9 @@ def _main():
         
         ax5.plot(np.log10(dm0f[1:]))
 
-    
-
-    annotate(fig1, 'Dynamic spectrum', 'Time', 'Channel')
-    annotate(fig2, 'Mean bandpass', 'Channel','Mean bandpass')
-    annotate(fig3, 'Bandpass stdDev', 'Channel','Bandpass StdDev')
+    annotate(fig1, 'Dynamic spectrum', 'Time (s)', 'Frequency (MHz)')
+    annotate(fig2, 'Mean bandpass', 'Frequency (MHz)','Mean bandpass')
+    annotate(fig3, 'Bandpass stdDev', 'Frequency (MHz)','Bandpass StdDev')
     annotate(fig4, 'FFT of all channels', 'Digital frequency ', 'Channel')
     annotate(fig5, 'FFT of DM0', 'Digital Frequency', 'FFT (dB)')
 
