@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
 	argv += optind;
 
 	if (argc == 0) {
-		printf("Not enough arguments\n");
+		printf("Not enough arguments: %d\n", argc);
 		exit(EXIT_FAILURE);
 	}
 

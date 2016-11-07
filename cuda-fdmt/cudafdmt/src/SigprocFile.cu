@@ -52,11 +52,11 @@ SigprocFile::SigprocFile(const char* filename) {
 		exit(EXIT_FAILURE);
 	}
 	// TODO: Check it starts with HEADER_START
-	m_hdr_nbytes = (size_t)((hdr_end - m_hdr) + strlen("HEADER_END") + 1);
+	m_hdr_nbytes = (size_t)((hdr_end - m_hdr) + strlen("HEADER_END"));
 	assert(m_hdr_nbytes < MAX_HDR_SIZE);
 	m_hdr[m_hdr_nbytes] = 0;
 	seek_sample(0);
-	printf("File %s has header %d bytes long\n", filename, m_hdr_nbytes);
+	printf("File %s has header %d bytes long. i.e. 0x%x\n", filename, m_hdr_nbytes, m_hdr_nbytes);
 	m_nbits = header_int("nbits");
 	m_nifs = header_int("nifs");
 	m_nchans = header_int("nchans");
@@ -110,6 +110,7 @@ size_t SigprocFile::seek_sample(size_t t)
 		printf("SigprocFile: Could not seek to offset of file %s\n. Error: %s", m_filename, strerror(errno));
 		assert(0);
 	}
+	printf("Seeking to byte offset %d (0x%x)\n", boff, boff);
 	return boff;
 }
 
