@@ -142,6 +142,7 @@ class SigprocFile(object):
         self.seek_data()
         header = {}
         self.header = header
+        self.hdr = hdr
         
                     
         for p in STRING_PARAMS:
