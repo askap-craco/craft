@@ -106,7 +106,7 @@ class SigprocFile(object):
             self._read_header()
 
         if 'src_raj' in self.header:
-            self.src_raj_deg = sigproc_sex2deg(self.header['src_raj']*15.0)
+            self.src_raj_deg = sigproc_sex2deg(self.header['src_raj'])*15.0
             
         if 'src_dej' in self.header:
             self.src_dej_deg = sigproc_sex2deg(self.header['src_dej'])
