@@ -31,6 +31,32 @@ INT_FORMAT = 'i'
 STRING_FORMAT = 's'
 DOUBLE_FORMAT = 'd'
 
+def sigproc_sex2deg(x):
+    '''
+    Computes a decimal number in degrees from a rediculous sigproc number in the form
+    ddmmss.s
+
+    >>> print '%0.5f' % sigproc_sex2deg(123456.789)
+    12.58244
+    >>> print '%0.5f' % sigproc_sex2deg(-123456.789)
+    -12.58244
+    >>> sigproc_sex2deg(0)
+    0.0
+    '''
+    sign = 1.
+    if x < 0:
+        sign = -1.
+
+    x = abs(x)
+    
+    dd = float(int(x/10000))
+    mm = float(int((x - dd*10000)/100))
+    ss = x - dd*10000 - mm*100
+    dout = sign*(dd + mm/60.0 + ss/3600.0)
+    
+    return dout
+    
+
 def unpack(hdr, param, struct_format):
     idx = hdr.find(param)
     if idx < 0:
@@ -78,6 +104,12 @@ class SigprocFile(object):
             self.header = header
         else:
             self._read_header()
+
+        if 'src_raj' in self.header:
+            self.src_raj_deg = sigproc_sex2deg(self.header['src_raj']*15.0)
+            
+        if 'src_dej' in self.header:
+            self.src_dej_deg = sigproc_sex2deg(self.header['src_dej'])
 
     def _write_header(self, header):
         f = self.fin
@@ -138,7 +170,7 @@ class SigprocFile(object):
             self.nsamples = self.file_size_elements
             
         self.observation_duration = self.nsamples * self.tsamp
-        
+
         
     def seek_data(self, offset_bytes=0):
         self.fin.seek(self.data_start_idx + offset_bytes)
@@ -262,6 +294,7 @@ def _main():
     for filename in args:
         fin = SigprocFile(filename)
         fin.print_header()
+        print 'RADEC DEG', fin.src_raj_deg, fin.src_dej_deg
         print "Header size", fin.header_size_bytes
         print "Data size", fin.data_size_bytes
         print "Number of elements", fin.file_size_elements
