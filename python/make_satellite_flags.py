@@ -17,6 +17,7 @@ import aces.mro as mro
 import sigproc
 import craftobs
 from crafthdr import DadaHeader
+import datetime
 
 def opentle(f):
     sats = {}
@@ -74,11 +75,16 @@ class Constellation(object):
 
     def load_tle(self, dir):
         tlefile = os.path.join(dir, self.tlename)
+        self.tlefile = tlefile
+        self.tlefile_mtime = os.path.getmtime(tlefile)
         self.tle = opentle(tlefile)
 
     def calc_trajectories(self, times, beam_bodies):
         traj = get_trajectories(self.tle, times, beam_bodies, self.septhresh)
         return traj
+
+    def get_tle_mtime(self):
+        return self.tlefile_mtime
 
 def plot(times, beam_bodies, trajectories):
 
@@ -135,11 +141,12 @@ def _main():
     hdrfile = values.hdrfile[0]
     print 'Loading header', hdrfile
     hdr = DadaHeader.fromfile(hdrfile)
+    beamdir = os.path.dirname(os.path.abspath(hdrfile))
+
     if 'TSTART' in hdr:
         mjdstart = float(hdr['TSTART'])
         duration = values.duration/3600./24.
     else:
-        beamdir = os.path.dirname(os.path.abspath(hdrfile))
         print 'Loading beam dir', beamdir
         beams, filfiles = craftobs.load_beams(beamdir, 128,128, return_files=True)
         mjdstart = filfiles[0].tstart
@@ -158,6 +165,7 @@ def _main():
     mjd0 = 15021.5 - 2.0 
     start_time = ephem.Date(mjdstart - mjd0)
     times = np.arange(start_time, start_time+ duration, tdelt)
+    times_mjd = times + mjd0
 
     # GPS: http://www.navipedia.net/index.php/GPS_Signal_Plan
     gps = Constellation('gps-ops.txt', # tle name
@@ -189,12 +197,42 @@ def _main():
 
     constellations = [gps, galileo, beidou, glonass]
 
+    all_traj = {}
+
     for const in constellations:
         const.load_tle(values.tle_dir)
         trajectories = const.calc_trajectories(times, beam_bodies)
+        for satname, traj in trajectories.iteritems():
+            all_traj[satname] = (const, traj)
 
-        if values.show:
-            plot(times, beam_bodies, trajectories)
+    if values.show:
+        plot(times, beam_bodies, all_traj)
+
+
+    flagfile = os.path.join(beamdir, 'satellites.flags')
+    flout = open(flagfile, 'w')
+    flout.write('# CRAFT Flagfile written by {}\n'.format(sys.argv[0]))
+    flout.write('# Cmdline: {}\n'.format(' '.join(sys.argv)))
+    flout.write('# Local Now:{}\n'.format(datetime.datetime.now().isoformat()))
+    flout.write('# UTC Now:{}\n'.format(datetime.datetime.utcnow().isoformat()))
+    flout.write('# Beam dir:{}\n'.format(beamdir))
+    flout.write('# TLE dir: {}\n'.format(values.tle_dir))
+    for const in constellations:
+        flout.write('# TLEFILE {}. {} satellites. Last modified {}\n'.
+                    format(const.tlename, len(const.tle), datetime.datetime.fromtimestamp(const.get_tle_mtime()).isoformat()))
+
+    flout.write('# {} trajectories are within the threshold\n'.format(len(all_traj)))
+    for satname, (const, traj) in all_traj.iteritems():
+        bsepmin = np.degrees([tj[5] for tj in traj])
+        bsepbeam = [tj[6] for tj in traj]
+        minidx = bsepmin.argmin()
+        tle = const.tle[satname]
+        flout.write('#\n#{} minimum beam separation {:0.2f} deg at {}. Beams {}\n'.format(satname, bsepmin.min(), times_mjd[minidx], sorted(set(bsepbeam))))
+        flout.write('#\n#{0}\n#{1}\n#{2}\n'.format(*tle))
+
+        flout.write('# flags\n')
+        flout.write('# mjdstart, mjdend, freq_mhz_start, freq_mhz_end, beam_start, beam_end\n')
+        # TOO tired - do this later. Loop through all beams - just do it. And add all the freqs
 
     
     if values.show:
