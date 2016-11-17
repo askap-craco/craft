@@ -78,10 +78,9 @@ def get_trajectories(satellites, times, beam_bodies, septhresh_deg=None):
 
             sepmin = bsep.min()
 
-            if septhresh_deg is None or sepmin < np.radians(septhresh_deg):
-                traj.append(t, sat.az, sat.alt, sat.ra, sat.dec, bsep.min(), bsep.argmin(), bsep)
+            traj.append(t, sat.az, sat.alt, sat.ra, sat.dec, bsep.min(), bsep.argmin(), bsep)
 
-        if traj.nt > 0:
+        if septhresh_deg is None or traj.bsep.min() < np.radians(septhresh_deg):
             trajectories[satname] = traj
 
     return trajectories
@@ -150,6 +149,19 @@ def plot(times, beam_bodies, trajectories):
     axes[0].set_ylabel('Minimum beam separation (deg)')
     axes[1].set_ylabel('Beam number with minimum separation')
 
+def rotate_beams(ra0, dec0, ras, decs, rot_deg=45.0):
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+
+    center = SkyCoord(ra0, dec0, unit='deg')
+    newframe = center.skyoffset_frame(rotation=rot_deg*u.deg)
+    beams = [SkyCoord(r, d, unit='deg') for (r, d) in zip(ras, decs)]
+    new_beams = [b.transform_to(newframe) for b in beams]
+
+    new_ras = [b.lon.degree + ra0 for b in new_beams]
+    new_decs = [b.lat.degree + dec0 for b in new_beams]
+
+    return new_ras, new_decs
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -158,9 +170,10 @@ def _main():
     parser.add_argument('-d', '--duration', type=float, help='Duration to simulate (seconds)', default=1200.)
     parser.add_argument('-t', '--tdelta', type=float, help='Delta t to simulate (seconds)', default=10.)
     parser.add_argument('--tle-dir', help='Directory to find TLEs in. Defaults to env["TLE_DIR"]', default=os.environ['TLE_DIR'])
+    parser.add_argument('-r','--rotate-beams', type=float, help='rotate beams to fix a header bug by a number of degrees')
     parser.add_argument('-s', '--show', action='store_true', default=False, help='Show plots')
     parser.add_argument(dest='hdrfile', nargs=1)
-    parser.set_defaults(verbose=False)
+    parser.set_defaults(verbose=False, rotate_beams=0.0)
     values = parser.parse_args()
     if values.verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -172,20 +185,31 @@ def _main():
     hdr = DadaHeader.fromfile(hdrfile)
     beamdir = os.path.dirname(os.path.abspath(hdrfile))
 
+
+    print 'Loading beam dir', beamdir
+    beams, filfiles = craftobs.load_beams(beamdir, 128,128, return_files=True)
+
     if 'TSTART' in hdr:
         mjdstart = float(hdr['TSTART'])
         duration = values.duration/3600./24.
     else:
-        print 'Loading beam dir', beamdir
-        beams, filfiles = craftobs.load_beams(beamdir, 128,128, return_files=True)
         mjdstart = filfiles[0].tstart
         duration_sec = filfiles[0].file_size_elements*filfiles[0].tsamp
         duration = duration_sec/3600./24.
 
+    if values.duration is not None:
+        duration = values.duration
+
     ras = map(float, hdr['BEAM_RA'][0].split(','))[0:36]
     decs = map(float, hdr['BEAM_DEC'][0].split(','))[0:36]
+    if values.rotate_beams != 0:
+        logging.info('Rotating beams by %f', values.rotate_beams)
+        ra0 = float(hdr['RA'][0])
+        dec0 = float(hdr['DEC'][0])
+        ras, decs = rotate_beams(ra0, dec0, ras, decs, values.rotate_beams)
 
     beam_bodies = make_bodies_from_arrays(ras, decs)
+    nbeams = len(beam_bodies)
 
     # pyephem epoch is 1899 December 31 12:00 according to http://rhodesmill.org/pyephem/tutorial.html
     # I need to subtract 2 days from this to make sense. Wierd
@@ -255,15 +279,32 @@ def _main():
         bsepmin = np.degrees(traj.bsepmin)
         bsepbeam = traj.bsepbeam
         minidx = bsepmin.argmin()
-        tle = const.tle[satname]
+        tlelines = const.tle[satname]
         flout.write('#\n#{} minimum beam separation {:0.2f} deg at {}. Beams {}\n'.format(satname, bsepmin.min(), times_mjd[minidx], sorted(set(bsepbeam))))
-        flout.write('#\n#{0}\n#{1}\n#{2}\n'.format(*tle))
+        flout.write('#\n#{0}\n#{1}\n#{2}\n'.format(*tlelines))
 
         flout.write('# flags\n')
         flout.write('# mjdstart, mjdend, freq_mhz_start, freq_mhz_end, beam_start, beam_end\n')
-        # TOO tired - do this later. Loop through all beams - just do it. And add all the freqs
+        
+        for ibeam in xrange(nbeams):
+            for fcent, fwidth, bandname in const.freqs:
+                beam_seps = traj.bsep[:, ibeam]
+                # find start and end time when it's too close
+                sep_times = times[beam_seps < np.radians(const.septhresh)]
+                if len(sep_times) == 0:
+                    continue
+                    
+                start_time = sep_times[0]
+                end_time = sep_times[-1]
+                start_mjd = start_time + mjd0
+                end_mjd = end_time + mjd0
+                fstart = fcent - fwidth/2.0
+                fend = fcent + fwidth/2.0
+                flout.write('{} {} {} {} {} {}\n'.format(start_mjd, end_mjd, fstart, fend, ibeam, ibeam))
 
     
+    flout.flush()
+    flout.close()
     if values.show:
         pylab.show()
 
