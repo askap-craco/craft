@@ -118,10 +118,6 @@ def plot(times, beam_bodies, trajectories):
 
     pylab.figure()
     times_mins = (times - min(times))*24.*60.
-    
-    for ib, b in enumerate(beam_bodies):
-        pylab.plot(np.degrees(b._ra), np.degrees(b._dec))
-        pylab.text(np.degrees(b._ra), np.degrees(b._dec), str(ib))
 
 
     for satname, (const, traj) in trajectories.iteritems():
@@ -129,6 +125,12 @@ def plot(times, beam_bodies, trajectories):
         dec = np.degrees(traj.dec)
         bsepmin = np.degrees(traj.bsepmin)
         pylab.plot(ra, dec, label=satname)
+
+    pylab.legend(frameon=False)
+
+    for ib, b in enumerate(beam_bodies):
+        pylab.text(np.degrees(b._ra), np.degrees(b._dec), str(ib), ha='center', va='center')
+        pylab.plot(np.degrees(b._ra), np.degrees(b._dec))
     
 
     xlim = pylab.xlim()
@@ -172,6 +174,7 @@ def _main():
     parser.add_argument('--tle-dir', help='Directory to find TLEs in. Defaults to env["TLE_DIR"]', default=os.environ['TLE_DIR'])
     parser.add_argument('-r','--rotate-beams', type=float, help='rotate beams to fix a header bug by a number of degrees')
     parser.add_argument('-s', '--show', action='store_true', default=False, help='Show plots')
+    parser.add_argument('-T', '--septhresh', type=float, help='Separation threshold (degrees)', default=5.0)
     parser.add_argument(dest='hdrfile', nargs=1)
     parser.set_defaults(verbose=False, rotate_beams=0.0)
     values = parser.parse_args()
@@ -198,7 +201,8 @@ def _main():
         duration = duration_sec/3600./24.
 
     if values.duration is not None:
-        duration = values.duration
+        duration = values.duration/3600./24.
+
 
     ras = map(float, hdr['BEAM_RA'][0].split(','))[0:36]
     decs = map(float, hdr['BEAM_DEC'][0].split(','))[0:36]
@@ -215,14 +219,15 @@ def _main():
     # I need to subtract 2 days from this to make sense. Wierd
     # i.e. mjd 57681 = 20 Oct 2016
     tdelt = values.tdelta/3600./24.
-    mjd0 = 15021.5 - 2.0 
+    mjd0 = 15021.5 - 2.0
     start_time = ephem.Date(mjdstart - mjd0)
-    times = np.arange(start_time, start_time+ duration, tdelt)
+    print 'start time', start_time, float(start_time)
+    times = np.arange(float(start_time), float(start_time)+ duration, tdelt)
     times_mjd = times + mjd0
 
     # GPS: http://www.navipedia.net/index.php/GPS_Signal_Plan
     gps = Constellation('gps-ops.txt', # tle name
-                        5.0, # separation threshold
+                        values.septhresh, # separation threshold
                         ((1575.42, 30.0, 'L1'), 
                          (1227.60, 30.0, 'L2'), 
                          (1176.45, 30.0, 'L5')))
@@ -230,20 +235,20 @@ def _main():
     #Galileo http://www.navipedia.net/index.php/Galileo_Signal_Plan
 
     galileo = Constellation('galileo.txt',
-                            5.0,
+                            values.septhresh,
                             ((1575.42, 40.0, 'E1'),
                              (1278.75, 40.0, 'E6'),
                              (1191.795, 90.0, 'E5')))
 
     # Beidou signal plan: http://www.navipedia.net/index.php/BeiDou_Signal_Plan
     beidou = Constellation('beidou.txt', 
-                           5.0,
+                           values.septhresh,
                            (((1561.098 + 1589.742)/2., 50.0, 'B1'),
                             (1207.14, 30.0, 'B2'),
                             (1268.52, 40.0, 'B3')))
 
     # Glonass: http://www.navipedia.net/index.php/GLONASS_Signal_Plan
-    glonass = Constellation('glo-ops.txt', 5.0,
+    glonass = Constellation('glo-ops.txt', values.septhresh,
                             (((1598.0625 + 1605.375)/2.0, 18.0, 'L1'),
                              ((1242.9375 + 1248.625)/2.0, 18.0, 'L2'),
                              (1201.0, 20.0, 'L3')))
