@@ -33,10 +33,38 @@ def opentle(f):
 
     return sats
 
+class Trajectory(object):
+    def __init__(self, sat, satlines, ntimes, nbeams):
+        self.sat = sat
+        self.satlines = satlines
+        self.times = np.zeros(ntimes)
+        self.az = np.zeros(ntimes)
+        self.alt = np.zeros(ntimes)
+        self.ra = np.zeros(ntimes)
+        self.dec = np.zeros(ntimes)
+        self.bsepmin = np.zeros(ntimes)
+        self.bsepbeam = np.zeros(ntimes)
+        self.bsep = np.zeros((ntimes, nbeams))
+        self.nt = 0
+
+    def append(self, time, az, alt, ra, dec, bsepmin, bsepbeam, bsep):
+        t = self.nt
+        self.times[t] = time
+        self.az[t] =az
+        self.alt[t] = alt
+        self.ra[t] = ra
+        self.dec[t] = dec
+        self.bsepmin[t] = bsepmin
+        self.bsepbeam[t] = bsepbeam
+        self.bsep[t,:] = bsep
+        self.nt += 1
+
+        
+
 def get_trajectories(satellites, times, beam_bodies, septhresh_deg=None):
     trajectories = {}
     for satname, satlines in satellites.iteritems():
-        traj = []
+        traj = Trajectory(satname, satlines, len(times), len(beam_bodies))
         sat = ephem.readtle(*satlines)
 
         for it, t in enumerate(times):
@@ -48,11 +76,12 @@ def get_trajectories(satellites, times, beam_bodies, septhresh_deg=None):
                 bbody.compute(askap)
                 bsep[ibeam] = ephem.separation(bbody, sat)
 
-            traj.append((t, sat.az, sat.alt, sat.ra, sat.dec, bsep.min(), bsep.argmin(), bsep))
+            sepmin = bsep.min()
 
-        sepmin = np.array([tr[5] for tr in traj])
-        
-        if septhresh_deg is None or np.any(sepmin < np.radians(septhresh_deg)):
+            if septhresh_deg is None or sepmin < np.radians(septhresh_deg):
+                traj.append(t, sat.az, sat.alt, sat.ra, sat.dec, bsep.min(), bsep.argmin(), bsep)
+
+        if traj.nt > 0:
             trajectories[satname] = traj
 
     return trajectories
@@ -96,10 +125,10 @@ def plot(times, beam_bodies, trajectories):
         pylab.text(np.degrees(b._ra), np.degrees(b._dec), str(ib))
 
 
-    for satname, traj in trajectories.iteritems():
-        ra = np.degrees([tr[3] for tr in traj])
-        dec = np.degrees([tr[4] for tr in traj])
-        bsepmin = np.degrees([tj[5] for tj in traj])
+    for satname, (const, traj) in trajectories.iteritems():
+        ra = np.degrees(traj.ra)
+        dec = np.degrees(traj.dec)
+        bsepmin = np.degrees(traj.bsepmin)
         pylab.plot(ra, dec, label=satname)
     
 
@@ -110,9 +139,9 @@ def plot(times, beam_bodies, trajectories):
 
     fig, axes = pylab.subplots(1, 2)
     #fig.set_size_inches([12,4])
-    for satname, traj in trajectories.iteritems():
-        bsepmin = np.degrees([tj[5] for tj in traj])
-        bsepbeam = [tj[6] for tj in traj]
+    for satname, (const, traj) in trajectories.iteritems():
+        bsepmin = np.degrees(traj.bsepmin)
+        bsepbeam = traj.bsepbeam
         axes[0].plot(times_mins, bsepmin, label=satname)
         axes[1].plot(times_mins, bsepbeam)
         
@@ -223,8 +252,8 @@ def _main():
 
     flout.write('# {} trajectories are within the threshold\n'.format(len(all_traj)))
     for satname, (const, traj) in all_traj.iteritems():
-        bsepmin = np.degrees([tj[5] for tj in traj])
-        bsepbeam = [tj[6] for tj in traj]
+        bsepmin = np.degrees(traj.bsepmin)
+        bsepbeam = traj.bsepbeam
         minidx = bsepmin.argmin()
         tle = const.tle[satname]
         flout.write('#\n#{} minimum beam separation {:0.2f} deg at {}. Beams {}\n'.format(satname, bsepmin.min(), times_mjd[minidx], sorted(set(bsepbeam))))

@@ -28,6 +28,9 @@ def annotate(fig, title, xlabel, ylabel):
     fig.text( 0.5, 0.98,title, ha='center', va='top')
     fig.text(0.5, 0.02, xlabel, ha='center', va='bottom')
     fig.text(0.02, 0.5, ylabel, rotation=90, ha='center', va='top')
+    fout='{}.png'.format(title.replace(' ', ''))
+    print 'Saving', fout
+    fig.savefig(fout)
     
 
 def commasep(s):
@@ -100,6 +103,8 @@ def _main():
     fig3, axes3 = subplots(nrows, ncols, sharex=True, sharey=True)
     fig4, axes4 = subplots(nrows, ncols, sharex=True, sharey=True)
     fig5, axes5 = subplots(nrows, ncols, sharex=True, sharey=True)
+    fig6, axes6 = subplots(nrows, ncols, sharex=True, sharey=True)
+
 
     pylab.figure()
     chan = 150
@@ -117,8 +122,6 @@ def _main():
     pylab.colorbar()
 
     nplots = min(nrows*ncols, nbeams)
-
-
     for i in xrange(nplots):
 
         ax1 = axes1.flat[i]
@@ -126,16 +129,26 @@ def _main():
         ax3 = axes3.flat[i]
         ax4 = axes4.flat[i]
         ax5 = axes5.flat[i]
+        ax6 = axes6.flat[i]
         bi = beams[:, i, :]
         print 'bi', bi.shape
         ntimes, nfreq = bi.shape
         
-
         ax1.imshow(bi.T, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent)
         ax1.text(0.98, 0.98, 'B{:02d}'.format(i), va='top', ha='right', transform=ax1.transAxes)
+        beam_mean = bi.mean(axis=0)
+        beam_std = bi.std(axis=0)
+        bmm = np.tile(beam_mean, (ntimes, 1))
+        bsm = np.tile(beam_std, (ntimes, 1))
+        bi_znorm = (bi - bmm)/bsm
+        print 'Znorm', bi_znorm.shape
+        beam_kurtosis = np.mean((bi_znorm)**4, axis=0)/np.mean((bi_znorm)**2, axis=0)**2
+        print 'kurt shape', beam_kurtosis.shape
 
-        ax2.plot(freqs, bi.mean(axis=0))
-        ax3.plot(freqs, bi.std(axis=0))
+        ax2.plot(freqs, beam_mean)
+        ax3.plot(freqs, beam_std)
+        ax6.plot(freqs, beam_kurtosis)
+
         dm0 = bi.mean(axis=1)
 
         dm0f = abs(np.fft.rfft(dm0, axis=0))**2
@@ -151,6 +164,7 @@ def _main():
     annotate(fig3, 'Bandpass stdDev', 'Frequency (MHz)','Bandpass StdDev')
     annotate(fig4, 'FFT of all channels', 'Digital frequency ', 'Channel')
     annotate(fig5, 'FFT of DM0', 'Digital Frequency', 'FFT (dB)')
+    annotate(fig6, 'Kurtosis', 'Frequency (MHz)', 'Kurtosis')
 
 
     pylab.show()
