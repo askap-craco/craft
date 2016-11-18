@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
 	float std_thresh = 1e9;
 	float mean_thresh = 1e9;
 	int flag_grow = 3;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:h")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:F:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
