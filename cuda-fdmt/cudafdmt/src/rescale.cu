@@ -27,7 +27,7 @@ void rescale_update_scaleoffset(rescale_t* rescale)
 	float nsamp = (float) rescale->sampnum;
 	for (unsigned i = 0; i < rescale->num_elements; i++) {
 		float mean = rescale->sum[i]/nsamp;
-		float meansq = rescale->sumsq[i]/nsamp;
+		float meansq = rescale->sum2[i]/nsamp;
 		float variance = meansq - mean*mean;
 
 		if (rescale->interval_samps == 0) { // Don't do rescaling
@@ -46,7 +46,7 @@ void rescale_update_scaleoffset(rescale_t* rescale)
 
 		// reset values to zero
 		rescale->sum[i] = 0.0;
-		rescale->sumsq[i] = 0.0;
+		rescale->sum2[i] = 0.0;
 	}
 
 	rescale->sampnum = 0;
@@ -69,7 +69,7 @@ void rescale_update_float(rescale_t* rescale, float* fdata, float* sampbuf, unsi
 		float vin = inx[i];
 		float vin2 = vin*vin;
 		rescale->sum[i] += vin;
-		rescale->sumsq[i] += vin2;
+		rescale->sum2[i] += vin2;
 		outx[i] = (vin + rescale->offset[i]) * rescale->scale[i];
 	}
 }
@@ -83,11 +83,11 @@ void rescale_update_float_polsum(rescale_t* rescale, float* fdata, float* sampbu
 		unsigned j = 2*i;
 		float vin = inx[j];
 		rescale->sum[j] += vin;
-		rescale->sumsq[j] += vin*vin;
+		rescale->sum2[j] += vin*vin;
 
 		float uin = inx[j+1];
 		rescale->sum[j+1] += uin;
-		rescale->sumsq[j+1] += uin*uin;
+		rescale->sum2[j+1] += uin*uin;
 
 		float vscale = (vin + rescale->offset[j]) * rescale->scale[j];
 		float uscale = (uin + rescale->offset[j+1]) * rescale->scale[j+1];
@@ -106,7 +106,7 @@ void rescale_update_uint8(rescale_t* rescale, float* fdata, uint8_t* sampbuf, un
 	for (unsigned i = 0; i < rescale->num_elements; i++) {
 		float vin = in[i];
 		rescale->sum[i] += vin;
-		rescale->sumsq[i] += vin*vin;
+		rescale->sum2[i] += vin*vin;
 		float vout = (vin + rescale->offset[i]) * rescale->scale[i];
 
 		if (vout < 0) {
@@ -128,11 +128,11 @@ void rescale_update_uint8_polsum(rescale_t* rescale, float* fdata, uint8_t* samp
 		unsigned j=2*i;
 		float vin = in[j];
 		rescale->sum[j] += vin;
-		rescale->sumsq[j] += vin*vin;
+		rescale->sum2[j] += vin*vin;
 
 		float uin=in[j+1];
 		rescale->sum[j+1] += uin;
-		rescale->sumsq[j+1] += uin*uin;
+		rescale->sum2[j+1] += uin*uin;
 
 		float vscale = (vin + rescale->offset[j]) * rescale->scale[j];
 		float uscale = (uin + rescale->offset[j+1]) * rescale->scale[j+1];
@@ -154,7 +154,7 @@ void rescale_update_int8(rescale_t* rescale, float* __restrict__ in, int8_t* __r
 	for (unsigned i = 0; i < rescale->num_elements; i++) {
 		float vin = in[i];
 		rescale->sum[i] += vin;
-		rescale->sumsq[i] += vin*vin;
+		rescale->sum2[i] += vin*vin;
 		float vout = (vin + rescale->offset[i]) * rescale->scale[i];
 		if (vout < -128) {
 			out[i] = -128;
@@ -178,7 +178,7 @@ float rescale_update_decay_float_single(rescale_t* rescale, uint64_t i, float vi
 	assert(k >= 0);
 
 	rescale->sum[i] += vin;
-	rescale->sumsq[i] += vin*vin;
+	rescale->sum2[i] += vin*vin;
 	float vout = (vin + rescale->offset[i]) * rescale->scale[i];
 	rescale->decay_offset[i] = (vout + rescale->decay_offset[i]*k) / (1.0 + k);
 
@@ -194,7 +194,7 @@ void rescale_update_decay_float(rescale_t* rescale, float* __restrict__ in, floa
 	for (unsigned i = 0; i < rescale->num_elements; i++) {
 		float vin = in[i];
 		rescale->sum[i] += vin;
-		rescale->sumsq[i] += vin*vin;
+		rescale->sum2[i] += vin*vin;
 		float vout = (vin + rescale->offset[i]) * rescale->scale[i];
 		rescale->decay_offset[i] = (vout + rescale->decay_offset[i]*k) / (1.0 + k);
 		out[i] = vout - rescale->decay_offset[i];
@@ -213,7 +213,7 @@ void rescale_update_decay_uint8(rescale_t* rescale,  float* in, uint8_t* out)
 	for (unsigned i = 0; i < rescale->num_elements; i++) {
 		float vin = in[i];
 		rescale->sum[i] += vin;
-		rescale->sumsq[i] += vin*vin;
+		rescale->sum2[i] += vin*vin;
 		float vout = (vin + rescale->offset[i]) * rescale->scale[i];
 		rescale->decay_offset[i] = (vout + rescale->decay_offset[i]*k) / (1.0 + k);
 		float rout = (vout - rescale->decay_offset[i]);
@@ -238,7 +238,7 @@ rescale_t* rescale_allocate(rescale_t* rescale, uint64_t nelements)
 	size_t sz = nelements*sizeof(float);
 
 	rescale->sum = (float*) rescale_malloc(sz);
-	rescale->sumsq = (float*) rescale_malloc(sz);
+	rescale->sum2 = (float*) rescale_malloc(sz);
 	rescale->scale = (float*) rescale_malloc(sz);
 	rescale->offset = (float*) rescale_malloc(sz);
 	rescale->decay_offset = (float*) rescale_malloc(sz);
@@ -247,7 +247,7 @@ rescale_t* rescale_allocate(rescale_t* rescale, uint64_t nelements)
 
 	for(uint64_t i = 0; i < nelements; ++i) {
 		rescale->sum[i] = 0;
-		rescale->sumsq[i] = 0;
+		rescale->sum2[i] = 0;
 		rescale->scale[i] = 1.0;
 		rescale->offset[i] = 0.0;
 		rescale->decay_offset[i] = 0.0;
@@ -280,7 +280,10 @@ rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nelements)
 {
 	size_t sz = nelements*sizeof(rescale_dtype);
 	rescale_arraymalloc(&rescale->sum, nelements);
-	rescale_arraymalloc(&rescale->sumsq, nelements);
+	rescale_arraymalloc(&rescale->sum2, nelements);
+	rescale_arraymalloc(&rescale->sum3, nelements);
+	rescale_arraymalloc(&rescale->sum4, nelements);
+	rescale_arraymalloc(&rescale->kurt, nelements);
 	rescale_arraymalloc(&rescale->scale, nelements);
 	rescale_arraymalloc(&rescale->offset, nelements);
 	rescale_arraymalloc(&rescale->decay_offset, nelements);
@@ -342,7 +345,9 @@ void rescale_update_and_transpose_float(rescale_t& rescale, array4d_t& read_arr,
 __global__ void rescale_update_and_transpose_float_kernel(
 		const uint8_t* __restrict__ inarr,
 		rescale_dtype* __restrict__ sumarr,
-		rescale_dtype* __restrict__ sumsqarr,
+		rescale_dtype* __restrict__ sum2arr,
+		rescale_dtype* __restrict__ sum3arr,
+		rescale_dtype* __restrict__ sum4arr,
 		rescale_dtype* __restrict__ decay_offsetarr,
 		const rescale_dtype* __restrict__ offsetarr,
 		const rescale_dtype* __restrict__ scalearr,
@@ -359,7 +364,9 @@ __global__ void rescale_update_and_transpose_float_kernel(
 	int rsidx = c + nf*ibeam;
 	// all these reads are nice and coalesced
 	rescale_dtype sum = sumarr[rsidx]; // read from global memory
-	rescale_dtype sumsq = sumsqarr[rsidx]; // read from global
+	rescale_dtype sum2 = sum2arr[rsidx]; // read from global
+	rescale_dtype sum3 = sum3arr[rsidx];
+	rescale_dtype sum4 = sum4arr[rsidx];
 	rescale_dtype decay_offset = decay_offsetarr[rsidx];  // read from global
 	rescale_dtype offset = offsetarr[rsidx]; // read from global
 	rescale_dtype scale = scalearr[rsidx]; // read from global
@@ -380,7 +387,9 @@ __global__ void rescale_update_and_transpose_float_kernel(
 		// coalesced read from global
 		rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
 		sum += vin;
-		sumsq +=  vin*vin;
+		sum2 += vin*vin;
+		sum3 += vin*vin*vin;
+		sum4 += vin*vin*vin*vin;
 		rescale_dtype vout = (vin + offset) * scale;
 		decay_offset = (vout + decay_offset*k)/(1.0 + k);
 		rescale_dtype sout = vout - decay_offset;
@@ -392,7 +401,9 @@ __global__ void rescale_update_and_transpose_float_kernel(
 
 	// write everything back to global memory -- all coalesced
 	sumarr[rsidx] = sum;
-	sumsqarr[rsidx] = sumsq;
+	sum2arr[rsidx] = sum2;
+	sum3arr[rsidx] = sum3;
+	sum4arr[rsidx] = sum4;
 	decay_offsetarr[rsidx] = decay_offset;
 
 }
@@ -406,7 +417,9 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 	rescale_update_and_transpose_float_kernel<<<nbeams, nf>>>(
 			read_buf,
 			rescale.sum.d_device,
-			rescale.sumsq.d_device,
+			rescale.sum2.d_device,
+			rescale.sum3.d_device,
+			rescale.sum4.d_device,
 			rescale.decay_offset.d_device,
 			rescale.offset.d_device,
 			rescale.scale.d_device,
@@ -421,34 +434,67 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 
 __global__ void rescale_update_scaleoffset_kernel(
 		rescale_dtype* __restrict__ sum,
-		rescale_dtype* __restrict__ sumsq,
-		rescale_dtype* __restrict__ offset,
+		rescale_dtype* __restrict__ sum2,
+		rescale_dtype* __restrict__ sum3,
+		rescale_dtype* __restrict__ sum4,
+		rescale_dtype* __restrict__ kurtarr,
+		rescale_dtype* __restrict__ offsetarr,
 		rescale_dtype* __restrict__ scalearr,
 		rescale_dtype nsamp,
 		rescale_dtype target_stdev,
-		rescale_dtype target_mean)
+		rescale_dtype target_mean,
+		rescale_dtype kurt_thresh,
+		int kurt_grow)
 {
 	int c = threadIdx.x;
 	int nf = blockDim.x;
 	int ibeam = blockIdx.x;
 	int i = c + nf*ibeam;
 	rescale_dtype mean = sum[i]/nsamp;
-	rescale_dtype meansq = sumsq[i]/nsamp;
-	rescale_dtype variance = meansq - mean*mean;
-	rescale_dtype scale;
+	rescale_dtype mean2 = sum2[i]/nsamp;
+	rescale_dtype mean3 = sum3[i]/nsamp;
+	rescale_dtype mean4 = sum4[i]/nsamp;
+	rescale_dtype variance = mean2 - mean*mean;
 
-	if (variance == 0.0) {
-		scale = target_stdev;
-	} else {
-		scale = target_stdev / sqrt(variance);
+	// Kurtosis is k = E([X-mu]**4)/(Var[X]**2)
+	// numerator = E[X**4] - 4E[X][E[X**3] + 6 E[X**2]E[X]**2 - 3E[X]**4
+	rescale_dtype kurt = (mean4 - 4*mean*mean3 + 6*mean2*mean*mean - 3*mean*mean*mean*mean)/(variance*variance);
+	// save kurtosis
+	kurtarr[i] = kurt;
+	__syncthreads();
+	rescale_dtype scale = 0.0, offset = 0.0;
+	int coff = kurt_grow;
+	int icstart = max(0, c - coff) + nf*ibeam;
+	int icend = min(nf, c + coff) + nf*ibeam;
+	int kurt_flag = 0;
+	for (int ic = icstart; ic < icend; ++ic) {
+		if (kurtarr[ic] > kurt_thresh) {
+			kurt_flag = 1;
+			break;
+		}
 	}
 
-	offset[i] = -mean + target_mean/scale;
+	if (kurt_flag) {
+		scale = 0.0;
+		offset = 0.0;
+	} else {
+		if (variance == 0.0) {
+			scale = 1.0;
+		} else {
+			scale = target_stdev / sqrt(variance);
+		}
+		offset = -mean + target_mean/scale;
+	}
+
+	offsetarr[i] = offset;
 	scalearr[i] = scale;
 
 	// reset values to zero
 	sum[i] = 0.0;
-	sumsq[i] = 0.0;
+	sum2[i] = 0.0;
+	sum3[i] = 0.0;
+	sum4[i] = 0.0;
+
 }
 void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale)
 {
@@ -458,12 +504,17 @@ void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale)
 	int nblocks = rescale.num_elements / nthreads;
 	rescale_update_scaleoffset_kernel<<<nblocks, nthreads>>>(
 			rescale.sum.d_device,
-			rescale.sumsq.d_device,
+			rescale.sum2.d_device,
+			rescale.sum3.d_device,
+			rescale.sum4.d_device,
+			rescale.kurt.d_device,
 			rescale.offset.d_device,
 			rescale.scale.d_device,
 			(rescale_dtype) rescale.sampnum,
 			rescale.target_stdev,
-			rescale.target_mean);
+			rescale.target_mean,
+			rescale.kurt_thresh,
+			rescale.kurt_grow);
 	gpuErrchk(cudaDeviceSynchronize());
 	rescale.sampnum = 0;
 }

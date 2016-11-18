@@ -8,7 +8,7 @@
 typedef struct {
 	/* stuff for rescaling */
 	float* sum;
-	float* sumsq;
+	float* sum2;
 	float* scale;
 	float* offset;
 	float* decay_offset;
@@ -24,9 +24,12 @@ typedef struct {
 typedef struct {
 	/* stuff for rescaling */
 	array4d_t sum;
-	array4d_t sumsq;
+	array4d_t sum2; // sum v**2
+	array4d_t sum3; // sum v**3 - for kurtosis
+	array4d_t sum4; // sum v**4 - for kurtosis
 	array4d_t scale;
 	array4d_t offset;
+	array4d_t kurt; // kurtosis
 	array4d_t decay_offset;
 	uint64_t interval_samps;
 	uint64_t sampnum;
@@ -34,6 +37,8 @@ typedef struct {
 	float target_mean;
 	float target_stdev;
 	float decay_constant;
+	float kurt_thresh;
+	int kurt_grow;
 
 } rescale_gpu_t __attribute__((__aligned__(16)));
 

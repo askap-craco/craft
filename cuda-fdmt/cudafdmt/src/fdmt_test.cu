@@ -33,16 +33,18 @@ using namespace std;
 void runtest_usage() {
 	fprintf(stderr,
 			"cudafdmt [options] [infile [infile[ ...]]\n"
-			"	-d Number of dispersion trials\n"
-			"	-t Samples per block\n"
-			"  	-s Decay timescale\n"
+			"   -d Number of dispersion trials\n"
+			"   -t Samples per block\n"
+			"   -s Decay timescale\n"
 			"   -o Candidate filename\n"
 			"   -x threshold S/N\n"
 			"   -D dump intermediate data to disk\n"
 			"   -r Blocks per rescale update\n"
 			"   -S Number of blocks to skip\n"
+			"   -k Kurtosis threshold (3.8 is pretty good)\n"
+			"   -K Kurtosis channel growing (flags N channels either side of a bad kurtosis channel\n"
 			"   -g CUDA device\n"
-			"	-h Print this message\n"
+			"   -h Print this message\n"
 	);
 	exit(EXIT_FAILURE);
 }
@@ -58,7 +60,6 @@ void handle_signal(int signal)
 
 int main(int argc, char* argv[])
 {
-	printf("Test!");
 	int nd = 512;
 	int nt = 256;
 	int num_skip_blocks = 4;
@@ -69,7 +70,9 @@ int main(int argc, char* argv[])
 	const char* out_filename = "fredda.cand";
 	bool dump_data = false;
 	int cuda_device = 0;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:h")) != -1) {
+	float kurt_thresh = 1e9;
+	int kurt_grow = 3;
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:k:K:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -97,6 +100,12 @@ int main(int argc, char* argv[])
 			break;
 		case 'g':
 			cuda_device = atoi(optarg);
+			break;
+		case 'k':
+			kurt_thresh = atof(optarg);
+			break;
+		case 'K':
+			kurt_grow = atoi(optarg);
 			break;
 		case '?':
 		case 'h':
@@ -160,7 +169,9 @@ int main(int argc, char* argv[])
 	rescale.target_mean = 0.0;
 	rescale.target_stdev = 1.0/sqrt((float) nf);
 	rescale.decay_constant = 0.35 * decay_timescale / source.tsamp(); // This is how the_decimator.C does it, I think.
-	printf("Rescaling to mean=%f stdev=%f decay constant=%f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant);
+	rescale.kurt_thresh = kurt_thresh;
+	rescale.kurt_grow = kurt_grow;
+	printf("Rescaling to mean=%f stdev=%f decay constant=%f kurtosis threshold: %f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant, rescale.kurt_thresh);
 	//rescale_allocate(&rescale, nbeams*nf);
 	rescale_allocate_gpu(&rescale, nbeams*nf);
 	rescale_set_scale_offset_gpu(&rescale, 1.0, 0.0); // Set initial scale and offset
@@ -217,6 +228,16 @@ int main(int argc, char* argv[])
 
 		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
 			rescale_update_scaleoffset_gpu(rescale);
+			if (dump_data) {
+				sprintf(fbuf, "kurt_e%d.dat", blocknum);
+				printf("Dumping kurtosis %s\n", fbuf);
+				rescale.kurt.nw = 1;
+				rescale.kurt.nx = 1;
+				rescale.kurt.ny = nbeams;
+				rescale.kurt.nz = nf;
+				array4d_copy_to_host(&rescale.kurt);
+				array4d_dump(&rescale.kurt, fbuf);
+			}
 		}
 
 		if (blocknum >= num_rescale_blocks) {
