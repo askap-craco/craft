@@ -266,27 +266,30 @@ rescale_dtype* rescale_cumalloc(uint64_t sz)
 	return ptr;
 }
 
-void rescale_arraymalloc(array4d_t* arr, uint64_t sz)
+void rescale_arraymalloc(array4d_t* arr, uint64_t nbeams, uint64_t nf)
 {
 	arr->nw = 1;
 	arr->nx = 1;
-	arr->ny = 1;
-	arr->nz = sz;
+	arr->ny = nbeams;
+	arr->nz = nf;
 	array4d_malloc(arr);
 	array4d_set(arr, 0);
 }
 
-rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nelements)
+rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams,uint64_t nf)
 {
+	uint64_t nelements = nbeams*nf;
 	size_t sz = nelements*sizeof(rescale_dtype);
-	rescale_arraymalloc(&rescale->sum, nelements);
-	rescale_arraymalloc(&rescale->sum2, nelements);
-	rescale_arraymalloc(&rescale->sum3, nelements);
-	rescale_arraymalloc(&rescale->sum4, nelements);
-	rescale_arraymalloc(&rescale->kurt, nelements);
-	rescale_arraymalloc(&rescale->scale, nelements);
-	rescale_arraymalloc(&rescale->offset, nelements);
-	rescale_arraymalloc(&rescale->decay_offset, nelements);
+	rescale_arraymalloc(&rescale->sum, nbeams, nf);
+	rescale_arraymalloc(&rescale->sum2, nbeams, nf);
+	rescale_arraymalloc(&rescale->sum3, nbeams, nf);
+	rescale_arraymalloc(&rescale->sum4, nbeams, nf);
+	rescale_arraymalloc(&rescale->mean, nbeams, nf);
+	rescale_arraymalloc(&rescale->std, nbeams, nf);
+	rescale_arraymalloc(&rescale->kurt, nbeams, nf);
+	rescale_arraymalloc(&rescale->scale, nbeams, nf);
+	rescale_arraymalloc(&rescale->offset, nbeams, nf);
+	rescale_arraymalloc(&rescale->decay_offset, nbeams, nf);
 	array4d_set(&rescale->scale, 1.0);
 
 	rescale->sampnum = 0;
@@ -437,14 +440,18 @@ __global__ void rescale_update_scaleoffset_kernel(
 		rescale_dtype* __restrict__ sum2,
 		rescale_dtype* __restrict__ sum3,
 		rescale_dtype* __restrict__ sum4,
+		rescale_dtype* __restrict__ meanarr,
+		rescale_dtype* __restrict__ stdarr,
 		rescale_dtype* __restrict__ kurtarr,
 		rescale_dtype* __restrict__ offsetarr,
 		rescale_dtype* __restrict__ scalearr,
 		rescale_dtype nsamp,
 		rescale_dtype target_stdev,
 		rescale_dtype target_mean,
+		rescale_dtype mean_thresh,
+		rescale_dtype std_thresh,
 		rescale_dtype kurt_thresh,
-		int kurt_grow)
+		int flag_grow)
 {
 	int c = threadIdx.x;
 	int nf = blockDim.x;
@@ -456,25 +463,35 @@ __global__ void rescale_update_scaleoffset_kernel(
 	rescale_dtype mean4 = sum4[i]/nsamp;
 	rescale_dtype variance = mean2 - mean*mean;
 
-	// Kurtosis is k = E([X-mu]**4)/(Var[X]**2)
+	// Excess Kurtosis is k = E([X-mu]**4)/(Var[X]**2) - 3
 	// numerator = E[X**4] - 4E[X][E[X**3] + 6 E[X**2]E[X]**2 - 3E[X]**4
-	rescale_dtype kurt = (mean4 - 4*mean*mean3 + 6*mean2*mean*mean - 3*mean*mean*mean*mean)/(variance*variance);
-	// save kurtosis
+	rescale_dtype kurt = (mean4 - 4*mean*mean3 + 6*mean2*mean*mean - 3*mean*mean*mean*mean)/(variance*variance) -3 ;
+	// save flag inputs
+	meanarr[i] = mean;
+	stdarr[i] = sqrtf(variance);
 	kurtarr[i] = kurt;
+
 	__syncthreads();
 	rescale_dtype scale = 0.0, offset = 0.0;
-	int coff = kurt_grow;
-	int icstart = max(0, c - coff) + nf*ibeam;
-	int icend = min(nf, c + coff) + nf*ibeam;
-	int kurt_flag = 0;
+	int icstart = max(0, c - flag_grow) + nf*ibeam;
+	int icend = min(nf, c + flag_grow) + nf*ibeam;
+	int flag = 0;
+	rescale_dtype expected_mean = 128.;
+	rescale_dtype expected_std = 18.;
 	for (int ic = icstart; ic < icend; ++ic) {
-		if (kurtarr[ic] > kurt_thresh) {
-			kurt_flag = 1;
+		rescale_dtype meanoff = fabs(meanarr[ic] - expected_mean);
+		rescale_dtype stdoff = fabs(stdarr[ic] - expected_std);
+		rescale_dtype kurtoff = fabs(kurtarr[ic]);
+
+		if (meanoff > mean_thresh ||
+				stdoff > std_thresh ||
+				kurtoff > kurt_thresh) {
+			flag = 1;
 			break;
 		}
 	}
 
-	if (kurt_flag) {
+	if (flag) {
 		scale = 0.0;
 		offset = 0.0;
 	} else {
@@ -507,14 +524,18 @@ void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale)
 			rescale.sum2.d_device,
 			rescale.sum3.d_device,
 			rescale.sum4.d_device,
+			rescale.mean.d_device,
+			rescale.std.d_device,
 			rescale.kurt.d_device,
 			rescale.offset.d_device,
 			rescale.scale.d_device,
 			(rescale_dtype) rescale.sampnum,
 			rescale.target_stdev,
 			rescale.target_mean,
+			rescale.mean_thresh,
+			rescale.std_thresh,
 			rescale.kurt_thresh,
-			rescale.kurt_grow);
+			rescale.flag_grow);
 	gpuErrchk(cudaDeviceSynchronize());
 	rescale.sampnum = 0;
 }

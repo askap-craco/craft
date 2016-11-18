@@ -41,8 +41,10 @@ void runtest_usage() {
 			"   -D dump intermediate data to disk\n"
 			"   -r Blocks per rescale update\n"
 			"   -S Number of blocks to skip\n"
-			"   -k Kurtosis threshold (3.8 is pretty good)\n"
-			"   -K Kurtosis channel growing (flags N channels either side of a bad kurtosis channel\n"
+			"   -K Kurtosis threshold (0.8 is pretty good)\n"
+			"   -M Mean offset threshold (3 is OK)\n"
+			"   -T StdDev threshold (3 is OK)\n"
+			"   -G Flag channel growing (flags N channels either side of a bad channel)\n"
 			"   -g CUDA device\n"
 			"   -h Print this message\n"
 	);
@@ -58,6 +60,17 @@ void handle_signal(int signal)
 	stopped = true;
 }
 
+void dumparr(const char* prefix, const int blocknum, array4d_t* arr, bool copy=true)
+{
+	char fbuf[1024];
+	sprintf(fbuf, "%s_e%d.dat", prefix, blocknum);
+	printf("Dumping %s %s\n", prefix, fbuf);
+	if (copy) {
+		array4d_copy_to_host(arr);
+	}
+	array4d_dump(arr, fbuf);
+}
+
 int main(int argc, char* argv[])
 {
 	int nd = 512;
@@ -71,8 +84,10 @@ int main(int argc, char* argv[])
 	bool dump_data = false;
 	int cuda_device = 0;
 	float kurt_thresh = 1e9;
-	int kurt_grow = 3;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:k:K:h")) != -1) {
+	float std_thresh = 1e9;
+	float mean_thresh = 1e9;
+	int flag_grow = 3;
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -101,11 +116,17 @@ int main(int argc, char* argv[])
 		case 'g':
 			cuda_device = atoi(optarg);
 			break;
-		case 'k':
+		case 'K':
 			kurt_thresh = atof(optarg);
 			break;
-		case 'K':
-			kurt_grow = atoi(optarg);
+		case 'T':
+			std_thresh = atof(optarg);
+			break;
+		case 'M':
+			mean_thresh = atof(optarg);
+			break;
+		case 'F':
+			flag_grow = atoi(optarg);
 			break;
 		case '?':
 		case 'h':
@@ -169,11 +190,14 @@ int main(int argc, char* argv[])
 	rescale.target_mean = 0.0;
 	rescale.target_stdev = 1.0/sqrt((float) nf);
 	rescale.decay_constant = 0.35 * decay_timescale / source.tsamp(); // This is how the_decimator.C does it, I think.
+	rescale.mean_thresh = mean_thresh;
+	rescale.std_thresh = std_thresh;
 	rescale.kurt_thresh = kurt_thresh;
-	rescale.kurt_grow = kurt_grow;
-	printf("Rescaling to mean=%f stdev=%f decay constant=%f kurtosis threshold: %f\n",rescale.target_mean,rescale.target_stdev, rescale.decay_constant, rescale.kurt_thresh);
+	rescale.flag_grow = flag_grow;
+	printf("Rescaling to mean=%f stdev=%f decay constant=%f mean/std/kurtosis thresholds: %f/%f/%f grow flags by %d channels\n",rescale.target_mean,rescale.target_stdev,
+			rescale.decay_constant, rescale.mean_thresh, rescale.std_thresh, rescale.kurt_thresh,rescale.flag_grow);
 	//rescale_allocate(&rescale, nbeams*nf);
-	rescale_allocate_gpu(&rescale, nbeams*nf);
+	rescale_allocate_gpu(&rescale, nbeams, nf);
 	rescale_set_scale_offset_gpu(&rescale, 1.0, 0.0); // Set initial scale and offset
 
 	float foff =  (float) source.foff();
@@ -216,12 +240,8 @@ int main(int argc, char* argv[])
 		rescale_update_and_transpose_float_gpu(rescale, rescale_buf, read_buf_device, invert_freq);
 		trescale.stop();
 
-		char fbuf[1024];
 		if (dump_data) {
-			sprintf(fbuf, "inbuf_e%d.dat", blocknum);
-			array4d_copy_to_host(&rescale_buf);
-			array4d_dump(&rescale_buf, fbuf);
-			printf("Dumping input buffer %s\n", fbuf);
+			dumparr("inbuf", blocknum, &rescale_buf);
 		}
 
 		assert(num_rescale_blocks >= 0);
@@ -229,23 +249,16 @@ int main(int argc, char* argv[])
 		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
 			rescale_update_scaleoffset_gpu(rescale);
 			if (dump_data) {
-				sprintf(fbuf, "kurt_e%d.dat", blocknum);
-				printf("Dumping kurtosis %s\n", fbuf);
-				rescale.kurt.nw = 1;
-				rescale.kurt.nx = 1;
-				rescale.kurt.ny = nbeams;
-				rescale.kurt.nz = nf;
-				array4d_copy_to_host(&rescale.kurt);
-				array4d_dump(&rescale.kurt, fbuf);
+				dumparr("mean", blocknum, &rescale.mean);
+				dumparr("std", blocknum, &rescale.std);
+				dumparr("kurt", blocknum, &rescale.kurt);
 			}
 		}
 
 		if (blocknum >= num_rescale_blocks) {
 			fdmt_execute(&fdmt, rescale_buf.d_device, out_buf.d);
 			if (dump_data) {
-				sprintf(fbuf, "fdmt_e%d.dat", blocknum);
-				printf("Dumping fdmt buffer %s\n", fbuf);
-				array4d_dump(&out_buf, fbuf);
+				dumparr("fdmt", blocknum, &out_buf, false);
 			}
 			tboxcar.start();
 			boxcar_threshonly(&out_buf, thresh, sink);

@@ -29,6 +29,8 @@ typedef struct {
 	array4d_t sum4; // sum v**4 - for kurtosis
 	array4d_t scale;
 	array4d_t offset;
+	array4d_t mean; // mean
+	array4d_t std; // stdev
 	array4d_t kurt; // kurtosis
 	array4d_t decay_offset;
 	uint64_t interval_samps;
@@ -38,13 +40,15 @@ typedef struct {
 	float target_stdev;
 	float decay_constant;
 	float kurt_thresh;
-	int kurt_grow;
+	float mean_thresh;
+	float std_thresh;
+	int flag_grow;
 
 } rescale_gpu_t __attribute__((__aligned__(16)));
 
 
 rescale_t* rescale_allocate(rescale_t* rescale, uint64_t nelements) ;
-rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nelements);
+rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uint64_t nf);
 void rescale_set_scale_offset_gpu(rescale_gpu_t* rescale, float scale, float offset);
 
 void rescale_update_scaleoffset(rescale_t* rescale);
