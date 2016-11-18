@@ -41,9 +41,9 @@ void runtest_usage() {
 			"   -D dump intermediate data to disk\n"
 			"   -r Blocks per rescale update\n"
 			"   -S Number of blocks to skip\n"
-			"   -K Kurtosis threshold (0.8 is pretty good)\n"
 			"   -M Mean offset threshold (3 is OK)\n"
 			"   -T StdDev threshold (3 is OK)\n"
+			"   -K Kurtosis threshold (0.8 is pretty good)\n"
 			"   -G Flag channel growing (flags N channels either side of a bad channel)\n"
 			"   -g CUDA device\n"
 			"   -h Print this message\n"
@@ -125,7 +125,7 @@ int main(int argc, char* argv[])
 		case 'M':
 			mean_thresh = atof(optarg);
 			break;
-		case 'F':
+		case 'G':
 			flag_grow = atoi(optarg);
 			break;
 		case '?':
