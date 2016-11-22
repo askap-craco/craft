@@ -214,6 +214,7 @@ int main(int argc, char* argv[])
 	// add signal handler
 	signal(SIGHUP, &handle_signal);
 	signal(SIGINT, &handle_signal);
+	int num_flagged_beam_chans = 0;
 
 	while (source.read_samples_uint8(nt, read_buf) == nt) {
 		if (stopped) {
@@ -248,6 +249,13 @@ int main(int argc, char* argv[])
 
 		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
 			rescale_update_scaleoffset_gpu(rescale);
+			array4d_copy_to_host(&rescale.scale);
+			// Count how many channels have been flagged for this block
+			for(int i = 0; i < nf*nbeams; ++i) {
+				if (rescale.scale.d[i] == 0) {
+					num_flagged_beam_chans++;
+				}
+			}
 			if (dump_data) {
 				dumparr("mean", blocknum, &rescale.mean);
 				dumparr("std", blocknum, &rescale.std);
@@ -269,9 +277,11 @@ int main(int argc, char* argv[])
 		blocknum++;
 	}
 
+	float flagged_percent = ((float) num_flagged_beam_chans) / ((float) nf*nbeams*blocknum) * 100.0f;
 	printf("FREDDA Finished\n");
 	tall.stop();
-	cout << "Processed " << blocknum*nt << " samples = " << blocknum*nt*source.tsamp() << " seconds" << endl;
+	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << blocknum*nt*source.tsamp() << " seconds" << endl;
+	cout << "Auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;
 	cout << "FREDDA CPU "<< tall << endl;
 	cout << "Rescale CPU "<< trescale << endl;
 	cout << "Boxcar CPU "<< tboxcar << endl;
