@@ -155,7 +155,7 @@ def make_header(values, freqs):
     trigger_bat32 = start_bat32
     start_frameid = 1234
     finish_frameid = start_frameid + values.nsamps
-    trigger_frameid = start_frameid
+    trigger_frameid = start_frameidw
 
     h = DadaHeader()
     h += 'HDR_SIZE', 8192, 'Header size'

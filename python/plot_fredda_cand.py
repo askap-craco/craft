@@ -39,7 +39,6 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     for fin in values.files:
-
         pylab.close()
         if os.path.isdir(fin):
             fig,axes, ncand = plot_dir(fin, values)
@@ -71,7 +70,7 @@ def plot_dir(din, values):
     if len(candfiles) == 0:
         fig = pylab.figure()
         fig.text(0.5, 0.5, '%s has no candidate files'%din, transform=pylab.gca().transAxes)
-        return fig, gca, []
+        return fig, pylab.gca(), []
 
     ncols = 4
     nrows = len(candfiles)/ncols

@@ -71,6 +71,16 @@ def show_series(prefix, theslice):
         myimshow(pylab.gca(), v, aspect='auto', origin='lower')
         pylab.title(fname)
 
+def plot_series(prefix, theslice):
+    for fname in file_series(prefix):
+        ostate = load4d(fname)
+        pylab.figure()
+        v = ostate[theslice]
+        print fname, ostate.shape, 'zeros?', np.all(ostate == 0), 'max', v.max(), np.unravel_index(v.argmax(), v.shape)
+        pylab.plot(v.T)
+        pylab.title(fname)
+
+
 
 def _main():
     from argparse import ArgumentParser
@@ -89,6 +99,10 @@ def _main():
     show_series('ostate_e%d.dat', [beam, 0, slice(None), slice(None)])
     show_series('finalstate_e%d.dat', [beam, 0, slice(None), slice(None)])
     show_series('initstate_e%d.dat',[beam, slice(None),0, slice(None)])
+    plot_series('mean_e%d.dat',[0,0, slice(None), slice(None)])
+    plot_series('std_e%d.dat',[0,0, slice(None), slice(None)])
+    plot_series('kurt_e%d.dat',[0,0, slice(None), slice(None)])
+
 
     for i, fname in enumerate(file_series('state_s%d.dat')):
         if 0 < i < 9:
