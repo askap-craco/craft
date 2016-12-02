@@ -47,6 +47,7 @@ void runtest_usage() {
 			"   -K K - Kurtosis threshold (0.8 is pretty good)\n"
 			"   -G N - Flag channel growing (flags N channels either side of a bad channel)\n"
 			"   -n ncand - Maximum mumber of candidates to write per block\n"
+			"   -m mindm - Minimum DM to report candidates for (to ignore 0 DM junk)\n"
 			"   -g G - CUDA device\n"
 			"   -h Print this message\n"
 	);
@@ -90,7 +91,8 @@ int main(int argc, char* argv[])
 	float mean_thresh = 1e9;
 	int flag_grow = 3;
 	int max_ncand_per_block = INT_MAX;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:n:h")) != -1) {
+	int mindm = 0;
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:n:m:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -133,6 +135,9 @@ int main(int argc, char* argv[])
 			break;
 		case 'n':
 			max_ncand_per_block = atoi(optarg);
+			break;
+		case 'm':
+			mindm = atoi(optarg);
 			break;
 		case '?':
 		case 'h':
@@ -214,7 +219,7 @@ int main(int argc, char* argv[])
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
 	printf("Seeking to start of data: nblocks=%d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source.tsamp());
-	printf("Max ncand per block %d\n", max_ncand_per_block);
+	printf("S/N Threshold %f Max ncand per block %d mindm %d \n", thresh, max_ncand_per_block, mindm);
 	source.seek_sample(num_skip_blocks*nt);
 	int blocknum = 0;
 	unsigned long long total_candidates = 0;
@@ -277,7 +282,7 @@ int main(int argc, char* argv[])
 				dumparr("fdmt", blocknum, &out_buf, false);
 			}
 			tboxcar.start();
-			total_candidates += boxcar_threshonly(&out_buf, thresh, max_ncand_per_block, sink);
+			total_candidates += boxcar_threshonly(&out_buf, thresh, max_ncand_per_block, mindm, sink);
 			tboxcar.stop();
 
 		}

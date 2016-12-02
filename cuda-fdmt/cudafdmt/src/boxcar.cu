@@ -120,7 +120,7 @@ int boxcar_do(array4d_t* indata, array4d_t* outdata)
 
 }
 
-int boxcar_threshonly(const array4d_t* indata,  fdmt_dtype thresh, int max_ncand_per_block,
+int boxcar_threshonly(const array4d_t* indata,  fdmt_dtype thresh, int max_ncand_per_block, int mindm,
 		CandidateSink& sink) {
 	int nbeams = indata->nw;
 	assert(indata->nx == 1);
@@ -130,7 +130,7 @@ int boxcar_threshonly(const array4d_t* indata,  fdmt_dtype thresh, int max_ncand
 
 #pragma omp parallel for shared(ncand)
 	for(int b = 0; b < nbeams; ++b) {
-		for(int idt = 0; idt < ndt; ++idt) {
+		for(int idt = mindm; idt < ndt; ++idt) {
 			int off = array4d_idx(indata, b, 0, idt, 0);
 			for(int t = 0; t < nt; ++t) {
 				int inidx = off + t;
