@@ -231,6 +231,7 @@ int main(int argc, char* argv[])
 	printf("S/N Threshold %f Max ncand per block %d mindm %d \n", thresh, max_ncand_per_block, mindm);
 	source.seek_sample(num_skip_blocks*nt);
 	int blocknum = 0;
+	int iblock = num_skip_blocks;
 	unsigned long long total_candidates = 0;
 
 	// add signal handler
@@ -265,7 +266,7 @@ int main(int argc, char* argv[])
 		trescale.stop();
 
 		if (dump_data) {
-			dumparr("inbuf", blocknum, &rescale_buf);
+			dumparr("inbuf", iblock, &rescale_buf);
 		}
 
 		assert(num_rescale_blocks >= 0);
@@ -286,18 +287,18 @@ int main(int argc, char* argv[])
 				num_flagged_times += (nt - nsamps);
 			}
 			if (dump_data) {
-				dumparr("mean", blocknum, &rescale.mean);
-				dumparr("std", blocknum, &rescale.std);
-				dumparr("kurt", blocknum, &rescale.kurt);
-				dumparr("nsamps", blocknum, &rescale.nsamps);
-				dumparr("dm0", blocknum, &rescale.dm0);
+				dumparr("mean", iblock, &rescale.mean);
+				dumparr("std", iblock, &rescale.std);
+				dumparr("kurt", iblock, &rescale.kurt);
+				dumparr("nsamps", iblock, &rescale.nsamps);
+				dumparr("dm0", iblock, &rescale.dm0);
 			}
 		}
 
 		if (blocknum >= num_rescale_blocks) {
 			fdmt_execute(&fdmt, rescale_buf.d_device, out_buf.d);
 			if (dump_data) {
-				dumparr("fdmt", blocknum, &out_buf, false);
+				dumparr("fdmt", iblock, &out_buf, false);
 			}
 			tboxcar.start();
 			total_candidates += boxcar_threshonly(&out_buf, thresh, max_ncand_per_block, mindm, sink);
@@ -306,6 +307,7 @@ int main(int argc, char* argv[])
 		}
 
 		blocknum++;
+		iblock++;
 	}
 
 	float flagged_percent = ((float) num_flagged_beam_chans) / ((float) nf*nbeams*blocknum) * 100.0f;
