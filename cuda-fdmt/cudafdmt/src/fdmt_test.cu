@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <signal.h>
+#include <limits.h>
 #if defined (ENABLE_OPENMP)
 #include <omp.h>
 #endif
@@ -33,19 +34,20 @@ using namespace std;
 void runtest_usage() {
 	fprintf(stderr,
 			"cudafdmt [options] [infile [infile[ ...]]\n"
-			"   -d Number of dispersion trials\n"
-			"   -t Samples per block\n"
-			"   -s Decay timescale\n"
-			"   -o Candidate filename\n"
-			"   -x threshold S/N\n"
+			"   -d D - Number of dispersion trials\n"
+			"   -t T - Samples per block\n"
+			"   -s S - Decay timescale\n"
+			"   -o FILE - Candidate filename\n"
+			"   -x SN - threshold S/N\n"
 			"   -D dump intermediate data to disk\n"
-			"   -r Blocks per rescale update\n"
-			"   -S Number of blocks to skip\n"
-			"   -M Mean offset threshold (3 is OK)\n"
-			"   -T StdDev threshold (3 is OK)\n"
-			"   -K Kurtosis threshold (0.8 is pretty good)\n"
-			"   -G Flag channel growing (flags N channels either side of a bad channel)\n"
-			"   -g CUDA device\n"
+			"   -r R - Blocks per rescale update\n"
+			"   -S S - Number of blocks to skip\n"
+			"   -M M - Mean offset threshold (3 is OK)\n"
+			"   -T T - StdDev threshold (3 is OK)\n"
+			"   -K K - Kurtosis threshold (0.8 is pretty good)\n"
+			"   -G N - Flag channel growing (flags N channels either side of a bad channel)\n"
+			"   -n ncand - Maximum mumber of candidates to write per block\n"
+			"   -g G - CUDA device\n"
 			"   -h Print this message\n"
 	);
 	exit(EXIT_FAILURE);
@@ -73,9 +75,9 @@ void dumparr(const char* prefix, const int blocknum, array4d_t* arr, bool copy=t
 
 int main(int argc, char* argv[])
 {
-	int nd = 512;
-	int nt = 256;
-	int num_skip_blocks = 4;
+	int nd = 1024;
+	int nt = 512;
+	int num_skip_blocks = 8;
 	int num_rescale_blocks = 2;
 	float decay_timescale = 0.2; // Seconds?
 	char ch;
@@ -87,7 +89,8 @@ int main(int argc, char* argv[])
 	float std_thresh = 1e9;
 	float mean_thresh = 1e9;
 	int flag_grow = 3;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:h")) != -1) {
+	int max_ncand_per_block = INT_MAX;
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:n:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -127,6 +130,9 @@ int main(int argc, char* argv[])
 			break;
 		case 'G':
 			flag_grow = atoi(optarg);
+			break;
+		case 'n':
+			max_ncand_per_block = atoi(optarg);
 			break;
 		case '?':
 		case 'h':
@@ -208,8 +214,10 @@ int main(int argc, char* argv[])
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
 	printf("Seeking to start of data: nblocks=%d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source.tsamp());
+	printf("Max ncand per block %d\n", max_ncand_per_block);
 	source.seek_sample(num_skip_blocks*nt);
 	int blocknum = 0;
+	unsigned long long total_candidates = 0;
 
 	// add signal handler
 	signal(SIGHUP, &handle_signal);
@@ -269,7 +277,7 @@ int main(int argc, char* argv[])
 				dumparr("fdmt", blocknum, &out_buf, false);
 			}
 			tboxcar.start();
-			boxcar_threshonly(&out_buf, thresh, sink);
+			total_candidates += boxcar_threshonly(&out_buf, thresh, max_ncand_per_block, sink);
 			tboxcar.stop();
 
 		}
@@ -278,7 +286,7 @@ int main(int argc, char* argv[])
 	}
 
 	float flagged_percent = ((float) num_flagged_beam_chans) / ((float) nf*nbeams*blocknum) * 100.0f;
-	printf("FREDDA Finished\n");
+	printf("FREDDA Finished\nFound %llu candidates \n", total_candidates);
 	tall.stop();
 	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << blocknum*nt*source.tsamp() << " seconds" << endl;
 	cout << "Auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;

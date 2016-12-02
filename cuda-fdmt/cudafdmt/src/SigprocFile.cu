@@ -110,7 +110,6 @@ size_t SigprocFile::seek_sample(size_t t)
 		printf("SigprocFile: Could not seek to offset of file %s\n. Error: %s", m_filename, strerror(errno));
 		assert(0);
 	}
-	printf("Seeking to byte offset %d (0x%x)\n", boff, boff);
 	return boff;
 }
 
