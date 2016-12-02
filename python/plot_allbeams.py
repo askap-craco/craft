@@ -24,15 +24,10 @@ def onpick(event):
 
     print thisline.get_label(), xdata[ind], ydata[ind]
 
-def annotate(fig, title, xlabel, ylabel, values):
+def annotate(fig, title, xlabel, ylabel):
     fig.text( 0.5, 0.98,title, ha='center', va='top')
     fig.text(0.5, 0.02, xlabel, ha='center', va='bottom')
     fig.text(0.02, 0.5, ylabel, rotation=90, ha='center', va='top')
-    if values.save:
-        fout='{}.png'.format(title.replace(' ', ''))
-        print 'Saving', fout
-        fig.savefig(fout)
-    
 
 def commasep(s):
     return map(int, s.split(','))
@@ -71,40 +66,60 @@ def _main():
         tstart = 0
         ntimes = 128*8
 
-    plt = Plotter(values, tstart, ntimes)
+    plt = Plotter.from_values(values, tstart, ntimes)
     pylab.show()
 
         
 class Plotter(object):
-    def __init__(self, values, tstart, ntimes):
+    @staticmethod
 
-        self.nrows, self.ncols = values.nxy
-        
+    def from_values(values, tstart, ntimes):
+        p = Plotter(values.files, values.nxy)
+        if values.seconds:
+            p.set_position_seconds(*values.seconds)
+        else:
+            p.set_position_sample(tstart, ntimes)
 
-        self.values = values
+        p.imzrange = values.imzrange
+        p.draw()
+
+        return p
+    
+    def __init__(self, filenames, nxy, tstart=0, ntimes=1024, fft=False):
+        self.nrows, self.ncols = nxy
         self.figs = {}
         # Sniff data
-        beams, files = load_beams(self.values.files[0:1], tstart, ntimes=1, return_files=True)
+        self.files = filenames
+        beams, files = load_beams(filenames[0:1], tstart, ntimes=1, return_files=True)
+        nbeams = len(self.files)
         mjdstart = files[0].tstart
         tsamp = files[0].tsamp
-        
-        if values.seconds:
-            self.tstart = int(values.seconds[0]/tsamp)
-            self.ntimes = int(values.seconds[1]/tsamp)
-        else:
-            self.tstart = tstart
-            self.ntimes = ntimes
+
+        self.mjdstart = mjdstart
+        self.tsamp = tsamp
+        self.set_position_sample(tstart, ntimes)
+        self.imzrange = None
 
         self.mkfig('mean', 'Mean bandpass', 'Frequency (MHz)','Mean bandpass')
         self.mkfig('std', 'Bandpass stdDev', 'Frequency (MHz)','Bandpass StdDev')
         self.mkfig('kurt','Kurtosis', 'Frequency (MHz)', 'Kurtosis')
         self.mkfig('dynspec', 'Dynamic spectrum', 'Time (s) after %f' % mjdstart, 'Frequency (MHz)')
-        self.mkfig('cov', 'Beam covariance', 'beam no', 'beamno', 1,1)
-        if values.fft:
+        if nbeams > 1:
+            self.mkfig('cov', 'Beam covariance', 'beam no', 'beamno', 1,1)
+
+        if fft:
             self.mkfig('fftim', 'FFT of all channels', 'Digital frequency ', 'Channel')
             self.mkfig('fftplt', 'FFT of DM0', 'Digital Frequency', 'FFT (dB)')
 
-        self.draw()
+        self.fft = fft
+
+    def set_position_sample(self, tstart, ntimes):
+        self.tstart = tstart
+        self.ntimes = ntimes
+
+    def set_position_seconds(self, sstart, secs):
+        self.tstart = int(sstart/self.tsamp)
+        self.ntimes = int(secs/self.tsamp)
 
     def mkfig(self, name, title, xlab, ylab, nrows=None, ncols=None):
 
@@ -116,7 +131,7 @@ class Plotter(object):
         fig, axes = subplots(nrows, ncols, sharex=True, sharey=True)
         axes = axes.flatten()
         fig.canvas.mpl_connect('key_press_event', self.press)
-        annotate(fig, title, xlab, ylab, self.values)
+        annotate(fig, title, xlab, ylab)
 
         self.figs[name] = (fig, axes)
 
@@ -128,8 +143,18 @@ class Plotter(object):
         for name, (fig, axes) in self.figs.iteritems():
             for ax in axes:
                 ax.cla()
-            
 
+    def saveall(self, prefix):
+        for name, (fig, axes) in self.figs.iteritems():
+            fout='{}_{}.png'.format(prefix, name)
+            print 'Saving', fout
+            fig.savefig(fout)
+
+    def closeall(self):
+        for name, (fig, axes) in self.figs.iteritems():
+            #fig.close()
+            pass
+    
     def press(self, event):
         print 'press', event.key
         if event.key == 'n':
@@ -140,7 +165,8 @@ class Plotter(object):
         elif event.key == 'w':
             self.ntimes *= 2
         elif event.key == 'a':
-            self.ntimes /= 2
+            if self.ntimes > 2:
+                self.ntimes /= 2
 
         self.clearfigs()
         self.draw()
@@ -149,11 +175,9 @@ class Plotter(object):
     def draw(self):
         tstart = self.tstart
         ntimes = self.ntimes
-        values = self.values
-        beams, files = load_beams(self.values.files, tstart, ntimes, return_files=True)
+        beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
         self.beams = beams
-        self.files = files
-        bnames = [f.filename.split('.')[-2] for f in self.files]
+        bnames = [f.filename.split('.')[-2] for f in files]
         print 'Loaded beams', beams.shape
         ntimes, nbeams, nfreq = beams.shape
 
@@ -179,11 +203,11 @@ class Plotter(object):
         dm0 = beams[:, :, chan]
         dm0 -= dm0.mean(axis=0)
 
-        if self.values.imzrange is None:
+        if self.imzrange is None:
             imzmin = None
             imzmax = None
         else:
-            imzmin, imzmax = values.imzrange
+            imzmin, imzmax = self.imzrange
 
 
         if nbeams > 1:
@@ -224,7 +248,7 @@ class Plotter(object):
             
             dm0 = bi.mean(axis=1)
             
-            if self.values.fft:
+            if self.fft:
                 fig4, ax4 = self.getfig('fftim', i)
                 fig4, ax4 = self.getfig('fftplt', )
                 dm0f = abs(np.fft.rfft(dm0, axis=0))**2

@@ -12,7 +12,7 @@
 #include "CandidateSink.h"
 
 int boxcar_do(array4d_t* indata, array4d_t* outdata);
-int boxcar_threshonly(const array4d_t* indata, fdmt_dtype thresh, int max_ncand_per_block,int mindm,
+int boxcar_threshonly(const array4d_t* indata, size_t sampno, fdmt_dtype thresh, int max_ncand_per_block,int mindm,
 		CandidateSink& sink);
 #endif /* BOXCAR_H_ */
 

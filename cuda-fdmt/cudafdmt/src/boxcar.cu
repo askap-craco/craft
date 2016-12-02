@@ -120,7 +120,7 @@ int boxcar_do(array4d_t* indata, array4d_t* outdata)
 
 }
 
-int boxcar_threshonly(const array4d_t* indata,  fdmt_dtype thresh, int max_ncand_per_block, int mindm,
+int boxcar_threshonly(const array4d_t* indata, size_t sampno, fdmt_dtype thresh, int max_ncand_per_block, int mindm,
 		CandidateSink& sink) {
 	int nbeams = indata->nw;
 	assert(indata->nx == 1);
@@ -138,7 +138,7 @@ int boxcar_threshonly(const array4d_t* indata,  fdmt_dtype thresh, int max_ncand
 				if (v > thresh && ncand < max_ncand_per_block) {
 #pragma omp critical
 					{
-						sink.add_candidate(b, idt, t, 0, v);
+						sink.add_candidate(b, idt, t+sampno, 0, v);
 						ncand += 1;
 					}
 				}

@@ -301,7 +301,8 @@ int main(int argc, char* argv[])
 				dumparr("fdmt", iblock, &out_buf, false);
 			}
 			tboxcar.start();
-			total_candidates += boxcar_threshonly(&out_buf, thresh, max_ncand_per_block, mindm, sink);
+			size_t sampno = iblock*nt;
+			total_candidates += boxcar_threshonly(&out_buf, sampno, thresh, max_ncand_per_block, mindm, sink);
 			tboxcar.stop();
 
 		}
@@ -431,4 +432,5 @@ int runtest(int argc, char* argv[])
 	}
 	fclose(fin);
 	fclose(fout);
+	return 0;
 }

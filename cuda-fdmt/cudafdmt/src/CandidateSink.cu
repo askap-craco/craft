@@ -39,8 +39,7 @@ void CandidateSink::add_candidate(int ibeam, int idt, int t, int ibc, float sn)
 	// DM =
 
 	float  dm = m_srcfile->dm_of_idt(idt);
-	size_t sampno = t + m_srcfile->curr_sample();
-	double time_from_file = sampno*m_srcfile->tsamp();
-	fprintf(m_candfile, "%f %lu %f %d %d %0.3f %d\n", sn, sampno, time_from_file,
+	double time_from_file = t*m_srcfile->tsamp();
+	fprintf(m_candfile, "%f %lu %f %d %d %0.3f %d\n", sn, t, time_from_file,
 			ibc, idt, dm, ibeam);
 }

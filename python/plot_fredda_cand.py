@@ -13,6 +13,8 @@ import sys
 import logging
 import plotutil
 import fnmatch
+import plot_allbeams
+import glob
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -30,6 +32,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s','--show', action='store_true', help='Show')
     parser.add_argument('-f','--fname', help='Candidate filename')
+    parser.add_argument('--detail', action='store_true', help='Plot detail')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False, show=False)
     values = parser.parse_args()
@@ -43,6 +46,7 @@ def _main():
         if os.path.isdir(fin):
             fig,axes, ncand = plot_dir(fin, values)
         else:
+            fig, ax = plotutil.subplots(1,1)
             ax = pylab.gca()
             v = plot_file(fin, values, ax, title=fin)
             ncand = len(v)
@@ -55,13 +59,12 @@ def _main():
 
         if ncand > 0:
             print 'Saving', fout
-            pylab.savefig(fout, dpi=200)
+            fig.savefig(fout, dpi=200)
         else:
             print 'Not saving ', fin, 'is empty'
         
         if values.show:
             pylab.show()
-
 
 def plot_dir(din, values):
     candfiles = find_files(din, values.fname)
@@ -118,12 +121,17 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None):
         vin.shape = (1, len(vin))
 
     print fin, vin.shape
+    ncols = vin.shape[1]
     sn = vin[:, 0]
     sampno = vin[:, 1]
     time = vin[:, 2]
     boxcar = vin[:, 3]
     dm = vin[:, 4]
-    beamno = vin[:, 5]
+    if ncols > 5:
+        idm = vin[:, 5]
+        beamno = vin[:, 6]
+    else:
+        beamno = vin[:, 5]
 
     ubeams = set(beamno)
     for b in sorted(ubeams):
@@ -137,10 +145,52 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None):
         ax.set_ylabel('DM (delta_t)')
 
     if title:
-        ax.set_title(fin)
+       ax.set_title(fin)
 
+    if values.detail:
+        plot_details(fin, vin, values, ax, title, labels, subtitle)
 
     return vin
+
+def plot_details(fin, vin, values, ax, title, labels, subtitle):
+    fdir = os.path.basename(fin)
+
+    ncand = vin.shape[0]
+    ncols = vin.shape[1]
+    for c in xrange(ncand):
+        cand = vin[c, :]
+        plot_single_beam(fin, values, cand)
+        plot_all_beams(fin, values, cand)
+
+def plot_beams(fin, values, cand, pattern, nxy, postfix):
+    sn, sampno, time, boxcar, idm, dm, beamno = cand
+    
+    fdir = os.path.dirname(fin)
+    bpath = os.path.join(fdir, pattern)
+    beamfile = glob.glob(bpath)
+    tstart = int(sampno - idm - idm/2.)
+    tstart = max(0, tstart)
+    nsamps = int(2*idm)
+    assert len(beamfile) > 0, 'Couldnt find beamfiles in path {}'.format(bpath)
+    print 'got ', len(beamfile), 'in path', bpath, 'tstart', tstart, 'nsamps', nsamps
+    p = plot_allbeams.Plotter(beamfile, nxy, tstart, nsamps)
+    prefix = 's{:d}_b{:d}_idm{:d}_{}'.format(int(sampno), int(beamno), int(idm), postfix)
+    p.draw()
+    p.saveall(prefix)
+    if values.show:
+        pylab.show()
+
+    p.closeall()
+
+
+def plot_single_beam(fin, values, cand):
+    beamno = cand[-1]
+    beampat =  r'*.{:02d}.fil'.format(int(beamno))
+    plot_beams(fin, values, cand, beampat, (1,1), 'singlebeam')
+
+def plot_all_beams(fin, values, cand):
+    plot_beams(fin, values, cand, '*000000.*.fil', (6,6), 'allbeams')
+
 
 if __name__ == '__main__':
     _main()
