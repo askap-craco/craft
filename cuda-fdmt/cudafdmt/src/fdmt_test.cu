@@ -49,7 +49,8 @@ void runtest_usage() {
 			"   -n ncand - Maximum mumber of candidates to write per block\n"
 			"   -g G - CUDA device\n"
 			"   -h Print this message\n"
-	);
+			"    Version: %s\n"
+	, VERSION);
 	exit(EXIT_FAILURE);
 }
 
@@ -148,6 +149,7 @@ int main(int argc, char* argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	printf("Fredda version %s starting\n", VERSION);
 	printf("Setting cuda device to %d\n", cuda_device);
 	gpuErrchk( cudaSetDevice(cuda_device));
 
