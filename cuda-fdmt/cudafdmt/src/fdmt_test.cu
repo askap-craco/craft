@@ -48,6 +48,7 @@ void runtest_usage() {
 			"   -G N - Flag channel growing (flags N channels either side of a bad channel)\n"
 			"   -n ncand - Maximum mumber of candidates to write per block\n"
 			"   -m mindm - Minimum DM to report candidates for (to ignore 0 DM junk)\n"
+			"   -z Z - Zap channels with 0 DM above threshold Z\n"
 			"   -g G - CUDA device\n"
 			"   -h Print this message\n"
 	);
@@ -89,10 +90,11 @@ int main(int argc, char* argv[])
 	float kurt_thresh = 1e9;
 	float std_thresh = 1e9;
 	float mean_thresh = 1e9;
+	float dm0_thresh = 1e9;
 	int flag_grow = 3;
 	int max_ncand_per_block = INT_MAX;
 	int mindm = 0;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:n:m:h")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:n:m:z:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -138,6 +140,9 @@ int main(int argc, char* argv[])
 			break;
 		case 'm':
 			mindm = atoi(optarg);
+			break;
+		case 'z':
+			dm0_thresh = atof(optarg);
 			break;
 		case '?':
 		case 'h':
@@ -205,11 +210,13 @@ int main(int argc, char* argv[])
 	rescale.std_thresh = std_thresh;
 	rescale.kurt_thresh = kurt_thresh;
 	rescale.flag_grow = flag_grow;
-	printf("Rescaling to mean=%f stdev=%f decay constant=%f mean/std/kurtosis thresholds: %f/%f/%f grow flags by %d channels\n",rescale.target_mean,rescale.target_stdev,
-			rescale.decay_constant, rescale.mean_thresh, rescale.std_thresh, rescale.kurt_thresh,rescale.flag_grow);
+	rescale.dm0_thresh = dm0_thresh;
+	// set guess of initial scale and offset to dm0 thresholding works
+	printf("Rescaling to mean=%f stdev=%f decay constant=%f mean/std/kurtosis/dm0 thresholds: %f/%f/%f/%f grow flags by %d channels\n",rescale.target_mean,rescale.target_stdev,
+			rescale.decay_constant, rescale.mean_thresh, rescale.std_thresh, rescale.kurt_thresh, rescale.dm0_thresh, rescale.flag_grow);
 	//rescale_allocate(&rescale, nbeams*nf);
-	rescale_allocate_gpu(&rescale, nbeams, nf);
-	rescale_set_scale_offset_gpu(&rescale, 1.0, 0.0); // Set initial scale and offset
+	rescale_allocate_gpu(&rescale, nbeams, nf, nt);
+	rescale_set_scale_offset_gpu(&rescale, rescale.target_stdev/18.0, -128.0f); // uint8 stdev is 18 and mean +128.
 
 	float foff =  (float) source.foff();
 	assert(foff < 0);
@@ -228,6 +235,7 @@ int main(int argc, char* argv[])
 	signal(SIGHUP, &handle_signal);
 	signal(SIGINT, &handle_signal);
 	int num_flagged_beam_chans = 0;
+	int num_flagged_times = 0;
 
 	while (source.read_samples_uint8(nt, read_buf) == nt) {
 		if (stopped) {
@@ -263,16 +271,23 @@ int main(int argc, char* argv[])
 		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
 			rescale_update_scaleoffset_gpu(rescale);
 			array4d_copy_to_host(&rescale.scale);
+			array4d_copy_to_host(&rescale.nsamps);
+
 			// Count how many channels have been flagged for this block
 			for(int i = 0; i < nf*nbeams; ++i) {
 				if (rescale.scale.d[i] == 0) {
 					num_flagged_beam_chans++;
 				}
 			}
+			for (int i = 0; i < nbeams; ++i) {
+				num_flagged_times += (nt - (int)rescale.nsamps.d[i]);
+			}
 			if (dump_data) {
 				dumparr("mean", blocknum, &rescale.mean);
 				dumparr("std", blocknum, &rescale.std);
 				dumparr("kurt", blocknum, &rescale.kurt);
+				dumparr("nsamps", blocknum, &rescale.nsamps);
+				dumparr("dm0", blocknum, &rescale.dm0);
 			}
 		}
 
@@ -291,10 +306,12 @@ int main(int argc, char* argv[])
 	}
 
 	float flagged_percent = ((float) num_flagged_beam_chans) / ((float) nf*nbeams*blocknum) * 100.0f;
+	float times_flagged_percent = ((float) num_flagged_times) / ((float) blocknum*nbeams*nt) * 100.0f;
 	printf("FREDDA Finished\nFound %llu candidates \n", total_candidates);
 	tall.stop();
 	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << blocknum*nt*source.tsamp() << " seconds" << endl;
-	cout << "Auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;
+	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;
+	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams*nt) << " samples = " << times_flagged_percent << "%" << endl;
 	cout << "FREDDA CPU "<< tall << endl;
 	cout << "Rescale CPU "<< trescale << endl;
 	cout << "Boxcar CPU "<< tboxcar << endl;

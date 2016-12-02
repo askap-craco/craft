@@ -50,6 +50,7 @@ def load4d(fname, dtype=np.float32):
     d = np.fromfile(fin, dtype=dtype, count=theshape.prod())
     d.shape = theshape
     fin.close()
+    print 'load4d', fname, d.shape
     return d
 
 def file_series(prefix):
@@ -82,6 +83,27 @@ def plot_series(prefix, theslice):
 
 
 
+def plot_stats():
+    for fname in file_series('mean_e%d.dat'):
+        fig, ax = pylab.subplots(2,2)
+        ax = ax.flatten()
+        bslice = [0,0, slice(None), slice(None)]
+        bmean = load4d(fname)[bslice].T
+        bstd = load4d(fname.replace('mean','std'))[bslice].T
+        bkur = load4d(fname.replace('mean','kurt'))[bslice].T
+        bdm0 = load4d(fname.replace('mean','dm0'))[bslice].T
+        ax[0].plot(bmean)
+        ax[0].set_ylabel('Mean')
+        ax[1].plot(bstd)
+        ax[1].set_ylabel('Std')
+        ax[2].plot(bkur)
+        ax[2].set_ylabel('Kurtosis')
+        ax[3].plot(bdm0)
+        ax[3].set_ylabel('Dm0')
+        fig.text(0.5, 0.98, fname.replace('mean_','').replace('.dat',''), ha='center', va='top')
+        print fname
+
+
 def _main():
     from argparse import ArgumentParser
     parser = ArgumentParser(description='Script description')
@@ -96,12 +118,15 @@ def _main():
 
     beam = values.beam
 
-    show_series('ostate_e%d.dat', [beam, 0, slice(None), slice(None)])
-    show_series('finalstate_e%d.dat', [beam, 0, slice(None), slice(None)])
-    show_series('initstate_e%d.dat',[beam, slice(None),0, slice(None)])
-    plot_series('mean_e%d.dat',[0,0, slice(None), slice(None)])
-    plot_series('std_e%d.dat',[0,0, slice(None), slice(None)])
-    plot_series('kurt_e%d.dat',[0,0, slice(None), slice(None)])
+    #show_series('ostate_e%d.dat', [beam, 0, slice(None), slice(None)])
+    #show_series('finalstate_e%d.dat', [beam, 0, slice(None), slice(None)])
+    #show_series('initstate_e%d.dat',[beam, slice(None),0, slice(None)])
+    #plot_series('mean_e%d.dat',[0,0, slice(None), slice(None)])
+    #plot_series('std_e%d.dat',[0,0, slice(None), slice(None)])
+    #plot_series('kurt_e%d.dat',[0,0, slice(None), slice(None)])
+    #plot_series('dm0_e%d.dat',[0,0, slice(None), slice(None)])
+    plot_stats()
+    #plot_series('nsamps_e%d.dat',[0,0, slice(None), slice(None)])
 
 
     for i, fname in enumerate(file_series('state_s%d.dat')):

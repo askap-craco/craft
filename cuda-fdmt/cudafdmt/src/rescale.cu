@@ -276,7 +276,7 @@ void rescale_arraymalloc(array4d_t* arr, uint64_t nbeams, uint64_t nf)
 	array4d_set(arr, 0);
 }
 
-rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams,uint64_t nf)
+rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uint64_t nf, uint64_t nt)
 {
 	uint64_t nelements = nbeams*nf;
 	size_t sz = nelements*sizeof(rescale_dtype);
@@ -287,6 +287,8 @@ rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams,uint
 	rescale_arraymalloc(&rescale->mean, nbeams, nf);
 	rescale_arraymalloc(&rescale->std, nbeams, nf);
 	rescale_arraymalloc(&rescale->kurt, nbeams, nf);
+	rescale_arraymalloc(&rescale->dm0, nbeams, nt);
+	rescale_arraymalloc(&rescale->nsamps, nbeams, 1);
 	rescale_arraymalloc(&rescale->scale, nbeams, nf);
 	rescale_arraymalloc(&rescale->offset, nbeams, nf);
 	rescale_arraymalloc(&rescale->decay_offset, nbeams, nf);
@@ -294,6 +296,9 @@ rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams,uint
 
 	rescale->sampnum = 0;
 	rescale->num_elements = nelements;
+	rescale->nf = nf;
+	rescale->nt = nt;
+	rescale->nbeams = nbeams;
 
 	return rescale;
 
@@ -345,17 +350,53 @@ void rescale_update_and_transpose_float(rescale_t& rescale, array4d_t& read_arr,
 }
 
 
-__global__ void rescale_update_and_transpose_float_kernel(
+__global__ void rescale_calc_dm0_kernel (
+		const uint8_t* __restrict__ inarr,
+		const rescale_dtype* __restrict__ offsetarr,
+		const rescale_dtype* __restrict__ scalearr,
+		rescale_dtype* __restrict__ dm0arr,
+		int nf)
+{
+	// input = BTF order
+	// dm0 order: BT
+	// Rescale: BF order
+
+	int ibeam = blockIdx.x;
+	int t = threadIdx.x;
+	int nt = blockDim.x;
+	rescale_dtype dm0sum = 0.0;
+	for (int c = 0; c < nf; ++c) {
+		int rsidx = c + nf*ibeam; // rescale index BF order
+		// all these reads are nice and coalesced
+		rescale_dtype offset = offsetarr[rsidx]; // read from global
+		rescale_dtype scale = scalearr[rsidx]; // read from global
+		int inidx = c + nf*(t + nt*ibeam); // input index : BTF order
+
+		// coalesced read from global
+		rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
+		rescale_dtype vout = (vin + offset) * scale;
+		dm0sum += vout;
+	}
+
+	int dm0idx = t + nt*ibeam;
+	dm0arr[dm0idx] = dm0sum;
+}
+
+
+__global__ void rescale_update_and_transpose_float_kernel (
 		const uint8_t* __restrict__ inarr,
 		rescale_dtype* __restrict__ sumarr,
 		rescale_dtype* __restrict__ sum2arr,
 		rescale_dtype* __restrict__ sum3arr,
 		rescale_dtype* __restrict__ sum4arr,
 		rescale_dtype* __restrict__ decay_offsetarr,
+		rescale_dtype* __restrict__ nsampsarr,
 		const rescale_dtype* __restrict__ offsetarr,
 		const rescale_dtype* __restrict__ scalearr,
+		const rescale_dtype* __restrict__ dm0arr,
 		rescale_dtype* __restrict__ outarr,
 		float decay_constant,
+		float dm0_thresh,
 		int nt,
 		bool invert_freq)
 {
@@ -364,7 +405,7 @@ __global__ void rescale_update_and_transpose_float_kernel(
 	int nf = blockDim.x;
 	const rescale_dtype k = decay_constant;
 
-	int rsidx = c + nf*ibeam;
+	int rsidx = c + nf*ibeam; // rescale index: BF order
 	// all these reads are nice and coalesced
 	rescale_dtype sum = sumarr[rsidx]; // read from global memory
 	rescale_dtype sum2 = sum2arr[rsidx]; // read from global
@@ -384,21 +425,33 @@ __global__ void rescale_update_and_transpose_float_kernel(
 	// input = BTF order
 	// output = BFT order
 	// Rescale order: BF
+	// dm0 order: BT
+	// nsamps order: B
+
+	int nsamps = 0;
+
 	for (int t = 0; t < nt; ++t) {
 		int inidx = c + nf*(t + nt*ibeam);
 		int outidx = t + nt*(outc + nf*ibeam);
 		// coalesced read from global
-		rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
-		sum += vin;
-		sum2 += vin*vin;
-		sum3 += vin*vin*vin;
-		sum4 += vin*vin*vin*vin;
-		rescale_dtype vout = (vin + offset) * scale;
-		decay_offset = (vout + decay_offset*k)/(1.0 + k);
-		rescale_dtype sout = vout - decay_offset;
+		int dm0idx = t + nt*ibeam; // DM0 idx: BT order
+		rescale_dtype dm0 = dm0arr[dm0idx];
+		if (dm0 < dm0_thresh) {
+			rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
+			sum += vin;
+			sum2 += vin*vin;
+			sum3 += vin*vin*vin;
+			sum4 += vin*vin*vin*vin;
+			rescale_dtype vout = (vin + offset) * scale;
+			decay_offset = (vout + decay_offset*k)/(1.0 + k);
+			rescale_dtype sout = vout - decay_offset;
 
-		// non-coalesced write (transpose. Sorry)
-		outarr[outidx] = sout;
+			// non-coalesced write (transpose. Sorry)
+			outarr[outidx] = sout;
+			nsamps++;
+		} else {
+			outarr[outidx] = 0.0;
+		}
 
 	}
 
@@ -408,6 +461,9 @@ __global__ void rescale_update_and_transpose_float_kernel(
 	sum3arr[rsidx] = sum3;
 	sum4arr[rsidx] = sum4;
 	decay_offsetarr[rsidx] = decay_offset;
+	if (c == 0) { // should be the same for all threads
+		nsampsarr[ibeam] = (float)nsamps;
+	}
 
 }
 
@@ -416,6 +472,16 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 	int nbeams = rescale_buf.nw;
 	int nf = rescale_buf.nx;
 	int nt = rescale_buf.nz;
+
+	// Calculate dm0 for flagging
+	rescale_calc_dm0_kernel<<<nbeams, nt>>>(
+			read_buf,
+			rescale.offset.d_device,
+			rescale.scale.d_device,
+			rescale.dm0.d_device,
+			nf);
+
+	gpuErrchk(cudaDeviceSynchronize());
 	assert(rescale_buf.ny == 1);
 	rescale_update_and_transpose_float_kernel<<<nbeams, nf>>>(
 			read_buf,
@@ -424,10 +490,13 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 			rescale.sum3.d_device,
 			rescale.sum4.d_device,
 			rescale.decay_offset.d_device,
+			rescale.nsamps.d_device,
 			rescale.offset.d_device,
 			rescale.scale.d_device,
+			rescale.dm0.d_device,
 			rescale_buf.d_device,
 			rescale.decay_constant,
+			rescale.dm0_thresh,
 			nt,
 			invert_freq);
 	rescale.sampnum += nt;
@@ -435,7 +504,7 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 
 }
 
-__global__ void rescale_update_scaleoffset_kernel(
+__global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype* __restrict__ sum,
 		rescale_dtype* __restrict__ sum2,
 		rescale_dtype* __restrict__ sum3,
@@ -445,7 +514,7 @@ __global__ void rescale_update_scaleoffset_kernel(
 		rescale_dtype* __restrict__ kurtarr,
 		rescale_dtype* __restrict__ offsetarr,
 		rescale_dtype* __restrict__ scalearr,
-		rescale_dtype nsamp,
+		rescale_dtype* nsamparr,
 		rescale_dtype target_stdev,
 		rescale_dtype target_mean,
 		rescale_dtype mean_thresh,
@@ -457,6 +526,7 @@ __global__ void rescale_update_scaleoffset_kernel(
 	int nf = blockDim.x;
 	int ibeam = blockIdx.x;
 	int i = c + nf*ibeam;
+	rescale_dtype nsamp = nsamparr[ibeam]; // coalesced read
 	rescale_dtype mean = sum[i]/nsamp;
 	rescale_dtype mean2 = sum2[i]/nsamp;
 	rescale_dtype mean3 = sum3[i]/nsamp;
@@ -511,12 +581,15 @@ __global__ void rescale_update_scaleoffset_kernel(
 	sum2[i] = 0.0;
 	sum3[i] = 0.0;
 	sum4[i] = 0.0;
+	if (threadIdx.x == 0) {
+		nsamparr[ibeam] = 0;
+	}
 
 }
 void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale)
 {
 	assert(rescale.interval_samps > 0);
-	int nthreads = 336;
+	int nthreads = rescale.nf;
 	assert(rescale.num_elements % nthreads == 0);
 	int nblocks = rescale.num_elements / nthreads;
 	rescale_update_scaleoffset_kernel<<<nblocks, nthreads>>>(
@@ -529,7 +602,7 @@ void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale)
 			rescale.kurt.d_device,
 			rescale.offset.d_device,
 			rescale.scale.d_device,
-			(rescale_dtype) rescale.sampnum,
+			rescale.nsamps.d_device,
 			rescale.target_stdev,
 			rescale.target_mean,
 			rescale.mean_thresh,

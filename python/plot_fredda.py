@@ -92,12 +92,20 @@ def show_inbuf_series(prefix, theslice, start=0, maxn=10):
             print 'Quitting as maxn exceeded'
             break
 
+def statplot(ax, fname, name):
+    d = load4d(fname.replace('fdmt',name))
+    sl = [0,0,slice(None),slice(None)]
+    ax.plot(d[sl].T)
+    ax.set_ylabel(name)
+    return d
+
 def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
+    fig = pylab.figure()
+    
     for ifname, fname in enumerate(file_series(prefix, start)):
         ostate = load4d(fname)
-        gs = gridspec.GridSpec(2,5)
+        gs = gridspec.GridSpec(2,10)
         p = plt.subplot
-        
         rawax = p(gs[0, 0:2])
 
         rawname = fname.replace('fdmt','inbuf')
@@ -146,7 +154,16 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         dmax.plot(v[dmrange, :].T)
         dmax.set_xlabel('Sample')
         dmax.set_ylabel('S/N')
-        
+
+        meanax = p(gs[0, 6:8])
+        stdax = p(gs[0, 8:10])
+        kurtax = p(gs[1, 6:8])
+        dm0ax = p(gs[1, 8:10])
+
+        statplot(meanax, fname, 'mean')
+        statplot(stdax, fname, 'std')
+        statplot(kurtax, fname, 'kurt')
+        statplot(dm0ax, fname, 'dm0')
 
         pylab.show()
 

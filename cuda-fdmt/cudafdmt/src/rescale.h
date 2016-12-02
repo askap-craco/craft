@@ -32,6 +32,8 @@ typedef struct _rescale_gpu_t {
 	array4d_t mean; // mean
 	array4d_t std; // stdev
 	array4d_t kurt; // kurtosis
+	array4d_t dm0; // dm0 series
+	array4d_t nsamps; // number of used samples summed
 	array4d_t decay_offset;
 	uint64_t interval_samps;
 	uint64_t sampnum;
@@ -42,13 +44,17 @@ typedef struct _rescale_gpu_t {
 	float kurt_thresh;
 	float mean_thresh;
 	float std_thresh;
+	float dm0_thresh;
 	int flag_grow;
+	uint64_t nf;
+	uint64_t nt;
+	uint64_t nbeams;
 
 } rescale_gpu_t __attribute__((__aligned__(16)));
 
 
 rescale_t* rescale_allocate(rescale_t* rescale, uint64_t nelements) ;
-rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uint64_t nf);
+rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uint64_t nf, uint64_t nt);
 void rescale_set_scale_offset_gpu(rescale_gpu_t* rescale, float scale, float offset);
 
 void rescale_update_scaleoffset(rescale_t* rescale);

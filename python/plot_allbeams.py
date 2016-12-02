@@ -45,7 +45,8 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument(dest='files', nargs='+')
-    parser.add_argument('-t', '--times', help='Integration range to plot', type=commasep)
+    parser.add_argument('-t', '--times', help='Integration range to plot (samples)', type=commasep)
+    parser.add_argument('-s', '--seconds', help='Integration range to plot (seconds)', type=commasep)
     parser.add_argument('--nxy', help='number of rows,columns in plots', type=commasep)
     parser.add_argument('--imzrange', help='Z range for dynamic spectrum', type=floatcommasep)
     parser.add_argument('--fft', help='plot fft', action='store_true',default=False)
@@ -79,14 +80,20 @@ class Plotter(object):
 
         self.nrows, self.ncols = values.nxy
         
-        self.tstart = tstart
-        self.ntimes = ntimes
 
         self.values = values
         self.figs = {}
         # Sniff data
         beams, files = load_beams(self.values.files[0:1], tstart, ntimes=1, return_files=True)
         mjdstart = files[0].tstart
+        tsamp = files[0].tsamp
+        
+        if values.seconds:
+            self.tstart = int(values.seconds[0]/tsamp)
+            self.ntimes = int(values.seconds[1]/tsamp)
+        else:
+            self.tstart = tstart
+            self.ntimes = ntimes
 
         self.mkfig('mean', 'Mean bandpass', 'Frequency (MHz)','Mean bandpass')
         self.mkfig('std', 'Bandpass stdDev', 'Frequency (MHz)','Bandpass StdDev')
