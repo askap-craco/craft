@@ -271,9 +271,9 @@ int main(int argc, char* argv[])
 		assert(num_rescale_blocks >= 0);
 
 		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
+			array4d_copy_to_host(&rescale.nsamps); // must do this before updaing scaleoffset, which reset nsamps to zero
 			rescale_update_scaleoffset_gpu(rescale);
 			array4d_copy_to_host(&rescale.scale);
-			array4d_copy_to_host(&rescale.nsamps);
 
 			// Count how many channels have been flagged for this block
 			for(int i = 0; i < nf*nbeams; ++i) {
@@ -282,7 +282,8 @@ int main(int argc, char* argv[])
 				}
 			}
 			for (int i = 0; i < nbeams; ++i) {
-				num_flagged_times += (nt - (int)rescale.nsamps.d[i]);
+				int nsamps = (int)rescale.nsamps.d[i];
+				num_flagged_times += (nt - nsamps);
 			}
 			if (dump_data) {
 				dumparr("mean", blocknum, &rescale.mean);

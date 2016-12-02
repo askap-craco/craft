@@ -51,6 +51,7 @@ def load4d(fname, dtype=np.float32):
     d = np.fromfile(fin, dtype=dtype, count=theshape.prod())
     d.shape = theshape
     fin.close()
+    print fname, d.shape, 'zeros?', np.all(d == 0), 'max', d.max(), np.unravel_index(d.argmax(), d.shape)
     return d
 
 def file_series(prefix, start=0):
