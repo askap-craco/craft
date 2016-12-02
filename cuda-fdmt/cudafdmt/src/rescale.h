@@ -5,7 +5,7 @@
 #include "array.h"
 
 
-typedef struct {
+typedef struct _rescale_t{
 	/* stuff for rescaling */
 	float* sum;
 	float* sum2;
@@ -21,7 +21,7 @@ typedef struct {
 
 } rescale_t __attribute__((__aligned__(16)));
 
-typedef struct {
+typedef struct _rescale_gpu_t {
 	/* stuff for rescaling */
 	array4d_t sum;
 	array4d_t sum2; // sum v**2
