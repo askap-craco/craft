@@ -51,7 +51,8 @@ void runtest_usage() {
 			"   -z Z - Zap channels with 0 DM above threshold Z\n"
 			"   -g G - CUDA device\n"
 			"   -h Print this message\n"
-	);
+			"    Version: %s\n"
+	, VERSION);
 	exit(EXIT_FAILURE);
 }
 
@@ -158,6 +159,7 @@ int main(int argc, char* argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	printf("Fredda version %s starting\n", VERSION);
 	printf("Setting cuda device to %d\n", cuda_device);
 	gpuErrchk( cudaSetDevice(cuda_device));
 
