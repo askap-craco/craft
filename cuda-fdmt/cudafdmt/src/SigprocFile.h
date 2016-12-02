@@ -49,6 +49,9 @@ public:
 	size_t samples_read() {
 		return m_samples_read;
 	}
+	size_t curr_sample() {
+		return m_curr_sample;
+	}
 	double fch1() {
 		return m_fch1;
 	}
@@ -69,6 +72,7 @@ public:
 	size_t seek_sample(size_t t);
 
 
+
 private:
 	double m_fch1;
 	double m_foff;
@@ -79,6 +83,7 @@ private:
 	int m_nbits;
 
 	size_t m_samples_read;
+	size_t m_curr_sample;
 
 	FILE* m_file;
 	char* m_filename;

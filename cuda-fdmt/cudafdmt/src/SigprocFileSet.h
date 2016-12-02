@@ -48,6 +48,9 @@ public:
 	size_t samples_read() {
 		return first_file->samples_read();
 	}
+	size_t curr_sample() {
+		return first_file->curr_sample();
+	}
 
 	size_t seek_sample(int t) {
 		size_t boff;

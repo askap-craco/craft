@@ -110,6 +110,8 @@ size_t SigprocFile::seek_sample(size_t t)
 		printf("SigprocFile: Could not seek to offset of file %s\n. Error: %s", m_filename, strerror(errno));
 		assert(0);
 	}
+
+	m_curr_sample = t;
 	return boff;
 }
 
@@ -122,6 +124,7 @@ size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
 	size_t nelements = fread(output, sizeof(uint8_t), nreq, m_file);
 	size_t ont = nelements/m_nifs/m_nchans;
 	m_samples_read += ont;
+	m_curr_sample += nt;
 	return ont;
 }
 
