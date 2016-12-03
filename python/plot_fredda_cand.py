@@ -172,9 +172,9 @@ def plot_beams(fin, values, cand, pattern, nxy, postfix):
     tstart = max(0, tstart)
     nsamps = int(2*idm)
     assert len(beamfile) > 0, 'Couldnt find beamfiles in path {}'.format(bpath)
-    print 'got ', len(beamfile), 'in path', bpath, 'tstart', tstart, 'nsamps', nsamps
+    print 'got ', len(beamfile), 'beams in path', bpath, 'tstart', tstart, 'nsamps', nsamps
     p = plot_allbeams.Plotter(beamfile, nxy, tstart, nsamps)
-    prefix = 's{:d}_b{:d}_idm{:d}_{}'.format(int(sampno), int(beamno), int(idm), postfix)
+    prefix = os.path.join(fdir, 's{:d}_b{:d}_idm{:d}_{}'.format(int(sampno), int(beamno), int(idm), postfix))
     p.draw()
     p.saveall(prefix)
     if values.show:
