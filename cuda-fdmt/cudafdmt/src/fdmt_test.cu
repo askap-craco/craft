@@ -159,7 +159,11 @@ int main(int argc, char* argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	printf("Fredda version %s starting\n", VERSION);
+	printf("Fredda version %s starting. Cmdline: ", VERSION);
+	for (int c = 0; c < argc; ++c) {
+		printf("%s ", argv[c]);
+	}
+	printf("\n");
 	printf("Setting cuda device to %d\n", cuda_device);
 	gpuErrchk( cudaSetDevice(cuda_device));
 
@@ -279,11 +283,13 @@ int main(int argc, char* argv[])
 			// Count how many channels have been flagged for this block
 			for(int i = 0; i < nf*nbeams; ++i) {
 				if (rescale.scale.d[i] == 0) {
-					num_flagged_beam_chans++;
+					// that channel will be flagged for num_rescale_blocks
+					num_flagged_beam_chans += num_rescale_blocks;
 				}
 			}
 			for (int i = 0; i < nbeams; ++i) {
 				int nsamps = (int)rescale.nsamps.d[i];
+				// the number of flagged times is the number over the num_rescale_blocks
 				num_flagged_times += (nt - nsamps);
 			}
 			if (dump_data) {
