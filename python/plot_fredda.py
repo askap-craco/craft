@@ -12,8 +12,6 @@ import os
 import sys
 import logging
 import subprocess
-from craftsim import dispersed_voltage, dispersed_stft
-from FDMT import *
 import matplotlib.gridspec as gridspec
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"

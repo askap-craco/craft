@@ -152,8 +152,12 @@ class Plotter(object):
 
     def closeall(self):
         for name, (fig, axes) in self.figs.iteritems():
-            #fig.close()
-            pass
+            plt.close(fig)
+
+        self.figs = {}
+
+    def __del__(self):
+        self.closeall()
     
     def press(self, event):
         print 'press', event.key
