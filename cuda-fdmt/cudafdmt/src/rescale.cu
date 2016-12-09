@@ -435,15 +435,13 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		int inidx = c + nf*(t + nt*ibeam);
 		int outidx = t + nt*(outc + nf*ibeam);
 		// coalesced read from global
-		int dm0idx = t + nt*ibeam; // DM0 idx: BT order
 		rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
-
 		rescale_dtype vout = (vin + offset) * scale;
 		decay_offset = (vout + decay_offset*k)/(1.0 + k);
 		rescale_dtype sout = vout - decay_offset;
-
+		int dm0idx = t + nt*ibeam; // DM0 idx: BT order
 		rescale_dtype dm0 = dm0arr[dm0idx];
-		if (dm0 < dm0_thresh && sout < cell_thresh) {
+		if (fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh) {
 			sum += vin;
 			sum2 += vin*vin;
 			sum3 += vin*vin*vin;

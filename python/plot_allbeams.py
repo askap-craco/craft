@@ -74,7 +74,7 @@ class Plotter(object):
     @staticmethod
 
     def from_values(values, tstart, ntimes):
-        p = Plotter(values.files, values.nxy)
+        p = Plotter(values.files, values.nxy, fft=values.fft)
         if values.seconds:
             p.set_position_seconds(*values.seconds)
         else:
@@ -90,7 +90,8 @@ class Plotter(object):
         self.figs = {}
         # Sniff data
         self.files = filenames
-        beams, files = load_beams(filenames[0:1], tstart, ntimes=1, return_files=True)
+        beams, files = load_beams(filenames, tstart, ntimes=1, return_files=True)
+        self.bnames = [f.filename.split('.')[-2] for f in files]
         nbeams = len(self.files)
         mjdstart = files[0].tstart
         tsamp = files[0].tsamp
@@ -108,8 +109,9 @@ class Plotter(object):
             self.mkfig('cov', 'Beam covariance', 'beam no', 'beamno', 1,1)
 
         if fft:
-            self.mkfig('fftim', 'FFT of all channels', 'Digital frequency ', 'Channel')
-            self.mkfig('fftplt', 'FFT of DM0', 'Digital Frequency', 'FFT (dB)')
+            self.mkfig('fftim', 'FFT of all channels', 'Frequency (Hz)', 'Channel')
+            self.mkfig('fftplt', 'FFT of DM0', 'Frequency (Hz)', 'FFT (dB)')
+            self.mkfig('dm0plt', 'DM0', 'Sample', 'Intensity')
 
         self.fft = fft
 
@@ -137,7 +139,11 @@ class Plotter(object):
 
     def getfig(self, name, i):
         fig, axes = self.figs[name]
-        return fig, axes[i]
+        
+        ax = axes[i]
+        print i, len(axes), len(self.bnames), self.bnames
+        ax.text(0.98, 0.98, 'B{}'.format(self.bnames[i]), va='top', ha='right', transform=ax.transAxes)
+        return fig, ax
 
     def clearfigs(self):
         for name, (fig, axes) in self.figs.iteritems():
@@ -155,6 +161,11 @@ class Plotter(object):
             plt.close(fig)
 
         self.figs = {}
+        
+    def drawall(self):
+        for name, (fig, axes) in self.figs.iteritems():
+            fig.draw()
+
 
     def __del__(self):
         self.closeall()
@@ -162,9 +173,9 @@ class Plotter(object):
     def press(self, event):
         print 'press', event.key
         if event.key == 'n':
-            self.tstart += self.ntimes
+            self.tstart += self.ntimes/2
         elif event.key == 'p':
-            self.tstart -= self.ntimes
+            self.tstart -= self.ntimes/2
             self.tstart = max(self.tstart, 0)
         elif event.key == 'w':
             self.ntimes *= 2
@@ -181,7 +192,6 @@ class Plotter(object):
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
         self.beams = beams
-        bnames = [f.filename.split('.')[-2] for f in files]
         print 'Loaded beams', beams.shape
         ntimes, nbeams, nfreq = beams.shape
 
@@ -236,7 +246,7 @@ class Plotter(object):
             ntimes, nfreq = bi.shape
         
             ax1.imshow(bi.T, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none')
-            ax1.text(0.98, 0.98, 'B{}'.format(bnames[i]), va='top', ha='right', transform=ax1.transAxes)
+
             beam_mean = bi.mean(axis=0)
             beam_std = bi.std(axis=0)
             bmm = np.tile(beam_mean, (ntimes, 1))
@@ -254,13 +264,19 @@ class Plotter(object):
             
             if self.fft:
                 fig4, ax4 = self.getfig('fftim', i)
-                fig4, ax4 = self.getfig('fftplt', )
+                fig5, ax5 = self.getfig('fftplt', i)
                 dm0f = abs(np.fft.rfft(dm0, axis=0))**2
+                ntimes, nchans = bi.shape
                 bf = abs(np.fft.rfft(bi, axis=0).T)**2
-                ax4.imshow(np.log10(bf.T)[1:, :], aspect='auto')
-                ax5.plot(np.log10(dm0f[1:]))
+                fftfreqs  = np.arange(len(dm0f))/float(ntimes)/tsamp
+                fft_ext = (fftfreqs.min(), fftfreqs.max(), 0, nchans)
+                ax4.imshow(np.log10(bf)[:, 1:], aspect='auto', extent=fft_ext, origin='lower')
+                ax5.plot(fftfreqs[1:], np.log10(dm0f[1:]))
+                fig6, ax6 = self.getfig('dm0plt', i)
+                ax6.plot(dm0)
 
         pylab.draw()
+        #self.drawall()
 
 if __name__ == '__main__':
     _main()
