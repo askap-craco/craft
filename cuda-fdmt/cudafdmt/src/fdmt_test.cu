@@ -42,13 +42,14 @@ void runtest_usage() {
 			"   -D dump intermediate data to disk\n"
 			"   -r R - Blocks per rescale update\n"
 			"   -S S - Number of blocks to skip\n"
-			"   -M M - Mean offset threshold (3 is OK)\n"
-			"   -T T - StdDev threshold (3 is OK)\n"
-			"   -K K - Kurtosis threshold (0.8 is pretty good)\n"
-			"   -G N - Flag channel growing (flags N channels either side of a bad channel)\n"
+			"   -M M - Channel Mean flagging threshold (3 is OK)\n"
+			"   -T T - Channel StdDev flagging threshold (3 is OK)\n"
+			"   -K K - Channel Kurtosis threshold (0.8 is pretty good)\n"
+			"   -G N - Channel flag channel growing (flags N channels either side of a bad channel)\n"
+			"   -z Z - Zap times with 0 DM above threshold Z\n"
+			"   -C C - Zap time/frequency cells with S/N above threshold C\n"
 			"   -n ncand - Maximum mumber of candidates to write per block\n"
 			"   -m mindm - Minimum DM to report candidates for (to ignore 0 DM junk)\n"
-			"   -z Z - Zap channels with 0 DM above threshold Z\n"
 			"   -g G - CUDA device\n"
 			"   -h Print this message\n"
 			"    Version: %s\n"
@@ -92,10 +93,17 @@ int main(int argc, char* argv[])
 	float std_thresh = 1e9;
 	float mean_thresh = 1e9;
 	float dm0_thresh = 1e9;
+	float cell_thresh = 1e9;
 	int flag_grow = 3;
 	int max_ncand_per_block = INT_MAX;
 	int mindm = 0;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:n:m:z:h")) != -1) {
+
+	printf("Fredda version %s starting. Cmdline: ", VERSION);
+	for (int c = 0; c < argc; ++c) {
+		printf("%s ", argv[c]);
+	}
+
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:C:n:m:z:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -136,6 +144,9 @@ int main(int argc, char* argv[])
 		case 'G':
 			flag_grow = atoi(optarg);
 			break;
+		case 'C':
+			cell_thresh = atof(optarg);
+			break;
 		case 'n':
 			max_ncand_per_block = atoi(optarg);
 			break;
@@ -159,10 +170,6 @@ int main(int argc, char* argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	printf("Fredda version %s starting. Cmdline: ", VERSION);
-	for (int c = 0; c < argc; ++c) {
-		printf("%s ", argv[c]);
-	}
 	printf("\n");
 	printf("Setting cuda device to %d\n", cuda_device);
 	gpuErrchk( cudaSetDevice(cuda_device));
@@ -217,9 +224,14 @@ int main(int argc, char* argv[])
 	rescale.kurt_thresh = kurt_thresh;
 	rescale.flag_grow = flag_grow;
 	rescale.dm0_thresh = dm0_thresh;
+	rescale.cell_thresh = cell_thresh;
 	// set guess of initial scale and offset to dm0 thresholding works
-	printf("Rescaling to mean=%f stdev=%f decay constant=%f mean/std/kurtosis/dm0 thresholds: %f/%f/%f/%f grow flags by %d channels\n",rescale.target_mean,rescale.target_stdev,
-			rescale.decay_constant, rescale.mean_thresh, rescale.std_thresh, rescale.kurt_thresh, rescale.dm0_thresh, rescale.flag_grow);
+	printf("Rescaling to mean=%f stdev=%f decay constant=%f mean/std/kurtosis/dm0/Cell thresholds: %0.1f/%0.1f/%0.1f/%0.1f/%0.1f grow flags by %d channels\n",
+			rescale.target_mean,rescale.target_stdev,
+			rescale.decay_constant,
+			rescale.mean_thresh, rescale.std_thresh, rescale.kurt_thresh,
+			rescale.dm0_thresh, rescale.cell_thresh,
+			rescale.flag_grow);
 	//rescale_allocate(&rescale, nbeams*nf);
 	rescale_allocate_gpu(&rescale, nbeams, nf, nt);
 	rescale_set_scale_offset_gpu(&rescale, rescale.target_stdev/18.0, -128.0f); // uint8 stdev is 18 and mean +128.
@@ -283,13 +295,13 @@ int main(int argc, char* argv[])
 			// Count how many channels have been flagged for this block
 			for(int i = 0; i < nf*nbeams; ++i) {
 				if (rescale.scale.d[i] == 0) {
-					// that channel will be flagged for num_rescale_blocks
+					// that channel will stay flagged for num_rescale_blocks
 					num_flagged_beam_chans += num_rescale_blocks;
 				}
 			}
 			for (int i = 0; i < nbeams; ++i) {
 				int nsamps = (int)rescale.nsamps.d[i];
-				// the number of flagged times is the number over the num_rescale_blocks
+				// nsamps is the number of unflagged samples in the block
 				num_flagged_times += (nt - nsamps);
 			}
 			if (dump_data) {

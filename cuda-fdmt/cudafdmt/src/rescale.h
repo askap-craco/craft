@@ -45,6 +45,7 @@ typedef struct _rescale_gpu_t {
 	float mean_thresh;
 	float std_thresh;
 	float dm0_thresh;
+	float cell_thresh;
 	int flag_grow;
 	uint64_t nf;
 	uint64_t nt;

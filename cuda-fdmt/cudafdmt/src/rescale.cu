@@ -397,6 +397,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		rescale_dtype* __restrict__ outarr,
 		float decay_constant,
 		float dm0_thresh,
+		float cell_thresh,
 		int nt,
 		bool invert_freq)
 {
@@ -435,17 +436,18 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		int outidx = t + nt*(outc + nf*ibeam);
 		// coalesced read from global
 		int dm0idx = t + nt*ibeam; // DM0 idx: BT order
+		rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
+
+		rescale_dtype vout = (vin + offset) * scale;
+		decay_offset = (vout + decay_offset*k)/(1.0 + k);
+		rescale_dtype sout = vout - decay_offset;
+
 		rescale_dtype dm0 = dm0arr[dm0idx];
-		if (dm0 < dm0_thresh) {
-			rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
+		if (dm0 < dm0_thresh && sout < cell_thresh) {
 			sum += vin;
 			sum2 += vin*vin;
 			sum3 += vin*vin*vin;
 			sum4 += vin*vin*vin*vin;
-			rescale_dtype vout = (vin + offset) * scale;
-			decay_offset = (vout + decay_offset*k)/(1.0 + k);
-			rescale_dtype sout = vout - decay_offset;
-
 			// non-coalesced write (transpose. Sorry)
 			outarr[outidx] = sout;
 			nsamps++;
@@ -497,6 +499,7 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 			rescale_buf.d_device,
 			rescale.decay_constant,
 			rescale.dm0_thresh,
+			rescale.cell_thresh*rescale.target_stdev,
 			nt,
 			invert_freq);
 	rescale.sampnum += nt;
