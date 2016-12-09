@@ -292,18 +292,20 @@ int main(int argc, char* argv[])
 			rescale_update_scaleoffset_gpu(rescale);
 			array4d_copy_to_host(&rescale.scale);
 
-			// Count how many channels have been flagged for this block
 			for(int i = 0; i < nf*nbeams; ++i) {
+				// Count how many  channels have been flagged for this whole block
 				if (rescale.scale.d[i] == 0) {
 					// that channel will stay flagged for num_rescale_blocks
 					num_flagged_beam_chans += num_rescale_blocks;
 				}
-			}
-			for (int i = 0; i < nbeams; ++i) {
+				// Count how many times have been flagged for this block
 				int nsamps = (int)rescale.nsamps.d[i];
-				// nsamps is the number of unflagged samples in the block
-				num_flagged_times += (nt - nsamps);
+				// nsamps is the number of unflagged samples in nt*num_rescale_blocks samples
+				int nflagged = nt*num_rescale_blocks - nsamps;
+				assert (nflagged >= 0);
+				num_flagged_times += nflagged;
 			}
+
 			if (dump_data) {
 				dumparr("mean", iblock, &rescale.mean);
 				dumparr("std", iblock, &rescale.std);
@@ -330,7 +332,7 @@ int main(int argc, char* argv[])
 	}
 
 	float flagged_percent = ((float) num_flagged_beam_chans) / ((float) nf*nbeams*blocknum) * 100.0f;
-	float times_flagged_percent = ((float) num_flagged_times) / ((float) blocknum*nbeams*nt) * 100.0f;
+	float times_flagged_percent = ((float) num_flagged_times) / ((float) blocknum*nbeams*nt*nf) * 100.0f;
 	printf("FREDDA Finished\nFound %llu candidates \n", total_candidates);
 	tall.stop();
 	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << blocknum*nt*source.tsamp() << " seconds" << endl;

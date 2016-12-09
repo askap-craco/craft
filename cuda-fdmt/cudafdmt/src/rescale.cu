@@ -288,7 +288,7 @@ rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uin
 	rescale_arraymalloc(&rescale->std, nbeams, nf);
 	rescale_arraymalloc(&rescale->kurt, nbeams, nf);
 	rescale_arraymalloc(&rescale->dm0, nbeams, nt);
-	rescale_arraymalloc(&rescale->nsamps, nbeams, 1);
+	rescale_arraymalloc(&rescale->nsamps, nbeams, nf);
 	rescale_arraymalloc(&rescale->scale, nbeams, nf);
 	rescale_arraymalloc(&rescale->offset, nbeams, nf);
 	rescale_arraymalloc(&rescale->decay_offset, nbeams, nf);
@@ -406,6 +406,13 @@ __global__ void rescale_update_and_transpose_float_kernel (
 	int nf = blockDim.x;
 	const rescale_dtype k = decay_constant;
 
+
+	// input = BTF order
+	// output = BFT order
+	// Rescale order: BF
+	// dm0 order: BT
+	// nsamps order: BF
+
 	int rsidx = c + nf*ibeam; // rescale index: BF order
 	// all these reads are nice and coalesced
 	rescale_dtype sum = sumarr[rsidx]; // read from global memory
@@ -415,6 +422,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 	rescale_dtype decay_offset = decay_offsetarr[rsidx];  // read from global
 	rescale_dtype offset = offsetarr[rsidx]; // read from global
 	rescale_dtype scale = scalearr[rsidx]; // read from global
+	rescale_dtype nsamps = nsampsarr[rsidx]; // read from global
 
 	int outc;
 	if (invert_freq) {
@@ -423,13 +431,9 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		outc = c;
 	}
 
-	// input = BTF order
-	// output = BFT order
-	// Rescale order: BF
-	// dm0 order: BT
-	// nsamps order: B
 
-	int nsamps = 0;
+	// Easy way of expanding the time flagging by 1. Useful for killing dropouts. ACES-209
+	int last_sample_ok = 0;
 
 	for (int t = 0; t < nt; ++t) {
 		int inidx = c + nf*(t + nt*ibeam);
@@ -441,7 +445,8 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		rescale_dtype sout = vout - decay_offset;
 		int dm0idx = t + nt*ibeam; // DM0 idx: BT order
 		rescale_dtype dm0 = dm0arr[dm0idx];
-		if (fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh) {
+		int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh;
+		if (this_sample_ok && last_sample_ok) {
 			sum += vin;
 			sum2 += vin*vin;
 			sum3 += vin*vin*vin;
@@ -453,6 +458,8 @@ __global__ void rescale_update_and_transpose_float_kernel (
 			outarr[outidx] = 0.0;
 		}
 
+		last_sample_ok = this_sample_ok;
+
 	}
 
 	// write everything back to global memory -- all coalesced
@@ -461,10 +468,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 	sum3arr[rsidx] = sum3;
 	sum4arr[rsidx] = sum4;
 	decay_offsetarr[rsidx] = decay_offset;
-	if (c == 0) { // should be the same for all threads
-		nsampsarr[ibeam] = (float)nsamps;
-	}
-
+	nsampsarr[rsidx] = (float)nsamps;
 }
 
 void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& rescale_buf, const uint8_t* read_buf, bool invert_freq)
@@ -527,7 +531,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 	int nf = blockDim.x;
 	int ibeam = blockIdx.x;
 	int i = c + nf*ibeam;
-	rescale_dtype nsamp = nsamparr[ibeam]; // coalesced read
+	rescale_dtype nsamp = nsamparr[i];
 	rescale_dtype mean = sum[i]/nsamp;
 	rescale_dtype mean2 = sum2[i]/nsamp;
 	rescale_dtype mean3 = sum3[i]/nsamp;
@@ -582,10 +586,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 	sum2[i] = 0.0;
 	sum3[i] = 0.0;
 	sum4[i] = 0.0;
-	if (threadIdx.x == 0) {
-		nsamparr[ibeam] = 0;
-	}
-
+	nsamparr[i] = 0;
 }
 void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale)
 {
