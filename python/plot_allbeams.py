@@ -46,7 +46,7 @@ def _main():
     parser.add_argument('--imzrange', help='Z range for dynamic spectrum', type=floatcommasep)
     parser.add_argument('--fft', help='plot fft', action='store_true',default=False)
     parser.add_argument('--save', help='Save plots as png', action='store_true', default=False)
-    parser.set_defaults(verbose=False, nxy="3,3")
+    parser.set_defaults(verbose=False, nxy="1,1")
     values = parser.parse_args()
     if values.verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -172,9 +172,10 @@ class Plotter(object):
     
     def press(self, event):
         print 'press', event.key
-        if event.key == 'n':
+        draw = True
+        if event.key == 'right' or event.key == 'n':
             self.tstart += self.ntimes/2
-        elif event.key == 'p':
+        elif event.key == 'left' or event.key == 'p':
             self.tstart -= self.ntimes/2
             self.tstart = max(self.tstart, 0)
         elif event.key == 'w':
@@ -182,9 +183,14 @@ class Plotter(object):
         elif event.key == 'a':
             if self.ntimes > 2:
                 self.ntimes /= 2
+        elif event.key == 'ctrl+c':
+            sys.exit(0)
+        else:
+            draw = False
 
-        self.clearfigs()
-        self.draw()
+        if draw:
+            self.clearfigs()
+            self.draw()
 
 
     def draw(self):
@@ -271,7 +277,7 @@ class Plotter(object):
                 fftfreqs  = np.arange(len(dm0f))/float(ntimes)/tsamp
                 fft_ext = (fftfreqs.min(), fftfreqs.max(), 0, nchans)
                 ax4.imshow(np.log10(bf)[:, 1:], aspect='auto', extent=fft_ext, origin='lower')
-                ax5.plot(fftfreqs[1:], np.log10(dm0f[1:]))
+                ax5.loglog(fftfreqs[1:], (dm0f[1:]))
                 fig6, ax6 = self.getfig('dm0plt', i)
                 ax6.plot(dm0)
 

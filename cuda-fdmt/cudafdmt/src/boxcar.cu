@@ -5,8 +5,13 @@
 #include "fdmt_utils.h"
 #include "array.h"
 #include "CandidateSink.h"
+#include "boxcar.h"
 
-const int NBOX = 32; // Needs to be the warp size actually
+int mod(int a, int b)
+{
+    int r = a % b;
+    return r < 0 ? r + b : r;
+}
 
 __global__ void boxcar_do_kernel(const __restrict__ fdmt_dtype* indata,
 		fdmt_dtype* __restrict__ outdata,
@@ -74,10 +79,11 @@ __global__ void boxcar_do_kernel(const __restrict__ fdmt_dtype* indata,
 
 }
 
-int boxcar_do_cpu(const array4d_t* indata, array4d_t* outdata)
+int boxcar_do_cpu(const array4d_t* indata, array4d_t* outdata, array4d_t* boxcar_history)
 {
 	// Inshape: [nbeams, 1, ndt, nt]
 	// outshape: [nbeams, ndt, nt, nbox=32]
+	// KB checked this code on 10 Dec 2016 late at night with much pain - and it works.
 
 	int nbeams = indata->nw;
 	assert(indata->nx == 1);
@@ -87,27 +93,41 @@ int boxcar_do_cpu(const array4d_t* indata, array4d_t* outdata)
 	outdata->nx = ndt;
 	outdata->ny = nt;
 	outdata->nz = NBOX;
+
+	//boxcar_history.nw = 1;
+	//boxcar_history.nx = nbeams;
+	//boxcar_history.ny = nd;
+	//boxcar_history.nz = NBOX;
+
 	fdmt_dtype* inp = indata->d;
 	fdmt_dtype* outp = outdata->d;
 
-	fdmt_dtype state[NBOX];
-	fdmt_dtype history[NBOX];
-
-	bzero(state, sizeof(fdmt_dtype)*NBOX);
-	bzero(history, sizeof(fdmt_dtype)*NBOX);
-
 	for(int b = 0; b < nbeams; ++b) {
 		for(int idt = 0; idt < ndt; ++idt) {
+			// initialise state from boxcar history
+			fdmt_dtype state[NBOX];
+			int histidx = array4d_idx(boxcar_history, 0, b, idt, 0);
+			fdmt_dtype* history = &boxcar_history->d[histidx];
+
+			// history increases to the left
+			state[0] = history[0];
+			for(int ibc = 1; ibc < NBOX; ++ibc) {
+				state[ibc] = state[ibc-1] + history[ibc];
+			}
+
+			assert(state[0] == history[0]);
+
 			for(int t = 0; t < nt; ++t) {
 				int inidx = array4d_idx(indata, b, 0, idt, t);
-				fdmt_dtype v = inp[inidx];
+				fdmt_dtype vin = inp[inidx];
 				for (int ibc = 0; ibc < NBOX; ++ibc) {
-					int history_index = (t - ibc - 1) % NBOX;
-					state[ibc] += v - history[history_index];
+					int history_index = mod((-t + ibc),  NBOX);
 					int outidx = array4d_idx(outdata, b, idt, t, ibc);
-					outp[outidx] = state[ibc];
+					state[ibc] += vin - history[history_index];
+					outp[outidx] = state[ibc]/(sqrtf((float) (ibc + 1)));
 				}
-				history[(t - 1) % NBOX] = v;
+				int ohistidx = mod(-t-1, NBOX);
+				history[ohistidx] = vin;
 			}
 		}
 	}

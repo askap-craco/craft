@@ -261,6 +261,23 @@ int main(int argc, char* argv[])
 	int iblock = num_skip_blocks;
 	unsigned long long total_candidates = 0;
 
+	// make boxcar history
+	array4d_t boxcar_history;
+	boxcar_history.nw = 1;
+	boxcar_history.nx = nbeams;
+	boxcar_history.ny = nd;
+	boxcar_history.nz = NBOX;
+	array4d_malloc(&boxcar_history);
+	array4d_set(&boxcar_history, 0);
+
+	array4d_t boxcar_data;
+	boxcar_data.nw = nbeams;
+	boxcar_data.nx = nd;
+	boxcar_data.ny = nt;
+	boxcar_data.nz = NBOX;
+	array4d_malloc(&boxcar_data);
+	array4d_set(&boxcar_data, 0);
+
 	// add signal handler
 	signal(SIGHUP, &handle_signal);
 	signal(SIGINT, &handle_signal);
@@ -334,8 +351,11 @@ int main(int argc, char* argv[])
 			tboxcar.start();
 			size_t sampno = iblock*nt;
 			total_candidates += boxcar_threshonly(&out_buf, sampno, thresh, max_ncand_per_block, mindm, sink);
+			if (dump_data) {
+				boxcar_do_cpu(&out_buf, &boxcar_data, &boxcar_history);
+				dumparr("boxcar", iblock, &boxcar_data, false);
+			}
 			tboxcar.stop();
-
 		}
 
 		blocknum++;
