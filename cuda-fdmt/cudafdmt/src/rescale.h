@@ -33,6 +33,7 @@ typedef struct _rescale_gpu_t {
 	array4d_t std; // stdev
 	array4d_t kurt; // kurtosis
 	array4d_t dm0; // dm0 series
+	array4d_t dm0stats; // max/min/mean/variance of Dm0 accross time
 	array4d_t nsamps; // number of used samples summed
 	array4d_t decay_offset;
 	uint64_t interval_samps;

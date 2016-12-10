@@ -288,6 +288,7 @@ rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uin
 	rescale_arraymalloc(&rescale->std, nbeams, nf);
 	rescale_arraymalloc(&rescale->kurt, nbeams, nf);
 	rescale_arraymalloc(&rescale->dm0, nbeams, nt);
+	rescale_arraymalloc(&rescale->dm0stats, nbeams, 4); // max, min, mean, var
 	rescale_arraymalloc(&rescale->nsamps, nbeams, nf);
 	rescale_arraymalloc(&rescale->scale, nbeams, nf);
 	rescale_arraymalloc(&rescale->offset, nbeams, nf);
@@ -355,7 +356,8 @@ __global__ void rescale_calc_dm0_kernel (
 		const rescale_dtype* __restrict__ offsetarr,
 		const rescale_dtype* __restrict__ scalearr,
 		rescale_dtype* __restrict__ dm0arr,
-		int nf)
+		int nf,
+		rescale_dtype cell_thresh)
 {
 	// input = BTF order
 	// dm0 order: BT
@@ -365,6 +367,7 @@ __global__ void rescale_calc_dm0_kernel (
 	int t = threadIdx.x;
 	int nt = blockDim.x;
 	rescale_dtype dm0sum = 0.0;
+	int nsamp = 0;
 	for (int c = 0; c < nf; ++c) {
 		int rsidx = c + nf*ibeam; // rescale index BF order
 		// all these reads are nice and coalesced
@@ -375,11 +378,58 @@ __global__ void rescale_calc_dm0_kernel (
 		// coalesced read from global
 		rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
 		rescale_dtype vout = (vin + offset) * scale;
-		dm0sum += vout;
+		if (fabs(vout) < cell_thresh) {
+			dm0sum += vout;
+			++nsamp;
+		}
 	}
 
 	int dm0idx = t + nt*ibeam;
-	dm0arr[dm0idx] = dm0sum;
+	rescale_dtype correction = ((float) nsamp)/((float) nf);
+	dm0arr[dm0idx] = dm0sum * correction;
+}
+
+__global__ void rescale_calc_dm0stats_kernel (
+		const rescale_dtype* __restrict__ dm0arr,
+		rescale_dtype* __restrict__ dm0statarr,
+		int nt)
+{
+	// dm0 order: BT
+	// dm0stats order: BX
+	// X is max,min,mean,var
+
+	int ibeam = threadIdx.x;
+	rescale_dtype dm0sum = 0.0;
+	rescale_dtype dm0sum2 = 0.0;
+	rescale_dtype dm0min = dm0arr[ibeam];
+	rescale_dtype dm0max = dm0arr[ibeam];
+
+
+	for (int t = 0; t < nt; ++t) {
+		int dmidx = t + nt*ibeam;
+		rescale_dtype v = dm0arr[dmidx];
+		dm0sum += v;
+		dm0sum2 += v*v;
+		if (v < dm0min) {
+			dm0min = v;
+		}
+		if (v > dm0max) {
+			dm0max = v;
+		}
+
+	}
+	//dm0sumarr[ibeam] = dm0sum/((float) nt);
+	rescale_dtype nsamp = (float) nt;
+	rescale_dtype dm0mean = dm0sum/nsamp;
+	rescale_dtype mean2 = dm0sum2/nsamp;
+	rescale_dtype dm0var = mean2 - dm0mean*dm0mean;
+
+	dm0statarr[ibeam + 0] = dm0max;
+	dm0statarr[ibeam + 1] = dm0min;
+	dm0statarr[ibeam + 2] = dm0mean;
+	dm0statarr[ibeam + 3] = dm0var;
+
+	//printf("DM stats ibeam=%d max/min/mean/var %f/%f/%f/%f\n", ibeam, dm0max, dm0min, dm0mean, dm0var);
 }
 
 
@@ -394,6 +444,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		const rescale_dtype* __restrict__ offsetarr,
 		const rescale_dtype* __restrict__ scalearr,
 		const rescale_dtype* __restrict__ dm0arr,
+		const rescale_dtype* __restrict__ dm0sumarr,
 		rescale_dtype* __restrict__ outarr,
 		float decay_constant,
 		float dm0_thresh,
@@ -411,6 +462,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 	// output = BFT order
 	// Rescale order: BF
 	// dm0 order: BT
+	// dm0sum order: B
 	// nsamps order: BF
 
 	int rsidx = c + nf*ibeam; // rescale index: BF order
@@ -434,6 +486,9 @@ __global__ void rescale_update_and_transpose_float_kernel (
 
 	// Easy way of expanding the time flagging by 1. Useful for killing dropouts. ACES-209
 	int last_sample_ok = 0;
+	float block_dm0thresh = dm0_thresh/sqrtf((float) nt);
+	rescale_dtype dm0min = dm0sumarr[ibeam + 1]; // broadcast read. This is to catch dropouts
+
 
 	for (int t = 0; t < nt; ++t) {
 		int inidx = c + nf*(t + nt*ibeam);
@@ -445,7 +500,9 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		rescale_dtype sout = vout - decay_offset;
 		int dm0idx = t + nt*ibeam; // DM0 idx: BT order
 		rescale_dtype dm0 = dm0arr[dm0idx];
-		int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh;
+		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && fabs(dm0sum) < block_dm0thresh;
+		int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
+		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh;
 		if (this_sample_ok && last_sample_ok) {
 			sum += vin;
 			sum2 += vin*vin;
@@ -483,10 +540,20 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 			rescale.offset.d_device,
 			rescale.scale.d_device,
 			rescale.dm0.d_device,
-			nf);
+			nf,
+			rescale.cell_thresh);
 
 	gpuErrchk(cudaDeviceSynchronize());
-	assert(rescale_buf.ny == 1);
+
+	// Take the mean all the dm0 times into one big number per beam - this is the how we flag
+	// short dropouts see ACES-209
+	rescale_calc_dm0stats_kernel<<<1, nbeams>>>(
+			rescale.dm0.d_device,
+			rescale.dm0stats.d_device,
+			nt);
+
+	gpuErrchk(cudaDeviceSynchronize());
+
 	rescale_update_and_transpose_float_kernel<<<nbeams, nf>>>(
 			read_buf,
 			rescale.sum.d_device,
@@ -498,6 +565,7 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 			rescale.offset.d_device,
 			rescale.scale.d_device,
 			rescale.dm0.d_device,
+			rescale.dm0stats.d_device,
 			rescale_buf.d_device,
 			rescale.decay_constant,
 			rescale.dm0_thresh,
@@ -558,9 +626,9 @@ __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype stdoff = fabs(stdarr[ic] - expected_std);
 		rescale_dtype kurtoff = fabs(kurtarr[ic]);
 
-		if (meanoff > mean_thresh ||
+		if (nsamp > 0 && (meanoff > mean_thresh ||
 				stdoff > std_thresh ||
-				kurtoff > kurt_thresh) {
+				kurtoff > kurt_thresh)) {
 			flag = 1;
 			break;
 		}
@@ -570,12 +638,16 @@ __global__ void rescale_update_scaleoffset_kernel (
 		scale = 0.0;
 		offset = 0.0;
 	} else {
-		if (variance == 0.0) {
+		if (nsamp == 0) { // Don't update the scale and offset if everything has been flagged
+			offset = offsetarr[i];
+			scale = scalearr[i];
+		} else if (variance == 0.0) {
 			scale = 1.0;
+			offset = -mean + target_mean/scale;
 		} else {
 			scale = target_stdev / sqrt(variance);
+			offset = -mean + target_mean/scale;
 		}
-		offset = -mean + target_mean/scale;
 	}
 
 	offsetarr[i] = offset;

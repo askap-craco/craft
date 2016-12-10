@@ -46,11 +46,15 @@ def make_signal2():
 def load4d(fname, dtype=np.float32):
     fin = open(fname, 'r')
     theshape =  np.fromfile(fin, dtype=np.int32, count=4)
-    d = np.fromfile(fin, dtype=dtype, count=theshape.prod())
-    d.shape = theshape
+    v = np.fromfile(fin, dtype=dtype, count=theshape.prod())
+    v.shape = theshape
     fin.close()
-    print fname, d.shape, 'zeros?', np.all(d == 0), 'max', d.max(), np.unravel_index(d.argmax(), d.shape)
-    return d
+    print fname, v.shape, len(v), 'zeros?', np.all(v == 0), \
+            'max/min/mean/sum {}/{}/{}/{}'.format(v.max(), v.min(), v.mean(), v.sum()), \
+            'max at', \
+            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
+
+    return v
 
 def file_series(prefix, start=0):
     i = start
@@ -67,7 +71,10 @@ def show_inbuf_series(prefix, theslice, start=0, maxn=10):
         ostate = load4d(fname)
         fig = pylab.figure()
         v = ostate[theslice]
-        print fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), 'max', v.max(), np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
+        print fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), \
+            'max/min/mean/sum {}/{}/{}/{}'.format(v.max(), v.min(), v.mean(), v.sum()), \
+            'max at', \
+            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
         
         v = np.ma.masked_invalid(v)
         nfreq, ntime = v.shape
@@ -120,7 +127,11 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         nfreq, ntime = v.shape
 
         maxpos = np.unravel_index(v.argmax(), v.shape)
-        print fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), 'max', v.max(), maxpos , 'NaNs?', np.sum(np.isnan(v))
+        print fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), \
+            'max/min/mean/sum {}/{}/{}/{}'.format(v.max(), v.min(), v.mean(), v.sum()), \
+            'max at', \
+            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
+
         vmid = np.ma.median(v)
         voff = np.std((v - vmid))
         myimshow(fdmtax, (v), aspect='auto', origin='lower')
