@@ -10,8 +10,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-CandidateSink::CandidateSink(SigprocFileSet* srcfile, const char* filename) {
+CandidateSink::CandidateSink(SigprocFileSet* srcfile, const char* filename, bool negdm) {
 	m_srcfile = srcfile;
+	m_negdm = negdm;
 	if (filename == NULL) {
 		char fname[4096];
 		sprintf(fname, "%s.cand", srcfile->name());
@@ -40,6 +41,10 @@ void CandidateSink::add_candidate(int ibeam, int idt, int t, int ibc, float sn)
 
 	float  dm = m_srcfile->dm_of_idt(idt);
 	double time_from_file = t*m_srcfile->tsamp();
+	if (m_negdm) {
+		idt = -idt;
+		dm = -dm;
+	}
 	fprintf(m_candfile, "%f %lu %f %d %d %0.3f %d\n", sn, t, time_from_file,
 			ibc, idt, dm, ibeam);
 }

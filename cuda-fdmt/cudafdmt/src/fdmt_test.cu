@@ -34,7 +34,7 @@ using namespace std;
 void runtest_usage() {
 	fprintf(stderr,
 			"cudafdmt [options] [infile [infile[ ...]]\n"
-			"   -d D - Number of dispersion trials\n"
+			"   -d D - Number of dispersion trials. Negative D computes negative DMs\n"
 			"   -t T - Samples per block\n"
 			"   -s S - Decay timescale\n"
 			"   -o FILE - Candidate filename\n"
@@ -181,13 +181,27 @@ int main(int argc, char* argv[])
 
 	// Load sigproc file
 	SigprocFileSet source(argc, argv);
+	bool negdm = (nd < 0);
 
-	CandidateSink sink(&source, out_filename);
+	CandidateSink sink(&source, out_filename, negdm);
 	cout << "spf tsamp " << source.tsamp()<< " nbeams " << source.nbeams() << " fch1 " << source.fch1() << " nchans "
 			<< source.nchans() << "foff " << source.foff() << endl;
 	int nbeams = source.nbeams();
 	int nf = source.nchans();
 	size_t in_chunk_size = nbeams*nf*nt;
+
+	float foff =  (float) source.foff();
+	assert(foff < 0);
+	float fmax = (float) source.fch1() - foff; // The FDMT seems to want this offset to make sense of the world. Not sure why.
+	float fmin = fmax + nf*foff;
+
+
+	if (nd < 0) { // Flip the band to calculate negative DMs
+		nd = -nd; // make nd positive -otherwise array sizes get confuddled
+		// FDMT requres fmin < fmax
+		// rescaling will invert the channels now that we've changed the sign of foff
+		foff = -foff;
+	}
 
 	// Create read buffer
 	uint8_t* read_buf = (uint8_t*) malloc(sizeof(uint8_t) * in_chunk_size);
@@ -236,10 +250,7 @@ int main(int argc, char* argv[])
 	rescale_allocate_gpu(&rescale, nbeams, nf, nt);
 	rescale_set_scale_offset_gpu(&rescale, rescale.target_stdev/18.0, -128.0f); // uint8 stdev is 18 and mean +128.
 
-	float foff =  (float) source.foff();
-	assert(foff < 0);
-	float fmax = (float) source.fch1() - foff; // The FDMT seems to want this to make sense of the world. Not sure why.
-	float fmin = fmax + nf*foff;
+
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
