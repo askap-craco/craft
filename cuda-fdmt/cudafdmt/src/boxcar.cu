@@ -110,7 +110,11 @@ int boxcar_do_cpu(const array4d_t* indata,
 	int ncand = 0;
 	#pragma omp parallel for shared(ncand, inp, outp)
 	for(int b = 0; b < nbeams; ++b) {
+		int beam_ncand = 0;
 		for(int idt = mindm; idt < ndt; ++idt) {
+			if (beam_ncand >= max_ncand_per_block) {
+				break;
+			}
 			// initialise state from boxcar history
 			fdmt_dtype state[NBOX];
 			int histidx = array4d_idx(boxcar_history, 0, b, idt, 0);
@@ -168,6 +172,8 @@ int boxcar_do_cpu(const array4d_t* indata,
 					// OR if it's the last sample of the block (// because I can't be bothered keeping all the best_* states)
 					// THEN write out the candidate
 					if ((cand_tstart >= 0) && ((best_ibc < 0) || (t == nt - 1))) {
+
+						// Ignore this candidate if it's best boxcar is > maxbc
 						if (best_ibc <= maxbc) {
 #pragma omp critical
 							{
@@ -176,6 +182,7 @@ int boxcar_do_cpu(const array4d_t* indata,
 								sink.add_candidate(b, idt, best_ibc_t + sampno, best_ibc + 1, best_ibc_sn);
 								++ncand;
 							}
+							++beam_ncand;
 						}
 						// reset stuff for the next candidate
 						best_ibc_sn = -1;
