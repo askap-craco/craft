@@ -329,7 +329,7 @@ int main(int argc, char* argv[])
 				// Count how many times have been flagged for this block
 				int nsamps = (int)rescale.nsamps.d[i];
 				// nsamps is the number of unflagged samples in nt*num_rescale_blocks samples
-				int nflagged = nt*num_rescale_blocks - nsamps;
+				int nflagged = nt - nsamps;
 				assert (nflagged >= 0);
 				num_flagged_times += nflagged;
 			}
@@ -350,9 +350,14 @@ int main(int argc, char* argv[])
 			}
 			tboxcar.start();
 			size_t sampno = iblock*nt;
-			total_candidates += boxcar_threshonly(&out_buf, sampno, thresh, max_ncand_per_block, mindm, sink);
+			//total_candidates += boxcar_threshonly(&out_buf, sampno, thresh, max_ncand_per_block, mindm, sink);
+			total_candidates += boxcar_do_cpu(
+					&out_buf,
+					&boxcar_data,
+					&boxcar_history,
+					sampno,
+					thresh, max_ncand_per_block, mindm, sink);
 			if (dump_data) {
-				boxcar_do_cpu(&out_buf, &boxcar_data, &boxcar_history);
 				dumparr("boxcar", iblock, &boxcar_data, false);
 			}
 			tboxcar.stop();
@@ -363,12 +368,12 @@ int main(int argc, char* argv[])
 	}
 
 	float flagged_percent = ((float) num_flagged_beam_chans) / ((float) nf*nbeams*blocknum) * 100.0f;
-	float times_flagged_percent = ((float) num_flagged_times) / ((float) blocknum*nbeams*nt*nf) * 100.0f;
+	float dm0_flagged_percent = ((float) num_flagged_times) / ((float) blocknum*nbeams*nt*nf) * 100.0f;
 	printf("FREDDA Finished\nFound %llu candidates \n", total_candidates);
 	tall.stop();
 	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << blocknum*nt*source.tsamp() << " seconds" << endl;
 	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;
-	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams*nt) << " samples = " << times_flagged_percent << "%" << endl;
+	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;
 	cout << "FREDDA CPU "<< tall << endl;
 	cout << "Rescale CPU "<< trescale << endl;
 	cout << "Boxcar CPU "<< tboxcar << endl;

@@ -485,7 +485,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 
 
 	// Easy way of expanding the time flagging by 1. Useful for killing dropouts. ACES-209
-	int last_sample_ok = 0;
+	bool last_sample_ok = true;
 	float block_dm0thresh = dm0_thresh/sqrtf((float) nt);
 	rescale_dtype dm0min = dm0sumarr[ibeam + 1]; // broadcast read. This is to catch dropouts
 
@@ -501,7 +501,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		int dm0idx = t + nt*ibeam; // DM0 idx: BT order
 		rescale_dtype dm0 = dm0arr[dm0idx];
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && fabs(dm0sum) < block_dm0thresh;
-		int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
+		bool this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh;
 		if (this_sample_ok && last_sample_ok) {
 			sum += vin;
@@ -512,6 +512,11 @@ __global__ void rescale_update_and_transpose_float_kernel (
 			outarr[outidx] = sout;
 			nsamps++;
 		} else {
+//			printf("NOK ibeam/c/t %d/%d/%d dm0/sout/dm0min %f/%f/%f flags %d/%d/%d\n", ibeam, c, t,
+//					fabs(dm0), fabs(sout), dm0min,
+//					fabs(dm0) < dm0_thresh,
+//					fabs(sout) < cell_thresh,
+//					dm0min > -3*dm0_thresh);
 			outarr[outidx] = 0.0;
 		}
 

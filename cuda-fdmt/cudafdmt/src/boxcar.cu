@@ -79,7 +79,12 @@ __global__ void boxcar_do_kernel(const __restrict__ fdmt_dtype* indata,
 
 }
 
-int boxcar_do_cpu(const array4d_t* indata, array4d_t* outdata, array4d_t* boxcar_history)
+int boxcar_do_cpu(const array4d_t* indata,
+		array4d_t* outdata,
+		array4d_t* boxcar_history,
+		size_t sampno,
+		fdmt_dtype thresh, int max_ncand_per_block, int mindm,
+		CandidateSink& sink)
 {
 	// Inshape: [nbeams, 1, ndt, nt]
 	// outshape: [nbeams, ndt, nt, nbox=32]
@@ -94,6 +99,7 @@ int boxcar_do_cpu(const array4d_t* indata, array4d_t* outdata, array4d_t* boxcar
 	outdata->ny = nt;
 	outdata->nz = NBOX;
 
+	assert(mindm < ndt);
 	//boxcar_history.nw = 1;
 	//boxcar_history.nx = nbeams;
 	//boxcar_history.ny = nd;
@@ -101,9 +107,10 @@ int boxcar_do_cpu(const array4d_t* indata, array4d_t* outdata, array4d_t* boxcar
 
 	fdmt_dtype* inp = indata->d;
 	fdmt_dtype* outp = outdata->d;
-
+	int ncand = 0;
+	#pragma omp parallel for shared(ncand, inp, outp)
 	for(int b = 0; b < nbeams; ++b) {
-		for(int idt = 0; idt < ndt; ++idt) {
+		for(int idt = mindm; idt < ndt; ++idt) {
 			// initialise state from boxcar history
 			fdmt_dtype state[NBOX];
 			int histidx = array4d_idx(boxcar_history, 0, b, idt, 0);
@@ -117,20 +124,73 @@ int boxcar_do_cpu(const array4d_t* indata, array4d_t* outdata, array4d_t* boxcar
 
 			assert(state[0] == history[0]);
 
+			// A candidate starts when any boxcar exceeds the threshold
+			// and ends when all boxcars are below the threshold
+			// The highest S/N, boxcar and time of the candidate are all recorded
+			// and reported when the candidate finishes, or the end of the block arrives
+
+			// Initialise candidate grouping variables
+			int best_ibc = -1; // best boxcar index
+			fdmt_dtype best_ibc_sn = -1; // S/N of best boxcar
+			int best_ibc_t = -1; // t of best boxcar
+			int cand_tstart = -1; // t when threshold first exceeded. cand_tstart >=0 signifies a candidate in progress
+
 			for(int t = 0; t < nt; ++t) {
 				int inidx = array4d_idx(indata, b, 0, idt, t);
 				fdmt_dtype vin = inp[inidx];
 				for (int ibc = 0; ibc < NBOX; ++ibc) {
+					// Calculate boxcar value
 					int history_index = mod((-t + ibc),  NBOX);
 					int outidx = array4d_idx(outdata, b, idt, t, ibc);
 					state[ibc] += vin - history[history_index];
-					outp[outidx] = state[ibc]/(sqrtf((float) (ibc + 1)));
+					// Scale boxcar value with sqrt(length) to rescale to S/N
+					fdmt_dtype vout = state[ibc]/(sqrtf((float) (ibc + 1)));
+					outp[outidx] = vout;
+					if (vout > thresh) { // if this  S/N is above the threshold
+
+						//printf("boxcar exceeded threshold b/idt/t/ibc %d/%d/%d/%d vout=%f cand_tstart=%d best ibc/sn/t = %d/%f/%d\n",
+								//b, idt, t, ibc, vout, cand_tstart, best_ibc, best_ibc_sn, best_ibc_t);
+						// If there's no current candidate, we start one
+						if (cand_tstart < 0) {
+							cand_tstart = t;
+						}
+
+						// Keep the best S/N and ibc
+						if (vout > best_ibc_sn) {
+							best_ibc_sn = vout;
+							best_ibc = ibc;
+							best_ibc_t = t;
+						}
+					}
+
+					// If there was a candidate,
+					// AND it's ended because no boxcars exceeded the threshold this time
+					// OR if it's the last sample of the block (// because I can't be bothered keeping all the best_* states)
+					// THEN write out the candidate
+					if ((cand_tstart >= 0) && ((best_ibc < 0) || (t == nt - 1))) {
+						// record candidate details (the first boxcar is 1 sample wide)
+#pragma omp critical
+						{
+							assert(best_ibc_sn > 0);
+							sink.add_candidate(b, idt, best_ibc_t + sampno, best_ibc + 1, best_ibc_sn);
+							++ncand;
+						}
+						// reset stuff for the next candidate
+						best_ibc_sn = -1;
+						best_ibc = -1;
+						best_ibc_t  = -1;
+						cand_tstart = -1;
+					}
 				}
+
+
 				int ohistidx = mod(-t-1, NBOX);
 				history[ohistidx] = vin;
 			}
 		}
 	}
+
+	return ncand;
 }
 int boxcar_do(array4d_t* indata, array4d_t* outdata)
 {
