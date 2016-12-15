@@ -10,6 +10,7 @@ import logging
 import dada
 import pylab
 import numpy as np
+from cmdline import strrange
 
 class Formatter(object):
     def __init__(self, im):
@@ -23,8 +24,10 @@ def _main():
     from argparse import ArgumentParser
     parser = ArgumentParser(description='Script description')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-i', '--nint', help='Number of integrations', default=10, type=int)
+    parser.add_argument('-i', '--nint', help='Number of integrations', default=256, type=int)
     parser.add_argument('-b', '--bmax', help='Maximum beam to plot', type=int, default=2)
+    parser.add_argument('--imrange', help='Imavge vertical plot range')
+    parser.add_argument('--nxy', help='nxy', default='6,12')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -42,10 +45,10 @@ def _main():
     order = f.hdr.get('DORDER', 'TFBP')
     sz = dtype.itemsize
     while True:
-        plot(f, dtype, nint, nbeam, nchan, npol, order)
+        plot(f, dtype, nint, nbeam, nchan, npol, order, values)
 
 
-def plot(f, dtype, nint, nbeam, nchan, npol, order):
+def plot(f, dtype, nint, nbeam, nchan, npol, order, values):
     nelements = nbeam*nchan*nint*npol
 
     v = np.fromfile(f.fin, dtype=dtype, count=nelements)
@@ -60,13 +63,21 @@ def plot(f, dtype, nint, nbeam, nchan, npol, order):
 
     print 'Got dtypes', dtype, 'ORDER', order, 'shape', v.shape
 
-    fig, axes = pylab.subplots(6,12)
-    vmin = v.min()
-    vmax = v.max()
-    for beam, ax in enumerate(axes.flat):
+    fig, axes = pylab.subplots(*map(int, values.nxy.split(',')))
+    if values.imrange:
+        vmin, vmax = map(float, values.imrange.split(','))
+    else:
+        vmin = None
+        vmax = None
+    
+    for iax, ax in enumerate(axes.flat):
         assert order=='TFBP'
-        im = ax.imshow(v[:, :, beam,0].T, aspect='auto', vmin=vmin, vmax=vmax, interpolation='none', origin='lower')
-        ax.text(0, 0, 'beam %d' % beam, va='top', ha='left') 
+        pol = iax / nbeam
+        beam = iax % nbeam
+        img = v[:, :, beam,pol].T
+        print 'beam', beam, 'pol', pol,'max/min/mean/rms {}/{}/{}/{}'.format(img.max(), img.min(), img.mean(), img.std())
+        im = ax.imshow(img, aspect='auto', vmin=vmin, vmax=vmax, interpolation='none', origin='lower')
+        ax.text(0, 0, 'beam %d pol %d' % (beam, pol), va='top', ha='left') 
         ax.format_coord = Formatter(im)
 
 

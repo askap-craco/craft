@@ -83,7 +83,7 @@ int boxcar_do_cpu(const array4d_t* indata,
 		array4d_t* outdata,
 		array4d_t* boxcar_history,
 		size_t sampno,
-		fdmt_dtype thresh, int max_ncand_per_block, int mindm,
+		fdmt_dtype thresh, int max_ncand_per_block, int mindm, int maxbc,
 		CandidateSink& sink)
 {
 	// Inshape: [nbeams, 1, ndt, nt]
@@ -168,12 +168,14 @@ int boxcar_do_cpu(const array4d_t* indata,
 					// OR if it's the last sample of the block (// because I can't be bothered keeping all the best_* states)
 					// THEN write out the candidate
 					if ((cand_tstart >= 0) && ((best_ibc < 0) || (t == nt - 1))) {
-						// record candidate details (the first boxcar is 1 sample wide)
+						if (best_ibc <= maxbc) {
 #pragma omp critical
-						{
-							assert(best_ibc_sn > 0);
-							sink.add_candidate(b, idt, best_ibc_t + sampno, best_ibc + 1, best_ibc_sn);
-							++ncand;
+							{
+								assert(best_ibc_sn > 0);
+								// record candidate details (the first boxcar is 1 sample wide)
+								sink.add_candidate(b, idt, best_ibc_t + sampno, best_ibc + 1, best_ibc_sn);
+								++ncand;
+							}
 						}
 						// reset stuff for the next candidate
 						best_ibc_sn = -1;

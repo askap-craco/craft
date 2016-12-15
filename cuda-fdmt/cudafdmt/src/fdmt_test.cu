@@ -50,6 +50,7 @@ void runtest_usage() {
 			"   -C C - Zap time/frequency cells with S/N above threshold C\n"
 			"   -n ncand - Maximum mumber of candidates to write per block\n"
 			"   -m mindm - Minimum DM to report candidates for (to ignore 0 DM junk)\n"
+			"   -b maxbc - Maximum boxcar to create a candidate. Candidates with peaks above this boxcar are ignored\n"
 			"   -g G - CUDA device\n"
 			"   -h Print this message\n"
 			"    Version: %s\n"
@@ -97,13 +98,14 @@ int main(int argc, char* argv[])
 	int flag_grow = 3;
 	int max_ncand_per_block = INT_MAX;
 	int mindm = 0;
+	int maxbc = 32;
 
 	printf("Fredda version %s starting. Cmdline: ", VERSION);
 	for (int c = 0; c < argc; ++c) {
 		printf("%s ", argv[c]);
 	}
 
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:C:n:m:z:h")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:C:n:m:b:z:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -152,6 +154,9 @@ int main(int argc, char* argv[])
 			break;
 		case 'm':
 			mindm = atoi(optarg);
+			break;
+		case 'b':
+			maxbc = atoi(optarg);
 			break;
 		case 'z':
 			dm0_thresh = atof(optarg);
@@ -356,7 +361,7 @@ int main(int argc, char* argv[])
 					&boxcar_data,
 					&boxcar_history,
 					sampno,
-					thresh, max_ncand_per_block, mindm, sink);
+					thresh, max_ncand_per_block, mindm, maxbc, sink);
 			if (dump_data) {
 				dumparr("boxcar", iblock, &boxcar_data, false);
 			}
