@@ -84,6 +84,7 @@ int array2d_copy_to_device(array2d_t* a);
 
 __host__ __device__ size_t array4d_size(const array4d_t* a);
 __host__ __device__ int array4d_idx(const array4d_t* a, int w, int x, int y, int z);
+__host__ __device__ int array4d_idx(int nw, int nx, int ny, int nz, int w, int x, int y, int z);
 __host__ __device__ int array3d_idx(const array3d_t* a, int x, int y, int z);
 __host__ __device__ int array2d_idx(const array2d_t* a, int x, int y);
 

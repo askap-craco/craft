@@ -43,6 +43,12 @@ __host__ __device__ int array4d_idx(const array4d_t* a, int w, int x, int y, int
   return idx;
 }
 
+__host__ __device__ int array4d_idx(int nw, int nx, int ny, int nz, int w, int x, int y, int z)
+{
+	  int idx = z + nz*(y + ny*(x + w*nx));
+	  return idx;
+}
+
 __host__ __device__ size_t array4d_size(const array4d_t* a)
 {
 	return a->nw * a->nx * a->ny * a->nz;
@@ -91,6 +97,8 @@ int array2d_malloc(array2d_t* a)
 int array4d_copy_to_host(array4d_t* a)
 {
 	size_t size = array4d_size(a);
+	assert(a->d != NULL);
+	assert(a->d_device != NULL);
 	gpuErrchk(cudaMemcpy(a->d, a->d_device, size*sizeof(fdmt_dtype), cudaMemcpyDeviceToHost));
 	return size;
 }

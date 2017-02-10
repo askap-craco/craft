@@ -52,6 +52,7 @@ void runtest_usage() {
 			"   -m mindm - Minimum DM to report candidates for (to ignore 0 DM junk)\n"
 			"   -b maxbc - Maximum boxcar to create a candidate. Candidates with peaks above this boxcar are ignored\n"
 			"   -g G - CUDA device\n"
+			"   -N N - Maximum number of blocks to process before quitting\n"
 			"   -h Print this message\n"
 			"    Version: %s\n"
 	, VERSION);
@@ -99,13 +100,14 @@ int main(int argc, char* argv[])
 	int max_ncand_per_block = INT_MAX;
 	int mindm = 0;
 	int maxbc = 32;
+	int max_nblocks = INT_MAX;
 
 	printf("Fredda version %s starting. Cmdline: ", VERSION);
 	for (int c = 0; c < argc; ++c) {
 		printf("%s ", argv[c]);
 	}
 
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:C:n:m:b:z:h")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:C:n:m:b:z:N:h")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -161,6 +163,9 @@ int main(int argc, char* argv[])
 		case 'z':
 			dm0_thresh = atof(optarg);
 			break;
+		case 'N':
+			max_nblocks = atoi(optarg);
+			break;
 		case '?':
 		case 'h':
 		default:
@@ -180,8 +185,8 @@ int main(int argc, char* argv[])
 	gpuErrchk( cudaSetDevice(cuda_device));
 
 	CpuTimer tall;
-	CpuTimer trescale;
-	CpuTimer tboxcar;
+	CudaTimer trescale;
+	CudaTimer tboxcar;
 	tall.start();
 
 	// Load sigproc file
@@ -230,7 +235,7 @@ int main(int argc, char* argv[])
 	out_buf.nx = 1;
 	out_buf.ny = nd;
 	out_buf.nz = nt;
-	array4d_malloc_hostonly(&out_buf);
+	array4d_malloc(&out_buf);
 
 	// create rescaler
 	rescale_gpu_t rescale;
@@ -275,6 +280,9 @@ int main(int argc, char* argv[])
 	array4d_malloc(&boxcar_history);
 	array4d_set(&boxcar_history, 0);
 
+	// make boxcar output.
+	// TODO: Only allocate on GPU if we'll be dumping it to dis.
+	// Otherwise, we'll just use candidate lists and save on a bucketload of memory
 	array4d_t boxcar_data;
 	boxcar_data.nw = nbeams;
 	boxcar_data.nx = nd;
@@ -294,13 +302,13 @@ int main(int argc, char* argv[])
 			printf("Stopped due to signal received\n");
 			break;
 		}
-		//size_t nt2 = fin.read_samples_uint8(nt, read_buf2);
-		//assert(nt2 = nt);
+		if (blocknum >= max_nblocks) {
+			break;
+		}
+
 		// File is in TBF order
 		// Output needs to be BFT order
-		// Do transpose and cast to float on the way through
-		// TODO: Optimisation: cast to float and do rescaling in SIMD
-
+		// Do transpose and cast to float on the way through using GPU
 		// copy raw data to state. Here we're a little dodgey
 
 		bool invert_freq = (foff < 0);
@@ -321,12 +329,13 @@ int main(int argc, char* argv[])
 		assert(num_rescale_blocks >= 0);
 
 		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
-			array4d_copy_to_host(&rescale.nsamps); // must do this before updaing scaleoffset, which reset nsamps to zero
+			array4d_copy_to_host(&rescale.nsamps); // must do this before updaing scaleoffset, which resets nsamps to zero
 			rescale_update_scaleoffset_gpu(rescale);
-			array4d_copy_to_host(&rescale.scale);
 
+			// Count how many  hannels have been flagged for this whole block
+			// by looking at how many channels have scale==0
+			array4d_copy_to_host(&rescale.scale);
 			for(int i = 0; i < nf*nbeams; ++i) {
-				// Count how many  channels have been flagged for this whole block
 				if (rescale.scale.d[i] == 0) {
 					// that channel will stay flagged for num_rescale_blocks
 					num_flagged_beam_chans += num_rescale_blocks;
@@ -334,7 +343,7 @@ int main(int argc, char* argv[])
 				// Count how many times have been flagged for this block
 				int nsamps = (int)rescale.nsamps.d[i];
 				// nsamps is the number of unflagged samples in nt*num_rescale_blocks samples
-				int nflagged = nt - nsamps;
+				int nflagged = nt*num_rescale_blocks - nsamps;
 				assert (nflagged >= 0);
 				num_flagged_times += nflagged;
 			}
@@ -349,23 +358,26 @@ int main(int argc, char* argv[])
 		}
 
 		if (blocknum >= num_rescale_blocks) {
+			/// Execute the FDMT
 			fdmt_execute(&fdmt, rescale_buf.d_device, out_buf.d);
 			if (dump_data) {
 				dumparr("fdmt", iblock, &out_buf, false);
 			}
-			tboxcar.start();
 			size_t sampno = iblock*nt;
+
 			//total_candidates += boxcar_threshonly(&out_buf, sampno, thresh, max_ncand_per_block, mindm, sink);
-			total_candidates += boxcar_do_cpu(
-					&out_buf,
+			tboxcar.start();
+			total_candidates += boxcar_do_gpu (
+					&fdmt.ostate,
 					&boxcar_data,
 					&boxcar_history,
 					sampno,
 					thresh, max_ncand_per_block, mindm, maxbc, sink);
-			if (dump_data) {
-				dumparr("boxcar", iblock, &boxcar_data, false);
-			}
 			tboxcar.stop();
+
+			if (dump_data) {
+				dumparr("boxcar", iblock, &boxcar_data, true);
+			}
 		}
 
 		blocknum++;
@@ -375,13 +387,14 @@ int main(int argc, char* argv[])
 	float flagged_percent = ((float) num_flagged_beam_chans) / ((float) nf*nbeams*blocknum) * 100.0f;
 	float dm0_flagged_percent = ((float) num_flagged_times) / ((float) blocknum*nbeams*nt*nf) * 100.0f;
 	printf("FREDDA Finished\nFound %llu candidates \n", total_candidates);
+	float data_nsecs = blocknum*nt*source.tsamp();
 	tall.stop();
-	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << blocknum*nt*source.tsamp() << " seconds" << endl;
+	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << data_nsecs << " seconds" << " at " << data_nsecs/tall.wall_total()<< "x real time"<< endl;
 	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;
 	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;
 	cout << "FREDDA CPU "<< tall << endl;
-	cout << "Rescale CPU "<< trescale << endl;
-	cout << "Boxcar CPU "<< tboxcar << endl;
+	cout << "Rescale "<< trescale << endl;
+	cout << "Boxcar "<< tboxcar << endl;
 	cout << "File reading " << source.read_timer << endl;
 	fdmt_print_timing(&fdmt);
 
@@ -390,108 +403,4 @@ int main(int argc, char* argv[])
 	cout << "Resources User: " << usage.ru_utime.tv_sec <<
 			"s System:" << usage.ru_stime.tv_sec << "s MaxRSS:" << usage.ru_maxrss/1024/1024 << "MB" << endl;
 }
-int runtest(int argc, char* argv[])
-{
-	int nd = 512;
-	int nt = 256;
-	int nf = 336;
-	int nbeams = 1;
-	float fmax = 1440;
-	char ch;
-	while ((ch = getopt(argc, argv, "d:t:f:b:x:g:h")) != -1) {
-		switch (ch) {
-		case 'd':
-			nd = atoi(optarg);
-			break;
-		case 't':
-			nt = atoi(optarg);
-			break;
-		case 'f':
-			nf = atoi(optarg);
-			break;
-		case 'b':
-			nbeams = atoi(optarg);
-			break;
-		case 'x':
-			fmax = atof(optarg);
-			break;
-		case '?':
-		case 'h':
-		default:
-			runtest_usage();
-		}
-	}
-	argc -= optind;
-	argv += optind;
 
-	float fmin = fmax - (float)nf;
-
-	int blockin = nf*nt;
-	int blockout = nd*nt;
-	fdmt_dtype* din = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*blockin*nbeams);
-	fdmt_dtype* din_tmp = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*blockin*nbeams);
-	fdmt_dtype* dout = (fdmt_dtype*) malloc(sizeof(fdmt_dtype)*blockout*nbeams);
-	printf("Starting! fmin=%f fmax=%f nbeams=%d nf=%d nd=%d nt=%d\n", fmin, fmax, nbeams, nf, nd, nt);
-
-	if (argc != 2) {
-		printf("Not enough arguments\n");
-		exit(EXIT_FAILURE);
-	}
-
-	FILE* fin = fopen(argv[0], "r");
-	if (fin == NULL) {
-		perror("Could not open input file");
-		exit(EXIT_FAILURE);
-	}
-
-	FILE* fout = fopen(argv[1], "w");
-	if (fout == NULL) {
-		perror("Could not open output file");
-		exit(EXIT_FAILURE);
-	}
-
-
-	fdmt_t fdmt;
-	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
-
-	int nbox = 32;
-	array4d_t boxout;
-	boxout.nw = nbeams;
-	boxout.nx = nd;
-	boxout.ny = nt;
-	boxout.nz = nbox;
-	array4d_malloc(&boxout);
-
-	// read input file until exhausted
-	while (fread(din_tmp, sizeof(fdmt_dtype), blockin, fin) == blockin) {
-
-		// File is in TF format. We need FT order.
-		// Do the transpose
-		for(int t = 0; t < nt; ++t) {
-			for (int f = 0; f < nf; f++) {
-				din[f*nt + t] = din_tmp[f + nf*t];
-			}
-		}
-		// copy to all beams
-		for(int b = 1; b < nbeams; b++) {
-			int idx = b*blockin;
-			//memcpy(&din[idx], din, blockin*sizeof(fdmt_dtype));
-		}
-
-		CudaTimer t;
-		t.start();
-		for(int i = 0; i < 1; i++) {
-			fdmt_execute(&fdmt, din, dout);
-		}
-
-		boxcar_do(&fdmt.states[fdmt.curr_state_idx], &boxout);
-
-		t.stop();
-		cout << "FDMT Execute loop took " << t << endl;
-		fwrite(dout, sizeof(fdmt_dtype), blockout, fout);
-		cout << "Wrote " << blockout << " elements to outfile. First two are:" << dout[0] << dout[1] << endl;
-	}
-	fclose(fin);
-	fclose(fout);
-	return 0;
-}

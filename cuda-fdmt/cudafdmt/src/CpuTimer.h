@@ -21,13 +21,28 @@ public:
 	void stop();
 	friend ostream &operator<<(ostream & output,  CpuTimer &t)
 	{
-		output << "Wall total: " << t.m_mono_total
-				<< "s Wall average: " << t.m_mono_total/t.m_ncalls
-				<< " CPU total: " << t.m_cpu_total << "s "
-				<< " CPU average:" <<	t.m_cpu_total/t.m_ncalls;
+		output << "Wall total: " << t.wall_total()
+				<< "s Wall average: " << t.wall_average()
+				<< " CPU total: " << t.cpu_total() << "s "
+				<< " CPU average:" <<	t.cpu_average();
 
 		return output;
 	}
+
+	double wall_total() {
+		return m_mono_total;
+	}
+
+	double wall_average() {
+		return wall_total()/m_ncalls;
+	}
+	double cpu_total() {
+		return m_cpu_total;
+	}
+	double cpu_average() {
+		return cpu_total()/m_ncalls;
+	}
+
 private:
 	timespec m_thread_start;
 	timespec m_cpu_start;
