@@ -1,7 +1,7 @@
 #CUDA_PATH?=/Developer/NVIDIA/CUDA-7.5
 #CUDA_PATH=/usr/local/cuda-5.5/
 CUDA_PATH=$(CUDA)
-objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_test.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o
+objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_test.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o CandidateList.o
 NVCC=$(CUDA_PATH)/bin/nvcc
 
 #Embed version
