@@ -313,6 +313,8 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 				for (int j = idt; j < fdmt->nt; j++) {
 					fdmt_dtype n = (fdmt_dtype)  j;
 					state->d[outidx + j] = (state->d[iidx + j] + indata->d[imidx - j])/n;
+					printf("Chan c=%c idt=%idt j=%d stateout=%f sattein=%f indata=%f\n", c, idt, j,
+							state->d[outidx + j], state->d[iidx + j], indata->d[imidx - j]);
 				}
 			}
 		}
@@ -351,7 +353,12 @@ void __global__ fdmt_initialise_kernel(const fdmt_dtype* __restrict__ indata, fd
 		int imidx = nt - 1 + nt*(0 + 1*(c + nf*ibeam));
 		if (t >= idt && t < nt) {
 			mystate += indata[imidx - t];
-			state[outidx+t] = mystate;
+			// scale. idt+0 and . idt+1 gives a variacne hump at 1.3 at idt=1500
+			// scale=sqrtf(idt) makes it wavey
+			// scale=sqrtf(idt+1) looks a lot better, but it starts tocreep up for idt>2000 reaching 1.2 at idt=4096
+			// TODO: THis still isn't right. need to talk to Barak about what's going on here. Not entirely confince d tis logic is OK.
+			fdmt_dtype scale = sqrtf((fdmt_dtype)  idt +1 ); // Need to average in time, the variance gets larger for higher DMs
+			state[outidx+t] = mystate / scale;
 		}
 		__syncthreads();
 	}
