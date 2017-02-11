@@ -25,6 +25,7 @@
 #include "DataSource.h"
 #include "SigprocFile.h"
 #include "SigprocFileSet.h"
+#include "CandidateList.h"
 
 #include "rescale.h"
 
@@ -97,7 +98,7 @@ int main(int argc, char* argv[])
 	float dm0_thresh = 1e9;
 	float cell_thresh = 1e9;
 	int flag_grow = 3;
-	int max_ncand_per_block = INT_MAX;
+	int max_ncand_per_block = 4096;
 	int mindm = 0;
 	int maxbc = 32;
 	int max_nblocks = INT_MAX;
@@ -291,6 +292,10 @@ int main(int argc, char* argv[])
 	array4d_malloc(&boxcar_data);
 	array4d_set(&boxcar_data, 0);
 
+	printf("Making list %d\n", max_ncand_per_block);
+	CandidateList candidate_list(max_ncand_per_block);
+	printf("Made list %d\n", max_ncand_per_block);
+
 	// add signal handler
 	signal(SIGHUP, &handle_signal);
 	signal(SIGINT, &handle_signal);
@@ -371,9 +376,9 @@ int main(int argc, char* argv[])
 					&fdmt.ostate,
 					&boxcar_data,
 					&boxcar_history,
-					sampno,
-					thresh, max_ncand_per_block, mindm, maxbc, sink);
+					thresh, max_ncand_per_block, mindm, maxbc, &candidate_list);
 			tboxcar.stop();
+			candidate_list.copy_to_sink(sink, sampno);
 
 			if (dump_data) {
 				dumparr("boxcar", iblock, &boxcar_data, true);

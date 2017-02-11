@@ -5,6 +5,7 @@
 #include "fdmt_utils.h"
 #include "array.h"
 #include "CandidateSink.h"
+#include "CandidateList.h"
 #include "boxcar.h"
 
 // Modulous of a % b, but handles negative numbers
@@ -14,12 +15,65 @@ __host__ __device__ int mod(int a, int b)
     return r < 0 ? r + b : r;
 }
 
+// Modulous of a % b, but handles negative numbers
+__host__ __device__ fdmt_dtype mymax(fdmt_dtype a, fdmt_dtype b)
+{
+    return a > b ? a : b;
+}
+
+#define WARP_SZ 32
+__device__ inline int lane_id(void) { return threadIdx.x % WARP_SZ; }
+__device__ int warp_bcast(int v, int leader) { return __shfl(v, leader); }
+
+
+// One of my favourite things ever
+// From here: https://devblogs.nvidia.com/parallelforall/faster-parallel-reductions-kepler/
+__inline__ __device__
+int warpAllReduceSum(int val) {
+  for (int mask = warpSize/2; mask > 0; mask /= 2)
+    val += __shfl_xor(val, mask);
+  return val;
+}
+
+__inline__ __device__
+fdmt_dtype warpAllReduceMax(fdmt_dtype val) {
+  for (int mask = warpSize/2; mask > 0; mask /= 2)
+    val = max(val, __shfl_xor(val, mask));
+  return val;
+}
+
+// Total hack because I"m too scared to do copy constructors:
+//__device__ unsigned int add_candidate(candidate_*t c, candidate_t* m_candidates,  unsigned int* m_ncand,  unsigned int* m_max_cand) {
+__device__ unsigned int add_candidate(candidate_t* c, candidate_t* m_candidates, unsigned int* m_ncand, unsigned int* m_max_cand) {
+
+	// Increment the count by 1
+	unsigned int old_ncand = atomicInc(m_ncand, *m_max_cand);
+
+	candidate_t* cnext = m_candidates + old_ncand;
+	*cnext = *c;
+//	printf("Added candidate ibeam=%d idt=%d ibc=%d t=%d sn=%f. Current ncand: %d old ncand %d max_cand %d\n", cnext->ibeam, cnext->idt,
+//			cnext->ibc, cnext->t, cnext->sn, *m_ncand, old_ncand, *m_max_cand);
+
+	return old_ncand;
+}
+
+__device__ void check(unsigned int* m_ncand) {
+	__syncthreads();
+	if (*m_ncand != 0) {
+		printf("Argh! m_ncand is not zero! %d threadidx.x = %d threadidx.y = %d blockidx.x = %d blockidx.y = %d\n", *m_ncand, threadIdx.x, threadIdx.y, blockIdx.x, blockIdx.y);
+	}
+}
+
 __global__ void boxcar_do_kernel (
 		const __restrict__ fdmt_dtype* indata,
 		fdmt_dtype* __restrict__ outdata,
 		fdmt_dtype* __restrict__ historydata,
 		int nt,
-		int ndt)
+		int ndt,
+		fdmt_dtype threshold,
+		candidate_t* m_candidates,
+		unsigned int* m_max_cand,
+		unsigned int* m_ncand)
 {
 	// gridDim.x = nbeams
 	// gridDim.y = ndt_blocks // number of blocks of dispersion trials
@@ -81,6 +135,13 @@ __global__ void boxcar_do_kernel (
 		//printf("initstate ibc=%d state=%f history[ibc]=%f\n", ibc, state, history[ibc]);
 	}
 
+	candidate_t cand;
+	cand.t = -1; // t of the best detection so far. -1 for no curent detection ongoing
+	cand.sn = -1; // vout for best detection so far.
+	cand.ibc = ibc;
+	cand.idt = idt;
+	cand.ibeam = ibeam;
+
 
 	for(int t = 0; t < nt; ++t) {
 		// Should be a LDU instruction - global load across all threads in this warp
@@ -101,7 +162,7 @@ __global__ void boxcar_do_kernel (
 		fdmt_dtype vout = state/(sqrtf((float) (ibc + 1)));
 
 		if (idt == 0) {
-			//printf("ibc=%d hist_index = %d vin=%f state=%f vout=%f\n", ibc, history_index, vin, state, vout);
+			//pri	ntf("ibc=%d hist_index = %d vin=%f state=%f vout=%f\n", ibc, history_index, vin, state, vout);
 		}
 
 		// write state into output
@@ -110,9 +171,43 @@ __global__ void boxcar_do_kernel (
 		// increment output pointer
 		optr += NBOX;
 
-		// you can do a __syncthreads here if you really want, but because we're wroking in a warp, and there's
-		// no communication between warps (they're on different IDT indeces), we don't need to
-		//__syncthreads();
+		// here is the fun bit. Find best detection over all times and boxcars
+
+		// if in a detection:
+		if (cand.t >= 0) {
+			// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
+			if (::__all(vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
+				// find maximum across all boxcars
+				fdmt_dtype best_sn_for_ibc = warpAllReduceMax(cand.sn);
+				// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
+				int boxcar_mask = __ballot(best_sn_for_ibc == cand.sn);
+				int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
+
+//				printf("End of candidate. t=%d sn=%f idt=%d bestsn %f mask=0x%x ibc=%d best_ibc=%d got best? %d m_ncand %d\n",
+//						cand.t, cand.sn, cand.idt, best_sn_for_ibc, boxcar_mask, cand.ibc, best_ibc, best_sn_for_ibc == cand.sn, *m_ncand);
+
+				// if you're the winner, you get to write to memory. Lucky you!
+				if (ibc == best_ibc) {
+					add_candidate(&cand,  m_candidates,  m_ncand, m_max_cand);
+				}
+
+				// setup for next detection
+				cand.sn = -1;
+				cand.t = -1;
+			} else { // detection on-going
+				if (vout > cand.sn) { // keep best value for this boxcar
+					cand.sn = vout;
+					cand.t = t;
+				}
+			}
+		} else { // not currently in a detection
+			// do warp vote to see if any boxcars exceed threshold
+			if (::__any(vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
+				cand.sn = vout;
+				cand.t = t;
+			}
+		}
+
 	}
 
 	// write history to global memory so we can do the next run of this kernel
@@ -125,9 +220,8 @@ __global__ void boxcar_do_kernel (
 int boxcar_do_gpu(const array4d_t* indata,
 		array4d_t* boxcar_data,
 		array4d_t* boxcar_history,
-		size_t sampno,
 		fdmt_dtype thresh, int max_ncand_per_block, int mindm, int maxbc,
-		CandidateSink& sink)
+		CandidateList* sink)
 {
 	// indata is the FDMT ostate: i.e. Inshape: [nbeams, 1, ndt, ndt]
 	// boxcar_data shape: [nbeams, ndt, nt, nbox=32]
@@ -158,11 +252,18 @@ int boxcar_do_gpu(const array4d_t* indata,
 	assert(indata->d_device != NULL);
 	assert(boxcar_data->d_device != NULL);
 	assert(boxcar_history->d_device != NULL);
+	sink->clear();
+	assert(sink->ncand() == 0);
 	boxcar_do_kernel<<<grid_shape, block_shape>>>(
 			indata->d_device,
 			boxcar_data->d_device,
 			boxcar_history->d_device,
-			nt, ndt);
+			nt, ndt, thresh,
+			sink->m_candidates,
+			sink->m_max_cand,
+			sink->m_ncand);
+
+	gpuErrchk(cudaDeviceSynchronize());
 	return 0;
 
 }
@@ -170,8 +271,8 @@ int boxcar_do_gpu(const array4d_t* indata,
 int boxcar_do_cpu(const array4d_t* indata,
 		array4d_t* outdata,
 		array4d_t* boxcar_history,
-		size_t sampno,
-		fdmt_dtype thresh, int max_ncand_per_block, int mindm, int maxbc,
+		fdmt_dtype thresh, size_t sampno,
+		int max_ncand_per_block, int mindm, int maxbc,
 		CandidateSink& sink)
 {
 	// Inshape: [nbeams, 1, ndt, nt]
