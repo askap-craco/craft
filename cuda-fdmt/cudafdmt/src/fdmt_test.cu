@@ -292,9 +292,7 @@ int main(int argc, char* argv[])
 	array4d_malloc(&boxcar_data);
 	array4d_set(&boxcar_data, 0);
 
-	printf("Making list %d\n", max_ncand_per_block);
 	CandidateList candidate_list(max_ncand_per_block);
-	printf("Made list %d\n", max_ncand_per_block);
 
 	// add signal handler
 	signal(SIGHUP, &handle_signal);
@@ -372,13 +370,13 @@ int main(int argc, char* argv[])
 
 			//total_candidates += boxcar_threshonly(&out_buf, sampno, thresh, max_ncand_per_block, mindm, sink);
 			tboxcar.start();
-			total_candidates += boxcar_do_gpu (
+			boxcar_do_gpu (
 					&fdmt.ostate,
 					&boxcar_data,
 					&boxcar_history,
 					thresh, max_ncand_per_block, mindm, maxbc, &candidate_list);
 			tboxcar.stop();
-			candidate_list.copy_to_sink(sink, sampno);
+			total_candidates += candidate_list.copy_to_sink(sink, sampno);
 
 			if (dump_data) {
 				dumparr("boxcar", iblock, &boxcar_data, true);

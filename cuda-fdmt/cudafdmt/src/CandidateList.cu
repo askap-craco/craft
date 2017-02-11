@@ -48,7 +48,6 @@ unsigned int __host__ CandidateList::ncand() {
 
 __host__ unsigned int CandidateList::copy_to_sink(CandidateSink& sink, size_t sampno) {
 	unsigned int ncand = CandidateList::ncand();
-	printf("Writing %d candidates \n", ncand);
 	for (unsigned int i = 0; i < ncand; ++i) {
 		candidate_t* c = &m_candidates[i];
 		sink.add_candidate(c->ibeam, c->idt, sampno+ c->t, c->ibc, c->sn);
