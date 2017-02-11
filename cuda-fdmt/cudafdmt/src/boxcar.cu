@@ -123,7 +123,7 @@ __global__ void boxcar_do_kernel (
 	}
 
 	// not strictly required, as all the communication is between threads of a warp, but makes me feel good.
-	__syncthreads();
+	//__syncthreads();
 
 	// setup the state for *this* thread (which sits in a register hopefully from now on)
 	fdmt_dtype state = history[ibc];

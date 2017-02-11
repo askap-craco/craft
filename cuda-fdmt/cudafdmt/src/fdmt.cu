@@ -106,7 +106,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 		if (iif < nf - 1) { // all the bottom subbands
 			f_end = f_start + fres;
-		} else  { // if this is final subband
+		} else  { // if this is final, leftover subband because some cheeky monkey doesn't have a power of 2 number of channels.
 //			printf("iif %d final subband\n", iif);
 			if (2*iif + 1 < indata->nx) { // There are 2 subbands available in the input data
 				// The width of the output subband is the sum of the input suband (which is fres/2.0)
@@ -169,6 +169,14 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			dst_start.z = dt_middle_larger;
 
 			// We shouldn't overrun the incoming array
+			if (dt_middle_index >= indata->ny) {
+				printf("Bleagh! dt_middle_index exceeded input array. iteration_num %d oif=%d idt %d dt_middle_index %d ny %d delta_t_local %d\n", iteration_num, iif, idt, dt_middle_index, indata->ny, delta_t_local);
+				dt_middle_index = indata->ny -1 ; // NOT SURE I SHOULD BE DOING THIS!
+			}
+			if (dt_rest_index >= indata->ny) {
+				printf("Bleagh! dt_rest_index exceeded input array. iteration_num %d oif=%d idt %d dt_middle_index %d ny %d delta_t_local %d\n", iteration_num, iif, idt, dt_middle_index, indata->ny, delta_t_local);
+				dt_rest_index = indata->ny - 1;
+			}
 			assert(dt_middle_index < indata->ny);
 			assert(dt_rest_index < indata->ny);
 			// TODO: ADD MORE BOUNDS CHECKS
