@@ -259,7 +259,12 @@ int main(int argc, char* argv[])
 			rescale.flag_grow);
 	//rescale_allocate(&rescale, nbeams*nf);
 	rescale_allocate_gpu(&rescale, nbeams, nf, nt);
-	rescale_set_scale_offset_gpu(&rescale, rescale.target_stdev/18.0, -128.0f); // uint8 stdev is 18 and mean +128.
+	if (num_rescale_blocks == 0) {
+		rescale_set_scale_offset_gpu(&rescale, 1.0f, -128.0f); // Just pass it straight through without rescaling
+	} else {
+		rescale_set_scale_offset_gpu(&rescale, rescale.target_stdev/18.0, -128.0f); // uint8 stdev is 18 and mean +128.
+	}
+
 
 
 	fdmt_t fdmt;
