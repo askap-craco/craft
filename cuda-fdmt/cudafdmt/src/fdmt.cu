@@ -311,7 +311,8 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 				// for each time
 				// (TODO: Not including a missing overlap here)
 				for (int j = idt; j < fdmt->nt; j++) {
-					state->d[outidx + j] = state->d[iidx + j] + indata->d[imidx - j];
+					fdmt_dtype n = (fdmt_dtype)  j;
+					state->d[outidx + j] = (state->d[iidx + j] + indata->d[imidx - j])/n;
 				}
 			}
 		}
