@@ -46,6 +46,7 @@ def _main():
     parser.add_argument('--imzrange', help='Z range for dynamic spectrum', type=floatcommasep)
     parser.add_argument('--fft', help='plot fft', action='store_true',default=False)
     parser.add_argument('--save', help='Save plots as png', action='store_true', default=False)
+    parser.add_argument('--raw-units', help='Use raw unts, rather than physical units on axis', action='store_true', default=False)
     parser.set_defaults(verbose=False, nxy="1,1")
     values = parser.parse_args()
     if values.verbose:
@@ -74,7 +75,7 @@ class Plotter(object):
     @staticmethod
 
     def from_values(values, tstart, ntimes):
-        p = Plotter(values.files, values.nxy, fft=values.fft)
+        p = Plotter(values.files, values.nxy, fft=values.fft, raw_units=values.raw_units)
         if values.seconds:
             p.set_position_seconds(*values.seconds)
         else:
@@ -85,7 +86,7 @@ class Plotter(object):
 
         return p
     
-    def __init__(self, filenames, nxy, tstart=0, ntimes=1024, fft=False):
+    def __init__(self, filenames, nxy, tstart=0, ntimes=1024, fft=False, raw_units=False):
         self.nrows, self.ncols = nxy
         self.figs = {}
         # Sniff data
@@ -95,16 +96,23 @@ class Plotter(object):
         nbeams = len(self.files)
         mjdstart = files[0].tstart
         tsamp = files[0].tsamp
-
+        self.raw_units = raw_units
+        if self.raw_units:
+            xunit = 'sample'
+            yunit = 'channel'
+        else:
+            xunit= 'sec'
+            yunit = 'MHz'
+            
         self.mjdstart = mjdstart
         self.tsamp = tsamp
         self.set_position_sample(tstart, ntimes)
         self.imzrange = None
 
-        self.mkfig('mean', 'Mean bandpass', 'Frequency (MHz)','Mean bandpass')
-        self.mkfig('std', 'Bandpass stdDev', 'Frequency (MHz)','Bandpass StdDev')
-        self.mkfig('kurt','Kurtosis', 'Frequency (MHz)', 'Kurtosis')
-        self.mkfig('dynspec', 'Dynamic spectrum', 'Time (s) after %f' % mjdstart, 'Frequency (MHz)')
+        self.mkfig('mean', 'Mean bandpass', 'Frequency (%s)' % yunit,'Mean bandpass')
+        self.mkfig('std', 'Bandpass stdDev', 'Frequency (%s)' % yunit ,'Bandpass StdDev')
+        self.mkfig('kurt','Kurtosis', 'Frequency (%s)' % yunit, 'Kurtosis')
+        self.mkfig('dynspec', 'Dynamic spectrum', 'Time (%s) after %f' % (xunit, mjdstart), 'Frequency (%s)' % yunit)
         if nbeams > 1:
             self.mkfig('cov', 'Beam covariance', 'beam no', 'beamno', 1,1)
 
@@ -203,9 +211,16 @@ class Plotter(object):
 
         f0 = files[0]
         mjdstart = f0.tstart
-        tsamp = f0.tsamp
-        fch1 = f0.fch1
-        foff = f0.foff
+        
+        if self.raw_units:
+            tsamp = 1.
+            fch1 = 0.
+            foff = 1.
+        else:
+            tsamp = f0.tsamp
+            fch1 = f0.fch1
+            foff = f0.foff
+
         src_raj = f0.src_raj
         src_dej = f0.src_dej
         freqs = np.linspace(fch1, fch1 + nfreq*foff, nfreq, endpoint=True)

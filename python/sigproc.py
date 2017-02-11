@@ -130,6 +130,7 @@ class SigprocFile(object):
                 print 'Cannot write header', k
 
         write_str(f, 'HEADER_END')
+        self.data_start_idx = f.tell()
         
     def _read_header(self):
         fin = self.fin
@@ -214,13 +215,13 @@ class SigprocFile(object):
             raise NotImplementedError("Can't handle Nif > 1")
             
         if self.nbits == 8:
-            dtype = np.int8
+            dtype = np.uint8
             samps_per_element = 1
         elif self.nbits == 32:
             dtype = np.float32
             samps_per_element = 1
         elif self.nbits == 2:
-            dtype = np.int8
+            dtype = np.uint8
             samps_per_element = 4
         else:
             raise NotImplementedError("Can't handle nbits: %d" % self.nbits)

@@ -24,7 +24,7 @@ def _main():
     from argparse import ArgumentParser
     parser = ArgumentParser(description='Script description')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-i', '--nint', help='Number of integrations', default=256, type=int)
+    parser.add_argument('-t', '--time', help='Sample times', default='0,256')
     parser.add_argument('-b', '--bmax', help='Maximum beam to plot', type=int, default=2)
     parser.add_argument('--imrange', help='Imavge vertical plot range')
     parser.add_argument('--nxy', help='nxy', default='6,12')
@@ -40,10 +40,12 @@ def _main():
     nbeam = int(f.hdr['NBEAM'])
     nchan = int(f.hdr['NCHAN'])
     npol = int(f.hdr['NPOL'])
-    nint = values.nint
+    tstart, nint = map(int, values.time.split(','))
     dtype = np.dtype(f.hdr.get('DTYPE', '<f4'))
     order = f.hdr.get('DORDER', 'TFBP')
     sz = dtype.itemsize
+    byteoff = 4*nchan*nbeam*npol*tstart
+    f.fin.seek(byteoff + f.header_size)
     while True:
         plot(f, dtype, nint, nbeam, nchan, npol, order, values)
 

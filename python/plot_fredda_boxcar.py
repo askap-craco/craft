@@ -21,11 +21,11 @@ def _main():
     from argparse import ArgumentParser
     parser = ArgumentParser(description='Script description')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-b','--beam', type=float, help='beam number')
+    parser.add_argument('-b','--beam', type=int, help='beam number')
     parser.add_argument('-d','--dm', type=int, help='iDm to show in time series plot')
     parser.add_argument('-s','--start', type=int, help='Start block')
     parser.add_argument('-n','--maxn', type=int, help='max number of blocks ot plot')
-    parser.set_defaults(verbose=False, beam=0, start=4, maxn=10)
+    parser.set_defaults(verbose=False, beam=0, start=4, maxn=10, dm=0)
     values = parser.parse_args()
     if values.verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -35,7 +35,7 @@ def _main():
     for ifname, fname in enumerate(file_series('boxcar_e%d.dat', values.start)):
         alld = load4d(fname)
         
-        d = alld[0, values.dm, :, :]
+        d = alld[values.beam, values.dm, :, :]
         fig, axes = pylab.subplots(1,3)
         ax = axes.flatten()
         ax[0].plot(d)
