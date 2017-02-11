@@ -651,6 +651,9 @@ __host__ void cuda_fdmt_iteration3(const fdmt_t* fdmt, const int iteration_num, 
 	cuda_fdmt_iteration_kernel3<<<grid_shape, fdmt->max_dt>>>( fmin,  frange,  fjumps,  correction); // loops over all beams, subbands and dts
 }
 
+
+// The thing I like about this version is there' some small hope that it will cache some of teh data, because it loops over idt
+// On the other hand, we probably should to it explicitly with shared memory if we want to do it prperly.
 __global__ void cuda_fdmt_iteration_kernel4_sum (
 		fdmt_dtype*  __restrict__ outdata,
 		const fdmt_dtype* __restrict__ indata,
@@ -684,6 +687,79 @@ __global__ void cuda_fdmt_iteration_kernel4_sum (
 	}
 }
 
+// The thing I like about this i that it has loads of blocks, so works well even if nbeams is small.
+// But: it doesn't do much caching.
+__global__ void cuda_fdmt_iteration_kernel5_sum (
+		fdmt_dtype*  __restrict__ outdata,
+		const fdmt_dtype* __restrict__ indata,
+		int src_beam_stride,
+		int dst_beam_stride,
+		int tmax,
+		const int* __restrict__ ts_data)
+
+{
+	int beamno = blockIdx.x;
+	int idt = blockIdx.y;
+	int t = threadIdx.x;
+	int nt = blockDim.x;
+	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
+	const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
+	const int* ts_ptr = ts_data + 4*idt;
+	int src1_offset = ts_ptr[0];
+	int src2_offset = ts_ptr[1];
+	int out_offset = ts_ptr[2];
+	int mint = ts_ptr[3];
+
+	while(t < tmax + idt) {
+
+//		if (t >= maxt + delta_t_local) { // strictly could be the actuall delta_t for the out_offset, but who's counting?
+//			return;
+//		}
+
+		if (t < mint) {
+			outp[out_offset] = inp[src1_offset];
+		} else {
+			outp[out_offset] = inp[src1_offset] + inp[src2_offset];
+		}
+		t += nt;
+		outp += nt;
+		inp += nt;
+//
+	}
+
+
+}
+
+// The thing I like about this i that it has loads of blocks, so works well even if nbeams is small.
+// But: it doesn't do much caching.
+__global__ void cuda_fdmt_iteration_kernel5_copy (
+		fdmt_dtype*  __restrict__ outdata,
+		const fdmt_dtype* __restrict__ indata,
+		int src_beam_stride,
+		int dst_beam_stride,
+		int tmax,
+		const int* __restrict__ ts_data)
+
+{
+	int beamno = blockIdx.x;
+	int idt = blockIdx.y;
+	int t = threadIdx.x;
+	int nt = blockDim.x;
+	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
+	const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
+	const int* ts_ptr = ts_data + 4*idt;
+	int src1_offset = ts_ptr[0];
+	int out_offset = ts_ptr[2];
+
+	while(t < tmax + idt) {
+		outp[out_offset] = inp[src1_offset];
+		t += nt;
+		outp += nt;
+		inp += nt;
+	}
+
+
+}
 __global__ void cuda_fdmt_iteration_kernel4_copy (
 		fdmt_dtype*  __restrict__ outdata,
 		const fdmt_dtype* __restrict__ indata,
@@ -738,19 +814,33 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		// WARNING: This is sub-optimal as it doesn't use an integral number of warps, and
 		// Can exceed teh maximum thread limit of the GPU , and use the threads sub-optimally.
 		// More thought required to do this right.
+		// kernel4 requires nthreads = tax
 		int nthreads = tmax;
+		dim3 grid_size(fdmt->nbeams, delta_t_local);
+		//nthreads = 256;
 
 		if(2*iif + 1 < indata->nx) { // do sum if there's a channel to sum
-			cuda_fdmt_iteration_kernel4_sum<<<fdmt->nbeams, nthreads>>>(dst_start, src_start,
+//			cuda_fdmt_iteration_kernel4_sum<<<fdmt->nbeams, tmax>>>(dst_start, src_start,
+//					src_beam_stride,
+//					dst_beam_stride,
+//					delta_t_local, ts_data);
+
+			cuda_fdmt_iteration_kernel5_sum<<<grid_size, 256>>>(dst_start, src_start,
 					src_beam_stride,
 					dst_beam_stride,
-					delta_t_local, ts_data);
+					tmax, ts_data);
 			gpuErrchk(cudaPeekAtLastError());
 		} else { // Do copy if there's no channel to add
-			cuda_fdmt_iteration_kernel4_copy<<<fdmt->nbeams, nthreads>>>(dst_start, src_start,
-					src_beam_stride,
-					dst_beam_stride,
-					delta_t_local, ts_data);
+//			cuda_fdmt_iteration_kernel4_copy<<<fdmt->nbeams, tmax>>>(dst_start, src_start,
+//					src_beam_stride,
+//					dst_beam_stride,
+//					delta_t_local, ts_data);
+
+			cuda_fdmt_iteration_kernel5_copy<<<grid_size, 256>>>(dst_start, src_start,
+								src_beam_stride,
+								dst_beam_stride,
+								tmax, ts_data);
+
 			gpuErrchk(cudaPeekAtLastError());
 		}
 
