@@ -67,10 +67,21 @@ size_t array4d_malloc_hostonly(array4d_t* a)
 	return size;
 }
 
-size_t array4d_malloc(array4d_t* a)
+size_t array4d_malloc(array4d_t* a, bool host, bool device)
 {
-	size_t size = array4d_malloc_hostonly(a);
-    gpuErrchk( cudaMalloc((void**) &a->d_device, size*sizeof(fdmt_dtype) ));
+	size_t size = 0;
+	if (host) {
+		size = array4d_malloc_hostonly(a);
+	} else {
+		a->d = NULL;
+	}
+
+	if (device) {
+		size  = array4d_size(a);
+		gpuErrchk( cudaMalloc((void**) &a->d_device, size*sizeof(fdmt_dtype) ));
+	} else {
+		a->d_device = NULL;
+	}
     return size;
 }
 
@@ -175,10 +186,23 @@ void array4d_print_shape(const array4d_t* a)
 
 void array4d_set(array4d_t* a, fdmt_dtype v)
 {
+	assert(a->d != NULL);
 	for(int i = 0; i < array4d_size(a); ++i) {
 		a->d[i] = v;
 	}
 	array4d_copy_to_device(a);
+}
+
+size_t array4d_zero(array4d_t* a) {
+	size_t size = array4d_size(a);
+	if (a->d_device) {
+		gpuErrchk(cudaMemset(a->d_device, size*sizeof(fdmt_dtype), 0));
+	}
+	if (a->d) {
+		bzero(a->d, size*sizeof(fdmt_dtype));
+	}
+
+	return size;
 }
 
 int array4d_dump(const array4d_t* a, const char* foutname)

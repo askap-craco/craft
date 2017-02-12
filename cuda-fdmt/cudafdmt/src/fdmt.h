@@ -92,6 +92,7 @@ typedef struct _fdmt_t
 	float _f_width; // Width of all other subbands of an FDMT iteration - used during fdmt_create() to handle non-power-of-two FDMTs
 	//FdmtIteration* iterations[MAX_ITER]; // description of what happens for each iteration
 	vector<FdmtIteration* > iterations;
+	bool dump_data;
 	CudaTimer t_init;
 	CudaTimer t_iterations;
 	CudaTimer t_copy_in;
@@ -110,7 +111,7 @@ __host__ __device__ float cff(float f1_start, float f1_end, float f2_start, floa
 
 __host__ __device__ int calc_delta_t(const fdmt_t* fdmt, float f_start, float f_end);
 
-int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt,  int nbeams);
+int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt,  int nbeams, bool dump_data);
 
 int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata);
 

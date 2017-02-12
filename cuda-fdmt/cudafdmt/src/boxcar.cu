@@ -166,7 +166,9 @@ __global__ void boxcar_do_kernel (
 		}
 
 		// write state into output
-		optr[ibc] = vout;
+		if (outdata != NULL) {
+			optr[ibc] = vout;
+		}
 
 		// increment output pointer
 		optr += NBOX;
@@ -224,7 +226,7 @@ int boxcar_do_gpu(const array4d_t* indata,
 		CandidateList* sink)
 {
 	// indata is the FDMT ostate: i.e. Inshape: [nbeams, 1, ndt, ndt]
-	// boxcar_data shape: [nbeams, ndt, nt, nbox=32]
+	// boxcar_data shape: [nbeams, ndt, nt, nbox=32] - device and host pointers null if we don't want to save to memory
 	// But we might only want to boxcar the first nt of it
 	int nbeams = indata->nw;
 	int nt = boxcar_data->ny;
@@ -250,7 +252,6 @@ int boxcar_do_gpu(const array4d_t* indata,
 	dim3 grid_shape(nbeams, ndt_blocks);
 
 	assert(indata->d_device != NULL);
-	assert(boxcar_data->d_device != NULL);
 	assert(boxcar_history->d_device != NULL);
 	sink->clear();
 	assert(sink->ncand() == 0);

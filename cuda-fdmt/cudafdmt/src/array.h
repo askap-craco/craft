@@ -70,13 +70,15 @@ typedef struct _coord4 {
 
 int arraynd_idx(const arraynd_t *a, ...);
 
-size_t array4d_malloc(array4d_t* a);
+size_t array4d_malloc(array4d_t* a, bool host=true, bool device=true);
 size_t array4d_malloc_hostonly(array4d_t* a);
 int array4d_copy_to_host(array4d_t* a);
 int array4d_cuda_memset(array4d_t*a, char c) ;
 int array4d_copy_to_device(array4d_t* a);
 void array4d_print_shape(const array4d_t* a);
 void array4d_set(array4d_t* a, fdmt_dtype v);
+size_t array4d_zero(array4d_t* a);
+
 
 
 int array2d_malloc(array2d_t* a);

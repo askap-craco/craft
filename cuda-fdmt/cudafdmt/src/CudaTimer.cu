@@ -45,6 +45,10 @@ void CudaTimer::sync_stop() {
 
 float CudaTimer::get_elapsed_time() {
 	float ms;
-	gpuErrchk(cudaEventElapsedTime(&ms, m_start, m_stop));
+	if (m_ncalls == 0) { // if it hasn't been called, cudaEventElapsedTime fails with invalidResourceHandle
+		ms = 0;
+	} else {
+		gpuErrchk(cudaEventElapsedTime(&ms, m_start, m_stop));
+	}
 	return ms;
 }

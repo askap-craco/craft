@@ -216,27 +216,27 @@ int main(int argc, char* argv[])
 
 	// Create read buffer
 	uint8_t* read_buf = (uint8_t*) malloc(sizeof(uint8_t) * in_chunk_size);
+	assert(read_buf);
+
 	array4d_t read_arr;
 	read_arr.nw = 1;
 	read_arr.nx = nt;
 	read_arr.ny = nbeams;
 	read_arr.nz = nf;
-	assert(read_buf);
-
 
 	array4d_t rescale_buf;
 	rescale_buf.nw = nbeams;
 	rescale_buf.nx = nf;
 	rescale_buf.ny = 1;
 	rescale_buf.nz = nt;
-	array4d_malloc(&rescale_buf); // Can do GPU only maybe??
+	array4d_malloc(&rescale_buf, dump_data, true);
 
 	array4d_t out_buf;
 	out_buf.nw = nbeams;
 	out_buf.nx = 1;
 	out_buf.ny = nd;
 	out_buf.nz = nt;
-	array4d_malloc(&out_buf);
+	array4d_malloc(&out_buf, dump_data, true);
 
 	// create rescaler
 	rescale_gpu_t rescale;
@@ -258,18 +258,16 @@ int main(int argc, char* argv[])
 			rescale.dm0_thresh, rescale.cell_thresh,
 			rescale.flag_grow);
 	//rescale_allocate(&rescale, nbeams*nf);
-	rescale_allocate_gpu(&rescale, nbeams, nf, nt);
+	rescale_allocate_gpu(&rescale, nbeams, nf, nt, true); // Need host memory allocated for rescale because we copy back to count flags
 	if (num_rescale_blocks == 0) {
 		rescale_set_scale_offset_gpu(&rescale, 1.0f, -128.0f); // Just pass it straight through without rescaling
 	} else {
 		rescale_set_scale_offset_gpu(&rescale, rescale.target_stdev/18.0, -128.0f); // uint8 stdev is 18 and mean +128.
 	}
 
-
-
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
-	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams);
+	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams, dump_data);
 	printf("Seeking to start of data: nblocks=%d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source.tsamp());
 	printf("S/N Threshold %f Max ncand per block %d mindm %d \n", thresh, max_ncand_per_block, mindm);
 	source.seek_sample(num_skip_blocks*nt);
@@ -283,8 +281,8 @@ int main(int argc, char* argv[])
 	boxcar_history.nx = nbeams;
 	boxcar_history.ny = nd;
 	boxcar_history.nz = NBOX;
-	array4d_malloc(&boxcar_history);
-	array4d_set(&boxcar_history, 0);
+	array4d_malloc(&boxcar_history, dump_data, true);
+	array4d_zero(&boxcar_history);
 
 	// make boxcar output.
 	// TODO: Only allocate on GPU if we'll be dumping it to dis.
@@ -294,10 +292,14 @@ int main(int argc, char* argv[])
 	boxcar_data.nx = nd;
 	boxcar_data.ny = nt;
 	boxcar_data.nz = NBOX;
-	array4d_malloc(&boxcar_data);
-	array4d_set(&boxcar_data, 0);
+	array4d_malloc(&boxcar_data, dump_data, dump_data);
+	array4d_zero(&boxcar_data);
 
 	CandidateList candidate_list(max_ncand_per_block);
+
+	// measure bytes used
+	size_t gpu_free_bytes, gpu_total_bytes;
+	gpuErrchk(cudaMemGetInfo( &gpu_free_bytes, &gpu_total_bytes ));
 
 	// add signal handler
 	signal(SIGHUP, &handle_signal);
@@ -405,10 +407,10 @@ int main(int argc, char* argv[])
 	cout << "Boxcar "<< tboxcar << endl;
 	cout << "File reading " << source.read_timer << endl;
 	fdmt_print_timing(&fdmt);
-
-	struct rusage usage;
+		struct rusage usage;
 	getrusage(RUSAGE_SELF, &usage);
 	cout << "Resources User: " << usage.ru_utime.tv_sec <<
 			"s System:" << usage.ru_stime.tv_sec << "s MaxRSS:" << usage.ru_maxrss/1024/1024 << "MB" << endl;
+	cout << "GPU Memory used " << (gpu_total_bytes - gpu_free_bytes)/1024/1024 << " of " << gpu_total_bytes /1024/124 << " MiB" << endl;
 }
 

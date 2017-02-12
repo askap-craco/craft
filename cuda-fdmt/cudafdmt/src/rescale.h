@@ -56,7 +56,7 @@ typedef struct _rescale_gpu_t {
 
 
 rescale_t* rescale_allocate(rescale_t* rescale, uint64_t nelements) ;
-rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uint64_t nf, uint64_t nt);
+rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uint64_t nf, uint64_t nt, bool alloc_host);
 void rescale_set_scale_offset_gpu(rescale_gpu_t* rescale, float scale, float offset);
 
 void rescale_update_scaleoffset(rescale_t* rescale);

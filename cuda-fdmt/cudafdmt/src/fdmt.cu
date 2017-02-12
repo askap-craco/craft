@@ -195,7 +195,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 }
 
 
-int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt, int nbeams)
+int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt, int nbeams, bool dump_data)
 {
 	// Expect center frequencies on the input here. Interanlly use the bottom edge frequency
 	fdmt->max_dt = max_dt;
@@ -206,6 +206,8 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	fdmt->fmax = fmax;
 	fdmt->order = (int)ceil(log(fdmt->nf)/log(2.0));
 	fdmt->nbeams = nbeams;
+	fdmt->dump_data = dump_data;
+	bool host_alloc = dump_data;
 	assert(nf > 0);
 	assert(max_dt > 0);
 	assert(nt > 0);
@@ -236,7 +238,7 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 		fdmt->states[s].nx = fdmt->nf;
 		fdmt->states[s].ny = fdmt->delta_t;
 		fdmt->states[s].nz = fdmt->max_dt;
-		array4d_malloc(&fdmt->states[s]);
+		array4d_malloc(&fdmt->states[s], host_alloc, true);
 	}
 	fdmt->state_size = array4d_size(&fdmt->states[0]);
 	fdmt->state_nbytes = fdmt->state_size * sizeof(fdmt_dtype);
@@ -244,7 +246,7 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	fdmt->ostate.nx = 1;
 	fdmt->ostate.ny = fdmt->max_dt;
 	fdmt->ostate.nz = fdmt->max_dt;
-	array4d_malloc(&fdmt->ostate);
+	array4d_malloc(&fdmt->ostate, host_alloc, true);
 	array4d_cuda_memset(&fdmt->ostate, 0);
 
 	printf("FDMT State size: %d Bytes\n", fdmt->state_nbytes);
@@ -1077,9 +1079,12 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	outarray.ny = fdmt->max_dt;
 	outarray.nz = fdmt->nt;
 
-	fdmt->t_copy_back.start();
-	fdmt_copy_valid_ostate2(fdmt, &outarray);
-	fdmt->t_copy_back.stop();
+	if (fdmt->dump_data) {
+		fdmt->t_copy_back.start();
+		fdmt_copy_valid_ostate2(fdmt, &outarray);
+		fdmt->t_copy_back.stop();
+	}
+
 	fdmt->execute_count += 1;
 
 	return 0;
