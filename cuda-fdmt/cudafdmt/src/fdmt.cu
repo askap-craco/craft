@@ -348,25 +348,19 @@ void __global__ fdmt_initialise_kernel(const fdmt_dtype* __restrict__ indata,
 		}
 	}
 
-	// make sure the state is consistent.
-	__syncthreads();
 	// Do partial sums initialisation recursively (Equation 20.)
 	for (int idt = 1; idt < delta_t; ++idt) {
 		int outidx = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, idt, 0);
-		int iidx = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, idt-1, 0);
-		int imidx = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0);
+		int iidx   = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, idt-1, 0);
+		int imidx  = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, nt -1 );
 
 		// The state for dt=d = the state for dt=(d-1) + the time-reversed input sample
 		// for each time
 		// (TODO: Not including a missing overlap with the previous block here)
-		for(int j = idt; j < nt; ++j) {
-			//state[outidx + j] = state[iidx + j] + indata[imidx +j];
-			if (c == 16) {
-				//printf("Init outidx=%d iidx=%d imidx=%d j=%d state[outidx+j]=%f indata%f\n", outidx, iidx, imidx,j, state, indata[imidx-j]);
-			}
+		// originally this was j=idt, rather than j=0. But that just meant that 0<=j<idt were zero, which seems weird.
+		for(int j = 0; j < nt; ++j) {
+			state[outidx + j] = state[iidx + j] + indata[imidx -j];
 		}
-
-		__syncthreads();
 	}
 }
 
@@ -894,6 +888,11 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 	const fdmt_dtype* iptr = indata + off;
 	// Add the new state for all but the last block
 	while (t < max_dt - nt) {
+		// makign this optr[t] = iptr[t+-1] + optr[t + nt] makes the DC RMS worse
+		// optr[t] = iptr[t] + optr[t + nt +- 1]; also worse
+		// So 		optr[t] = iptr[t] + optr[t + nt];
+		// It's just weird that we have such a noisy response to DC input
+
 		optr[t] = iptr[t] + optr[t + nt];
 
 		// sync threads before doing the next block otherwise we don't copy the ostate correctly
