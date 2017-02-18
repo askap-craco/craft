@@ -195,12 +195,14 @@ void array4d_set(array4d_t* a, fdmt_dtype v)
 
 size_t array4d_zero(array4d_t* a) {
 	size_t size = array4d_size(a);
-	if (a->d_device) {
-		gpuErrchk(cudaMemset(a->d_device, size*sizeof(fdmt_dtype), 0));
-	}
 	if (a->d) {
 		bzero(a->d, size*sizeof(fdmt_dtype));
 	}
+
+	if (a->d_device != NULL) {
+		gpuErrchk(cudaMemset(a->d_device, 0, size*sizeof(fdmt_dtype)));
+	}
+
 
 	return size;
 }

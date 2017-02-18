@@ -314,7 +314,7 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 				// (TODO: Not including a missing overlap here)
 				for (int j = idt; j < fdmt->nt; j++) {
 					fdmt_dtype n = (fdmt_dtype)  j;
-					state->d[outidx + j] = (state->d[iidx + j] + indata->d[imidx - j])/n;
+					state->d[outidx + j] = (state->d[iidx + j] + indata->d[imidx - j]);
 					printf("Chan c=%c idt=%idt j=%d stateout=%f sattein=%f indata=%f\n", c, idt, j,
 							state->d[outidx + j], state->d[iidx + j], indata->d[imidx - j]);
 				}
@@ -326,42 +326,46 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 
 }
 
-void __global__ fdmt_initialise_kernel(const fdmt_dtype* __restrict__ indata, fdmt_dtype* __restrict__ state, int delta_t, int max_dt)
+void __global__ fdmt_initialise_kernel(const fdmt_dtype* __restrict__ indata,
+		fdmt_dtype* __restrict__ state, int delta_t, int max_dt, int nt)
 {
 	// indata is 4D array: (nbeams, nf, 1, nt): index [ibeam, c, 0, t] = t + nt*(0 + 1*(c + nf*ibeam))
 	// State is a 4D array: (nbeams, nf, delta_t, max_dt) ( for the moment)
 	// full index [ibeam, c, idt, t] is t + max_dt*(idt + delta_t*(c + nf*ibeam))
 
+	int nbeams = gridDim.x; // number of beams
+	int nf = blockDim.x; // Number of frequencies
 	int ibeam = blockIdx.x; // beam number
-	int c = blockIdx.y; // Channel number
+	int c = threadIdx.x; // Channel number
 
-	int nf = gridDim.y; // Number of frequencies
+	// Assign initial data to the state at delta_t=0
+	int outidx = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, 0, 0);
+	int imidx = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0);
+	for (int t = 0; t < nt; ++t) {
+		state[outidx + t] = indata[imidx + t];
+		if (c == 0) {
+			//printf("outidx %d imidx=%d t=%d indata=%f\n", outidx, imidx, t, indata[imidx+t]);
+		}
+	}
 
-	int nt = blockDim.x; // Number of samples
-	int t = threadIdx.x; // sample number
-
-	// assign initial data to delta_t = 0
-	int outidx = 0 + max_dt*(0 + delta_t*(c + nf*ibeam));
-	int inidx = 0 + nt*(0 + 1*(c + nf*ibeam));
-	fdmt_dtype mystate = indata[inidx + t];
-	state[outidx + t] = mystate;
+	// make sure the state is consistent.
 	__syncthreads();
 	// Do partial sums initialisation recursively (Equation 20.)
 	for (int idt = 1; idt < delta_t; ++idt) {
-		// output index [beam, c, idt, 0]
-		outidx = 0 + max_dt*(idt + delta_t*(c + nf*ibeam));
+		int outidx = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, idt, 0);
+		int iidx = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, idt-1, 0);
+		int imidx = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0);
 
-		// input index [beam, c, 0, nt-1]
-		int imidx = nt - 1 + nt*(0 + 1*(c + nf*ibeam));
-		if (t >= idt && t < nt) {
-			mystate += indata[imidx - t];
-			// scale. idt+0 and . idt+1 gives a variacne hump at 1.3 at idt=1500
-			// scale=sqrtf(idt) makes it wavey
-			// scale=sqrtf(idt+1) looks a lot better, but it starts tocreep up for idt>2000 reaching 1.2 at idt=4096
-			// TODO: THis still isn't right. need to talk to Barak about what's going on here. Not entirely confince d tis logic is OK.
-			fdmt_dtype scale = sqrtf((fdmt_dtype)  idt +1 ); // Need to average in time, the variance gets larger for higher DMs
-			state[outidx+t] = mystate / scale;
+		// The state for dt=d = the state for dt=(d-1) + the time-reversed input sample
+		// for each time
+		// (TODO: Not including a missing overlap with the previous block here)
+		for(int j = idt; j < nt; ++j) {
+			//state[outidx + j] = state[iidx + j] + indata[imidx +j];
+			if (c == 16) {
+				//printf("Init outidx=%d iidx=%d imidx=%d j=%d state[outidx+j]=%f indata%f\n", outidx, iidx, imidx,j, state, indata[imidx-j]);
+			}
 		}
+
 		__syncthreads();
 	}
 }
@@ -385,8 +389,8 @@ int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* 
 	array4d_cuda_memset(state, 0);
 	gpuErrchk(cudaDeviceSynchronize());
 
-	dim3 grid_shape(fdmt->nbeams, fdmt->nf);
-	fdmt_initialise_kernel<<<grid_shape, fdmt->nt>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt);
+	dim3 grid_shape(fdmt->nbeams);
+	fdmt_initialise_kernel<<<fdmt->nbeams, fdmt->nf>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt, fdmt->nt);
 	gpuErrchk(cudaDeviceSynchronize());
 
 	return 0;
