@@ -1096,10 +1096,10 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 void fdmt_print_timing(fdmt_t* fdmt)
 {
 	cout << "FDMT Timings:" << endl;
-	cout << "Initialisation: " << fdmt->t_init << endl;
-	cout << "Copy in:" << fdmt->t_copy_in << endl;
-	cout << "Execute: " << fdmt->t_iterations << endl;
-	cout << "Update Ostate: " << fdmt->t_update_ostate << endl;
-	cout << "Copy back: " << fdmt->t_copy_back << endl;
+	cout << "Initialisation: " << endl <<  fdmt->t_init << endl;
+	cout << "Copy in:" << endl << fdmt->t_copy_in << endl;
+	cout << "Execute: " << endl << fdmt->t_iterations << endl;
+	cout << "Update Ostate: " << endl << fdmt->t_update_ostate << endl;
+	cout << "Copy back: " << endl << fdmt->t_copy_back << endl;
 
 }

@@ -347,6 +347,7 @@ int main(int argc, char* argv[])
 		// Count how many times were flagged
 		assert(num_rescale_blocks >= 0);
 		array4d_copy_to_host(&rescale.nsamps); // must do this before updaing scaleoffset, which resets nsamps to zero
+
 		for(int i = 0; i < nf*nbeams; ++i) {
 			int nsamps = (int)rescale.nsamps.d[i]; // nsamps is the number of unflagged samples from this block
 			int nflagged = rescale.sampnum - nsamps;
@@ -354,6 +355,8 @@ int main(int argc, char* argv[])
 			assert (nflagged >= 0);
 			num_flagged_times += nflagged;
 		}
+
+
 
 		// do rescaling if required
 		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
@@ -421,12 +424,12 @@ int main(int argc, char* argv[])
 	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << data_nsecs << " seconds" << " at " << data_nsecs/tall.wall_total()<< "x real time"<< endl;
 	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;
 	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;
-	cout << "FREDDA CPU "<< tall << endl;
-	cout << "Rescale "<< trescale << endl;
-	cout << "Boxcar "<< tboxcar << endl;
-	cout << "File reading " << source.read_timer << endl;
+	cout << "FREDDA CPU "<< endl << tall << endl;
+	cout << "Rescale "<< endl << trescale << endl;
+	cout << "Boxcar "<< endl << tboxcar << endl;
+	cout << "File reading " << endl << source.read_timer << endl;
 	fdmt_print_timing(&fdmt);
-		struct rusage usage;
+	struct rusage usage;
 	getrusage(RUSAGE_SELF, &usage);
 	cout << "Resources User: " << usage.ru_utime.tv_sec <<
 			"s System:" << usage.ru_stime.tv_sec << "s MaxRSS:" << usage.ru_maxrss/1024/1024 << "MB" << endl;
