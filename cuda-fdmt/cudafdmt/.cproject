@@ -33,6 +33,9 @@
 								<option id="nvcc.compiler.def.symbols.1641456189" name="Defined symbols (-D)" superClass="nvcc.compiler.def.symbols" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="VERSION=\&quot;nsight\&quot;"/>
 								</option>
+								<option id="nvcc.compiler.include.paths.717113947" superClass="nvcc.compiler.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="/Users/ban115/Downloads/cub/cub-1.6.4/cub"/>
+								</option>
 								<inputType id="nvcc.compiler.input.cu.1489551541" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.1617973910" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.1795090693" superClass="nvcc.compiler.input.c"/>
