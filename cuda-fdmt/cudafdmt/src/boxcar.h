@@ -13,7 +13,7 @@
 #include "CandidateList.h"
 
 const int NBOX = 32; // Needs to be the warp size. One day we'll check that.
-const int DT_BLOCKS =  4; // Number of DTs to do in a block simultaneously
+const int DT_BLOCKS =  8; // Number of DTs to do in a block simultaneously
 
 int boxcar_do(array4d_t* indata, array4d_t* outdata);
 int boxcar_do_cpu(const array4d_t* indata,

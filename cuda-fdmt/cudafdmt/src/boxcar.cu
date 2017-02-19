@@ -285,6 +285,8 @@ __global__ void boxcar_do_kernel2 (
 	cand.idt = idt;
 	cand.ibeam = ibeam;
 
+	const fdmt_dtype ibc_scale = sqrtf((float) (ibc + 1));
+
 
 	for(int t = 0; t < nt; ++t) {
 		// Should be a LDU instruction - global load across all threads in this warp
@@ -303,6 +305,7 @@ __global__ void boxcar_do_kernel2 (
 
 		// scale output value to have constant variance per boxcar size
 		fdmt_dtype vout = state/(sqrtf((float) (ibc + 1)));
+		//fdmt_dtype vout = state * ibc_scale;
 
 		// write state into output
 		if (outdata != NULL) {
