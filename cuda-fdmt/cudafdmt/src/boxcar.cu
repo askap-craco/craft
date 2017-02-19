@@ -286,6 +286,7 @@ __global__ void boxcar_do_kernel2 (
 	cand.ibeam = ibeam;
 
 	const fdmt_dtype ibc_scale = sqrtf((float) (ibc + 1));
+	threshold *= ibc_scale;// scale threshold, otherwise you have to do lots of processing per sample, which is wasteful.
 
 
 	for(int t = 0; t < nt; ++t) {
@@ -304,12 +305,13 @@ __global__ void boxcar_do_kernel2 (
 		}
 
 		// scale output value to have constant variance per boxcar size
-		fdmt_dtype vout = state/(sqrtf((float) (ibc + 1)));
+		//fdmt_dtype vout = state/(sqrtf((float) (ibc + 1)));
 		//fdmt_dtype vout = state * ibc_scale;
+		fdmt_dtype vout = state;
 
 		// write state into output
 		if (outdata != NULL) {
-			optr[ibc] = vout;
+			optr[ibc] = vout/(sqrtf((float) (ibc + 1)));
 			// increment output pointer
 			optr += NBOX;
 		}
@@ -321,13 +323,16 @@ __global__ void boxcar_do_kernel2 (
 			// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
 			if (::__all(vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
 				// find maximum across all boxcars
-				fdmt_dtype best_sn_for_ibc = warpAllReduceMax(cand.sn);
+				fdmt_dtype scaled_sn = cand.sn/ibc_scale;
+				fdmt_dtype best_sn_for_ibc = warpAllReduceMax(scaled_sn);
 				// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
-				int boxcar_mask = __ballot(best_sn_for_ibc == cand.sn);
+				int boxcar_mask = __ballot(best_sn_for_ibc == scaled_sn);
 				int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
 
 				// if you're the winner, you get to write to memory. Lucky you!
 				if (ibc == best_ibc) {
+					cand.sn = scaled_sn;
+					// rescale sn, which is currently unrescaled
 					add_candidate(&cand,  m_candidates,  m_ncand, m_max_cand);
 				}
 
