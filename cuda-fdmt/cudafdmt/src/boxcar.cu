@@ -312,38 +312,38 @@ __global__ void boxcar_do_kernel2 (
 		}
 
 		// here is the fun bit. Find best detection over all times and boxcars
-//
-//		// if in a detection:
-//		if (cand.t >= 0) {
-//			// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
-//			if (::__all(vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
-//				// find maximum across all boxcars
-//				fdmt_dtype best_sn_for_ibc = warpAllReduceMax(cand.sn);
-//				// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
-//				int boxcar_mask = __ballot(best_sn_for_ibc == cand.sn);
-//				int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
-//
-//				// if you're the winner, you get to write to memory. Lucky you!
-//				if (ibc == best_ibc) {
-//					add_candidate(&cand,  m_candidates,  m_ncand, m_max_cand);
-//				}
-//
-//				// setup for next detection
-//				cand.sn = -1;
-//				cand.t = -1;
-//			} else { // detection on-going
-//				if (vout > cand.sn) { // keep best value for this boxcar
-//					cand.sn = vout;
-//					cand.t = t;
-//				}
-//			}
-//		} else { // not currently in a detection
-//			// do warp vote to see if any boxcars exceed threshold
-//			if (::__any(vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
-//				cand.sn = vout;
-//				cand.t = t;
-//			}
-//		}
+
+		// if in a detection:
+		if (cand.t >= 0) {
+			// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
+			if (::__all(vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
+				// find maximum across all boxcars
+				fdmt_dtype best_sn_for_ibc = warpAllReduceMax(cand.sn);
+				// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
+				int boxcar_mask = __ballot(best_sn_for_ibc == cand.sn);
+				int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
+
+				// if you're the winner, you get to write to memory. Lucky you!
+				if (ibc == best_ibc) {
+					add_candidate(&cand,  m_candidates,  m_ncand, m_max_cand);
+				}
+
+				// setup for next detection
+				cand.sn = -1;
+				cand.t = -1;
+			} else { // detection on-going
+				if (vout > cand.sn) { // keep best value for this boxcar
+					cand.sn = vout;
+					cand.t = t;
+				}
+			}
+		} else { // not currently in a detection
+			// do warp vote to see if any boxcars exceed threshold
+			if (::__any(vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
+				cand.sn = vout;
+				cand.t = t;
+			}
+		}
 
 	}
 
