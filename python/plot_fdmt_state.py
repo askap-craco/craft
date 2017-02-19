@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
-Template for making scripts to run from the command line
+Plots the FDMT state. 
+In fdmt.h you need to #define DUMP_STATE=1
 
 Copyright (C) CSIRO 2015
 """
@@ -108,7 +109,11 @@ def _main():
     from argparse import ArgumentParser
     parser = ArgumentParser(description='Script description')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-b','--beam', type=float, help='beam number')
+    parser.add_argument('-b','--beam', type=int, help='beam number')
+    parser.add_argument('-d','--dt', type=int, help='DM trial', default=0)
+    parser.add_argument('-c','--chan', type=int, help='channel', default=0)
+    parser.add_argument('-n','--ndm', type=int, help='Number of dms to plot on RHS line plot', default=10)
+
     parser.set_defaults(verbose=False, beam=0)
     values = parser.parse_args()
     if values.verbose:
@@ -118,27 +123,35 @@ def _main():
 
     beam = values.beam
 
-    #show_series('ostate_e%d.dat', [beam, 0, slice(None), slice(None)])
-    #show_series('finalstate_e%d.dat', [beam, 0, slice(None), slice(None)])
-    #show_series('initstate_e%d.dat',[beam, slice(None),0, slice(None)])
-    #plot_series('mean_e%d.dat',[0,0, slice(None), slice(None)])
-    #plot_series('std_e%d.dat',[0,0, slice(None), slice(None)])
-    #plot_series('kurt_e%d.dat',[0,0, slice(None), slice(None)])
-    #plot_series('dm0_e%d.dat',[0,0, slice(None), slice(None)])
     plot_stats()
-    #plot_series('nsamps_e%d.dat',[0,0, slice(None), slice(None)])
-
 
     for i, fname in enumerate(file_series('state_s%d.dat')):
-        if 0 < i < 9:
+        if 0 < i < 8:
             continue
 
         d = load4d(fname)
-        fig, ax = pylab.subplots(1,2)
-        myimshow(ax[0], d[beam, :, 0, :], aspect='auto', origin='lower')
-        myimshow(ax[1], d[beam, 0, :, :], aspect='auto', origin='lower')
+        fig, ax = pylab.subplots(1,3)
+        nbeams, nchan, ndt, nt = d.shape
+        dt = min(values.dt, ndt-1)
+        chan = min(values.chan, nchan-1)
 
-        ax[0].set_title(fname)
+        myimshow(ax[0], d[beam, :, dt, :], aspect='auto', origin='lower')
+        ax[0].set_xlabel('t')
+        ax[0].set_ylabel('Channel')
+        ax[0].set_title(fname + ' DT={}'.format(dt))
+
+        myimshow(ax[1], d[beam, chan, :, :], aspect='auto', origin='lower')
+        ax[1].set_xlabel('t')
+        ax[1].set_ylabel('dt')
+        ax[1].set_title(fname + ' CHAN={}'.format(chan))
+
+        dtstart = max(dt - values.ndm/2, 0)
+        dtend = min(dt + values.ndm/2, ndt-1)
+        print 'dtrange', dtstart, dtend
+        ax[2].plot(d[beam, chan, dtstart:dtend, :].T)
+        ax[2].set_xlabel('t')
+        ax[2].set_ylabel('Amplitude')
+        ax[2].set_title(fname + ' DT={}-{} CHAN={}'.format(dtstart,dtend, chan))
 
         print fname, d.shape, np.prod(d.shape)
 

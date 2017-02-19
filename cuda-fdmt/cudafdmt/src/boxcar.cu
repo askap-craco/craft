@@ -288,10 +288,10 @@ __global__ void boxcar_do_kernel2 (
 	const fdmt_dtype ibc_scale = sqrtf((float) (ibc + 1));
 	threshold *= ibc_scale;// scale threshold, otherwise you have to do lots of processing per sample, which is wasteful.
 
-
 	for(int t = 0; t < nt; ++t) {
 		// Should be a LDU instruction - global load across all threads in this warp
-		fdmt_dtype vin = iptr[t];
+		fdmt_dtype vin = *iptr;
+		iptr++;
 
 		// Add the curent sample and subtract the 'previous' one
 		state += vin - vprev;
@@ -323,7 +323,7 @@ __global__ void boxcar_do_kernel2 (
 			// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
 			if (::__all(vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
 				// find maximum across all boxcars
-				fdmt_dtype scaled_sn = cand.sn/ibc_scale;
+				fdmt_dtype scaled_sn = cand.sn/ibc_scale; // scale by boxcar width, so all boxcars have the same variance
 				fdmt_dtype best_sn_for_ibc = warpAllReduceMax(scaled_sn);
 				// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
 				int boxcar_mask = __ballot(best_sn_for_ibc == scaled_sn);

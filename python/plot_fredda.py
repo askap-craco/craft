@@ -99,10 +99,14 @@ def show_inbuf_series(prefix, theslice, start=0, maxn=10):
             break
 
 def statplot(ax, fname, name):
-    d = load4d(fname.replace('fdmt',name))
-    sl = [0,0,slice(None),slice(None)]
-    ax.plot(d[sl].T)
-    ax.set_ylabel(name)
+    d = None
+    try :
+        d = load4d(fname.replace('fdmt',name))
+        sl = [0,0,slice(None),slice(None)]
+        ax.plot(d[sl].T)
+        ax.set_ylabel(name)
+    except IOError:
+        print 'No data for ', fname, name
     return d
 
 def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
