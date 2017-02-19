@@ -343,9 +343,6 @@ void __global__ fdmt_initialise_kernel(const fdmt_dtype* __restrict__ indata,
 	int imidx = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0);
 	for (int t = 0; t < nt; ++t) {
 		state[outidx + t] = indata[imidx + t];
-		if (c == 0) {
-			//printf("outidx %d imidx=%d t=%d indata=%f\n", outidx, imidx, t, indata[imidx+t]);
-		}
 	}
 
 	// Do partial sums initialisation recursively (Equation 20.)
@@ -360,6 +357,46 @@ void __global__ fdmt_initialise_kernel(const fdmt_dtype* __restrict__ indata,
 		// originally this was j=idt, rather than j=0. But that just meant that 0<=j<idt were zero, which seems weird.
 		for(int j = 0; j < nt; ++j) {
 			state[outidx + j] = state[iidx + j] + indata[imidx -j];
+		}
+	}
+}
+
+void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
+		fdmt_dtype* __restrict__ state, int delta_t, int max_dt, int nt)
+{
+	// indata is 4D array: (nbeams, nf, 1, nt): index [ibeam, c, 0, t] = t + nt*(0 + 1*(c + nf*ibeam))
+	// State is a 4D array: (nbeams, nf, delta_t, max_dt) ( for the moment)
+	// full index [ibeam, c, idt, t] is t + max_dt*(idt + delta_t*(c + nf*ibeam))
+
+	int nbeams = gridDim.x; // number of beams
+	int nf = gridDim.y; // Number of frequencies
+	int tblock = blockDim.x; // number of samples per thread block
+	int ibeam = blockIdx.x; // beam number
+	int c = blockIdx.y; // Channel number
+	int t = threadIdx.x; // sample number
+
+	// Assign initial data to the state at delta_t=0
+	int outidx = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, 0, 0);
+	int imidx = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0);
+	while (t < nt) {
+		state[outidx + t] = indata[imidx + t];
+		t += tblock;
+	}
+
+	// Do partial sums initialisation recursively (Equation 20.)
+	for (int idt = 1; idt < delta_t; ++idt) {
+		int outidx = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, idt, 0);
+		int iidx   = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, idt-1, 0);
+		int imidx  = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, nt -1 );
+
+		// The state for dt=d = the state for dt=(d-1) + the time-reversed input sample
+		// for each time
+		// (TODO: Not including a missing overlap with the previous block here)
+		// originally this was j=idt, rather than j=0. But that just meant that 0<=j<idt were zero, which seems weird.
+		t = threadIdx.x; // reset t
+		while (t < nt) {
+			state[outidx + t] = state[iidx + t] + indata[imidx -t];
+			t += tblock;
 		}
 	}
 }
@@ -383,8 +420,10 @@ int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* 
 	array4d_cuda_memset(state, 0);
 	gpuErrchk(cudaDeviceSynchronize());
 
-	dim3 grid_shape(fdmt->nbeams);
-	fdmt_initialise_kernel<<<fdmt->nbeams, fdmt->nf>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt, fdmt->nt);
+	dim3 grid_shape(fdmt->nbeams, fdmt->nf);
+	//fdmt_initialise_kernel<<<fdmt->nbeams, fdmt->nf>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt, fdmt->nt);
+	int nthreads = 256;
+	fdmt_initialise_kernel2<<<grid_shape, nthreads>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt, fdmt->nt);
 	gpuErrchk(cudaDeviceSynchronize());
 
 	return 0;
