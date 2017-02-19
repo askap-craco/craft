@@ -496,7 +496,11 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		// coalesced read from global
 		rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
 		rescale_dtype vout = (vin + offset) * scale;
-		decay_offset = (vout + decay_offset*k)/(1.0 + k);
+		if (k == 0) { // If we set the timescale to zero, we just don't do any decaying
+			decay_offset = 0;
+		} else {
+			decay_offset = (vout + decay_offset*k)/(1.0 + k);
+		}
 		rescale_dtype sout = vout - decay_offset;
 		int dm0idx = t + nt*ibeam; // DM0 idx: BT order
 		rescale_dtype dm0 = dm0arr[dm0idx];
@@ -510,7 +514,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 			sum4 += vin*vin*vin*vin;
 			// non-coalesced write (transpose. Sorry)
 			outarr[outidx] = sout;
-			nsamps++;
+			nsamps += 1;
 		} else {
 //			printf("NOK ibeam/c/t %d/%d/%d dm0/sout/dm0min %f/%f/%f flags %d/%d/%d\n", ibeam, c, t,
 //					fabs(dm0), fabs(sout), dm0min,

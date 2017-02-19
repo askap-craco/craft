@@ -41,7 +41,7 @@ void runtest_usage() {
 			"   -o FILE - Candidate filename\n"
 			"   -x SN - threshold S/N\n"
 			"   -D dump intermediate data to disk\n"
-			"   -r R - Blocks per rescale update\n"
+			"   -r R - Blocks per rescale update (0 for no rescaling)\n"
 			"   -S S - Number of blocks to skip\n"
 			"   -M M - Channel Mean flagging threshold (3 is OK)\n"
 			"   -T T - Channel StdDev flagging threshold (3 is OK)\n"
@@ -73,10 +73,18 @@ void dumparr(const char* prefix, const int blocknum, array4d_t* arr, bool copy=t
 {
 	char fbuf[1024];
 	sprintf(fbuf, "%s_e%d.dat", prefix, blocknum);
-	printf("Dumping %s %s\n", prefix, fbuf);
 	if (copy) {
 		array4d_copy_to_host(arr);
 	}
+	int nz = 0;
+	int size = array4d_size(arr);
+	for(int i = 0; i < size; i++) {
+		if (arr->d[i] == 0.0) {
+			nz += 1;
+		}
+	}
+
+	printf("Dumping %s %s %d zeros\n", prefix, fbuf, nz);
 	array4d_dump(arr, fbuf);
 }
 
@@ -107,6 +115,7 @@ int main(int argc, char* argv[])
 	for (int c = 0; c < argc; ++c) {
 		printf("%s ", argv[c]);
 	}
+	printf("\n");
 
 	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:C:n:m:b:z:N:h")) != -1) {
 		switch (ch) {
@@ -306,6 +315,7 @@ int main(int argc, char* argv[])
 	signal(SIGINT, &handle_signal);
 	int num_flagged_beam_chans = 0;
 	int num_flagged_times = 0;
+	int blocks_since_rescale_update = 0;
 
 	while (source.read_samples_uint8(nt, read_buf) == nt) {
 		if (stopped) {
@@ -322,13 +332,11 @@ int main(int argc, char* argv[])
 		// copy raw data to state. Here we're a little dodgey
 
 		bool invert_freq = (foff < 0);
-		array4d_t* inarr = &fdmt.states[1];
 		uint8_t* read_buf_device = (uint8_t*) fdmt.states[0].d_device;
 		fdmt.t_copy_in.start();
 		gpuErrchk(cudaMemcpy(read_buf_device, read_buf, in_chunk_size*sizeof(uint8_t), cudaMemcpyHostToDevice));
 		fdmt.t_copy_in.stop();
 		trescale.start();
-		//rescale_update_and_transpose_float(rescale, read_arr, rescale_buf,read_buf, invert_freq);
 		rescale_update_and_transpose_float_gpu(rescale, rescale_buf, read_buf_device, invert_freq);
 		trescale.stop();
 
@@ -336,13 +344,25 @@ int main(int argc, char* argv[])
 			dumparr("inbuf", iblock, &rescale_buf);
 		}
 
+		// Count how many times were flagged
 		assert(num_rescale_blocks >= 0);
+		array4d_copy_to_host(&rescale.nsamps); // must do this before updaing scaleoffset, which resets nsamps to zero
 
+		for(int i = 0; i < nf*nbeams; ++i) {
+			int nsamps = (int)rescale.nsamps.d[i]; // nsamps is the number of unflagged samples from this block
+			int nflagged = rescale.sampnum - nsamps;
+			// rescale.sampnum is the total number of samples that has gone into the rescaler
+			assert (nflagged >= 0);
+			num_flagged_times += nflagged;
+		}
+
+
+
+		// do rescaling if required
 		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
-			array4d_copy_to_host(&rescale.nsamps); // must do this before updaing scaleoffset, which resets nsamps to zero
 			rescale_update_scaleoffset_gpu(rescale);
 
-			// Count how many  hannels have been flagged for this whole block
+			// Count how many  channels have been flagged for this whole block
 			// by looking at how many channels have scale==0
 			array4d_copy_to_host(&rescale.scale);
 			for(int i = 0; i < nf*nbeams; ++i) {
@@ -351,6 +371,8 @@ int main(int argc, char* argv[])
 					num_flagged_beam_chans += num_rescale_blocks;
 				}
 				// Count how many times have been flagged for this block
+				// TODO: DANGER DANGER! This doesn't count flagged times if num_rescale_blocks = 0
+				// This gave me a long headache at LAX when I set -s 1e30 stupidly.
 				int nsamps = (int)rescale.nsamps.d[i];
 				// nsamps is the number of unflagged samples in nt*num_rescale_blocks samples
 				int nflagged = nt*num_rescale_blocks - nsamps;
@@ -402,12 +424,12 @@ int main(int argc, char* argv[])
 	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << data_nsecs << " seconds" << " at " << data_nsecs/tall.wall_total()<< "x real time"<< endl;
 	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;
 	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;
-	cout << "FREDDA CPU "<< tall << endl;
-	cout << "Rescale "<< trescale << endl;
-	cout << "Boxcar "<< tboxcar << endl;
-	cout << "File reading " << source.read_timer << endl;
+	cout << "FREDDA CPU "<< endl << tall << endl;
+	cout << "Rescale "<< endl << trescale << endl;
+	cout << "Boxcar "<< endl << tboxcar << endl;
+	cout << "File reading " << endl << source.read_timer << endl;
 	fdmt_print_timing(&fdmt);
-		struct rusage usage;
+	struct rusage usage;
 	getrusage(RUSAGE_SELF, &usage);
 	cout << "Resources User: " << usage.ru_utime.tv_sec <<
 			"s System:" << usage.ru_stime.tv_sec << "s MaxRSS:" << usage.ru_maxrss/1024/1024 << "MB" << endl;
