@@ -12,14 +12,14 @@
 // Modulous of a % b, but handles negative numbers
 __host__ __device__ int mod(int a, int b)
 {
-    int r = a % b;
-    return r < 0 ? r + b : r;
+	int r = a % b;
+	return r < 0 ? r + b : r;
 }
 
 // Modulous of a % b, but handles negative numbers
 __host__ __device__ fdmt_dtype mymax(fdmt_dtype a, fdmt_dtype b)
 {
-    return a > b ? a : b;
+	return a > b ? a : b;
 }
 
 #define WARP_SZ 32
@@ -31,16 +31,16 @@ __device__ int warp_bcast(int v, int leader) { return __shfl(v, leader); }
 // From here: https://devblogs.nvidia.com/parallelforall/faster-parallel-reductions-kepler/
 __inline__ __device__
 int warpAllReduceSum(int val) {
-  for (int mask = warpSize/2; mask > 0; mask /= 2)
-    val += __shfl_xor(val, mask);
-  return val;
+	for (int mask = warpSize/2; mask > 0; mask /= 2)
+		val += __shfl_xor(val, mask);
+	return val;
 }
 
 __inline__ __device__
 fdmt_dtype warpAllReduceMax(fdmt_dtype val) {
-  for (int mask = warpSize/2; mask > 0; mask /= 2)
-    val = max(val, __shfl_xor(val, mask));
-  return val;
+	for (int mask = warpSize/2; mask > 0; mask /= 2)
+		val = max(val, __shfl_xor(val, mask));
+	return val;
 }
 
 // Total hack because I"m too scared to do copy constructors:
@@ -52,8 +52,8 @@ __device__ unsigned int add_candidate(candidate_t* c, candidate_t* m_candidates,
 
 	candidate_t* cnext = m_candidates + old_ncand;
 	*cnext = *c;
-//	printf("Added candidate ibeam=%d idt=%d ibc=%d t=%d sn=%f. Current ncand: %d old ncand %d max_cand %d\n", cnext->ibeam, cnext->idt,
-//			cnext->ibc, cnext->t, cnext->sn, *m_ncand, old_ncand, *m_max_cand);
+	//	printf("Added candidate ibeam=%d idt=%d ibc=%d t=%d sn=%f. Current ncand: %d old ncand %d max_cand %d\n", cnext->ibeam, cnext->idt,
+	//			cnext->ibc, cnext->t, cnext->sn, *m_ncand, old_ncand, *m_max_cand);
 
 	return old_ncand;
 }
@@ -65,6 +65,7 @@ __device__ void check(unsigned int* m_ncand) {
 	}
 }
 
+/* Shared memory for history */
 __global__ void boxcar_do_kernel (
 		const __restrict__ fdmt_dtype* indata,
 		fdmt_dtype* __restrict__ outdata,
@@ -78,7 +79,7 @@ __global__ void boxcar_do_kernel (
 {
 	// gridDim.x = nbeams
 	// gridDim.y = ndt_blocks // number of blocks of dispersion trials
-    // blockDim.x = NBOX
+	// blockDim.x = NBOX
 	// blockDim.y = DT_BLOCKS = number of dispersion trials to do at once
 	// TOTAL nthreads = NBOX * DT_BLOCKS
 	// Assume ndt is an integer multiple of DT_BLOCKS
@@ -186,8 +187,8 @@ __global__ void boxcar_do_kernel (
 				int boxcar_mask = __ballot(best_sn_for_ibc == cand.sn);
 				int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
 
-//				printf("End of candidate. t=%d sn=%f idt=%d bestsn %f mask=0x%x ibc=%d best_ibc=%d got best? %d m_ncand %d\n",
-//						cand.t, cand.sn, cand.idt, best_sn_for_ibc, boxcar_mask, cand.ibc, best_ibc, best_sn_for_ibc == cand.sn, *m_ncand);
+				//				printf("End of candidate. t=%d sn=%f idt=%d bestsn %f mask=0x%x ibc=%d best_ibc=%d got best? %d m_ncand %d\n",
+				//						cand.t, cand.sn, cand.idt, best_sn_for_ibc, boxcar_mask, cand.ibc, best_ibc, best_sn_for_ibc == cand.sn, *m_ncand);
 
 				// if you're the winner, you get to write to memory. Lucky you!
 				if (ibc == best_ibc) {
@@ -233,7 +234,7 @@ __global__ void boxcar_do_kernel2 (
 {
 	// gridDim.x = nbeams
 	// gridDim.y = ndt_blocks // number of blocks of dispersion trials
-    // blockDim.x = NBOX
+	// blockDim.x = NBOX
 	// blockDim.y = DT_BLOCKS = number of dispersion trials to do at once
 	// TOTAL nthreads = NBOX * DT_BLOCKS
 	// Assume ndt is an integer multiple of DT_BLOCKS
@@ -287,6 +288,7 @@ __global__ void boxcar_do_kernel2 (
 
 	const fdmt_dtype ibc_scale = sqrtf((float) (ibc + 1));
 	threshold *= ibc_scale;// scale threshold, otherwise you have to do lots of processing per sample, which is wasteful.
+
 
 	for(int t = 0; t < nt; ++t) {
 		// Should be a LDU instruction - global load across all threads in this warp
@@ -360,6 +362,163 @@ __global__ void boxcar_do_kernel2 (
 
 }
 
+/* Use warp shuffle for history, shared memory for input */
+__global__ void boxcar_do_kernel3 (
+		const __restrict__ fdmt_dtype* indata,
+		fdmt_dtype* __restrict__ outdata,
+		fdmt_dtype* __restrict__ historydata,
+		int nt,
+		int ndt,
+		fdmt_dtype threshold,
+		candidate_t* m_candidates,
+		unsigned int* m_max_cand,
+		unsigned int* m_ncand)
+{
+	// gridDim.x = nbeams
+	// gridDim.y = ndt_blocks // number of blocks of dispersion trials
+	// blockDim.x = NBOX
+	// blockDim.y = DT_BLOCKS = number of dispersion trials to do at once
+	// TOTAL nthreads = NBOX * DT_BLOCKS
+	// Assume ndt is an integer multiple of DT_BLOCKS
+	// indata.shape = [nbeams, 1, ndt, ndt]
+	// outdata.shape = [nbeams,ndt, nt, nbox]
+	// history.shape = [1, nbeams, ndt, NBOX]
+
+	int nbeams = gridDim.x;
+
+	int ibeam = blockIdx.x; // beam index
+	int grid_dt = blockIdx.y; // delta_t of grid
+	int thread_dt = threadIdx.y; // delta_t from thread
+	int idt = thread_dt + DT_BLOCKS*grid_dt; // total delta_t
+	int ibc = threadIdx.x; // boxcar width in samples. ibc=0 is 1 sample wide.
+
+	int in_off = array4d_idx(nbeams, 1, ndt, ndt, ibeam, 0, idt, 0); // input offset
+	int out_off = array4d_idx(nbeams, ndt, nt, NBOX, ibeam, idt, 0, 0); // output offset
+	int hist_off = array4d_idx(1, nbeams, ndt, NBOX, 0, ibeam, idt, 0); // history offset
+
+	// Shared memory
+	__shared__ fdmt_dtype thread_indata[DT_BLOCKS][NBOX];
+
+	const fdmt_dtype* iptr = indata + in_off + ibc;
+	fdmt_dtype* global_history = historydata + hist_off;
+	fdmt_dtype* optr = outdata + out_off;
+
+	// Specialize WarpScan for type fdmt_dtype
+	typedef cub::WarpScan<fdmt_dtype> WarpScan;
+
+	// Allocate WarpScan shared memory for DT_BLOCKS warps
+	__shared__ typename WarpScan::TempStorage temp_storage[DT_BLOCKS];
+
+	// Initialise state from history. This is basically an 'inclusive sum scan'
+	// i.e. state[n] = sum_{i=0}^{n}{history[i]}. This next few lines does a
+	// Work efficient parallel scan (see http://http.developer.nvidia.com/GPUGems3/gpugems3_ch39.html)
+	// Implemented in CUB
+	// Load data from global history. boxcar 0 holds the most recent sample, boxcar 1 a little older, etc, etc.
+	fdmt_dtype state = global_history[ibc]; // here, state contains the history.
+
+	// get CUB to do the inclusive sum scan using the temperator storage for this warp
+	WarpScan(temp_storage[thread_dt]).InclusiveSum(state, state);
+
+	// 'state' now contains the correct state for this boxcar
+
+	// Read the previous sample (relevant for this boxcar width from global memory)
+	fdmt_dtype vprev = global_history[ibc];
+
+	candidate_t cand;
+	cand.t = -1; // t of the best detection so far. -1 for no current detection ongoing
+	cand.sn = -1; // vout for best detection so far.
+	cand.ibc = ibc;
+	cand.idt = idt;
+	cand.ibeam = ibeam;
+
+	const fdmt_dtype ibc_scale = sqrtf((float) (ibc + 1));
+	threshold *= ibc_scale;// scale threshold, otherwise you have to do lots of processing per sample, which is wasteful.
+
+
+	for(int blk = 0; blk < nt/NBOX; ++blk) {
+		// Should be a coalesced
+		fdmt_dtype vin = *iptr;
+		iptr += NBOX;
+
+		// store in shared memory - should be coalesced
+		thread_indata[thread_dt][ibc] = vin;
+
+		// loop through shared memory
+		for (int t = 0 ; t < NBOX; ++t) {
+			vin = thread_indata[thread_dt][t]; // 'broadcast' from shared memory
+			// Add the current sample and subtract the 'previous' one
+			state += vin - vprev;
+
+			// shift previous values one thread to the right. leaves vprev for ibc=0 unchanged.
+			vprev = __shfl_up(vprev, 1, NBOX);
+
+			// set vprev to vin for ibc=0
+			if (ibc == 0) {
+				vprev = vin;
+			}
+
+			// scale output value to have constant variance per boxcar size
+			//fdmt_dtype vout = state/(sqrtf((float) (ibc + 1)));
+			//fdmt_dtype vout = state * ibc_scale;
+			fdmt_dtype vout = state;
+
+			// write state into output
+			if (outdata != NULL) {
+				optr[ibc] = vout/(sqrtf((float) (ibc + 1)));
+				// increment output pointer
+				optr += NBOX;
+			}
+
+
+			// here is the fun bit. Find best detection over all times and boxcars
+
+			// if in a detection:
+			if (cand.t >= 0) {
+				// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
+				if (::__all(vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
+					// find maximum across all boxcars
+					fdmt_dtype scaled_sn = cand.sn/ibc_scale; // scale by boxcar width, so all boxcars have the same variance
+					fdmt_dtype best_sn_for_ibc = warpAllReduceMax(scaled_sn);
+					// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
+					int boxcar_mask = __ballot(best_sn_for_ibc == scaled_sn);
+					int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
+
+					// if you're the winner, you get to write to memory. Lucky you!
+					if (ibc == best_ibc) {
+						cand.sn = scaled_sn;
+						// rescale sn, which is currently unrescaled
+						add_candidate(&cand,  m_candidates,  m_ncand, m_max_cand);
+					}
+
+					// setup for next detection
+					cand.sn = -1;
+					cand.t = -1;
+				} else { // detection on-going
+					if (vout > cand.sn) { // keep best value for this boxcar
+						cand.sn = vout;
+						cand.t = t;
+					}
+				}
+			} else { // not currently in a detection
+				// do warp vote to see if any boxcars exceed threshold
+				if (::__any(vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
+					cand.sn = vout;
+					cand.t = t;
+				}
+			}
+
+
+		}
+
+
+
+	}
+
+	// write vprev to global memory so we can do the next run of this kernel
+	global_history[ibc] = vprev;
+
+}
+
 __global__ void test_cub_prefix_sum() {
 
 	// Specialize WarpScan for type fdmt_dtype
@@ -422,7 +581,7 @@ int boxcar_do_gpu(const array4d_t* indata,
 	assert(boxcar_history->d_device != NULL);
 	sink->clear();
 	assert(sink->ncand() == 0);
-	boxcar_do_kernel2<<<grid_shape, block_shape>>>(
+	boxcar_do_kernel3<<<grid_shape, block_shape>>>(
 			indata->d_device,
 			boxcar_data->d_device,
 			boxcar_history->d_device,
@@ -465,7 +624,7 @@ int boxcar_do_cpu(const array4d_t* indata,
 	fdmt_dtype* inp = indata->d;
 	fdmt_dtype* outp = outdata->d;
 	int ncand = 0;
-	#pragma omp parallel for shared(ncand, inp, outp)
+#pragma omp parallel for shared(ncand, inp, outp)
 	for(int b = 0; b < nbeams; ++b) {
 		int beam_ncand = 0;
 		for(int idt = mindm; idt < ndt; ++idt) {
@@ -511,7 +670,7 @@ int boxcar_do_cpu(const array4d_t* indata,
 					if (vout > thresh) { // if this  S/N is above the threshold
 
 						//printf("boxcar exceeded threshold b/idt/t/ibc %d/%d/%d/%d vout=%f cand_tstart=%d best ibc/sn/t = %d/%f/%d\n",
-								//b, idt, t, ibc, vout, cand_tstart, best_ibc, best_ibc_sn, best_ibc_t);
+						//b, idt, t, ibc, vout, cand_tstart, best_ibc, best_ibc_sn, best_ibc_t);
 						// If there's no current candidate, we start one
 						if (cand_tstart < 0) {
 							cand_tstart = t;
