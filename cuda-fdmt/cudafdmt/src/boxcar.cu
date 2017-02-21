@@ -506,12 +506,7 @@ __global__ void boxcar_do_kernel3 (
 					cand.t = t;
 				}
 			}
-
-
 		}
-
-
-
 	}
 
 	// write vprev to global memory so we can do the next run of this kernel
