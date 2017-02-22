@@ -123,6 +123,15 @@ def _main():
 
     beam = values.beam
 
+    if os.path.exists('fdmtweights.dat'):
+        weights = load4d('fdmtweights.dat')
+        pylab.figure()
+        pylab.plot(weights[0,0,0,:])
+        pylab.xlabel('idt')
+        pylab.ylabel('Weight')
+        pylab.show()
+        
+
     plot_stats()
 
     for i, fname in enumerate(file_series('state_s%d.dat')):

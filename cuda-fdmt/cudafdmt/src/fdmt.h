@@ -85,6 +85,7 @@ typedef struct _fdmt_t
 	int curr_state_idx; // index of the current state in the states[] array
 	array4d_t states[2]; // iteration states
 	array4d_t ostate; // Special state for output delay and sum
+	array4d_t weights; // weights to apply to dispersion axis
 	int state_nbytes; // number of bytes in state
 	int state_size; // number of elements in state
 	int execute_count; //  number of times execute() has been called
@@ -114,6 +115,9 @@ __host__ __device__ int calc_delta_t(const fdmt_t* fdmt, float f_start, float f_
 int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt,  int nbeams, bool dump_data);
 
 int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata);
+
+int fdmt_calculate_weights(fdmt_t* fdmt, array4d_t* inarr);
+
 
 /**
  * Does an FDMT iteration

@@ -131,6 +131,27 @@ int array4d_cuda_memset(array4d_t*a, char c) {
 	return size;
 }
 
+
+// use a grid stride loop
+//https://devblogs.nvidia.com/parallelforall/cuda-pro-tip-write-flexible-kernels-grid-stride-loops/
+__global__ void _array4d_fill_kernel(fdmt_dtype* arr, int size, fdmt_dtype v) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = idx; i < size; i += gridDim.x * blockDim.x) {
+        arr[i]=v;
+    }
+}
+
+// http://stackoverflow.com/questions/6835960/cuda-using-memsetor-fill-or-to-set-an-array-of-float-to-max-val-possible
+int array4d_fill_device(array4d_t* a, fdmt_dtype v) {
+	size_t size = array4d_size(a);
+	assert(a->d_device != NULL);
+	int blocksize = 256;
+	int nblocks = (size + blocksize - 1) / size;
+	_array4d_fill_kernel<<<nblocks, blocksize>>>(a->d_device, size, v);
+	gpuErrchk(cudaDeviceSynchronize());
+}
+
 int array2d_copy_to_device(array2d_t* a)
 {
 	size_t size = array2d_size(a);

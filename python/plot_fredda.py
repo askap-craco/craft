@@ -149,6 +149,7 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         chans = np.arange(nchans)
         specax.plot(rawd.std(axis=1), chans)
         specax.plot(rawd.mean(axis=1), chans)
+        specax.set_ylim(min(chans), max(chans))
 
         dmax2 = p(gs[1,2])
         ndt, _ = v.shape
@@ -157,6 +158,7 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         dmax2.plot(v.mean(axis=1), dts)
         dmax2.set_ylabel('Delta_t')
         dmax2.set_xlabel('StdDev/Mean')
+        dmax2.set_ylim(min(dts), max(dts))
         
         dmax = p(gs[:, 3:6])
         maxdm, maxt = maxpos
