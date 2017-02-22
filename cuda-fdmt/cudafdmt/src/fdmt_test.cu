@@ -251,7 +251,8 @@ int main(int argc, char* argv[])
 	rescale_gpu_t rescale;
 	rescale.interval_samps = nt;
 	rescale.target_mean = 0.0;
-	rescale.target_stdev = 1.0/sqrt((float) nf);
+	//rescale.target_stdev = 1.0/sqrt((float) nf);
+	rescale.target_stdev = 1.0;
 	rescale.decay_constant = 0.35 * decay_timescale / source.tsamp(); // This is how the_decimator.C does it, I think.
 	rescale.mean_thresh = mean_thresh;
 	rescale.std_thresh = std_thresh;
@@ -277,6 +278,7 @@ int main(int argc, char* argv[])
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams, dump_data);
+	fdmt_calculate_weights(&fdmt, &rescale_buf);
 	printf("Seeking to start of data: nblocks=%d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source.tsamp());
 	printf("S/N Threshold %f Max ncand per block %d mindm %d \n", thresh, max_ncand_per_block, mindm);
 	source.seek_sample(num_skip_blocks*nt);

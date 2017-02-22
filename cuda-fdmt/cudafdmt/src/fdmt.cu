@@ -1,7 +1,6 @@
 #include <iostream>
 #include "cpu_kernels.h"
 #include "gpu_kernels.h"
-//#include "cuda_fdmt.h"
 #include "fdmt.h"
 #include "fdmt_utils.h"
 #include "CudaTimer.h"
@@ -195,6 +194,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 }
 
 
+
 int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt, int nbeams, bool dump_data)
 {
 	// Expect center frequencies on the input here. Interanlly use the bottom edge frequency
@@ -249,9 +249,12 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	array4d_malloc(&fdmt->ostate, host_alloc, true);
 	array4d_cuda_memset(&fdmt->ostate, 0);
 
-	printf("FDMT State size: %d Bytes\n", fdmt->state_nbytes);
-
-
+	fdmt->weights.nw = 1;
+	fdmt->weights.nx = 1;
+	fdmt->weights.ny = 1;
+	fdmt->weights.nz = fdmt->max_dt;
+	array4d_malloc(&fdmt->weights, host_alloc, true);
+	array4d_fill_device(&fdmt->weights, 1.0);
 
 	// save iteration setup
 	int s = 0;
@@ -905,7 +908,8 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 }
 
 __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
-										const fdmt_dtype* __restrict__ indata)
+										const fdmt_dtype* __restrict__ indata,
+										const fdmt_dtype* __restrict__ weights)
 {
 	// Adds the indata into the ostate and shifts the ostate where the's some to add
 	// shape of both arrays is [nbeams, max_dt, max_dt]
@@ -932,7 +936,13 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 		// So 		optr[t] = iptr[t] + optr[t + nt];
 		// It's just weird that we have such a noisy response to DC input
 
-		optr[t] = iptr[t] + optr[t + nt];
+		// Weight only the last block by the weights
+		fdmt_dtype weight = 1.;
+		if (t < nt) {
+			weight = weights[idt];
+		}
+
+		optr[t] = (iptr[t] + optr[t + nt])*weight;
 
 		// sync threads before doing the next block otherwise we don't copy the ostate correctly
 		__syncthreads();
@@ -960,7 +970,7 @@ __host__ void fdmt_update_ostate(fdmt_t* fdmt)
 
 	dim3 grid_shape(fdmt->nbeams, fdmt->max_dt);
 	cuda_fdmt_update_ostate<<<grid_shape, fdmt->nt>>>(fdmt->ostate.d_device,
-			currstate->d_device);
+			currstate->d_device, fdmt->weights.d_device);
 
 	gpuErrchk(cudaDeviceSynchronize());
 }
@@ -1130,6 +1140,51 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	fdmt->execute_count += 1;
 
 	return 0;
+}
+
+__global__ void fdmt_set_weights_kernel(const __restrict__ fdmt_dtype* ostate, fdmt_dtype* weights, int max_dt)
+{
+	for (int idx = blockIdx.x * blockDim.x + threadIdx.x;
+			idx < max_dt;
+			idx += blockDim.x * gridDim.x)
+	{
+		weights[idx] = rsqrtf(ostate[max_dt * idx]);
+	}
+}
+
+
+// Run ones through the FDMT so we can work out the weighting function
+// Use the supplied inarra as working memory
+int fdmt_calculate_weights(fdmt_t* fdmt, array4d_t* inarr)
+{
+	int nruns = fdmt->max_dt/fdmt->nt + 1;
+	for (int ii = 0; ii < nruns; ++ii) {
+		int s = 0;
+		array4d_fill_device(inarr, 1.0);
+		fdmt_initialise_gpu(fdmt, inarr, &fdmt->states[s]); // Initialise inital state
+		fdmt_execute_iterations(fdmt); //  actually execute the iterations on the GPU
+		fdmt_update_ostate(fdmt); // update the output state
+	}
+
+	// set weights array
+	int blocksize = 256;
+	int nblocks = (fdmt->max_dt + blocksize - 1) / fdmt->max_dt;
+	fdmt_set_weights_kernel<<<nblocks, blocksize>>>(fdmt->ostate.d_device, fdmt->weights.d_device, fdmt->max_dt);
+	gpuErrchk(cudaDeviceSynchronize());
+	if (fdmt->dump_data) {
+		array4d_copy_to_host(&fdmt->weights);
+		array4d_dump(&fdmt->weights, "fdmtweights.dat");
+	}
+
+	// clear state
+	for (int s = 0; s < 2; ++s) {
+		array4d_zero(&fdmt->states[s]);
+	}
+
+	// clear ostate
+	array4d_zero(&fdmt->ostate);
+	gpuErrchk(cudaDeviceSynchronize());
+
 }
 
 void fdmt_print_timing(fdmt_t* fdmt)
