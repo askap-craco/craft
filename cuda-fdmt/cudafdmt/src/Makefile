@@ -3,12 +3,13 @@
 CUDA_PATH=$(CUDA)
 objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_test.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o CandidateList.o
 NVCC=$(CUDA_PATH)/bin/nvcc
+CUB_PATH=$(HOME)/build/cub/cub-1.6.4/cub/
 
 #Embed version
 # See http://stackoverflow.com/questions/1704907/how-can-i-get-my-c-code-to-automatically-print-out-its-git-version-hash
 GIT_VERSION := $(shell git describe --dirty --always --tags)
 
-NVCCFLAGS=-g -O3 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_35,code=compute_35 -gencode arch=compute_35,code=sm_35  -x cu -DVERSION=\"$(GIT_VERSION)\"
+NVCCFLAGS=-g -O3 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_35,code=compute_35 -gencode arch=compute_35,code=sm_35  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH)
 
 NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=compute_35,code=compute_35 -gencode arch=compute_35,code=sm_35 -link -Xcompiler -fopenmp
 
