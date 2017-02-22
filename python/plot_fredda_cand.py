@@ -26,6 +26,8 @@ def find_files(rootd, pattern):
 
     return matches
 
+markers = mpl.markers.MarkerStyle().filled_markers
+
 def _main():
     from argparse import ArgumentParser
     parser = ArgumentParser(description='Script description')
@@ -134,9 +136,12 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None):
         beamno = vin[:, 5]
 
     ubeams = set(beamno)
-    for b in sorted(ubeams):
+    for ib, b in enumerate(sorted(ubeams)):
         bmask = beamno == b
-        ax.plot(time[bmask], dm[bmask]+1, marker='x', ls='None', label='Beam %d' %b, picker=3)
+        mask = bmask
+        maxbox = max(boxcar[mask]) 
+        ax.scatter(time[mask], 1+dm[mask], s=sn[mask]**2, marker=markers[ib % len(markers)], c=boxcar[mask]/maxbox, cmap='rainbow', label='Beam %d' %b, picker=3, edgecolors='face', alpha=0.4)
+        ax.set_yscale('log')
                
     plotutil.addpick()
     
