@@ -357,6 +357,7 @@ __global__ void rescale_calc_dm0_kernel (
 		const rescale_dtype* __restrict__ scalearr,
 		rescale_dtype* __restrict__ dm0arr,
 		int nf,
+		int nt,
 		rescale_dtype cell_thresh)
 {
 	// input = BTF order
@@ -364,29 +365,29 @@ __global__ void rescale_calc_dm0_kernel (
 	// Rescale: BF order
 
 	int ibeam = blockIdx.x;
-	int t = threadIdx.x;
-	int nt = blockDim.x;
-	rescale_dtype dm0sum = 0.0;
-	int nsamp = 0;
-	for (int c = 0; c < nf; ++c) {
-		int rsidx = c + nf*ibeam; // rescale index BF order
-		// all these reads are nice and coalesced
-		rescale_dtype offset = offsetarr[rsidx]; // read from global
-		rescale_dtype scale = scalearr[rsidx]; // read from global
-		int inidx = c + nf*(t + nt*ibeam); // input index : BTF order
+	for(int t = threadIdx.x; t < nt; t += blockDim.x) {
+		rescale_dtype dm0sum = 0.0;
+		int nsamp = 0;
+		for (int c = 0; c < nf; ++c) {
+			int rsidx = c + nf*ibeam; // rescale index BF order
+			// all these reads are nice and coalesced
+			rescale_dtype offset = offsetarr[rsidx]; // read from global
+			rescale_dtype scale = scalearr[rsidx]; // read from global
+			int inidx = c + nf*(t + nt*ibeam); // input index : BTF order
 
-		// coalesced read from global
-		rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
-		rescale_dtype vout = (vin + offset) * scale;
-		if (fabs(vout) < cell_thresh) {
-			dm0sum += vout;
-			++nsamp;
+			// coalesced read from global
+			rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
+			rescale_dtype vout = (vin + offset) * scale;
+			if (fabs(vout) < cell_thresh) {
+				dm0sum += vout;
+				++nsamp;
+			}
 		}
-	}
 
-	int dm0idx = t + nt*ibeam;
-	rescale_dtype correction = ((float) nsamp)/((float) nf);
-	dm0arr[dm0idx] = dm0sum * correction;
+		int dm0idx = t + nt*ibeam;
+		rescale_dtype correction = ((float) nsamp)/((float) nf);
+		dm0arr[dm0idx] = dm0sum * correction;
+	}
 }
 
 __global__ void rescale_calc_dm0stats_kernel (
@@ -544,12 +545,12 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 	int nt = rescale_buf.nz;
 
 	// Calculate dm0 for flagging
-	rescale_calc_dm0_kernel<<<nbeams, nt>>>(
+	rescale_calc_dm0_kernel<<<nbeams, 256>>>(
 			read_buf,
 			rescale.offset.d_device,
 			rescale.scale.d_device,
 			rescale.dm0.d_device,
-			nf,
+			nf, nt,
 			rescale.cell_thresh);
 
 	gpuErrchk(cudaDeviceSynchronize());

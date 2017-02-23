@@ -909,7 +909,8 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 
 __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 										const fdmt_dtype* __restrict__ indata,
-										const fdmt_dtype* __restrict__ weights)
+										const fdmt_dtype* __restrict__ weights,
+										int nt)
 {
 	// Adds the indata into the ostate and shifts the ostate where the's some to add
 	// shape of both arrays is [nbeams, max_dt, max_dt]
@@ -921,7 +922,7 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 
 	int ibeam = blockIdx.x;
 	int nbeams = gridDim.x;
-	int nt = blockDim.x;
+	int blockt = blockDim.x;
 	int max_dt = gridDim.y;
 	int idt = blockIdx.y;
 
@@ -946,7 +947,7 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 
 		// sync threads before doing the next block otherwise we don't copy the ostate correctly
 		__syncthreads();
-		t += nt;
+		t += blockt;
 	}
 	// just copy the last block
 	if (t < max_dt) {
@@ -969,8 +970,8 @@ __host__ void fdmt_update_ostate(fdmt_t* fdmt)
 	assert(currstate->nz == fdmt->ostate.nz);
 
 	dim3 grid_shape(fdmt->nbeams, fdmt->max_dt);
-	cuda_fdmt_update_ostate<<<grid_shape, fdmt->nt>>>(fdmt->ostate.d_device,
-			currstate->d_device, fdmt->weights.d_device);
+	cuda_fdmt_update_ostate<<<grid_shape, 256>>>(fdmt->ostate.d_device,
+			currstate->d_device, fdmt->weights.d_device, fdmt->nt);
 
 	gpuErrchk(cudaDeviceSynchronize());
 }
