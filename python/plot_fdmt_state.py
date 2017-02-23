@@ -113,6 +113,7 @@ def _main():
     parser.add_argument('-d','--dt', type=int, help='DM trial', default=0)
     parser.add_argument('-c','--chan', type=int, help='channel', default=0)
     parser.add_argument('-n','--ndm', type=int, help='Number of dms to plot on RHS line plot', default=10)
+    parser.add_argument('-t','--time', type=int, help='Time slice to plot', default=0)
 
     parser.set_defaults(verbose=False, beam=0)
     values = parser.parse_args()
@@ -129,17 +130,16 @@ def _main():
         pylab.plot(weights[0,0,0,:])
         pylab.xlabel('idt')
         pylab.ylabel('Weight')
-        pylab.show()
         
 
     plot_stats()
 
     for i, fname in enumerate(file_series('state_s%d.dat')):
-        if 0 < i < 8:
-            continue
+        #if 0 < i < 8:
+#            continue
 
         d = load4d(fname)
-        fig, ax = pylab.subplots(1,3)
+        fig, ax = pylab.subplots(1,4)
         nbeams, nchan, ndt, nt = d.shape
         dt = min(values.dt, ndt-1)
         chan = min(values.chan, nchan-1)
@@ -161,6 +161,11 @@ def _main():
         ax[2].set_xlabel('t')
         ax[2].set_ylabel('Amplitude')
         ax[2].set_title(fname + ' DT={}-{} CHAN={}'.format(dtstart,dtend, chan))
+
+        ax[3].plot(d[beam, chan, :, values.time].T)
+        ax[3].set_xlabel('dt')
+        ax[3].set_ylabel('Amplitude')
+        ax[3].set_title(fname + ' chan={} t={}'.format(chan, values.time))
 
         print fname, d.shape, np.prod(d.shape)
 

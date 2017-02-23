@@ -36,7 +36,7 @@ def _main():
            'nbits':8,
            'foff':-1.0,
            'fch1':1448.0,
-           'nchans': 256,
+           'nchans': 512,
            'telescope_id':1,
            'src_dej': -30724.3618819,
            'src_raj': 164015.762746,

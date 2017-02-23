@@ -19,7 +19,7 @@
 #include "array.h"
 #include "array2d.h"
 #include "CudaTimer.h"
-//#define DUMP_STATE 1
+#define DUMP_STATE 1
 
 #define MAX_ITER 16
 
@@ -116,7 +116,7 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 
 int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata);
 
-int fdmt_calculate_weights(fdmt_t* fdmt, array4d_t* inarr);
+int fdmt_calculate_weights(fdmt_t* fdmt);
 
 
 /**

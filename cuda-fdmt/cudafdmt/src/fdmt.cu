@@ -269,6 +269,8 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 
 	fdmt->execute_count = 0;
 
+	fdmt_calculate_weights(fdmt);
+
 	return 0;
 }
 
@@ -358,18 +360,20 @@ void __global__ fdmt_initialise_kernel(const fdmt_dtype* __restrict__ indata,
 		// for each time
 		// (TODO: Not including a missing overlap with the previous block here)
 		// originally this was j=idt, rather than j=0. But that just meant that 0<=j<idt were zero, which seems weird.
+
 		for(int j = 0; j < nt; ++j) {
-			state[outidx + j] = state[iidx + j] + indata[imidx -j];
+			state[outidx + j] = (state[iidx + j] + indata[imidx -j]);
 		}
 	}
 }
 
 void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
-		fdmt_dtype* __restrict__ state, int delta_t, int max_dt, int nt)
+		fdmt_dtype* __restrict__ state, int delta_t, int max_dt, int nt, bool count)
 {
 	// indata is 4D array: (nbeams, nf, 1, nt): index [ibeam, c, 0, t] = t + nt*(0 + 1*(c + nf*ibeam))
 	// State is a 4D array: (nbeams, nf, delta_t, max_dt) ( for the moment)
 	// full index [ibeam, c, idt, t] is t + max_dt*(idt + delta_t*(c + nf*ibeam))
+	// If coutn is true, it initialises the input to the number of cells that will be added
 
 	int nbeams = gridDim.x; // number of beams
 	int nf = gridDim.y; // Number of frequencies
@@ -382,7 +386,11 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 	int outidx = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, 0, 0);
 	int imidx = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0);
 	while (t < nt) {
-		state[outidx + t] = indata[imidx + t];
+		if (count) {
+			state[outidx + t] = 1.;
+		} else {
+			state[outidx + t] = indata[imidx + t];
+		}
 		t += tblock;
 	}
 
@@ -397,22 +405,32 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 		// (TODO: Not including a missing overlap with the previous block here)
 		// originally this was j=idt, rather than j=0. But that just meant that 0<=j<idt were zero, which seems weird.
 		t = threadIdx.x; // reset t
+		fdmt_dtype c1 = sqrtf(fdmt_dtype(idt));
+		fdmt_dtype c2 = sqrtf(fdmt_dtype(idt+1));
+		c1 = 1.;
+		c2 = 1.;
 		while (t < nt) {
-			state[outidx + t] = state[iidx + t] + indata[imidx -t];
+			if (count) {
+				state[outidx + t] = fdmt_dtype(idt + 1);
+			} else {
+				state[outidx + t] = (state[iidx + t]*c1 + indata[imidx -t])/c2;
+			}
 			t += tblock;
 		}
 	}
 }
 
-int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* state)
+int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* state, bool count)
 {
 	// indata is 4D array: (nbeams, nf, 1, nt)
 	// State is a 4D array: (nbeams, nf, deltat, max_dt) ( for the moment)
 
-	assert(indata->nw == fdmt->nbeams);
-	assert(indata->nx == fdmt->nf);
-	assert(indata->ny == 1);
-	assert(indata->nz == fdmt->nt);
+	if (! count) {
+		assert(indata->nw == fdmt->nbeams);
+		assert(indata->nx == fdmt->nf);
+		assert(indata->ny == 1);
+		assert(indata->nz == fdmt->nt);
+	}
 
 	state->nw = fdmt->nbeams;
 	state->nx = fdmt->nf;
@@ -426,7 +444,7 @@ int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* 
 	dim3 grid_shape(fdmt->nbeams, fdmt->nf);
 	//fdmt_initialise_kernel<<<fdmt->nbeams, fdmt->nf>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt, fdmt->nt);
 	int nthreads = 256;
-	fdmt_initialise_kernel2<<<grid_shape, nthreads>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt, fdmt->nt);
+	fdmt_initialise_kernel2<<<grid_shape, nthreads>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt, fdmt->nt, count);
 	gpuErrchk(cudaDeviceSynchronize());
 
 	return 0;
@@ -1090,7 +1108,7 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	fdmt->t_init.start();
 	int s = 0;
 	//fdmt_initialise(fdmt, &inarr, &fdmt->states[s]);
-	fdmt_initialise_gpu(fdmt, &inarr, &fdmt->states[s]);
+	fdmt_initialise_gpu(fdmt, &inarr, &fdmt->states[s], false);
 	fdmt->t_init.stop();
 
 #ifdef DUMP_STATE
@@ -1149,20 +1167,22 @@ __global__ void fdmt_set_weights_kernel(const __restrict__ fdmt_dtype* ostate, f
 			idx < max_dt;
 			idx += blockDim.x * gridDim.x)
 	{
-		weights[idx] = rsqrtf(ostate[max_dt * idx]);
+		fdmt_dtype nhits = ostate[max_dt * idx];
+	    //weights[idx] = rsqrtf(nhits);
+		weights[idx] = 1.;
 	}
 }
 
 
 // Run ones through the FDMT so we can work out the weighting function
 // Use the supplied inarra as working memory
-int fdmt_calculate_weights(fdmt_t* fdmt, array4d_t* inarr)
+int fdmt_calculate_weights(fdmt_t* fdmt)
 {
 	int nruns = fdmt->max_dt/fdmt->nt + 1;
+	array4d_t inarr_dummy;
 	for (int ii = 0; ii < nruns; ++ii) {
 		int s = 0;
-		array4d_fill_device(inarr, 1.0);
-		fdmt_initialise_gpu(fdmt, inarr, &fdmt->states[s]); // Initialise inital state
+		fdmt_initialise_gpu(fdmt, &inarr_dummy, &fdmt->states[s], true); // Initialise state with ones
 		fdmt_execute_iterations(fdmt); //  actually execute the iterations on the GPU
 		fdmt_update_ostate(fdmt); // update the output state
 	}
