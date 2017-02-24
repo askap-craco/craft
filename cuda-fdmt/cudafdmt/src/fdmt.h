@@ -89,8 +89,8 @@ typedef struct _fdmt_t
 	int state_nbytes; // number of bytes in state
 	int state_size; // number of elements in state
 	int execute_count; //  number of times execute() has been called
-	float _last_f_width; // Width of the top subband of an FDMT iteration - used during fdmt_create() to handle non-power-of-two FDMTs
-	float _f_width; // Width of all other subbands of an FDMT iteration - used during fdmt_create() to handle non-power-of-two FDMTs
+	float _df_top; // Width of the top subband of an FDMT iteration - used during fdmt_create() to handle non-power-of-two FDMTs
+	float _df_bot; // Width of all other subbands of an FDMT iteration - used during fdmt_create() to handle non-power-of-two FDMTs
 	//FdmtIteration* iterations[MAX_ITER]; // description of what happens for each iteration
 	vector<FdmtIteration* > iterations;
 	bool dump_data;

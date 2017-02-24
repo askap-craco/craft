@@ -48,25 +48,44 @@ __host__ __device__ int calc_delta_t(const fdmt_t* fdmt, float f_start, float f_
 	return delta_t;
 }
 
+__host__ __device__ int calc_delta_t(float f_start, float f_end, float fmin, float fmax, int max_dt)
+{
+	float rf = cff(f_start, f_end, fmin, fmax);
+	float delta_tf = ((float)max_dt-1.0) * rf;
+	int delta_t = (int)ceilf(delta_tf);
+
+	return delta_t;
+}
+
 __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_num, const array4d_t* indata, array4d_t* outdata)
 {
-	float df = fdmt->df; // channel resolution
 
-	// Add 1 to the frequency dimension if it's not divisible by 2 to handle non-power-of-two nf
-	int nf = indata->nx/2 + indata->nx % 2;
+	// If the number of incoming channels is not a multiple of two, we copy the highest channel to the next state
+	// without doing anything to it (except making sure it lives in the right place in the destination state.
+	// We track the frequency resolution of the top channel separately from all the other bottom channels
 
-	// Barak's calculation of the frequency resolution of current iteration was like this:
-	//float delta_f = (float)(1 << iteration_num) * df;
-	// that version gives  array dimensions that are larger than the requested max_dt for
-	// non-power-of-2 nf, by the time the Iterations finished.
-	// Doing
-	float delta_f = (fdmt->fmax - fdmt->fmin)/((float) nf);
-	/// gives the correct dimensions
-	// BUT: The DM resolution is weird (i.e. higher than expected).
-	// E.g. for 336 x 1 MHc channels max at 1440 MHz, Tint=1.265625ms vela arrives at dt=105 samples,
-    // Butit's DM of 69 pc/cm^-3 should have a dt of around, I dunno, 75 samples. So.... Errr?
-	// Tracking it properly gives:
+	const float df = fdmt->df; // channel resolution
+	const float fmin = fdmt->fmin; // Bottom of band
 
+	const bool do_copy = indata->nx %2 == 1; // true if the top channel will be copied rather than FDMTed
+	const int nf = indata->nx/2 + indata->nx % 2; 	// Number of channels in the output state. Adds 1 if the top channel will be copied.
+
+	if (do_copy) {
+		fdmt->_df_top += 0; //top channel width unchanged
+	} else {
+		fdmt->_df_top += fdmt->_df_bot; // We will be wider by a new channel
+	}
+
+	fdmt->_df_bot *= 2.0; // Bottom channels will be added together
+
+	float delta_f;
+	if (nf == 1) { // This is the last iteration
+		delta_f = fdmt->_df_top;
+	} else {
+		delta_f = fdmt->_df_bot;
+	}
+
+	const float fres = fdmt->_df_bot;
 	int delta_t = calc_delta_t(fdmt, fdmt->fmin, fdmt->fmin+delta_f); // Max DM
 	int ndt = delta_t + 1;
 
@@ -80,15 +99,12 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 	FdmtIteration* iter = new FdmtIteration(outdata->nw, outdata->nx, outdata->ny, outdata->nz);
 	fdmt->iterations.push_back(iter);
-	float fmin = fdmt->fmin; // Bottom of band
-	float fres = fdmt->_f_width*2.0; // Frequency resolution of the output subbands
-	fdmt->_f_width = fres;
 
-//	printf("Iteration %d max_dt %d delta_f =%f nf=%d fres=%f fmin=%f inshape: [%d, %d, %d, %d] outshape: [%d, %d, %d, %d]\n",
-//			iteration_num, fdmt->max_dt, delta_f,
-//				nf, fres, fmin,
-//				indata->nw, indata->nx, indata->ny, indata->nz,
-//				outdata->nw, outdata->nx, outdata->ny, outdata->nz);
+
+	printf("Iteration %d max_dt %d nf=%d fres=%f fmin=%f inshape: [%d, %d, %d, %d] outshape: [%d, %d, %d, %d]\n",
+			iteration_num, fdmt->max_dt, nf, fres, fmin,
+				indata->nw, indata->nx, indata->ny, indata->nz,
+				outdata->nw, outdata->nx, outdata->ny, outdata->nz);
 
 	float correction = 0.0;
 	if (iteration_num > 0) {
@@ -100,30 +116,37 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 	// For each output sub-band
 	for (int iif = 0; iif < nf; iif++) {
+		bool copy_subband = false;
 		float f_start = fres * (float)iif + fmin - df/2.0f; // Freq of bottom output subband
 		float f_end;
+		float f_middle;
 
 		if (iif < nf - 1) { // all the bottom subbands
 			f_end = f_start + fres;
-		} else  { // if this is final, leftover subband because some cheeky monkey doesn't have a power of 2 number of channels.
-//			printf("iif %d final subband\n", iif);
-			if (2*iif + 1 < indata->nx) { // There are 2 subbands available in the input data
+			f_middle = f_start +  fres/2.0f - correction; // Middle freq of subband, less 0.5xresolution
+		} else  { // if this is the top output subband
+			assert(iif == nf - 1);
+			printf("iif %d final subband\n", iif);
+
+			if (do_copy) { // this iteration is a copy iteration -  there is no subband above this one in the input data
+				// the output channel width equals the input channel width
+				printf("no Subband avilable. Copy: fdmt->_df_top=%f\n", fdmt->_df_top);
+				f_end = f_start + fdmt->_df_top;
+				//f_middle = f_start + fdmt->_df_top - correction; // Middle freq of subband, less 0.5xresolution
+				f_middle = f_start + fdmt->_df_top/2.0f - correction;
+				// Tell that code down there to mark this subband to copy the output across
+				copy_subband = true;
+			} else { // There are 2 subbands available in the input data
 				// The width of the output subband is the sum of the input suband (which is fres/2.0)
 				// plus whatever the previous output was
-				float out_width = fdmt->_last_f_width + fres/2.0;
-				f_end = f_start + out_width;
-//				printf("2 subbands available: fdmt->_last_f_width=%f. New Width: %f\n", fdmt->_last_f_width, out_width);
-				fdmt->_last_f_width = out_width;
-			} else { // there is not subband above this one in the input data
-				// the output channel width equals the input channel width
-//				printf("no Subband avilable. Copy: fdmt->_last_f_width=%f\n", fdmt->_last_f_width);
-				f_end = f_start + fdmt->_last_f_width;
+				f_end = f_start + fdmt->_df_top;
+				f_middle = f_start + fres/2.0 - correction;
+				printf("2 subbands available: fdmt->_df_top=%f. fres %f f_start %f f_end %f\n", fdmt->_df_top, fres, f_start, f_end);
 			}
-
 		}
 
-		float f_middle = (f_end - f_start)/2.0f + f_start - correction; // Middle freq of subband, less 0.5xresolution
-		float f_middle_larger = (f_end - f_start)/2.0f + f_start + correction; // Middle freq of subband + 0.5x resolution (helps with rounding)
+		float f_middle_larger = f_middle + 2*correction; // Middle freq of subband + 0.5x resolution (helps with rounding)
+
 
 		// Max DM for this subband
 		int delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
@@ -131,14 +154,20 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 		// Note; we must not overwrite the max ndt - doign too many down low will give us too much resolution
 		// Up high.
 		if (delta_t_local > ndt) {
+			printf("YUK! delta_t_local %d > ndt %d\n", delta_t_local, ndt);
 			delta_t_local = ndt;
 		}
 		iter->add_subband(delta_t_local);
-//		printf("iif %d oif1=%d oif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
-//					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
+		printf("iif %d oif1=%d oif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
+					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
 		if (iif == 0) {
-			assert(delta_t_local == ndt);// Should populate all delta_t in the lowest band????
+			assert(delta_t_local == ndt);// Should populate all delta_t in the lowest band!!!
 		}
+
+		assert(f_start < f_middle);
+		assert(f_middle < f_middle_larger);
+		assert(f_middle_larger < f_end);
+
 
 		// For each DM relevant for this subband
 		for (int idt = 0; idt < delta_t_local; idt++) {
@@ -185,6 +214,9 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
 			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0) - mint;
 			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
+			if (copy_subband) {
+				src2_offset = -1;
+			}
 			iter->save_subband_values(idt, src1_offset, src2_offset, out_offset, mint);
 		}
 	}
@@ -258,8 +290,8 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 
 	// save iteration setup
 	int s = 0;
-	fdmt->_f_width = fdmt->df;
-	fdmt->_last_f_width = fdmt->df;
+	fdmt->_df_bot = fdmt->df;
+	fdmt->_df_top = fdmt->df;
 	for (int iiter = 1; iiter < fdmt->order+1; iiter++) {
 		array4d_t* curr_state = &fdmt->states[s];
 		s = (s + 1) % 2;
