@@ -95,7 +95,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 	outdata->ny = ndt;
 	outdata->nz = indata->nz;
 
-	assert(array4d_size(outdata) <= fdmt->state_size);
+	//assert(array4d_size(outdata) <= fdmt->state_size);
 
 	FdmtIteration* iter = new FdmtIteration(outdata->nw, outdata->nx, outdata->ny, outdata->nz);
 	fdmt->iterations.push_back(iter);
@@ -212,7 +212,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			int mint = dt_middle_larger;
 
 			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
-			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0) - mint;
+			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0) - mint; // src2 offset is by mint because it only starts adding after mint samples
 			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
 			if (copy_subband) {
 				src2_offset = -1;
@@ -270,10 +270,9 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 		fdmt->states[s].nx = fdmt->nf;
 		fdmt->states[s].ny = fdmt->delta_t;
 		fdmt->states[s].nz = fdmt->max_dt;
-		array4d_malloc(&fdmt->states[s], host_alloc, true);
+		//array4d_malloc(&fdmt->states[s], host_alloc, true);
 	}
-	fdmt->state_size = array4d_size(&fdmt->states[0]);
-	fdmt->state_nbytes = fdmt->state_size * sizeof(fdmt_dtype);
+
 	fdmt->ostate.nw = fdmt->nbeams;
 	fdmt->ostate.nx = 1;
 	fdmt->ostate.ny = fdmt->max_dt;
@@ -292,12 +291,31 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	int s = 0;
 	fdmt->_df_bot = fdmt->df;
 	fdmt->_df_top = fdmt->df;
+	array4d_t biggest_state = fdmt->states[s];
+	size_t biggest_state_size = array4d_size(&biggest_state);
+
 	for (int iiter = 1; iiter < fdmt->order+1; iiter++) {
 		array4d_t* curr_state = &fdmt->states[s];
 		s = (s + 1) % 2;
 		array4d_t* new_state = &fdmt->states[s];
 		fdmt_save_iteration(fdmt, iiter, curr_state, new_state);
+		size_t new_state_size = array4d_size(new_state);
+		if (new_state_size > biggest_state_size) {
+			biggest_state = *new_state;
+		}
 	}
+
+	for(int s = 0; s < 2; ++s) {
+		fdmt->states[s].nw = biggest_state.nw;
+		fdmt->states[s].nx = biggest_state.nx;
+		fdmt->states[s].ny = biggest_state.ny;
+		fdmt->states[s].nz = biggest_state.nz;
+		array4d_malloc(&fdmt->states[s], host_alloc, true);
+	}
+
+	fdmt->state_size = array4d_size(&fdmt->states[0]);
+	fdmt->state_nbytes = fdmt->state_size * sizeof(fdmt_dtype);
+
 
 	fdmt->execute_count = 0;
 
@@ -810,15 +828,18 @@ __global__ void cuda_fdmt_iteration_kernel5_sum (
 	int idt = blockIdx.y;
 	int t = threadIdx.x;
 	int nt = blockDim.x;
-	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
-	const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
 	const int* ts_ptr = ts_data + 4*idt;
+
 	int src1_offset = ts_ptr[0];
 	int src2_offset = ts_ptr[1];
 	int out_offset = ts_ptr[2];
 	int mint = ts_ptr[3];
 
-	while(t < tmax + idt) {
+	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
+	const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
+
+
+	while(t < tmax) {
 
 //		if (t >= maxt + delta_t_local) { // strictly could be the actuall delta_t for the out_offset, but who's counting?
 //			return;
@@ -832,10 +853,7 @@ __global__ void cuda_fdmt_iteration_kernel5_sum (
 		t += nt;
 		outp += nt;
 		inp += nt;
-//
 	}
-
-
 }
 
 // The thing I like about this i that it has loads of blocks, so works well even if nbeams is small.
@@ -859,7 +877,7 @@ __global__ void cuda_fdmt_iteration_kernel5_copy (
 	int src1_offset = ts_ptr[0];
 	int out_offset = ts_ptr[2];
 
-	while(t < tmax + idt) {
+	while(t < tmax) {
 		outp[out_offset] = inp[src1_offset];
 		t += nt;
 		outp += nt;
@@ -914,8 +932,6 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		const fdmt_dtype* src_start = &indata->d_device[0];
 		fdmt_dtype* dst_start = &outdata->d_device[0];
 		int tmax = min(nt + delta_t_local, indata->nz-1);
-		//printf("iter %d iif %d TMAX %d nt  %d delta_t_local %d %d \n", iteration_num, iif, tmax, nt, delta_t_local, indata->nz);
-
 		assert(tmax < indata->nz);
 
 
