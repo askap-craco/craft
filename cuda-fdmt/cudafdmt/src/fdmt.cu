@@ -1017,7 +1017,6 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 	int max_dt = gridDim.y;
 	int idt = blockIdx.y;
 
-	//int off = (max_dt+nt)*(idt + max_dt*ibeam);
 	int off = array4d_idx(1, nbeams, max_dt, max_dt+nt, 0, ibeam, idt, 0);
 	fdmt_dtype* optr = ostate + off;
 	const fdmt_dtype* iptr = indata + off;
@@ -1030,8 +1029,7 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 
 		if (t < nt) {
 			// Weight only the last block by the weights
-			fdmt_dtype weight = 1.;
-			//weight = weights[idt];
+			fdmt_dtype weight = weights[idt];
 			optr[t] = (iptr[t] + optr[t + nt])*weight;
 		} else if (t >= max_dt) {
 			optr[t] = iptr[t];
@@ -1231,15 +1229,15 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 	return 0;
 }
 
-__global__ void fdmt_set_weights_kernel(const __restrict__ fdmt_dtype* ostate, fdmt_dtype* weights, int max_dt)
+__global__ void fdmt_set_weights_kernel(const __restrict__ fdmt_dtype* ostate, fdmt_dtype* weights, int max_dt, int stride)
 {
 	for (int idx = blockIdx.x * blockDim.x + threadIdx.x;
 			idx < max_dt;
 			idx += blockDim.x * gridDim.x)
 	{
-		fdmt_dtype nhits = ostate[max_dt * idx];
-	    //weights[idx] = rsqrtf(nhits);
-		weights[idx] = 1.;
+		fdmt_dtype nhits = ostate[stride * idx];
+	    weights[idx] = rsqrtf(nhits);
+		//weights[idx] = 1.;
 	}
 }
 
@@ -1248,7 +1246,7 @@ __global__ void fdmt_set_weights_kernel(const __restrict__ fdmt_dtype* ostate, f
 // Use the supplied inarra as working memory
 int fdmt_calculate_weights(fdmt_t* fdmt)
 {
-	int nruns = fdmt->max_dt/fdmt->nt + 1;
+	int nruns = fdmt->max_dt/fdmt->nt + 1; // add 1 for extraq giggles
 	array4d_t inarr_dummy;
 	for (int ii = 0; ii < nruns; ++ii) {
 		int s = 0;
@@ -1260,7 +1258,7 @@ int fdmt_calculate_weights(fdmt_t* fdmt)
 	// set weights array
 	int blocksize = 256;
 	int nblocks = (fdmt->max_dt + blocksize - 1) / fdmt->max_dt;
-	fdmt_set_weights_kernel<<<nblocks, blocksize>>>(fdmt->ostate.d_device, fdmt->weights.d_device, fdmt->max_dt);
+	fdmt_set_weights_kernel<<<nblocks, blocksize>>>(fdmt->ostate.d_device, fdmt->weights.d_device, fdmt->max_dt, fdmt->max_dt + fdmt->nt);
 	gpuErrchk(cudaDeviceSynchronize());
 	if (fdmt->dump_data) {
 		array4d_copy_to_host(&fdmt->weights);
