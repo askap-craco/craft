@@ -1004,7 +1004,7 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 										int nt)
 {
 	// Adds the indata into the ostate and shifts the ostate where the's some to add
-	// shape of both arrays is [nbeams, max_dt, max_dt]
+	// shape of both arrays is [nbeams, max_dt, max_dt + nt]
 	// The time axis is the last one (it just has a big shape)
 	// Where nbeams = gridDim.x
 	// max_dt = gridDim.y
@@ -1017,12 +1017,12 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 	int max_dt = gridDim.y;
 	int idt = blockIdx.y;
 
-	int off = max_dt*(idt + max_dt*ibeam);
-	int t = threadIdx.x;
+	//int off = (max_dt+nt)*(idt + max_dt*ibeam);
+	int off = array4d_idx(1, nbeams, max_dt, max_dt+nt, 0, ibeam, idt, 0);
 	fdmt_dtype* optr = ostate + off;
 	const fdmt_dtype* iptr = indata + off;
 	// Add the new state for all but the last block
-	for (int t = threadIdx.x; t < max_dt; t += blockt) {
+	for (int t = threadIdx.x; t < max_dt + nt; t += blockt) {
 		// makign this optr[t] = iptr[t+-1] + optr[t + nt] makes the DC RMS worse
 		// optr[t] = iptr[t] + optr[t + nt +- 1]; also worse
 		// So 		optr[t] = iptr[t] + optr[t + nt];
@@ -1033,7 +1033,7 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 			fdmt_dtype weight = 1.;
 			//weight = weights[idt];
 			optr[t] = (iptr[t] + optr[t + nt])*weight;
-		} else if (t >= max_dt -nt) {
+		} else if (t >= max_dt) {
 			optr[t] = iptr[t];
 		} else {
 			optr[t] = (iptr[t] + optr[t + nt]);
@@ -1101,7 +1101,7 @@ __host__ void fdmt_copy_valid_ostate3(fdmt_t* fdmt, array4d_t* out)
 
 __host__ void fdmt_copy_valid_ostate2(const fdmt_t* fdmt, array4d_t* out)
 {
-	// ostate has size [nbeams, 1, max_dt, max_dt]
+	// ostate has size [nbeams, 1, max_dt, max_dt + nt]
 	// dst has size [1, nbeams, max_dt, nt]
 	assert(out->nw == 1);
 	assert(out->nx == fdmt->nbeams);
@@ -1109,7 +1109,7 @@ __host__ void fdmt_copy_valid_ostate2(const fdmt_t* fdmt, array4d_t* out)
 	assert(out->nz == fdmt->nt);
 
 	size_t dpitch = sizeof(fdmt_dtype)*fdmt->nt;
-	size_t spitch = sizeof(fdmt_dtype)*fdmt->max_dt;
+	size_t spitch = sizeof(fdmt_dtype)*(fdmt->max_dt + fdmt->nt);
 	size_t width = sizeof(fdmt_dtype)*fdmt->nt;
 	size_t height = fdmt->max_dt;
 	for(int b = 0; b < fdmt->nbeams; ++b) {
