@@ -380,7 +380,7 @@ __global__ void boxcar_do_kernel3 (
 	// blockDim.y = DT_BLOCKS = number of dispersion trials to do at once
 	// TOTAL nthreads = NBOX * DT_BLOCKS
 	// Assume ndt is an integer multiple of DT_BLOCKS
-	// indata.shape = [nbeams, 1, ndt, ndt]
+	// indata.shape = [nbeams, 1, ndt, ndt + nt]
 	// outdata.shape = [nbeams,ndt, nt, nbox]
 	// history.shape = [1, nbeams, ndt, NBOX]
 
@@ -392,7 +392,7 @@ __global__ void boxcar_do_kernel3 (
 	int idt = thread_dt + DT_BLOCKS*grid_dt; // total delta_t
 	int ibc = threadIdx.x; // boxcar width in samples. ibc=0 is 1 sample wide.
 
-	int in_off = array4d_idx(nbeams, 1, ndt, ndt, ibeam, 0, idt, 0); // input offset
+	int in_off = array4d_idx(nbeams, 1, ndt, ndt + nt, ibeam, 0, idt, 0); // input offset
 	int out_off = array4d_idx(nbeams, ndt, nt, NBOX, ibeam, idt, 0, 0); // output offset
 	int hist_off = array4d_idx(1, nbeams, ndt, NBOX, 0, ibeam, idt, 0); // history offset
 
@@ -555,7 +555,7 @@ int boxcar_do_gpu(const array4d_t* indata,
 	assert(indata->nw  == nbeams);
 	assert(indata->nx == 1);
 	assert(indata->ny == ndt);
-	assert(indata->nz == ndt);
+	assert(indata->nz == ndt + nt);
 	assert(boxcar_data->nw == nbeams);
 	assert(boxcar_data->nx == ndt);
 	assert(boxcar_data->ny == nt);

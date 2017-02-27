@@ -93,7 +93,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 	outdata->nw = indata->nw;
 	outdata->nx = nf;
 	outdata->ny = ndt;
-	outdata->nz = indata->nz;
+	outdata->nz = fdmt->nt + ndt; // everything else is zeros
 
 	//assert(array4d_size(outdata) <= fdmt->state_size);
 
@@ -125,7 +125,6 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 		if (iif < nf - 1) { // all the bottom subbands
 			f_end = f_start + fres;
 			f_middle = f_start +  fres/2.0f - correction; // Middle freq of subband, less 0.5xresolution
-			fmax_virtual = fdmt->fmax;
 			delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
 		} else  { // if this is the top output subband
 			assert(iif == nf - 1);
@@ -135,10 +134,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 				// the output channel width equals the input channel width
 				printf("no Subband available. Copy: fdmt->_df_top=%f\n", fdmt->_df_top);
 				f_end = f_start + fdmt->_df_top*2.0;
-				//f_end = f_start + fres;
 				f_middle = f_start + fdmt->_df_top - correction; // Middle freq of subband, less 0.5xresolution
-				//f_middle = f_start + fres/2.0f - correction;
-				fmax_virtual = f_end;
 				// Tell that code down there to mark this subband to copy the output across
 				copy_subband = true;
 				delta_t_local = fdmt->_ndt_top;
@@ -148,7 +144,6 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 				// plus whatever the previous output was
 				f_end = f_start + fdmt->_df_top;
 				f_middle = f_start + fres/2.0 - correction;
-				fmax_virtual = f_end;
 				printf("2 subbands available: fdmt->_df_top=%f. fres %f f_start %f f_end %f\n", fdmt->_df_top, fres, f_start, f_end);
 				delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
 				fdmt->_ndt_top = delta_t_local;
@@ -158,9 +153,6 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 		float f_middle_larger = f_middle + 2*correction; // Middle freq of subband + 0.5x resolution (helps with rounding)
 
 
-		// Max DM for this subband
-		//int delta_t_local = calc_delta_t(f_start, f_end, fdmt->fmin, fmax_virtual, fdmt->max_dt);
-
 		// Note; we must not overwrite the max ndt - doign too many down low will give us too much resolution
 		// Up high.
 		if (delta_t_local > ndt) {
@@ -168,7 +160,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			delta_t_local = ndt;
 		}
 		iter->add_subband(delta_t_local);
-		printf("iif %d oif1=%d oif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
+		printf("oif %d iif1=%d iif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
 					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
 		if (iif == 0) {
 			assert(delta_t_local == ndt);// Should populate all delta_t in the lowest band!!!
@@ -190,7 +182,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 			int itmin = 0;
 			int itmax = dt_middle_larger;
-			//printf("idt %d dtmid %d dt_mid_l %d dt_rest %d\n", idt, dt_middle_index, dt_middle_larger, dt_rest);
+			printf("idt %d dtmid %d dt_mid_l %d dt_rest %d\n", idt, dt_middle_index, dt_middle_larger, dt_rest);
 
 			dim3 dst_start(iif, idt+shift_output,0);
 			dim3 src1_start(2*iif, dt_middle_index, 0);
@@ -229,6 +221,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 				src2_offset = -1;
 				mint = 0;
 			}
+			printf("Subband idt %d src1_offset %d src2_offset %d out_offset %d mint %d\n", idt, src1_offset, src2_offset, out_offset, mint);
 			iter->save_subband_values(idt, src1_offset, src2_offset, out_offset, mint);
 		}
 	}
@@ -276,28 +269,13 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	fdmt->delta_t += 1; // Slightly different definition to original
 
 	// Allocate states as ping-pong buffer
-
 	for (int s = 0; s < 2; s++) {
 		fdmt->states[s].nw = fdmt->nbeams;
 		fdmt->states[s].nx = fdmt->nf;
 		fdmt->states[s].ny = fdmt->delta_t;
-		fdmt->states[s].nz = fdmt->max_dt;
+		fdmt->states[s].nz = fdmt->delta_t + nt;
 		//array4d_malloc(&fdmt->states[s], host_alloc, true);
 	}
-
-	fdmt->ostate.nw = fdmt->nbeams;
-	fdmt->ostate.nx = 1;
-	fdmt->ostate.ny = fdmt->max_dt;
-	fdmt->ostate.nz = fdmt->max_dt;
-	array4d_malloc(&fdmt->ostate, host_alloc, true);
-	array4d_cuda_memset(&fdmt->ostate, 0);
-
-	fdmt->weights.nw = 1;
-	fdmt->weights.nx = 1;
-	fdmt->weights.ny = 1;
-	fdmt->weights.nz = fdmt->max_dt;
-	array4d_malloc(&fdmt->weights, host_alloc, true);
-	array4d_fill_device(&fdmt->weights, 1.0);
 
 	// save iteration setup
 	int s = 0;
@@ -314,8 +292,13 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 		size_t new_state_size = array4d_size(new_state);
 		if (new_state_size > biggest_state_size) {
 			biggest_state = *new_state;
+			biggest_state_size = new_state_size;
 		}
 	}
+
+	printf("Biggest state is %d elements = ", biggest_state_size);
+	array4d_print_shape(&biggest_state);
+	printf("\n");
 
 	for(int s = 0; s < 2; ++s) {
 		fdmt->states[s].nw = biggest_state.nw;
@@ -327,6 +310,21 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 
 	fdmt->state_size = array4d_size(&fdmt->states[0]);
 	fdmt->state_nbytes = fdmt->state_size * sizeof(fdmt_dtype);
+
+	fdmt->ostate.nw = fdmt->nbeams;
+	fdmt->ostate.nx = 1;
+	fdmt->ostate.ny = fdmt->max_dt;
+	fdmt->ostate.nz = fdmt->max_dt + nt;
+	array4d_malloc(&fdmt->ostate, host_alloc, true);
+	array4d_cuda_memset(&fdmt->ostate, 0);
+
+	fdmt->weights.nw = 1;
+	fdmt->weights.nx = 1;
+	fdmt->weights.ny = 1;
+	fdmt->weights.nz = fdmt->max_dt;
+	array4d_malloc(&fdmt->weights, host_alloc, true);
+	array4d_fill_device(&fdmt->weights, 1.0);
+
 
 
 	fdmt->execute_count = 0;
@@ -433,7 +431,7 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 		fdmt_dtype* __restrict__ state, int delta_t, int max_dt, int nt, bool count)
 {
 	// indata is 4D array: (nbeams, nf, 1, nt): index [ibeam, c, 0, t] = t + nt*(0 + 1*(c + nf*ibeam))
-	// State is a 4D array: (nbeams, nf, delta_t, max_dt) ( for the moment)
+	// State is a 4D array: (nbeams, nf, delta_t, delta_t + nt) ( for the moment)
 	// full index [ibeam, c, idt, t] is t + max_dt*(idt + delta_t*(c + nf*ibeam))
 	// If coutn is true, it initialises the input to the number of cells that will be added
 
@@ -445,7 +443,7 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 	int t = threadIdx.x; // sample number
 
 	// Assign initial data to the state at delta_t=0
-	int outidx = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, 0, 0);
+	int outidx = array4d_idx(nbeams, nf, delta_t, delta_t + nt, ibeam, c, 0, 0);
 	int imidx = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0);
 	while (t < nt) {
 		if (count) {
@@ -458,8 +456,8 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 
 	// Do partial sums initialisation recursively (Equation 20.)
 	for (int idt = 1; idt < delta_t; ++idt) {
-		int outidx = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, idt, 0);
-		int iidx   = array4d_idx(nbeams, nf, delta_t, max_dt, ibeam, c, idt-1, 0);
+		int outidx = array4d_idx(nbeams, nf, delta_t, delta_t + nt, ibeam, c, idt, 0);
+		int iidx   = array4d_idx(nbeams, nf, delta_t, delta_t + nt, ibeam, c, idt-1, 0);
 		int imidx  = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, nt -1 );
 
 		// The state for dt=d = the state for dt=(d-1) + the time-reversed input sample
@@ -497,7 +495,7 @@ int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* 
 	state->nw = fdmt->nbeams;
 	state->nx = fdmt->nf;
 	state->ny = fdmt->delta_t;
-	state->nz = fdmt->max_dt;
+	state->nz = fdmt->nt + fdmt->delta_t;
 
 	// zero off the state
 	array4d_cuda_memset(state, 0);
@@ -833,11 +831,13 @@ __global__ void cuda_fdmt_iteration_kernel5_sum (
 		int src_beam_stride,
 		int dst_beam_stride,
 		int tmax,
+		int tend,
 		const int* __restrict__ ts_data)
 
 {
 	int beamno = blockIdx.x;
 	int idt = blockIdx.y;
+	int ndt = gridDim.y;
 	int t = threadIdx.x;
 	int nt = blockDim.x;
 	const int* ts_ptr = ts_data + 4*idt;
@@ -850,18 +850,31 @@ __global__ void cuda_fdmt_iteration_kernel5_sum (
 	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
 	const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
 
+	while(t < mint) {
+		outp[out_offset] = inp[src1_offset];
+		t += nt;
+		outp += nt;
+		inp += nt;
+	}
 
 	while(t < tmax) {
+		outp[out_offset] = inp[src1_offset] + inp[src2_offset];
+		t += nt;
+		outp += nt;
+		inp += nt;
+	}
 
-//		if (t >= maxt + delta_t_local) { // strictly could be the actuall delta_t for the out_offset, but who's counting?
-//			return;
-//		}
+	int tend1 = min(tend, tmax + mint);
 
-		if (t < mint) {
-			outp[out_offset] = inp[src1_offset];
-		} else {
-			outp[out_offset] = inp[src1_offset] + inp[src2_offset];
-		}
+	while(t < tend1) {
+		outp[out_offset] = inp[src2_offset];
+		t += nt;
+		outp += nt;
+		inp += nt;
+	}
+
+	while(t < tend) {
+		outp[out_offset] = 0;
 		t += nt;
 		outp += nt;
 		inp += nt;
@@ -875,7 +888,7 @@ __global__ void cuda_fdmt_iteration_kernel5_copy (
 		const fdmt_dtype* __restrict__ indata,
 		int src_beam_stride,
 		int dst_beam_stride,
-		int tmax,
+		int tend,
 		const int* __restrict__ ts_data)
 
 {
@@ -889,7 +902,7 @@ __global__ void cuda_fdmt_iteration_kernel5_copy (
 	int src1_offset = ts_ptr[0];
 	int out_offset = ts_ptr[2];
 
-	while(t < tmax) {
+	while(t < tend) {
 		outp[out_offset] = inp[src1_offset];
 		t += nt;
 		outp += nt;
@@ -927,7 +940,8 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 	outdata->nx = iter->state_shape.x;
 	outdata->ny = iter->state_shape.y;
 	outdata->nz = iter->state_shape.z;
-	assert(indata->nz == outdata->nz);
+	//assert(indata->nz == outdata->nz); // This almost certainly isn't the case - it grows with iteration
+
 	int nt = fdmt->nt;
 	assert(array4d_size(outdata) <= fdmt->state_size);
 	assert(outdata->nx == iter->dt_data.size());
@@ -943,8 +957,10 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		int delta_t_local = iter->delta_ts.at(iif);
 		const fdmt_dtype* src_start = &indata->d_device[0];
 		fdmt_dtype* dst_start = &outdata->d_device[0];
-		int tmax = min(nt + delta_t_local, indata->nz-1);
-		assert(tmax < indata->nz);
+		int tmax = min(nt + delta_t_local, indata->nz);
+		int tend = outdata->nz;
+		assert(tmax <= indata->nz);
+		assert(tmax <= tend);
 
 
 		// WARNING: This is sub-optimal as it doesn't use an integral number of warps, and
@@ -953,24 +969,21 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		// kernel4 requires nthreads = tax
 		int nthreads = tmax;
 		dim3 grid_size(fdmt->nbeams, delta_t_local);
-		//nthreads = 256;
+
+		printf("Iteration %d iif %d indata->nz %d outdata->nz %d nt=%d delta_t_local %d tmax %d tend %d\n", iteration_num, iif,
+				indata->nz, outdata->nz, nt, delta_t_local, tmax, tend);
+
 
 		if(2*iif + 1 < indata->nx) { // do sum if there's a channel to sum
-//			cuda_fdmt_iteration_kernel4_sum<<<fdmt->nbeams, tmax>>>(dst_start, src_start,
-//					src_beam_stride,
-//					dst_beam_stride,
-//					delta_t_local, ts_data);
 
 			cuda_fdmt_iteration_kernel5_sum<<<grid_size, 256>>>(dst_start, src_start,
 					src_beam_stride,
 					dst_beam_stride,
-					tmax, ts_data);
+					tmax,tend,
+					ts_data);
 			gpuErrchk(cudaPeekAtLastError());
 		} else { // Do copy if there's no channel to add
-//			cuda_fdmt_iteration_kernel4_copy<<<fdmt->nbeams, tmax>>>(dst_start, src_start,
-//					src_beam_stride,
-//					dst_beam_stride,
-//					delta_t_local, ts_data);
+
 
 			cuda_fdmt_iteration_kernel5_copy<<<grid_size, 256>>>(dst_start, src_start,
 								src_beam_stride,

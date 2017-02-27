@@ -127,6 +127,8 @@ int array4d_copy_to_host(array4d_t* a)
 
 int array4d_cuda_memset(array4d_t*a, char c) {
 	size_t size = array4d_size(a);
+	assert(size > 0);
+	assert(a->d_device != NULL);
 	gpuErrchk(cudaMemset(a->d_device, c, size*sizeof(fdmt_dtype)));
 	return size;
 }
