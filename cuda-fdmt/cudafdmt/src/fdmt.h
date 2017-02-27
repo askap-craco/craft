@@ -91,6 +91,7 @@ typedef struct _fdmt_t
 	int execute_count; //  number of times execute() has been called
 	float _df_top; // Width of the top subband of an FDMT iteration - used during fdmt_create() to handle non-power-of-two FDMTs
 	float _df_bot; // Width of all other subbands of an FDMT iteration - used during fdmt_create() to handle non-power-of-two FDMTs
+	int _ndt_top; // Number of valid dispersion measures in the top band
 	//FdmtIteration* iterations[MAX_ITER]; // description of what happens for each iteration
 	vector<FdmtIteration* > iterations;
 	bool dump_data;

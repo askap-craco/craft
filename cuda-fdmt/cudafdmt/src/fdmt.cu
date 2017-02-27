@@ -120,28 +120,38 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 		float f_start = fres * (float)iif + fmin - df/2.0f; // Freq of bottom output subband
 		float f_end;
 		float f_middle;
+		int delta_t_local;
 
 		if (iif < nf - 1) { // all the bottom subbands
 			f_end = f_start + fres;
 			f_middle = f_start +  fres/2.0f - correction; // Middle freq of subband, less 0.5xresolution
+			fmax_virtual = fdmt->fmax;
+			delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
 		} else  { // if this is the top output subband
 			assert(iif == nf - 1);
 			printf("iif %d final subband\n", iif);
 
 			if (do_copy) { // this iteration is a copy iteration -  there is no subband above this one in the input data
 				// the output channel width equals the input channel width
-				printf("no Subband avilable. Copy: fdmt->_df_top=%f\n", fdmt->_df_top);
-				f_end = f_start + fdmt->_df_top;
-				//f_middle = f_start + fdmt->_df_top - correction; // Middle freq of subband, less 0.5xresolution
-				f_middle = f_start + fdmt->_df_top/2.0f - correction;
+				printf("no Subband available. Copy: fdmt->_df_top=%f\n", fdmt->_df_top);
+				f_end = f_start + fdmt->_df_top*2.0;
+				//f_end = f_start + fres;
+				f_middle = f_start + fdmt->_df_top - correction; // Middle freq of subband, less 0.5xresolution
+				//f_middle = f_start + fres/2.0f - correction;
+				fmax_virtual = f_end;
 				// Tell that code down there to mark this subband to copy the output across
 				copy_subband = true;
+				delta_t_local = fdmt->_ndt_top;
+
 			} else { // There are 2 subbands available in the input data
 				// The width of the output subband is the sum of the input suband (which is fres/2.0)
 				// plus whatever the previous output was
 				f_end = f_start + fdmt->_df_top;
 				f_middle = f_start + fres/2.0 - correction;
+				fmax_virtual = f_end;
 				printf("2 subbands available: fdmt->_df_top=%f. fres %f f_start %f f_end %f\n", fdmt->_df_top, fres, f_start, f_end);
+				delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
+				fdmt->_ndt_top = delta_t_local;
 			}
 		}
 
@@ -149,7 +159,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 
 		// Max DM for this subband
-		int delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
+		//int delta_t_local = calc_delta_t(f_start, f_end, fdmt->fmin, fmax_virtual, fdmt->max_dt);
 
 		// Note; we must not overwrite the max ndt - doign too many down low will give us too much resolution
 		// Up high.
@@ -215,7 +225,9 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0) - mint; // src2 offset is by mint because it only starts adding after mint samples
 			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
 			if (copy_subband) {
+				src1_offset = array4d_idx(indata, 0, 2*iif, idt, 0);
 				src2_offset = -1;
+				mint = 0;
 			}
 			iter->save_subband_values(idt, src1_offset, src2_offset, out_offset, mint);
 		}
@@ -997,29 +1009,26 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 	fdmt_dtype* optr = ostate + off;
 	const fdmt_dtype* iptr = indata + off;
 	// Add the new state for all but the last block
-	while (t < max_dt - nt) {
+	for (int t = threadIdx.x; t < max_dt; t += blockt) {
 		// makign this optr[t] = iptr[t+-1] + optr[t + nt] makes the DC RMS worse
 		// optr[t] = iptr[t] + optr[t + nt +- 1]; also worse
 		// So 		optr[t] = iptr[t] + optr[t + nt];
 		// It's just weird that we have such a noisy response to DC input
 
-		// Weight only the last block by the weights
-		fdmt_dtype weight = 1.;
 		if (t < nt) {
-			weight = weights[idt];
+			// Weight only the last block by the weights
+			fdmt_dtype weight = 1.;
+			//weight = weights[idt];
+			optr[t] = (iptr[t] + optr[t + nt])*weight;
+		} else if (t >= max_dt -nt) {
+			optr[t] = iptr[t];
+		} else {
+			optr[t] = (iptr[t] + optr[t + nt]);
 		}
-
-		optr[t] = (iptr[t] + optr[t + nt])*weight;
 
 		// sync threads before doing the next block otherwise we don't copy the ostate correctly
 		__syncthreads();
-		t += blockt;
 	}
-	// just copy the last block
-	if (t < max_dt) {
-		optr[t] = iptr[t];
-	}
-
 }
 
 
