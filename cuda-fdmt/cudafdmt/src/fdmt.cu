@@ -101,10 +101,10 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 	fdmt->iterations.push_back(iter);
 
 
-	printf("Iteration %d max_dt %d nf=%d fres=%f fmin=%f inshape: [%d, %d, %d, %d] outshape: [%d, %d, %d, %d]\n",
-			iteration_num, fdmt->max_dt, nf, fres, fmin,
-				indata->nw, indata->nx, indata->ny, indata->nz,
-				outdata->nw, outdata->nx, outdata->ny, outdata->nz);
+//	printf("Iteration %d max_dt %d nf=%d fres=%f fmin=%f inshape: [%d, %d, %d, %d] outshape: [%d, %d, %d, %d]\n",
+//			iteration_num, fdmt->max_dt, nf, fres, fmin,
+//				indata->nw, indata->nx, indata->ny, indata->nz,
+//				outdata->nw, outdata->nx, outdata->ny, outdata->nz);
 
 	float correction = 0.0;
 	if (iteration_num > 0) {
@@ -160,8 +160,8 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			delta_t_local = ndt;
 		}
 		iter->add_subband(delta_t_local);
-		printf("oif %d iif1=%d iif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
-					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
+//		printf("oif %d iif1=%d iif2=%d dt_loc=%d f_start %f f_end %f f_middle %f f_middle_larger %f\n", iif,
+//					2*iif, 2*iif+1, delta_t_local, f_start, f_end, f_middle, f_middle_larger);
 		if (iif == 0) {
 			assert(delta_t_local == ndt);// Should populate all delta_t in the lowest band!!!
 		}
@@ -182,7 +182,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 			int itmin = 0;
 			int itmax = dt_middle_larger;
-			printf("idt %d dtmid %d dt_mid_l %d dt_rest %d\n", idt, dt_middle_index, dt_middle_larger, dt_rest);
+			//printf("idt %d dtmid %d dt_mid_l %d dt_rest %d\n", idt, dt_middle_index, dt_middle_larger, dt_rest);
 
 			dim3 dst_start(iif, idt+shift_output,0);
 			dim3 src1_start(2*iif, dt_middle_index, 0);
@@ -190,7 +190,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 			//array_gpu_copy1(outdata, indata, &dst_start, &src1_start, dt_middle_larger);
 
-			// Now we work on the remaining times that are guaranteed not to overrun the input dimensions
+     		// Now we work on the remaining times that are guaranteed not to overrun the input dimensions
 			itmin = dt_middle_larger;
 			itmax = fdmt->max_dt;
 
@@ -221,7 +221,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 				src2_offset = -1;
 				mint = 0;
 			}
-			printf("Subband idt %d src1_offset %d src2_offset %d out_offset %d mint %d\n", idt, src1_offset, src2_offset, out_offset, mint);
+			//printf("Subband idt %d src1_offset %d src2_offset %d out_offset %d mint %d\n", idt, src1_offset, src2_offset, out_offset, mint);
 			iter->save_subband_values(idt, src1_offset, src2_offset, out_offset, mint);
 		}
 	}
@@ -970,8 +970,8 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		int nthreads = tmax;
 		dim3 grid_size(fdmt->nbeams, delta_t_local);
 
-		printf("Iteration %d iif %d indata->nz %d outdata->nz %d nt=%d delta_t_local %d tmax %d tend %d\n", iteration_num, iif,
-				indata->nz, outdata->nz, nt, delta_t_local, tmax, tend);
+		//printf("Iteration %d iif %d indata->nz %d outdata->nz %d nt=%d delta_t_local %d tmax %d tend %d\n", iteration_num, iif,
+				//indata->nz, outdata->nz, nt, delta_t_local, tmax, tend);
 
 
 		if(2*iif + 1 < indata->nx) { // do sum if there's a channel to sum
