@@ -69,7 +69,6 @@ def file_series(prefix, start=0):
 def show_inbuf_series(prefix, theslice, start=0, maxn=10):
     for ifname, fname in enumerate(file_series(prefix, start)):
         ostate = load4d(fname)
-        fig = pylab.figure()
         v = ostate[theslice]
         print fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), \
             'max/min/mean/sum {}/{}/{}/{}'.format(v.max(), v.min(), v.mean(), v.sum()), \
@@ -80,16 +79,18 @@ def show_inbuf_series(prefix, theslice, start=0, maxn=10):
         nfreq, ntime = v.shape
         vmid = np.ma.median(v)
         voff = np.std((v - vmid))
-
-        
+        fig, axes = pylab.subplots(1,2)
 
         myimshow(axes[0], (v), aspect='auto', origin='lower')
+        axes[0].set_xlabel('t')
+        axes[0].set_ylabel('dt')
 
         #bins = np.linspace(vmid-3,vmid+3,50)
         bins = 50
 
         for f in xrange(nfreq):
-            axes[1].hist(v[f,:], bins=bins, histtype='step')
+            #axes[1].hist(v[f,:], bins=bins, histtype='step')
+            pass
             #axes[1].loglog(abs(np.fft.rfft(v[120:140, :].sum(axis=0))))
 
         pylab.title(fname)
@@ -207,10 +208,11 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
 
-    #show_inbuf_series('inbuf_e%d.dat', [0, slice(None), 0, slice(None)], start=20, maxn=1)
+    #show_inbuf_series('ostate_e%d.dat', [0, 0, slice(None),slice(None)], start=values.start, maxn=10)
+    #pylab.show()
     show_fdmt_series('fdmt_e%d.dat', [values.beam, 0, slice(None), slice(None)], values, start=values.start, maxn=values.maxn, ibeam=values.beam)
 
-    #pylab.show()
+    pylab.show()
     
 
 
