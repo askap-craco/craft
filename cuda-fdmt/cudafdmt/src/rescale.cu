@@ -385,7 +385,7 @@ __global__ void rescale_calc_dm0_kernel (
 		}
 
 		int dm0idx = t + nt*ibeam;
-		rescale_dtype correction = ((float) nsamp)/((float) nf);
+		rescale_dtype correction = rsqrtf((float) nsamp);
 		dm0arr[dm0idx] = dm0sum * correction;
 	}
 }
@@ -445,7 +445,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		const rescale_dtype* __restrict__ offsetarr,
 		const rescale_dtype* __restrict__ scalearr,
 		const rescale_dtype* __restrict__ dm0arr,
-		const rescale_dtype* __restrict__ dm0sumarr,
+		const rescale_dtype* __restrict__ dm0statarr,
 		rescale_dtype* __restrict__ outarr,
 		float decay_constant,
 		float dm0_thresh,
@@ -488,7 +488,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 	// Easy way of expanding the time flagging by 1. Useful for killing dropouts. ACES-209
 	bool last_sample_ok = true;
 	float block_dm0thresh = dm0_thresh/sqrtf((float) nt);
-	rescale_dtype dm0min = dm0sumarr[ibeam + 1]; // broadcast read. This is to catch dropouts
+	rescale_dtype dm0min = dm0statarr[ibeam + 1]; // broadcast read. This is to catch dropouts
 
 
 	for (int t = 0; t < nt; ++t) {
