@@ -128,11 +128,11 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
 		} else  { // if this is the top output subband
 			assert(iif == nf - 1);
-			printf("iif %d final subband\n", iif);
+			//printf("iif %d final subband\n", iif);
 
 			if (do_copy) { // this iteration is a copy iteration -  there is no subband above this one in the input data
 				// the output channel width equals the input channel width
-				printf("no Subband available. Copy: fdmt->_df_top=%f\n", fdmt->_df_top);
+				//printf("no Subband available. Copy: fdmt->_df_top=%f\n", fdmt->_df_top);
 				f_end = f_start + fdmt->_df_top*2.0;
 				f_middle = f_start + fdmt->_df_top - correction; // Middle freq of subband, less 0.5xresolution
 				// Tell that code down there to mark this subband to copy the output across
@@ -144,7 +144,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 				// plus whatever the previous output was
 				f_end = f_start + fdmt->_df_top;
 				f_middle = f_start + fres/2.0 - correction;
-				printf("2 subbands available: fdmt->_df_top=%f. fres %f f_start %f f_end %f\n", fdmt->_df_top, fres, f_start, f_end);
+				//printf("2 subbands available: fdmt->_df_top=%f. fres %f f_start %f f_end %f\n", fdmt->_df_top, fres, f_start, f_end);
 				delta_t_local = calc_delta_t(fdmt, f_start, f_end) + 1;
 				fdmt->_ndt_top = delta_t_local;
 			}
@@ -156,7 +156,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 		// Note; we must not overwrite the max ndt - doign too many down low will give us too much resolution
 		// Up high.
 		if (delta_t_local > ndt) {
-			printf("YUK! delta_t_local %d > ndt %d\n", delta_t_local, ndt);
+			//printf("YUK! delta_t_local %d > ndt %d\n", delta_t_local, ndt);
 			delta_t_local = ndt;
 		}
 		iter->add_subband(delta_t_local);
@@ -296,7 +296,7 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 		}
 	}
 
-	printf("Biggest state is %d elements = ", biggest_state_size);
+	printf("Biggest state is %d elements = %d MiB = ", biggest_state_size, biggest_state_size*sizeof(fdmt_dtype)/1024/1024);
 	array4d_print_shape(&biggest_state);
 	printf("\n");
 

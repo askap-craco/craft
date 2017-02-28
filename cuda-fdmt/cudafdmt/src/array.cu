@@ -81,15 +81,15 @@ size_t array4d_malloc(array4d_t* a, bool host, bool device)
 		size_t free, total;
 		gpuErrchk(cudaMemGetInfo(&free, &total));
 
-		printf("Allocating [%d, %d, %d, %d] %d MIB total %d/%d on GPU\n",a->nw, a->nx, a->ny, a->nz,
-				size*sizeof(fdmt_dtype)/1024/1024, (total-free)/1024/1024, total/1024/1024);
+//		printf("Allocating [%d, %d, %d, %d] %d MIB total %d/%d on GPU\n",a->nw, a->nx, a->ny, a->nz,
+//				size*sizeof(fdmt_dtype)/1024/1024, (total-free)/1024/1024, total/1024/1024);
 
 		gpuErrchk( cudaMalloc((void**) &a->d_device,
 				size*sizeof(fdmt_dtype) ));
 		gpuErrchk(cudaMemGetInfo(&free, &total));
 
-		printf("Allocated [%d, %d, %d, %d] %d MIB total %d/%d on GPU\n",a->nw, a->nx, a->ny, a->nz,
-		size*sizeof(fdmt_dtype)/1024/1024, (total-free)/1024/1024, total/1024/1024);
+		//printf("Allocated [%d, %d, %d, %d] %d MIB total %d/%d on GPU\n",a->nw, a->nx, a->ny, a->nz,
+		//size*sizeof(fdmt_dtype)/1024/1024, (total-free)/1024/1024, total/1024/1024);
 	} else {
 		a->d_device = NULL;
 	}
