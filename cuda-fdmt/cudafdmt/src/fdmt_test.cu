@@ -42,7 +42,7 @@ void runtest_usage() {
 			"   -x SN - threshold S/N\n"
 			"   -D dump intermediate data to disk\n"
 			"   -r R - Blocks per rescale update (0 for no rescaling)\n"
-			"   -S S - Number of blocks to skip\n"
+			"   -S S - Seek to this number of seconds before starting\n"
 			"   -M M - Channel Mean flagging threshold (3 is OK)\n"
 			"   -T T - Channel StdDev flagging threshold (3 is OK)\n"
 			"   -K K - Channel Kurtosis threshold (0.8 is pretty good)\n"
@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
 {
 	int nd = 1024;
 	int nt = 512;
-	int num_skip_blocks = 8;
+	float seek_seconds = 0.0;
 	int num_rescale_blocks = 2;
 	float decay_timescale = 0.2; // Seconds?
 	char ch;
@@ -141,7 +141,7 @@ int main(int argc, char* argv[])
 			num_rescale_blocks = atoi(optarg);
 			break;
 		case 'S':
-			num_skip_blocks = atoi(optarg);
+			seek_seconds = atof(optarg);
 			break;
 		case 'g':
 			cuda_device = atoi(optarg);
@@ -278,9 +278,11 @@ int main(int argc, char* argv[])
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams, dump_data);
-	printf("Seeking to start of data: nblocks=%d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source.tsamp());
+	assert(seek_seconds >= 0);
+	int num_skip_blocks = seek_seconds / source.tsamp() / nt;
+	printf("Seeking to start of data: block %d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source.tsamp());
 	printf("S/N Threshold %f Max ncand per block %d mindm %d \n", thresh, max_ncand_per_block, mindm);
-	source.seek_sample(num_skip_blocks*nt);
+	source.seek_sample(nt*num_skip_blocks);
 	int blocknum = 0;
 	int iblock = num_skip_blocks;
 	unsigned long long total_candidates = 0;
