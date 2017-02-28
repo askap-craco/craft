@@ -34,6 +34,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s','--show', action='store_true', help='Show')
     parser.add_argument('-f','--fname', help='Candidate filename')
+    parser.add_argument('-o','--outfile', help='Output file name')
     parser.add_argument('--detail', action='store_true', help='Plot detail')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False, show=False)
@@ -46,7 +47,7 @@ def _main():
     for fin in values.files:
         pylab.close()
         if os.path.isdir(fin):
-            fig,axes, ncand = plot_dir(fin, values)
+            fig, axes, ncand = plot_dir(fin, values)
         else:
             fig, ax = plotutil.subplots(1,1)
             ax = pylab.gca()
@@ -56,8 +57,11 @@ def _main():
         fout = fin
         if fout.endswith('/'):
             fout = fout[0:-1]
-            
-        fout = '%s_%s.png' % (fout, values.fname)
+        
+        if values.fout is None:
+            fout = '%s_%s.png' % (fout, values.fname)
+        else:
+            fout = values.fout
 
         if ncand > 0:
             print 'Saving', fout
