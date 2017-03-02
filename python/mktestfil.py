@@ -15,6 +15,14 @@ import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+def dmchanof(f1, foff, tint, dm):
+    currfreq = ((f1/1e3)**-2 + tint/4.15/dm)**(-0.5)*1e3
+    currchan = int(np.round(-(f1 - currfreq)/foff))
+    #print 'dm', dm, 't',t, 'tint', tint, 'currfreq', currfreq,'currchan', currchan
+
+    return currchan
+
+
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
@@ -25,6 +33,7 @@ def _main():
     parser.add_argument('-p','--pulse-amplitude', type=float, help='Amplitude of single pulse', default=1.)
     parser.add_argument('-s','--show', action='store_true')
     parser.add_argument('-c','--nchan', type=int, help='Number of channels', default=336)
+    parser.add_argument('--toffset', type=int, help='Sampel offset to start dpulse', default=1500)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -61,19 +70,25 @@ def _main():
     d.shape = shape
     print 'Shape', d.shape
 
-    offset = 617
+    offset = values.toffset
     if values.dm is not None:
         t = 0
         while True:
-            tint = t * hdr['tsamp']*1000.
-            currfreq = ((f1/1e3)**-2 + tint/4.15/values.dm)**(-0.5)*1e3
-            currchan = int(np.round(-(f1 - currfreq)/foff))
-            #print 'dm', values.dm, 't',t, 'tint', tint, 'currfreq', currfreq,'currchan', currchan
+            t1 = t * hdr['tsamp']*1000.
+            t2 = (t + 1) * hdr['tsamp']*1000.
+
+            c1 = dmchanof(f1,foff, t1, values.dm)
+            c2 = dmchanof(f1,foff, t2, values.dm)
+            if c2 >= nchans:
+                c2 = nchans
+
+            currchan = c1
+
             t += 1
             if currchan < 0 or currchan >= nchans or (t + offset) >= ntimes:
                 break
             else:
-                d[t+offset, 0, currchan] += values.pulse_amplitude
+                d[t+offset, 0, c1:c2] += values.pulse_amplitude
 
             
     if values.show:

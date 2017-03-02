@@ -52,9 +52,19 @@ def load_beams(path, tstart, ntimes, pattern='*.fil', return_files=False):
 
             #ifnum = int(fname.split('.')[-2])
             ifnum = ifname
+            data[:, ifnum, :] = v[:, 0, :]
+
+            '''
             print 'load beams', v.shape, data.shape, ifnum, ifname
             print 'WARNING! WHY IS THAT DEAD CHANNEL IN THERE< EVEN WITH ONES?'
-            data[:, ifnum, :] = v[:, 0, :]
+            import pylab
+            pylab.figure()
+            pylab.imshow(v[:, 0, :])
+            pylab.title('v')
+            pylab.figure()
+            pylab.imshow(data[:, ifnum, :])
+            pylab.title('data')
+            '''
 
         else:
             data = v

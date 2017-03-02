@@ -49,12 +49,16 @@ def _main():
 
     for fin in values.files:
         d = np.loadtxt(fin)
+        if len(d) == 0:
+            logging.info('%s is empty', fin)
+            continue
         assert d.shape[1] == 7
         # make new array. Concatenate time twice and dm twice at the end, along with a counter
         hstack = (d, d[:, t0:t0+1], d[:, t0:t0+1], d[:, d0:d0+1], d[:, d0:d0+1], np.ones((d.shape[0], 1)))
         dnew = np.hstack(hstack)
         dout = fof(dnew, values)
         np.savetxt(fin+'.fof', dout, fmt=formats, header=header)
+        logging.info('%s reduced from %d to %d candidates', fin, dnew.shape[0], dout.shape[0])
 
 
 def errplot(alldarr, **kwargs):

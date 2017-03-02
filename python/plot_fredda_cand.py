@@ -44,24 +44,39 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
+    cmap = plt.get_cmap('rainbow')
+    maxboxcar = 32.
+    scalarmap = plt.cm.ScalarMappable(cmap=cmap, norm=mpl.colors.Normalize(1., maxboxcar))
+    scalarmap._A = [] # URGH http://stackoverflow.com/questions/8342549/matplotlib-add-colorbar-to-a-sequence-of-line-plots
+
+
     for fin in values.files:
         pylab.close()
         if os.path.isdir(fin):
-            fig, axes, ncand = plot_dir(fin, values)
+            fig, axes, ncand = plot_dir(fin, values, scmap=cmap)
         else:
             fig, ax = plotutil.subplots(1,1)
             ax = pylab.gca()
-            v = plot_file(fin, values, ax, title=fin)
-            ncand = len(v)
+            try:
+                v = plot_file(fin, values, ax, title=fin,scmap=cmap)
+                ncand = len(v)
+            except:
+                logging.exception('Could not plot file')
+            
+        # add colorbar
+        fig.subplots_adjust(right=0.87)
+        cbar_ax = fig.add_axes([0.90, 0.1, 0.02, 0.8])
+        cbar = fig.colorbar(scalarmap, cax=cbar_ax)
+        cbar.set_label('Width (samples)')
 
         fout = fin
         if fout.endswith('/'):
             fout = fout[0:-1]
         
-        if values.fout is None:
+        if values.outfile is None:
             fout = '%s_%s.png' % (fout, values.fname)
         else:
-            fout = values.fout
+            fout = values.outfile
 
         if ncand > 0:
             print 'Saving', fout
@@ -72,7 +87,7 @@ def _main():
         if values.show:
             pylab.show()
 
-def plot_dir(din, values):
+def plot_dir(din, values, scmap=None):
     candfiles = find_files(din, values.fname)
     print 'len candfiles', len(candfiles)
     
@@ -90,7 +105,7 @@ def plot_dir(din, values):
     print 'nxy', nrows, ncols
     fig, axes = plotutil.subplots(nrows, ncols, sharex=True, sharey=True)
     fig.set_size_inches([8,6])
-    fig.set_dpi(300)
+    #fig.set_dpi(300)
     axes = axes.flatten()
 
     ncands = 0
@@ -98,17 +113,17 @@ def plot_dir(din, values):
         ax=axes[ic]
         antname = f.replace(din, '').replace('C000','').replace(values.fname,'').replace('/','')
         subtitle = antname
-        v = plot_file(f, values, ax, labels=False, subtitle=subtitle)
+        v = plot_file(f, values, ax, labels=False, subtitle=subtitle, scmap=scmap)
         ncands += len(v)
 
     fig.suptitle(din)
     fig.text(0.5, 0.05, 'Time(s)', ha='center',va='bottom')
-    fig.text(0.05, 0.5, 'Delta_t', rotation=90, ha='center', va='top')
+    fig.text(0.05, 0.5, 'DM (pc/cm3)', rotation=90, ha='center', va='top')
 
     return fig, axes, ncands
 
 
-def plot_file(fin, values, ax, title=None, labels=True, subtitle=None):
+def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=None):
     vin = np.loadtxt(fin)
 
     if subtitle:
@@ -132,26 +147,23 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None):
     sampno = vin[:, 1]
     time = vin[:, 2]
     boxcar = vin[:, 3]
-    dm = vin[:, 4]
-    if ncols > 5:
-        idm = vin[:, 5]
-        beamno = vin[:, 6]
-    else:
-        beamno = vin[:, 5]
+    idm = vin[:, 4]
+    dm = vin[:, 5]
+    beamno = vin[:, 6]
 
     ubeams = set(beamno)
     for ib, b in enumerate(sorted(ubeams)):
         bmask = beamno == b
         mask = bmask
-        maxbox = max(boxcar[mask]) 
-        ax.scatter(time[mask], 1+dm[mask], s=sn[mask]**2, marker=markers[ib % len(markers)], c=boxcar[mask]/maxbox, cmap='rainbow', label='Beam %d' %b, picker=3, edgecolors='face', alpha=0.4)
+        ax.scatter(time[mask], 1+dm[mask], s=sn[mask]**2, marker=markers[ib % len(markers)], c=boxcar[mask], cmap=scmap, label='Beam %d' %b, picker=3, edgecolors='face', alpha=0.4, norm=mpl.colors.Normalize(1., 32.))
         ax.set_yscale('log')
+        ax.set_ylim(1, 5000)
                
     plotutil.addpick()
     
     if labels:
         ax.set_xlabel('Time (s)')
-        ax.set_ylabel('DM (delta_t)')
+        ax.set_ylabel('1+DM (pc/cm3)')
 
     if title:
        ax.set_title(fin)

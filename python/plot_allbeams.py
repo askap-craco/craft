@@ -14,6 +14,7 @@ import logging
 import itertools
 from craftobs import load_beams
 from plotutil import subplots
+import matplotlib.gridspec as gridspec
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -70,6 +71,39 @@ def _main():
     plt = Plotter.from_values(values, tstart, ntimes)
     pylab.show()
 
+def tscrunch(beams, factor):
+    ntimes, nbeams, nfreq = beams.shape
+    newbeams = np.zeros((ntimes/factor, nbeams, nfreq))
+    for t in xrange(newbeams.shape[0]):
+        tstart = t*factor
+        tend = (t+1)*factor
+        newbeams[t, :, :] = beams[tstart:tend, :, :].mean(axis=0)
+
+    return newbeams
+
+
+def fscrunch(beams, factor):
+    ntimes, nbeams, nfreq = beams.shape
+    newbeams = np.zeros((ntimes, nbeams, nfreq/factor))
+    for f in xrange(newbeams.shape[2]):
+        fstart = f*factor
+        fend = (f+1)*factor
+        newbeams[:, :, f] = beams[:, :, fstart:fend].mean(axis=2)
+
+
+    return newbeams
+
+
+def dmroll(beams, dm, fch1, foff, tint):
+    newbeams = np.empty_like(beams)
+    ntimes, nbeams, nfreq = newbeams.shape
+    for f in xrange(nfreq):
+        freq = fch1 + f*foff
+        tdelay = 4.15*dm*(fch1**-2 - freq**-2)
+        shift = int(np.round(tdelay/tint))
+        newbeams[:, :, f] = np.roll(beams[:,:,f], shift)
+
+    return newbeams
         
 class Plotter(object):
     @staticmethod
@@ -97,6 +131,9 @@ class Plotter(object):
         mjdstart = files[0].tstart
         tsamp = files[0].tsamp
         self.raw_units = raw_units
+        self.tscrunch_factor = 1
+        self.fscrunch_factor = 1
+        self.dm = 0.
         if self.raw_units:
             xunit = 'sample'
             yunit = 'channel'
@@ -108,11 +145,14 @@ class Plotter(object):
         self.tsamp = tsamp
         self.set_position_sample(tstart, ntimes)
         self.imzrange = None
+        if nbeams == 1:
+            self.mk_single_fig('dynspec', '', '', '')
+        else:
+            self.mkfig('mean', 'Mean bandpass', 'Frequency (%s)' % yunit,'Mean bandpass')
+            self.mkfig('std', 'Bandpass stdDev', 'Frequency (%s)' % yunit ,'Bandpass StdDev')
+            self.mkfig('kurt','Kurtosis', 'Frequency (%s)' % yunit, 'Kurtosis')
+            self.mkfig('dynspec', 'Dynamic spectrum', 'Time (%s) after %f' % (xunit, mjdstart), 'Frequency (%s)' % yunit)
 
-        self.mkfig('mean', 'Mean bandpass', 'Frequency (%s)' % yunit,'Mean bandpass')
-        self.mkfig('std', 'Bandpass stdDev', 'Frequency (%s)' % yunit ,'Bandpass StdDev')
-        self.mkfig('kurt','Kurtosis', 'Frequency (%s)' % yunit, 'Kurtosis')
-        self.mkfig('dynspec', 'Dynamic spectrum', 'Time (%s) after %f' % (xunit, mjdstart), 'Frequency (%s)' % yunit)
         if nbeams > 1:
             self.mkfig('cov', 'Beam covariance', 'beam no', 'beamno', 1,1)
 
@@ -130,6 +170,17 @@ class Plotter(object):
     def set_position_seconds(self, sstart, secs):
         self.tstart = int(sstart/self.tsamp)
         self.ntimes = int(secs/self.tsamp)
+
+    def mk_single_fig(self, name, title, xlab, ylab):
+        p = plt.subplot
+        gs = gridspec.GridSpec(3,3)
+        rawax = p(gs[0:2, 0:2])
+        tax = p(gs[2,0:2])
+        fax = p(gs[0:2,2])
+        fig = pylab.gcf()
+        fig.canvas.mpl_connect('key_press_event', self.press)
+        annotate(fig, title, xlab, ylab)
+        self.figs[name] = (fig, [rawax, tax, fax])
 
     def mkfig(self, name, title, xlab, ylab, nrows=None, ncols=None):
 
@@ -156,7 +207,9 @@ class Plotter(object):
     def clearfigs(self):
         for name, (fig, axes) in self.figs.iteritems():
             for ax in axes:
+                print 'clearing', fig, ax
                 ax.cla()
+                
 
     def saveall(self, prefix):
         for name, (fig, axes) in self.figs.iteritems():
@@ -191,6 +244,16 @@ class Plotter(object):
         elif event.key == 'a':
             if self.ntimes > 2:
                 self.ntimes /= 2
+        elif event.key == 't':
+            self.tscrunch_factor += 1
+        elif event.key == 'T':
+            self.tscrunch_factor = max(1, self.tscrunch_factor - 1)
+        elif event.key == 'f':
+            self.fscrunch_factor += 1
+        elif event.key == 'F':
+            self.fscrunch_factor = max(1, self.fscrunch_factor - 1)
+        elif event.key == 'd':
+            self.dm = float(raw_input('Input DM(pc/cm3)'))
         elif event.key == 'ctrl+c':
             sys.exit(0)
         else:
@@ -205,11 +268,24 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
+        beams -= 128
+        beams /= 18
+        f0 = files[0]
         self.beams = beams
         print 'Loaded beams', beams.shape
-        ntimes, nbeams, nfreq = beams.shape
+        print 'scrunching t=', self.tscrunch_factor, 'f=', self.fscrunch_factor, 'dm', self.dm
 
-        f0 = files[0]
+        if self.dm != 0:
+            beams = dmroll(beams, self.dm, f0.fch1/1e3, f0.foff/1e3, f0.tsamp*1e3)
+
+        if self.tscrunch_factor != 1:
+            beams = tscrunch(beams, self.tscrunch_factor)
+
+        if self.fscrunch_factor != 1:
+            beams = fscrunch(beams, self.fscrunch_factor)
+
+
+        ntimes, nbeams, nfreq = beams.shape
         mjdstart = f0.tstart
         
         if self.raw_units:
@@ -235,7 +311,7 @@ class Plotter(object):
 
         chan = 150
         dm0 = beams.mean(axis=2)
-        dm0 = beams[:, :, chan]
+        #dm0 = beams[:, :, chan]
         dm0 -= dm0.mean(axis=0)
 
         if self.imzrange is None:
@@ -244,7 +320,33 @@ class Plotter(object):
         else:
             imzmin, imzmax = self.imzrange
 
+        if nbeams > 1:
+            self.draw_many(beams, im_extent, origin, imzmin, imzmax, freqs)
+        else:
+            self.draw_single(beams, im_extent, origin, imzmin, imzmax, freqs)
 
+        pylab.draw()
+
+
+
+    def draw_single(self, beams, im_extent, origin, imzmin, imzmax, freqs):
+        bi = beams[:, 0, :]
+        ntimes, nfreq = bi.shape
+        bi = bi.T
+        print 'BISHAPE', bi.shape
+        fig, [rawax, tax, fax] = self.figs['dynspec']
+        rawax.cla()
+        rawax.imshow(bi, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none')
+        fax.plot(bi.mean(axis=1)*np.sqrt(ntimes), freqs)
+        fax.plot(bi.std(axis=1),freqs)
+        fax.set_ylim(freqs.min(), freqs.max())
+        tax.plot(bi.mean(axis=0)*np.sqrt(nfreq))
+        tax.plot(bi.std(axis=0))
+        tax.set_xlim(0, ntimes)
+
+
+    def draw_many(self, beams, im_extent, origin, imzmin, imzmax, freqs):
+        ntimes, nbeams, nfreq = beams.shape
         if nbeams > 1:
             cov = np.cov(dm0.T)
             #b0 = beams[:, 0, :]
@@ -296,7 +398,6 @@ class Plotter(object):
                 fig6, ax6 = self.getfig('dm0plt', i)
                 ax6.plot(dm0)
 
-        pylab.draw()
         #self.drawall()
 
 if __name__ == '__main__':
