@@ -313,7 +313,7 @@ __global__ void boxcar_do_kernel2 (
 
 		// write state into output
 		if (outdata != NULL) {
-			optr[ibc] = vout/(sqrtf((float) (ibc + 1)));
+			optr[ibc] = vout/ibc_scale;
 			// increment output pointer
 			optr += NBOX;
 		}
