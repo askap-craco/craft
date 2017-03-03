@@ -1000,7 +1000,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 
 __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 										const fdmt_dtype* __restrict__ indata,
-										const fdmt_dtype* __restrict__ weights,
+										const fdmt_dtype weight,
 										int nt)
 {
 	// Adds the indata into the ostate and shifts the ostate where the's some to add
@@ -1029,8 +1029,6 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 
 		if (t < nt) {
 			// Weight only the last block by the weights
-			fdmt_dtype weight = weights[idt];
-			//weight = 1.0;
 			optr[t] = (iptr[t] + optr[t + nt])*weight;
 		} else if (t >= max_dt) {
 			optr[t] = iptr[t];
@@ -1058,7 +1056,7 @@ __host__ void fdmt_update_ostate(fdmt_t* fdmt)
 
 	dim3 grid_shape(fdmt->nbeams, fdmt->max_dt);
 	cuda_fdmt_update_ostate<<<grid_shape, 256>>>(fdmt->ostate.d_device,
-			currstate->d_device, fdmt->weights.d_device, fdmt->nt);
+			currstate->d_device, rsqrtf(fdmt->nf), fdmt->nt);
 
 	gpuErrchk(cudaDeviceSynchronize());
 }
