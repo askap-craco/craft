@@ -18,7 +18,10 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 
 def dispersed_voltage(f_min, f_max, n_pulse, n_samps, D=5, PulseSig = 0.4, PulsePosition = 4134567/4):
-    ''' Modified from FDMT.py'''
+    '''
+    Produces a dispersed voltage time zeries
+    Modified from FDMT.py
+    '''
     print locals()
     N_total = n_samps
     PulseLength = n_pulse
