@@ -458,7 +458,7 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 	for (int idt = 1; idt < delta_t; ++idt) {
 		int outidx = array4d_idx(nbeams, nf, delta_t, delta_t + nt, ibeam, c, idt, 0);
 		int iidx   = array4d_idx(nbeams, nf, delta_t, delta_t + nt, ibeam, c, idt-1, 0);
-		int imidx  = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, nt -1 );
+		int imidx  = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0 );
 
 		// The state for dt=d = the state for dt=(d-1) + the time-reversed input sample
 		// for each time
@@ -473,7 +473,7 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 			if (count) {
 				state[outidx + t] = fdmt_dtype(idt + 1);
 			} else {
-				state[outidx + t] = (state[iidx + t]*c1 + indata[imidx -t])/c2;
+				state[outidx + t] = (state[iidx + t]*c1 + indata[imidx + t])/c2;
 			}
 			t += tblock;
 		}
@@ -1030,6 +1030,7 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 		if (t < nt) {
 			// Weight only the last block by the weights
 			fdmt_dtype weight = weights[idt];
+			weight = 1.0;
 			optr[t] = (iptr[t] + optr[t + nt])*weight;
 		} else if (t >= max_dt) {
 			optr[t] = iptr[t];
@@ -1238,6 +1239,7 @@ __global__ void fdmt_set_weights_kernel(const __restrict__ fdmt_dtype* ostate, f
 		fdmt_dtype nhits = ostate[stride * idx];
 	    weights[idx] = rsqrtf(nhits);
 		//weights[idx] = 1.;
+	    weights[idx] = nhits;
 	}
 }
 
