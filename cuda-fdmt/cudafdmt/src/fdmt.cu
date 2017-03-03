@@ -465,10 +465,10 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 		// (TODO: Not including a missing overlap with the previous block here)
 		// originally this was j=idt, rather than j=0. But that just meant that 0<=j<idt were zero, which seems weird.
 		t = threadIdx.x; // reset t
-		fdmt_dtype c1 = sqrtf(fdmt_dtype(idt));
-		fdmt_dtype c2 = sqrtf(fdmt_dtype(idt+1));
-		c1 = 1.;
-		c2 = 1.;
+		fdmt_dtype c1 = (fdmt_dtype(idt));
+		fdmt_dtype c2 = (fdmt_dtype(idt+1));
+		//c1 = 1.;
+		//c2 = 1.;
 		while (t < nt) {
 			if (count) {
 				state[outidx + t] = fdmt_dtype(idt + 1);
@@ -1030,7 +1030,7 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 		if (t < nt) {
 			// Weight only the last block by the weights
 			fdmt_dtype weight = weights[idt];
-			weight = 1.0;
+			//weight = 1.0;
 			optr[t] = (iptr[t] + optr[t + nt])*weight;
 		} else if (t >= max_dt) {
 			optr[t] = iptr[t];
@@ -1239,7 +1239,7 @@ __global__ void fdmt_set_weights_kernel(const __restrict__ fdmt_dtype* ostate, f
 		fdmt_dtype nhits = ostate[stride * idx];
 	    weights[idx] = rsqrtf(nhits);
 		//weights[idx] = 1.;
-	    weights[idx] = nhits;
+	    //weights[idx] = nhits;
 	}
 }
 
