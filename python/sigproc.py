@@ -93,7 +93,11 @@ def write_str(f, s):
     f.write(s)
 
 def write(f, v, struct_format):
-    f.write(struct.pack(struct_format, v))
+    try:
+        f.write(struct.pack(struct_format, v))
+    except:
+        print 'Could not write value %s to %s with format %s' %( v, f, struct_format)
+        raise 
 
 class SigprocFile(object):
     def __init__(self, filename, mode='r', header=None):
@@ -117,6 +121,7 @@ class SigprocFile(object):
         write_str(f, 'HEADER_START')
 
         for k, v in header.iteritems():
+            print k, v
             if k in STRING_PARAMS:
                 write_str(f, k)
                 write_str(f, v)
@@ -176,6 +181,9 @@ class SigprocFile(object):
         
     def seek_data(self, offset_bytes=0):
         self.fin.seek(self.data_start_idx + offset_bytes)
+
+    def seek_sample(self, sampnum):
+        self.fin.seek(self.data_start_idx + sampnum*self.nifs*self.nchans*self.nbits/8)
         
     def get_num_elements(self):
         nelements = self.nifs * self.nchans * self.nsamples
