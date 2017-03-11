@@ -36,6 +36,15 @@ def commasep(s):
 def floatcommasep(s):
     return map(float, s.split(','))
 
+def next_divisor(x, n):
+    for t in xrange(x, n/2):
+        if n % t == 0:
+            return t
+
+def divisors(n):
+    d = [t for t in xrange(1, n/2 + 1) if n % t == 0]
+    return d
+
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
@@ -77,7 +86,7 @@ def tscrunch(beams, factor):
     for t in xrange(newbeams.shape[0]):
         tstart = t*factor
         tend = (t+1)*factor
-        newbeams[t, :, :] = beams[tstart:tend, :, :].mean(axis=0)
+        newbeams[t, :, :] = beams[tstart:tend, :, :].sum(axis=0)/np.sqrt(factor)
 
     return newbeams
 
@@ -88,8 +97,7 @@ def fscrunch(beams, factor):
     for f in xrange(newbeams.shape[2]):
         fstart = f*factor
         fend = (f+1)*factor
-        newbeams[:, :, f] = beams[:, :, fstart:fend].mean(axis=2)
-
+        newbeams[:, :, f] = beams[:, :, fstart:fend].sum(axis=2)/np.sqrt(factor)
 
     return newbeams
 
@@ -123,9 +131,12 @@ class Plotter(object):
     def __init__(self, filenames, nxy, tstart=0, ntimes=1024, fft=False, raw_units=False):
         self.nrows, self.ncols = nxy
         self.figs = {}
+        self.fig_labels = {}
         # Sniff data
         self.files = filenames
         beams, files = load_beams(filenames, tstart, ntimes=1, return_files=True)
+        ntimes, self.nbeams, self.nfreq = beams.shape
+
         self.bnames = [f.filename.split('.')[-2] for f in files]
         nbeams = len(self.files)
         mjdstart = files[0].tstart
@@ -146,7 +157,7 @@ class Plotter(object):
         self.set_position_sample(tstart, ntimes)
         self.imzrange = None
         if nbeams == 1:
-            self.mk_single_fig('dynspec', '', '', '')
+            self.mk_single_fig('dynspec', '', 'Time (%s) after %f' % (xunit, mjdstart), 'Frequency (%s)' % yunit)
         else:
             self.mkfig('mean', 'Mean bandpass', 'Frequency (%s)' % yunit,'Mean bandpass')
             self.mkfig('std', 'Bandpass stdDev', 'Frequency (%s)' % yunit ,'Bandpass StdDev')
@@ -173,14 +184,15 @@ class Plotter(object):
 
     def mk_single_fig(self, name, title, xlab, ylab):
         p = plt.subplot
+        fig = plt.figure()
         gs = gridspec.GridSpec(3,3)
-        rawax = p(gs[0:2, 0:2])
-        tax = p(gs[2,0:2])
-        fax = p(gs[0:2,2])
-        fig = pylab.gcf()
+        rawax = fig.add_subplot(gs[0:2, 0:2])
+        tax = fig.add_subplot(gs[2,0:2], sharex=rawax)
+        fax = fig.add_subplot(gs[0:2,2], sharey=rawax)
         fig.canvas.mpl_connect('key_press_event', self.press)
-        annotate(fig, title, xlab, ylab)
+        #annotate(fig, title, xlab, ylab)
         self.figs[name] = (fig, [rawax, tax, fax])
+        self.fig_labels[name] = (title, xlab, ylab)
 
     def mkfig(self, name, title, xlab, ylab, nrows=None, ncols=None):
 
@@ -249,9 +261,11 @@ class Plotter(object):
         elif event.key == 'T':
             self.tscrunch_factor = max(1, self.tscrunch_factor - 1)
         elif event.key == 'f':
-            self.fscrunch_factor += 1
+            fdiv = divisors(self.nfreq)
+            self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) + 1]
         elif event.key == 'F':
-            self.fscrunch_factor = max(1, self.fscrunch_factor - 1)
+            fdiv = divisors(self.nfreq)
+            self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) -1]
         elif event.key == 'd':
             self.dm = float(raw_input('Input DM(pc/cm3)'))
         elif event.key == 'ctrl+c':
@@ -284,7 +298,6 @@ class Plotter(object):
         if self.fscrunch_factor != 1:
             beams = fscrunch(beams, self.fscrunch_factor)
 
-
         ntimes, nbeams, nfreq = beams.shape
         mjdstart = f0.tstart
         
@@ -300,19 +313,17 @@ class Plotter(object):
         src_raj = f0.src_raj
         src_dej = f0.src_dej
         freqs = np.linspace(fch1, fch1 + nfreq*foff, nfreq, endpoint=True)
+        times=  np.linspace(tstart*tsamp, (ntimes+tstart)*tsamp, ntimes, endpoint=True)
+
         assert(len(freqs) == nfreq)
         
         if foff < 0:
             origin = 'upper'
-            im_extent = (tstart*tsamp, (ntimes+tstart)*tsamp, fch1 + foff*nfreq, fch1)
+            im_extent = (times[0], times[-1], freqs[-1], freqs[0])
         else:
             origin = 'lower'
-            im_extent = (tstart*tsamp , (ntimes+tstart) *tsamp, fch1, fch1 + foff*nfreq)
+            im_extent = (times[0], times[-1], freqs[0], freqs[-1])
 
-        chan = 150
-        dm0 = beams.mean(axis=2)
-        #dm0 = beams[:, :, chan]
-        dm0 -= dm0.mean(axis=0)
 
         if self.imzrange is None:
             imzmin = None
@@ -323,30 +334,43 @@ class Plotter(object):
         if nbeams > 1:
             self.draw_many(beams, im_extent, origin, imzmin, imzmax, freqs)
         else:
-            self.draw_single(beams, im_extent, origin, imzmin, imzmax, freqs)
+            self.draw_single(beams, im_extent, origin, imzmin, imzmax, freqs, times)
 
         pylab.draw()
 
-
-
-    def draw_single(self, beams, im_extent, origin, imzmin, imzmax, freqs):
+    def draw_single(self, beams, im_extent, origin, imzmin, imzmax, freqs, times):
         bi = beams[:, 0, :]
         ntimes, nfreq = bi.shape
         bi = bi.T
         print 'BISHAPE', bi.shape
         fig, [rawax, tax, fax] = self.figs['dynspec']
-        rawax.cla()
         rawax.imshow(bi, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none')
-        fax.plot(bi.mean(axis=1)*np.sqrt(ntimes), freqs)
-        fax.plot(bi.std(axis=1),freqs)
+        fax.plot(bi.mean(axis=1)*np.sqrt(ntimes), freqs, label='mean')
+        #fax.plot(bi.std(axis=1)*np.sqrt(ntimes),freqs, label='std')
         fax.set_ylim(freqs.min(), freqs.max())
-        tax.plot(bi.mean(axis=0)*np.sqrt(nfreq))
-        tax.plot(bi.std(axis=0))
-        tax.set_xlim(0, ntimes)
+        tax.plot(times, bi.mean(axis=0)*np.sqrt(nfreq), label='mean')
+        #tax.plot(times, bi.std(axis=0)*np.sqrt(nfreq), label='std')
+        tax.set_xlim(times.min(), times.max())
+
+        title, xlab, ylab = self.fig_labels['dynspec']
+        rawax.set_ylabel(ylab)
+        plt.setp(rawax.get_xticklabels(), visible=False)
+        plt.setp(fax.get_yticklabels(), visible=False)
+        fig.subplots_adjust(hspace=0, wspace=0)
+        tax.set_xlabel(xlab)
+        tax.set_ylabel('S/N')
+        fax.set_xlabel('Bandpass')
+        #tax.legend(frameon=False)
+        #fax.legend(frameon=False)
 
 
     def draw_many(self, beams, im_extent, origin, imzmin, imzmax, freqs):
         ntimes, nbeams, nfreq = beams.shape
+        chan = 150
+        dm0 = beams.mean(axis=2)
+        #dm0 = beams[:, :, chan]
+        dm0 -= dm0.mean(axis=0)
+
         if nbeams > 1:
             cov = np.cov(dm0.T)
             #b0 = beams[:, 0, :]

@@ -35,6 +35,10 @@ def _main():
     parser.add_argument('-s','--show', action='store_true', help='Show')
     parser.add_argument('-f','--fname', help='Candidate filename')
     parser.add_argument('-o','--outfile', help='Output file name')
+    parser.add_argument('-w','--max-boxcar', help='max width to plot', default=32, type=int)
+    parser.add_argument('-d','--min-dm', help='minimum dm to plot', default=0, type=float)
+    parser.add_argument('-b','--min-sn', help='minimum S/N to plot', default=0, type=float)
+
     parser.add_argument('--detail', action='store_true', help='Plot detail')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False, show=False)
@@ -62,6 +66,7 @@ def _main():
                 ncand = len(v)
             except:
                 logging.exception('Could not plot file')
+                ncand = 0
             
         # add colorbar
         fig.subplots_adjust(right=0.87)
@@ -94,7 +99,7 @@ def plot_dir(din, values, scmap=None):
     if len(candfiles) == 0:
         fig = pylab.figure()
         fig.text(0.5, 0.5, '%s has no candidate files'%din, transform=pylab.gca().transAxes)
-        return fig, pylab.gca(), []
+        return fig, pylab.gca(), 0
 
     ncols = 4
     nrows = len(candfiles)/ncols
@@ -142,6 +147,13 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=Non
         vin.shape = (1, len(vin))
 
     print fin, vin.shape
+    boxcar = vin[:, 3]
+    dm = vin[:, 5]
+    sn = vin[:, 0]
+    mask = (boxcar < values.max_boxcar) & (dm >= values.min_dm) & (sn >= values.min_sn)
+    badvin = vin[~mask, :]
+    # plot failed detections in grey
+    vin = vin[mask, :]
     ncols = vin.shape[1]
     sn = vin[:, 0]
     sampno = vin[:, 1]
@@ -150,12 +162,13 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=Non
     idm = vin[:, 4]
     dm = vin[:, 5]
     beamno = vin[:, 6]
-
     ubeams = set(beamno)
+
+    ax.scatter(badvin[:, 2], 1+badvin[:, 5], marker='.', alpha=0.4, edgecolors='face', c='0.5')
+
     for ib, b in enumerate(sorted(ubeams)):
         bmask = beamno == b
-        mask = bmask
-        ax.scatter(time[mask], 1+dm[mask], s=sn[mask]**2, marker=markers[ib % len(markers)], c=boxcar[mask], cmap=scmap, label='Beam %d' %b, picker=3, edgecolors='face', alpha=0.4, norm=mpl.colors.Normalize(1., 32.))
+        ax.scatter(time[bmask], 1+dm[bmask], s=sn[bmask]**2, marker=markers[ib % len(markers)], c=boxcar[bmask], cmap=scmap, label='Beam %d' %b, picker=3, edgecolors='face', alpha=0.4, norm=mpl.colors.Normalize(1., 32.))
         ax.set_yscale('log')
         ax.set_ylim(1, 5000)
                

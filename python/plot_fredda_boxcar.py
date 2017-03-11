@@ -23,9 +23,11 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-b','--beam', type=int, help='beam number')
     parser.add_argument('-d','--dm', type=int, help='iDm to show in time series plot')
+    parser.add_argument('-t','--time', type=int, help='Time sample to print stats of')
     parser.add_argument('-s','--start', type=int, help='Start block')
+    parser.add_argument('-w','--boxcar', type=int, help='Boxcar to print stats of')
     parser.add_argument('-n','--maxn', type=int, help='max number of blocks ot plot')
-    parser.set_defaults(verbose=False, beam=0, start=4, maxn=10, dm=0)
+    parser.set_defaults(verbose=False, beam=0, start=4, maxn=10, dm=0, boxcar=0, time=0)
     values = parser.parse_args()
     if values.verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -35,6 +37,7 @@ def _main():
     for ifname, fname in enumerate(file_series('boxcar_e%d.dat', values.start)):
         alld = load4d(fname)
         
+        # shape = beam, t, idm, boxcar
         d = alld[values.beam, values.dm, :, :]
         fig, axes = pylab.subplots(1,3)
         ax = axes.flatten()
@@ -50,6 +53,8 @@ def _main():
         ax2.plot(d.mean(axis=0), 'r')
         ax2.set_ylabel('mean')
         ax2.set_xlabel('Boxcar')
+
+        print 'S/N per beam idm=%d t=%d bc=%d: %s' % (values.dm, values.time, values.boxcar, alld[:, values.dm, values.time, values.boxcar])
                     
         pylab.show()
         
