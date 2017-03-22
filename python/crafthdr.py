@@ -58,14 +58,16 @@ class DadaHeader(OrderedDict):
         return s
 
     
-    def tofile(self, fout):
+    def tofile(self, fout, add_zeros=True):
         self.reset_hdr_size()
         s = str(self)
         fout.write(s)
         hsize = self.get_value('HDR_SIZE')
         nzeros = hsize - len(s)
         assert nzeros >= 0
-        fout.write('\x00'*nzeros)
+        if add_zeros:
+            fout.write('\x00'*nzeros)
+
         return hsize
 
     @staticmethod
@@ -73,10 +75,15 @@ class DadaHeader(OrderedDict):
         d = DadaHeader()
         with open(filename, 'rU') as fin:
             first_lines = fin.read(hdr_size)
-            for line in first_lines.split('\n'):
+            for iline, line in enumerate(first_lines.split('\n')):
                 if ' ' not in line:
                     continue
-                name, rest = line.split(None, 1)
+                
+                bits = line.split(None, 1)
+                if len(bits) != 2:
+                    continue
+                    
+                name, rest = bits
                 valuecomment = rest.split('#', 1)
                 if len(valuecomment) >= 2:
                     value, comment = valuecomment

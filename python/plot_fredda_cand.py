@@ -93,7 +93,7 @@ def _main():
             pylab.show()
 
 def plot_dir(din, values, scmap=None):
-    candfiles = find_files(din, values.fname)
+    candfiles = sorted(find_files(din, values.fname))
     print 'len candfiles', len(candfiles)
     
     if len(candfiles) == 0:
@@ -126,6 +126,10 @@ def plot_dir(din, values, scmap=None):
     fig.text(0.05, 0.5, 'DM (pc/cm3)', rotation=90, ha='center', va='top')
 
     return fig, axes, ncands
+
+def onpick(event):
+    thisline = event.artist
+    print event, dir(event), event.artist, dir(event.artist)
 
 
 def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=None):
@@ -172,7 +176,7 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=Non
         ax.set_yscale('log')
         ax.set_ylim(1, 5000)
                
-    plotutil.addpick()
+    pylab.gcf().canvas.mpl_connect('pick_event', onpick)
     
     if labels:
         ax.set_xlabel('Time (s)')

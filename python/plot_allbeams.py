@@ -57,6 +57,7 @@ def _main():
     parser.add_argument('--fft', help='plot fft', action='store_true',default=False)
     parser.add_argument('--save', help='Save plots as png', action='store_true', default=False)
     parser.add_argument('--raw-units', help='Use raw unts, rather than physical units on axis', action='store_true', default=False)
+    parser.add_argument('--dm', help='Dispersion measure (pc/cm3)', default=0., type=float)
     parser.set_defaults(verbose=False, nxy="1,1")
     values = parser.parse_args()
     if values.verbose:
@@ -124,6 +125,7 @@ class Plotter(object):
             p.set_position_sample(tstart, ntimes)
 
         p.imzrange = values.imzrange
+        p.dm = values.dm
         p.draw()
 
         return p
@@ -134,6 +136,7 @@ class Plotter(object):
         self.fig_labels = {}
         # Sniff data
         self.files = filenames
+        print self.files[0]
         beams, files = load_beams(filenames, tstart, ntimes=1, return_files=True)
         ntimes, self.nbeams, self.nfreq = beams.shape
 
