@@ -57,7 +57,7 @@ def _main():
     parser.add_argument('--fft', help='plot fft', action='store_true',default=False)
     parser.add_argument('--save', help='Save plots as png', action='store_true', default=False)
     parser.add_argument('--raw-units', help='Use raw unts, rather than physical units on axis', action='store_true', default=False)
-    parser.add_argument('--dm', help='Dispersion measure (pc/cm3)', default=0., type=float)
+    parser.add_argument('-d', '--dm', help='Dispersion measure (pc/cm3)', default=0., type=float)
     parser.set_defaults(verbose=False, nxy="1,1")
     values = parser.parse_args()
     if values.verbose:
@@ -410,17 +410,17 @@ class Plotter(object):
             ax3.plot(freqs, beam_std)
             ax6.plot(freqs, beam_kurtosis)
             
-            dm0 = bi.mean(axis=1)
-            
             if self.fft:
+                dm0 = bi.mean(axis=1)
                 fig4, ax4 = self.getfig('fftim', i)
                 fig5, ax5 = self.getfig('fftplt', i)
                 dm0f = abs(np.fft.rfft(dm0, axis=0))**2
                 ntimes, nchans = bi.shape
                 bf = abs(np.fft.rfft(bi, axis=0).T)**2
-                fftfreqs  = np.arange(len(dm0f))/float(ntimes)/tsamp
+                fftfreqs  = np.arange(len(dm0f))/float(ntimes)/self.tsamp
                 fft_ext = (fftfreqs.min(), fftfreqs.max(), 0, nchans)
                 ax4.imshow(np.log10(bf)[:, 1:], aspect='auto', extent=fft_ext, origin='lower')
+                print 'fft', dm0f.shape
                 ax5.loglog(fftfreqs[1:], (dm0f[1:]))
                 fig6, ax6 = self.getfig('dm0plt', i)
                 ax6.plot(dm0)
