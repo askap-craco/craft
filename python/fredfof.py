@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Template for making scripts to run from the command line
+Compute friends-of-friends merge of FREDDA candidates
 
 Copyright (C) CSIRO 2015
 """
@@ -31,7 +31,7 @@ formats = (floatf, intf, floatf, intf, intf, floatf, intf, intf, intf, intf, int
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-    parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
+    parser = ArgumentParser(description='Compute friends-of-friends merge of FREDDA candidates', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-t', '--tdist', type=int, help='Sample distance', default=32)
     parser.add_argument('-d','--ddist', type=int, help='Idt distance', default=20)

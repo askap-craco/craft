@@ -33,12 +33,16 @@ def _main():
     for f in values.files:
         detect(f, values)
 
+bat_cards = ('START_WRITE_BAT32','STOP_WRITE_BAT32','TRIGGER_BAT32')
+frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
+
 def detect(f, values):
     hdr = DadaHeader.fromfile(f)
     fin = open(f, 'r')
     hdrsize = int(hdr['HDR_SIZE'][0])
     fin.seek(hdrsize)
     mode = int(hdr['CRAFT_MODE'][0]) & 0x3
+    nbits = int(hdr['NBITS'][0])
     infsamp = float(hdr['SAMP_RATE'][0])
     tsamp = float(values.nsamps)/infsamp
     # TODO: Calculate frequencies a bit better - tricky because individual
@@ -48,6 +52,16 @@ def detect(f, values):
     foff = freqs[1] - freqs[0]
     # TODO: Get tstart from BATs. This is the easy way
     tstart = float(hdr['ANT_MJD'][0])
+    bats = np.array([int(hdr[c][0], base=16) for c in bat_cards])
+    frames = np.array([int(hdr[c][0]) for c in frame_cards])
+    bat0 = int(hdr['BAT_NOW'][0], base=16)
+    bat0_40 = bat0 & 0xffffffffff
+
+    print 'BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6
+    # lowest 32 bits of bat from the time the file was written
+    print 'FRAMES duration', (frames[0] - frames[1])/infsamp,'offset', (frames[2] - frames[0])/infsamp
+
+
     hdr = {'data_type': 1,
            'tsamp': tsamp,
            'tstart': tstart,
@@ -59,16 +73,41 @@ def detect(f, values):
     fout = SigprocFile(foutname, 'w', hdr)
     nchan = len(freqs)
            
+    # See https://svn.atnf.csiro.au/askapsoft/Src/trunk/Code/Base/adbe/current/adbe/Beamformer.cc
     if mode == 0: # 16b+16b
         d = np.fromfile(fin, dtype=np.int16)
         nsamps = len(d)/2/nchan
         assert 2*nchan*nsamps == len(d), 'Not integral number of samples'
+        
         d.shape = (nsamps, nchan, 2)
     elif mode == 1: # 8b + 8b:
         d = np.fromfile(fin, dtype=np.int8)
         nsamps = len(d)/2/nchan
         assert 2*nchan*nsamps == len(d), 'Not integral number of samples'
         d.shape = (nsamps, nchan, 2)
+    elif mode == 2: # 4b+4b
+        dbytes = np.fromfile(fin, dtype=np.int8)
+        nsamps = len(dbytes)/2/nchan*2
+        assert len(dbytes) == nsamps*nchan
+        d = np.empty((nsamps, nchan, 2), dtype=np.int8)
+        dbytes.shape = (nsamps, nchan)
+        d[:, :, 0] = (dbytes & 0xf) - (dbytes & 0x8)*2 # real
+        dbytes >>= 4
+        d[:, :, 1] = (dbytes & 0xf) - (dbytes & 0x8)*2 # imag
+        
+    elif mode == 3: # 1b+1b
+        dbytes = np.fromfile(fin, dtype=np.int8)
+        nsamps = len(dbytes)/2/nchan*4
+        assert len(dbytes) == nsamps*nchan*4
+        d = np.empty((nsamps, nchan, 2), dtype=np.int8)
+        dbytes.shape = (nsamps, nchan)
+        for t in xrange(4):
+            # Convert 0 into +1 and 1 into -1
+            d[t::4, :, 0] = 1 - 2*(dbytes & 0x1) # real
+            dbytes >>= 1
+            d[t::4, :, 1] = 1 - 2*(dbytes & 0x1) # imag
+            dbytes >>= 1
+
     else:
         raise ValueError('Unsupported mode (yet) {}'.format(mode))
         
@@ -93,15 +132,20 @@ def detect(f, values):
         pylab.plot(np.real(df[0:4096, 0]), label='real')
         pylab.plot(np.imag(df[0:4096, 0]), label='imag')
         pylab.xlabel('Sample')
-        pylab.ylabel('Voltage')
+        pylab.ylabel('Voltage codeword')
         pylab.legend()
-        
-    
-        pylab.figure()
-        pylab.hist(np.real(df[:, 0]), label='real', bins=128, histtype='step')
-        pylab.hist(np.imag(df[:, 0]), label='imag', bins=128, histtype='step')
-        pylab.legend()
-        pylab.xlabel('Voltage')
+        bmax = 2**(nbits/2 - 1) # Factor of 2 for real+imag and -1 for full width
+        bins = np.arange(-bmax-0.5, bmax+0.5, 1)
+        print 'NBITS', nbits, 'bmax', bmax
+        fig, axes = plt.subplots(1,2, sharex=True, sharey=True)
+        for chan in xrange(nchan):
+            axes[0].hist(np.real(df[:, chan]), label='chan %d' % chan, bins=bins, histtype='step')
+            axes[1].hist(np.imag(df[:, chan]), label='chan %d' % chan, bins=bins, histtype='step')
+        axes[0].legend(frameon=False)
+        axes[0].set_xlabel('Real Codeword')
+        axes[1].set_xlabel('Imag Codeword')
+        axes[0].set_xlim(df.real.min(), df.real.max())
+
         pylab.figure()
         int_times = np.arange(dfil.shape[0])*tsamp
         pylab.plot(int_times, dfil)
@@ -110,7 +154,7 @@ def detect(f, values):
         pylab.figure()
         df = np.fft.rfft(dfil, axis=0)
         fsamp = 1./tsamp
-        fft_freqs = np.arange(len(df)) *fsamp/2.0
+        fft_freqs = np.arange(len(df)) *fsamp/2.0/len(df)
         pylab.plot(fft_freqs[1:], abs(df[1:, :])**2)
         pylab.xlabel('Frequency (Hz)')
         pylab.show()
