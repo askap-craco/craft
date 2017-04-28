@@ -1,0 +1,7 @@
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --time=01:00:00
+#SBATCH --account=ja3
+#SBATCH --partition=gpuq
+
+aprun -n 1 heim_all.sh $@
