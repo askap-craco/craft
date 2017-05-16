@@ -433,7 +433,7 @@ __global__ void boxcar_do_kernel3 (
 
 	const fdmt_dtype ibc_scale = sqrtf((float) (ibc + 1));
 	threshold *= ibc_scale;// scale threshold, otherwise you have to do lots of processing per sample, which is wasteful.
-
+	int fullt = 0;
 
 	for(int blk = 0; blk < nt/NBOX; ++blk) {
 		// Should be a coalesced
@@ -464,18 +464,22 @@ __global__ void boxcar_do_kernel3 (
 
 			// write state into output
 			if (outdata != NULL) {
-				optr[ibc] = vout/(sqrtf((float) (ibc + 1)));
+				optr[ibc] = vout/ibc_scale;
 				// increment output pointer
 				optr += NBOX;
 			}
 
 
 			// here is the fun bit. Find best detection over all times and boxcars
-
 			// if in a detection:
 			if (cand.t >= 0) {
+
+				if (vout > cand.sn) { // keep best value for this boxcar. Put here in case the final sample (next if statement) is true
+					cand.sn = vout;
+					cand.t = fullt;
+				}
 				// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
-				if (::__all(vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
+				if (::__all(vout < threshold) || fullt == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
 					// find maximum across all boxcars
 					fdmt_dtype scaled_sn = cand.sn/ibc_scale; // scale by boxcar width, so all boxcars have the same variance
 					fdmt_dtype best_sn_for_ibc = warpAllReduceMax(scaled_sn);
@@ -494,18 +498,17 @@ __global__ void boxcar_do_kernel3 (
 					cand.sn = -1;
 					cand.t = -1;
 				} else { // detection on-going
-					if (vout > cand.sn) { // keep best value for this boxcar
-						cand.sn = vout;
-						cand.t = t;
-					}
+
 				}
 			} else { // not currently in a detection
 				// do warp vote to see if any boxcars exceed threshold
 				if (::__any(vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
 					cand.sn = vout;
-					cand.t = t;
+					cand.t = fullt;
 				}
 			}
+
+			fullt++;
 		}
 	}
 
