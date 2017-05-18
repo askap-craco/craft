@@ -37,9 +37,9 @@ def _main():
     for ifname, fname in enumerate(file_series('boxcar_e%d.dat', values.start)):
         alld = load4d(fname)
         
-        # shape = beam, t, idm, boxcar
+        # shape = beam, idm, t, boxcar
         d = alld[values.beam, values.dm, :, :]
-        fig, axes = pylab.subplots(1,3)
+        fig, axes = pylab.subplots(1,4)
         ax = axes.flatten()
         ax[0].plot(d)
         ax[0].set_xlabel('Sample')
@@ -55,6 +55,10 @@ def _main():
         ax2.set_xlabel('Boxcar')
 
         print 'S/N per beam idm=%d t=%d bc=%d: %s' % (values.dm, values.time, values.boxcar, alld[:, values.dm, values.time, values.boxcar])
+
+        ax3 = ax[3]
+        ax3.imshow(alld[values.beam, :, :, values.boxcar])
+        
                     
         pylab.show()
         

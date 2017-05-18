@@ -271,14 +271,50 @@ class Plotter(object):
             self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) -1]
         elif event.key == 'd':
             self.dm = float(raw_input('Input DM(pc/cm3)'))
+        elif event.key == 'c':
+            self.squeeze_zrange(2.)
+        elif event.key == 'C':
+            self.squeeze_zrange(0.5)
         elif event.key == 'ctrl+c':
             sys.exit(0)
+        elif event.key == 'h' or event.key == '?':
+            self.print_help()
+            draw = False
         else:
             draw = False
 
         if draw:
             self.clearfigs()
             self.draw()
+
+    def squeeze_zrange(self, mul):
+        zmin, zmax = self.imzrange
+        zmid = (zmin + zmax)/2.
+        zrange = zmax - zmin
+        new_zrange = zrange/mul
+        self.imzrange = (zmid - new_zrange/2., zmid + new_zrange/2.)
+        return self.imzrange
+
+
+    def print_help(self):
+        s = '''
+        Key Mapping
+        n or right arrow - Move right by half a window
+        p or left arrow - Move left by half a window
+        w - zoom out by 2
+        a - zoom in by 2
+        t - increase tscrunch by 1 bin
+        T - decrease tscrunch by 1 bin
+        f - increase fscrunch by 1 bin
+        F - decrease fscrunch by 1 bin
+        d - Dedisperse (I'll ask for the DM on the cmdline
+        c - Increase colormap zoom
+        C - Decrease colormap zoom
+        h or ? - Print this help
+        Ctrl-C - quit'''
+        print s
+
+        return s
 
 
     def draw(self):
@@ -345,9 +381,12 @@ class Plotter(object):
         bi = beams[:, 0, :]
         ntimes, nfreq = bi.shape
         bi = bi.T
-        print 'BISHAPE', bi.shape
+        print 'BISHAPE', bi.shape, 'ZRAGE', imzmin, imzmax
         fig, [rawax, tax, fax] = self.figs['dynspec']
         rawax.imshow(bi, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none')
+        if imzmin is None and imzmax is None:
+            self.imzrange = (bi.min(), bi.max())
+            
         fax.plot(bi.mean(axis=1)*np.sqrt(ntimes), freqs, label='mean')
         #fax.plot(bi.std(axis=1)*np.sqrt(ntimes),freqs, label='std')
         fax.set_ylim(freqs.min(), freqs.max())
