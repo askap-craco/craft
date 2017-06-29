@@ -194,6 +194,9 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			itmin = dt_middle_larger;
 			itmax = fdmt->max_dt;
 
+# 			// save number of operations the FDMT takes
+			fdmt->nops += (itmax - itmin)*fdmt->nbeams;
+
 			// src and dst now start from a bit offset
 			src1_start.z = dt_middle_larger;
 			dst_start.z = dt_middle_larger;

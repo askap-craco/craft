@@ -25,12 +25,13 @@ public:
 	void sync_start();
 	void sync_stop();
 	float get_elapsed_time();
+	float get_average_time();
 
 	friend ostream &operator<<(ostream & output,  CudaTimer &t)
 	{
 		output << "\tCPU " << t.cputimer <<
 				"\n\tCUDA total: " << t.m_total_time
-				<< " average: " << t.m_total_time/t.m_ncalls
+				<< " average: " << t.get_average_time()
 				<< " last: " << t.get_elapsed_time() << "ms"
 				<< " ncalls:" <<	t.m_ncalls;
 

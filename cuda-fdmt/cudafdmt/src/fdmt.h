@@ -93,6 +93,7 @@ typedef struct _fdmt_t
 	float _df_bot; // Width of all other subbands of an FDMT iteration - used during fdmt_create() to handle non-power-of-two FDMTs
 	int _ndt_top; // Number of valid dispersion measures in the top band
 	//FdmtIteration* iterations[MAX_ITER]; // description of what happens for each iteration
+	int nops; // Number of floating point operations we do for all iterations for a single beam
 	vector<FdmtIteration* > iterations;
 	bool dump_data;
 	CudaTimer t_init;

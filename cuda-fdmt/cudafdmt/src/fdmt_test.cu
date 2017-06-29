@@ -432,6 +432,12 @@ int main(int argc, char* argv[])
 	cout << "Boxcar "<< endl << tboxcar << endl;
 	cout << "File reading " << endl << source.read_timer << endl;
 	fdmt_print_timing(&fdmt);
+	cout << "FDMT " << fdmt.nops/1e9
+			<< " Gops/iteration ran at: " << fdmt.nops / (fdmt.t_iterations.get_average_time()/1e3)/1e9
+			<< " GFLOPS" << endl;
+	cout << "Boxcar " << 2*nd*nt*NBOX/1e9
+			<< " Gops/iteration. ran at: " << 2*nd*nt*NBOX/(tboxcar.get_average_time()/1e3)/1e9
+			<< " GFLOPS" << endl;
 	struct rusage usage;
 	getrusage(RUSAGE_SELF, &usage);
 	cout << "Resources User: " << usage.ru_utime.tv_sec <<

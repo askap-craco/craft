@@ -44,6 +44,7 @@ void CudaTimer::sync_stop() {
 }
 
 float CudaTimer::get_elapsed_time() {
+	// Returns elapsed time in milliseconds.
 	float ms;
 	if (m_ncalls == 0) { // if it hasn't been called, cudaEventElapsedTime fails with invalidResourceHandle
 		ms = 0;
@@ -51,4 +52,9 @@ float CudaTimer::get_elapsed_time() {
 		gpuErrchk(cudaEventElapsedTime(&ms, m_start, m_stop));
 	}
 	return ms;
+}
+
+float CudaTimer::get_average_time() {
+	// average elapsed time per clal in ms
+	return m_total_time/(float)m_ncalls;
 }
