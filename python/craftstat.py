@@ -49,6 +49,7 @@ def _main():
     parser.add_argument(dest='files', nargs='+')
     parser.add_argument('--step', type=int, help='time step', default=10)
     parser.add_argument('--ntimes', type=int, help='Numerb of samples per block', default=1024)
+    parser.add_argument('-O','--outfile', help='Output file for influxdb data. Inhibits live loading')
     parser.set_defaults(verbose=False, nxy="1,1")
     values = parser.parse_args()
     if values.verbose:
@@ -57,7 +58,13 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     st = CraftStatMaker(values.files, values)
-    #influxout = open('/tmp/craftstat.influxdb', 'w')
+    influxout = None
+    client = None
+    if values.outfile:
+        influxout = open(values.outfile, 'w')
+    else:
+        client = InfluxDBClient(host='akingest01', database='craft')
+        
     fullpath  = os.path.abspath(values.files[0])
     pathbits = fullpath.split('/') # hacky way of getting sbid, scanid and ant
     print len(pathbits), pathbits
@@ -65,7 +72,6 @@ def _main():
     scanid = pathbits[-4]
     ant = pathbits[-3]
     startid = pathbits[-2]
-    client = InfluxDBClient(host='akingest01', database='craft')
     while True:
         s, unix_start = st.next_stat()
         nbeams, nstat = s.shape
@@ -79,14 +85,18 @@ def _main():
             field_dict = {}
             for sname, v in zip(st.stat_names, s[b, :]):
                 field_dict[sname] = v
-            #influxout.write(outs)
+
             body = {'measurement':'craftstat',
                     'tags':{'sbid':sbid,'scanid':scanid,'ant':ant,'beam':b},
                     'time':unix_nanosec,
                     'fields':field_dict
                     }
-            client.write_points([body])
-            #print outs
+
+            if influxout is not None:
+                influxout.write(outs)
+
+            if client is not None:
+                client.write_points([body])
 
 class CraftStatMaker(object):
     def __init__(self, files, values):
