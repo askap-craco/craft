@@ -98,7 +98,7 @@ class CraftStatMaker(object):
         self.tstart = 0
         self.fft_freqs = np.array([38.5, 50, 100, 200, 300])
         beams, self.spfiles = load_beams(self.files, self.tstart, self.ntimes, return_files=True)
-        self.stat_names = ['bmean','bstd']
+        self.stat_names = ['bmean','bstd', 'dm0std']
         for f in self.fft_freqs:
             self.stat_names.append('f{}'.format(f))
 
@@ -129,7 +129,7 @@ class CraftStatMaker(object):
         beams /= 18
 
         ntimes, nbeams, nfreq = beams.shape
-        stat = np.zeros((nbeams, 2 + len(self.fft_freqs)))
+        stat = np.zeros((nbeams, 3 + len(self.fft_freqs)))
 
         for i in xrange(nbeams):
             bi = beams[:, i, :]
@@ -137,23 +137,20 @@ class CraftStatMaker(object):
             # spectra
             beam_mean = bi.mean(axis=0)
             beam_std = bi.std(axis=0)
-            #bmm = np.tile(beam_mean, (ntimes, 1))
-            #bsm = np.tile(beam_std, (ntimes, 1))
-            #bi_znorm = (bi - bmm)/bsm
-            #beam_kurtosis = np.mean((bi_znorm)**4, axis=0)/np.mean((bi_znorm)**2, axis=0)**2
             bstd = beam_std.std()
-            stat[i, 0] = beam_mean.mean()
-            stat[i, 1] = bstd
-
             # dm0
             dm0 = bi.mean(axis=1)
+            dm0std = dm0.std()
+
+            stat[i, 0] = beam_mean.mean()
+            stat[i, 1] = bstd
+            stat[i, 2] = dm0std
+
             dm0f = abs(np.fft.rfft(dm0, axis=0))**2
             ntimes, nchans = bi.shape
 
             idxs = np.rint(self.fft_freqs * float(ntimes) * self.tsamp).astype(int)
-            stat[i, 2:] = dm0f[idxs]/bstd
-
-            
+            stat[i, 3:] = dm0f[idxs]/dm0std
             fftfreqs  = np.arange(len(dm0f))/float(ntimes)/self.tsamp
 
             #pylab.plot(fftfreqs, dm0f)
