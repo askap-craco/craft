@@ -33,7 +33,7 @@ def _main():
     for f in values.files:
         detect(f, values)
 
-bat_cards = ('START_WRITE_BAT32','STOP_WRITE_BAT32','TRIGGER_BAT32')
+bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
 frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 
 def detect(f, values):
@@ -54,7 +54,7 @@ def detect(f, values):
     tstart = float(hdr['ANT_MJD'][0])
     bats = np.array([int(hdr[c][0], base=16) for c in bat_cards])
     frames = np.array([int(hdr[c][0]) for c in frame_cards])
-    bat0 = int(hdr['BAT_NOW'][0], base=16)
+    bat0 = int(hdr['NOW_BAT'][0], base=16)
     bat0_40 = bat0 & 0xffffffffff
 
     print 'BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6

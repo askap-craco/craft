@@ -36,8 +36,8 @@ def find_files(rootd, pattern):
 markers = mpl.markers.MarkerStyle().filled_markers
 
 def _main():
-    from argparse import ArgumentParser
-    parser = ArgumentParser(description='Script description')
+    from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+    parser = ArgumentParser(description='Plot fredda candidates', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s','--show', action='store_true', help='Show')
     parser.add_argument('-f','--fname', help='Candidate filename')
@@ -176,6 +176,7 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=Non
     ubeams = set(beamno)
 
     ax.scatter(badvin[:, 2], 1+badvin[:, 5], marker='.', alpha=0.4, edgecolors='face', c='0.5')
+    print 'MASK has ', sum(mask), 'valid candidates'
 
     for ib, b in enumerate(sorted(ubeams)):
         bmask = beamno == b

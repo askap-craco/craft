@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Plots a lot of beams
+Calculates statistics on lots of beams
 
 Copyright (C) CSIRO 2015
 """
@@ -15,15 +15,10 @@ import itertools
 from craftobs import load_beams
 from plotutil import subplots
 import matplotlib.gridspec as gridspec
+from influxdb import InfluxDBClient
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
-def onpick(event):
-    thisline = event.artist
-    xdata, ydata = thisline.get_data()
-    ind = event.ind
-
-    print thisline.get_label(), xdata[ind], ydata[ind]
 
 def annotate(fig, title, xlabel, ylabel):
     fig.text( 0.5, 0.98,title, ha='center', va='top')
@@ -45,19 +40,16 @@ def divisors(n):
     d = [t for t in xrange(1, n/2 + 1) if n % t == 0]
     return d
 
+MJD_UNIX_EPOCH = 40587.0
+
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument(dest='files', nargs='+')
-    parser.add_argument('-t', '--times', help='Integration range to plot (samples)', type=commasep)
-    parser.add_argument('-s', '--seconds', help='Integration range to plot (seconds)', type=commasep)
-    parser.add_argument('--nxy', help='number of rows,columns in plots', type=commasep)
-    parser.add_argument('--imzrange', help='Z range for dynamic spectrum', type=floatcommasep)
-    parser.add_argument('--fft', help='plot fft', action='store_true',default=False)
-    parser.add_argument('--save', help='Save plots as png', action='store_true', default=False)
-    parser.add_argument('--raw-units', help='Use raw unts, rather than physical units on axis', action='store_true', default=False)
-    parser.add_argument('-d', '--dm', help='Dispersion measure (pc/cm3)', default=0., type=float)
+    parser.add_argument('--step', type=int, help='time step', default=10)
+    parser.add_argument('--ntimes', type=int, help='Numerb of samples per block', default=1024)
+    parser.add_argument('-O','--outfile', help='Output file for influxdb data. Inhibits live loading')
     parser.set_defaults(verbose=False, nxy="1,1")
     values = parser.parse_args()
     if values.verbose:
@@ -65,55 +57,128 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    if values.times:
-        bits = values.times
-        if len(bits) == 1:
-            tstart = bits[0]
-            ntimes = 128*8
-        elif len(bits) == 2:
-            tstart, ntimes = bits
-        else:
-            raise ValueError('Invalid times: %s', values.times)
+    st = CraftStatMaker(values.files, values)
+    influxout = None
+    client = None
+    if values.outfile:
+        influxout = open(values.outfile, 'w')
     else:
-        tstart = 0
-        ntimes = 128*8
-
-    plt = Plotter.from_values(values, tstart, ntimes)
-    pylab.show()
-
-def tscrunch(beams, factor):
-    ntimes, nbeams, nfreq = beams.shape
-    newbeams = np.zeros((ntimes/factor, nbeams, nfreq))
-    for t in xrange(newbeams.shape[0]):
-        tstart = t*factor
-        tend = (t+1)*factor
-        newbeams[t, :, :] = beams[tstart:tend, :, :].sum(axis=0)/np.sqrt(factor)
-
-    return newbeams
-
-
-def fscrunch(beams, factor):
-    ntimes, nbeams, nfreq = beams.shape
-    newbeams = np.zeros((ntimes, nbeams, nfreq/factor))
-    for f in xrange(newbeams.shape[2]):
-        fstart = f*factor
-        fend = (f+1)*factor
-        newbeams[:, :, f] = beams[:, :, fstart:fend].sum(axis=2)/np.sqrt(factor)
-
-    return newbeams
-
-
-def dmroll(beams, dm, fch1, foff, tint):
-    newbeams = np.empty_like(beams)
-    ntimes, nbeams, nfreq = newbeams.shape
-    for f in xrange(nfreq):
-        freq = fch1 + f*foff
-        tdelay = 4.15*dm*(fch1**-2 - freq**-2)
-        shift = int(np.round(tdelay/tint))
-        newbeams[:, :, f] = np.roll(beams[:,:,f], shift)
-
-    return newbeams
+        client = InfluxDBClient(host='akingest01', database='craft')
         
+    fullpath  = os.path.abspath(values.files[0])
+    pathbits = fullpath.split('/') # hacky way of getting sbid, scanid and ant
+    print len(pathbits), pathbits
+    sbid = pathbits[-5]
+    scanid = pathbits[-4]
+    ant = pathbits[-3]
+    startid = pathbits[-2]
+    while True:
+        s, unix_start = st.next_stat()
+        nbeams, nstat = s.shape
+        # nanoseconds since unix epoch
+        unix_nanosec = int(np.round(unix_start * 1e9))
+        for b in xrange(nbeams):
+            outs = 'craftstat,sbid={},scanid={},ant={},beam={} '.format(sbid, scanid, ant, b)
+            statbits = ['{}={}'.format(statname, stat) for (statname, stat) in zip(st.stat_names, s[b,: ])]
+            outs += ','.join(statbits)
+            outs += ' {}\n'.format(unix_nanosec)
+            field_dict = {}
+            for sname, v in zip(st.stat_names, s[b, :]):
+                field_dict[sname] = v
+
+            body = {'measurement':'craftstat',
+                    'tags':{'sbid':sbid,'scanid':scanid,'ant':ant,'beam':b},
+                    'time':unix_nanosec,
+                    'fields':field_dict
+                    }
+
+            if influxout is not None:
+                influxout.write(outs)
+
+            if client is not None:
+                client.write_points([body])
+
+class CraftStatMaker(object):
+    def __init__(self, files, values):
+        self.files = files
+        self.values = values
+        self.ntimes = values.ntimes
+        self.tstep = values.step
+        self.tstart = 0
+        self.fft_freqs = np.array([38.5, 50, 100, 200, 300])
+        beams, self.spfiles = load_beams(self.files, self.tstart, self.ntimes, return_files=True)
+        self.stat_names = ['bmean','bstd']
+        for f in self.fft_freqs:
+            self.stat_names.append('f{}'.format(f))
+
+    def next_data(self):
+
+        for ifin, f in enumerate(self.spfiles):
+            f.seek_sample(self.tstart)
+            nelements = f.nchans*self.ntimes
+            dtype = np.uint8
+            v = np.fromfile(f.fin, dtype=dtype, count=nelements )
+
+            
+
+    def next_stat(self):
+        beams, files = load_beams(self.files, self.tstart, self.ntimes, return_files=True)
+        mjdstart = files[0].tstart
+        tsamp = files[0].tsamp
+
+        self.mjdstart = mjdstart
+        self.tsamp = tsamp
+        mjdtime = self.mjdstart + self.tstart * self.tsamp/3600./24.
+        unix_start = (self.mjdstart - MJD_UNIX_EPOCH)*86400.
+        unix_time = unix_start + self.tstart * self.tsamp 
+        self.tstart += self.tstep * self.ntimes
+
+        # Normalise to nominal 0 mean, unit stdev - HACK!
+        beams -= 128
+        beams /= 18
+
+        ntimes, nbeams, nfreq = beams.shape
+        stat = np.zeros((nbeams, 2 + len(self.fft_freqs)))
+
+        for i in xrange(nbeams):
+            bi = beams[:, i, :]
+            ntimes, nfreq = bi.shape
+            # spectra
+            beam_mean = bi.mean(axis=0)
+            beam_std = bi.std(axis=0)
+            #bmm = np.tile(beam_mean, (ntimes, 1))
+            #bsm = np.tile(beam_std, (ntimes, 1))
+            #bi_znorm = (bi - bmm)/bsm
+            #beam_kurtosis = np.mean((bi_znorm)**4, axis=0)/np.mean((bi_znorm)**2, axis=0)**2
+            bstd = beam_std.std()
+            stat[i, 0] = beam_mean.mean()
+            stat[i, 1] = bstd
+
+            # dm0
+            dm0 = bi.mean(axis=1)
+            dm0f = abs(np.fft.rfft(dm0, axis=0))**2
+            ntimes, nchans = bi.shape
+
+            idxs = np.rint(self.fft_freqs * float(ntimes) * self.tsamp).astype(int)
+            stat[i, 2:] = dm0f[idxs]/bstd
+
+            
+            fftfreqs  = np.arange(len(dm0f))/float(ntimes)/self.tsamp
+
+            #pylab.plot(fftfreqs, dm0f)
+            #for f in self.fft_freqs:
+            #    pylab.axvline(f)
+            #pylab.show()
+
+        return stat, unix_time
+
+
+def getstats():
+    tstart = self.tstart
+    ntimes = self.ntimes
+    beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
+
+
 class Plotter(object):
     @staticmethod
 
@@ -136,7 +201,6 @@ class Plotter(object):
         self.fig_labels = {}
         # Sniff data
         self.files = filenames
-        print self.files[0]
         beams, files = load_beams(filenames, tstart, ntimes=1, return_files=True)
         ntimes, self.nbeams, self.nfreq = beams.shape
 
@@ -243,86 +307,7 @@ class Plotter(object):
             fig.draw()
 
 
-    def __del__(self):
-        self.closeall()
-    
-    def press(self, event):
-        print 'press', event.key
-        draw = True
-        if event.key == 'right' or event.key == 'n':
-            self.tstart += self.ntimes/2
-        elif event.key == 'left' or event.key == 'p':
-            self.tstart -= self.ntimes/2
-            self.tstart = max(self.tstart, 0)
-        elif event.key == 'w':
-            self.ntimes *= 2
-        elif event.key == 'a':
-            if self.ntimes > 2:
-                self.ntimes /= 2
-        elif event.key == 't':
-            self.tscrunch_factor += 1
-        elif event.key == 'T':
-            self.tscrunch_factor = max(1, self.tscrunch_factor - 1)
-        elif event.key == 'f':
-            fdiv = divisors(self.nfreq)
-            self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) + 1]
-        elif event.key == 'F':
-            fdiv = divisors(self.nfreq)
-            self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) -1]
-        elif event.key == 'd':
-            self.dm = float(raw_input('Input DM(pc/cm3)'))
-        elif event.key == 'c':
-            self.squeeze_zrange(2.)
-        elif event.key == 'C':
-            self.squeeze_zrange(0.5)
-        elif event.key == 'ctrl+c':
-            sys.exit(0)
-        elif event.key == 'h' or event.key == '?':
-            self.print_help()
-            draw = False
-        else:
-            draw = False
-
-        if draw:
-            self.clearfigs()
-            self.draw()
-
-    def squeeze_zrange(self, mul):
-        zmin, zmax = self.imzrange
-        zmid = (zmin + zmax)/2.
-        zrange = zmax - zmin
-        new_zrange = zrange/mul
-        self.imzrange = (zmid - new_zrange/2., zmid + new_zrange/2.)
-        return self.imzrange
-
-
-    def print_help(self):
-        s = '''
-        Key Mapping
-        n or right arrow - Move right by half a window
-        p or left arrow - Move left by half a window
-        w - zoom out by 2
-        a - zoom in by 2
-        t - increase tscrunch by 1 bin
-        T - decrease tscrunch by 1 bin
-        f - increase fscrunch by 1 bin
-        F - decrease fscrunch by 1 bin
-        d - Dedisperse (I'll ask for the DM on the cmdline
-        c - Increase colormap zoom
-        C - Decrease colormap zoom
-        h or ? - Print this help
-        Ctrl-C - quit'''
-        print s
-
-        return s
-
-
     def draw(self):
-        tstart = self.tstart
-        ntimes = self.ntimes
-        beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
-        beams -= 128
-        beams /= 18
         f0 = files[0]
         self.beams = beams
         print 'Loaded beams', beams.shape
