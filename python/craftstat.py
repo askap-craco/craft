@@ -15,6 +15,7 @@ import itertools
 from craftobs import load_beams
 from plotutil import subplots
 import matplotlib.gridspec as gridspec
+import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -37,7 +38,7 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument(dest='files', nargs='+')
-    parser.add_argument('--step', type=int, help='time step', default=10)
+    parser.add_argument('--step', type=int, help='time step', default=300)
     parser.add_argument('--ntimes', type=int, help='Numerb of samples per block', default=1024)
     parser.add_argument('-O','--outfile', help='Output file for influxdb data. Inhibits live loading')
     parser.add_argument('--show', action='store_true', help='show plots', default=False)
@@ -56,13 +57,15 @@ def _main():
         from influxdb import InfluxDBClient
         client = InfluxDBClient(host='akingest01', database='craft')
 
-    for file in values.files:
+    for filename in values.files:
         try:
-            get_meas(filename, client, influxout)
+            print filename
+            get_meas(filename, client, influxout, values)
         except:
-            pass
+            logging.exception('Blah exception in get_meas')
 
-    influxout.close()
+    if influxout is not None:
+        influxout.close()
         
 def get_meas(filename, client, influxout, values):
     fullpath  = os.path.abspath(filename)
@@ -78,16 +81,18 @@ def get_meas(filename, client, influxout, values):
     st = CraftStatMaker(filename, values)
 
     while True:
-        s, unix_start = st.next_stat()
-        nbeams, nstat = s.shape
+        try:
+            s, unix_start = st.stats()
+        except StopIteration:
+            break
         # nanoseconds since unix epoch
         unix_nanosec = int(np.round(unix_start * 1e9))
         outs = 'craftstat,sbid={},scanid={},ant={},beam={} '.format(sbid, scanid, ant, b)
-        statbits = ['{}={}'.format(statname, stat) for (statname, stat) in zip(st.stat_names, s[b,: ])]
+        statbits = ['{}={}'.format(statname, stat) for (statname, stat) in s.iteritems()]
         outs += ','.join(statbits)
         outs += ' {}\n'.format(unix_nanosec)
         field_dict = {}
-        for sname, v in zip(st.stat_names, s[b, :]):
+        for sname, v in s.iteritems():
             field_dict[sname] = v
             
         body = {'measurement':'craftstat',
@@ -100,7 +105,11 @@ def get_meas(filename, client, influxout, values):
             influxout.write(outs)
 
         if client is not None:
+            logging.debug("Writing data to client %s", str(body))
             client.write_points([body])
+
+            
+    logging.debug('Finished')
 
 class CraftStatMaker(object):
     def __init__(self, fname, values):
@@ -113,7 +122,7 @@ class CraftStatMaker(object):
         self.spfile = sigproc.SigprocFile(self.fname)
         self.mjdstart = self.spfile.tstart
         self.tsamp = self.spfile.tsamp
-        self.stat_names = ['bmean','bstd', 'dm0std']
+        self.stat_names = []
         for f in self.fft_freqs:
             self.stat_names.append('f{}'.format(f))
 
@@ -121,49 +130,95 @@ class CraftStatMaker(object):
         self.tstart += self.tstep + self.ntimes
         self.spfile.seek_sample(self.tstart)
         assert self.spfile.nbits == 8
-        d = np.fromfile(self.spfile.fin, dtype=np.uint8, count=self.ntimes*self.spfile.nchans)
-        d.shape = (self.ntimes, 1, self.spfile.nchans)
+        count = self.ntimes*self.spfile.nchans
+        d = np.fromfile(self.spfile.fin, dtype=np.uint8, count=count)
+        if len(d) == count:
+            d.shape = (self.ntimes,  self.spfile.nchans)
+            return d
+        else:
+            logging.debug("Finisshed at %d", self.tstart)
+            raise StopIteration
+            
 
-        return  d
-
-    def next_stat(self):
+    def stats(self):
 
         bi = self.next_data()
+            
         mjdtime = self.mjdstart + self.tstart * self.tsamp/3600./24.
         unix_start = (self.mjdstart - MJD_UNIX_EPOCH)*86400.
         unix_time = unix_start + self.tstart * self.tsamp 
         self.tstart += self.tstep * self.ntimes
 
         # Normalise to nominal 0 mean, unit stdev - HACK!
-        beams -= 128
-        beams /= 18
+        bi -= 128
+        bi /= 18
 
-        stat = np.zeros((1, 3 + len(self.fft_freqs)))
+        stat = np.zeros((3 + len(self.fft_freqs)))
 
         ntimes, nfreq = bi.shape
             # spectra
         beam_mean = bi.mean(axis=0)
         beam_std = bi.std(axis=0)
+
+        freqs = np.arange(self.spfile.nchans)*self.spfile.foff + self.spfile.fch1
         bstd = beam_std.std()
 # dm0
         dm0 = bi.mean(axis=1)
         dm0std = dm0.std()
 
-        stat[i, 0] = beam_mean.mean()
-        stat[i, 1] = bstd
-        stat[i, 2] = dm0std
+        stat = {}
+        stat['spec.mean.mean'] = beam_mean.mean()
+        stat['spec.mean.max'] = beam_mean.max()
+        stat['spec.mean.min'] = beam_mean.min()
+        stat['spec.mean.maxfreq'] = freqs[beam_mean.argmax()]
+        stat['spec.mean.minfreq'] = freqs[beam_mean.argmin()]
 
-        dm0f = abs(np.fft.rfft(dm0, axis=0))**2
+        stat['spec.std.mean'] = beam_std.mean()
+        stat['spec.std.max'] = beam_std.max()
+        stat['spec.std.min'] = beam_std.min()
+        stat['spec.std.maxfreq'] = freqs[beam_std.argmax()]
+        stat['spec.std.minfreq'] = freqs[beam_std.argmin()]
+        stat['dm0.mean'] = dm0.mean()
+        stat['dm0.std'] = dm0.std()
+
+        
+
+        dm0f = abs(np.fft.rfft(dm0, axis=0))**2/dm0std**2
         ntimes, nchans = bi.shape
 
         idxs = np.rint(self.fft_freqs * float(ntimes) * self.tsamp).astype(int)
-        stat[i, 3:] = dm0f[idxs]/dm0std
-        fftfreqs  = np.arange(len(dm0f))/float(ntimes)/self.tsamp
+        for n, i in zip(self.fft_freqs, idxs):
+            freq = '{:0.1f}'.format(n).replace('.','d')
+            stat['fft.{}Hz'.format(freq)] = dm0f[i]
 
-            #pylab.plot(fftfreqs, dm0f)
-            #for f in self.fft_freqs:
-            #    pylab.axvline(f)
-            #pylab.show()
+        stat['fft.max'] = dm0f[1:].max()
+        stat['fft.mean'] = dm0f[1:].mean()
+        stat['fft.std'] = dm0f[1:].std()
+        fmax = dm0f[1:].max()
+        fmax_idx  = np.argmax(dm0f[1:])
+        fftfreqs  = np.arange(len(dm0f))/float(ntimes)/self.tsamp
+        stat['fft.max.freq'] = fftfreqs[dm0f[1:].argmax() + 1]
+            
+
+        if self.values.show:
+            f, axes = pylab.subplots(2,2)
+            axes = axes.flatten()
+            axes[0].imshow(bi.T, aspect='auto')
+            axes[0].set_xlabel('Time')
+            axes[0].set_xlabel('Channel')
+            axes[1].semilogy(fftfreqs, dm0f)
+            for f in self.fft_freqs:
+                axes[1].axvline(f)
+
+            axes[1].semilogy(stat['fft.max.freq'], stat['fft.max'], 'x')
+
+            axes[1].set_xlabel('Frequency Hz')
+            axes[1].set_ylabel('Amp')
+            axes[2].plot(freqs, beam_mean)
+            axes[3].plot(freqs, beam_std)
+            
+
+            pylab.show()
 
         return stat, unix_time
 
