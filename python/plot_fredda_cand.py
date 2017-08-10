@@ -18,6 +18,13 @@ import glob
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+def get_dada_header(f):
+    thedir = os.path.dirname(f)
+    files = glob.glob(os.path.join(thedir, 'ak*.hdr.fixed'))
+    assert len(files) == 1, 'Too many headers in {}'.format(thedir)
+    hdr = DadaHeader.fromfile(files[0])
+    return hdr
+
 def find_files(rootd, pattern):
     matches = []
     for root, dirnames, filenames in os.walk(rootd):

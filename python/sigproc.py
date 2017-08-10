@@ -60,7 +60,7 @@ def sigproc_sex2deg(x):
 def unpack(hdr, param, struct_format):
     idx = hdr.find(param)
     if idx < 0:
-        warnings.warn('Could not find parameter {}'.format(param))
+        #warnings.warn('Could not find parameter {}'.format(param))
         return None
 
     idx += len(param) # idx is thte start of the string
@@ -74,7 +74,7 @@ def unpack(hdr, param, struct_format):
 def unpack_str(hdr, param):
     idx = hdr.find(param)
     if idx < 0:
-        warnings.warn('Could not find parameter {}'.format(param))
+        #warnings.warn('Could not find parameter {}'.format(param))
         return None
 
     idx += len(param) # idx is thte start of the string

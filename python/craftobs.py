@@ -40,9 +40,10 @@ def load_beams(path, tstart, ntimes, pattern='*.fil', return_files=False):
             dtype = np.uint8
         elif (f.nbits == 32):
             dtype = np.float32
-        
+
         v = np.fromfile(f.fin, dtype=dtype, count=nelements )
         v.shape = (ntimes, f.nifs, f.nchans)
+        
 
         if f.nifs == 1:
             nifs = len(files)
