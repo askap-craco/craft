@@ -36,8 +36,9 @@ def _main():
     parser.add_argument('-t', '--tdist', type=int, help='Sample distance', default=32)
     parser.add_argument('-d','--ddist', type=int, help='Idt distance', default=20)
     parser.add_argument('-p', '--plot', action='store_true', help='Show plots', default=False)
-    parser.add_argument('-w','--wmax', type=int, help='Maxium width to allow, above which we discard all candidates everything', default=32)
-    parser.add_argument('--dmmin', type=float, help='Minimum DM co consider', default=0.)
+    parser.add_argument('-w','--wmax', type=int, help='Maxium width to allow, above which we discard all candidates', default=32)
+    parser.add_argument('--dmmin', type=float, help='Minimum DM to consider', default=0.)
+    parser.add_argument('--snmin', type=float, help='Minimum S/N to consider', default=0.)
     parser.add_argument('-n','--nblock', type=int, help='Number  of candidates to process in a block')
     
     parser.add_argument(dest='files', nargs='+')
@@ -61,7 +62,7 @@ def load(fin, values):
 
         bits = map(float, line.split())
         # filter for width
-        if bits[3] < values.wmax and bits[4] > values.dmmin:
+        if bits[3] < values.wmax and bits[4] > values.dmmin and bits[0] > values.snmin:
             d.append(bits)
         else: # ignore it
             pass
