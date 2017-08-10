@@ -36,6 +36,9 @@ def _main():
     parser.add_argument('-t', '--tdist', type=int, help='Sample distance', default=32)
     parser.add_argument('-d','--ddist', type=int, help='Idt distance', default=20)
     parser.add_argument('-p', '--plot', action='store_true', help='Show plots', default=False)
+    parser.add_argument('-w','--wmax', type=int, help='Maxium width to allow, above which we discard all candidates everything', default=32)
+    parser.add_argument('--dmmin', type=float, help='Minimum DM co consider', default=0.)
+    parser.add_argument('-n','--nblock', type=int, help='Number  of candidates to process in a block')
     
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
@@ -45,23 +48,41 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-
-
     for fin in values.files:
-        d = np.loadtxt(fin)
-        if len(d) == 0:
-            logging.info('%s is empty', fin)
+        fof_file(fin, values)
+
+def load(fin, values):
+    d = []
+    for iline, line in enumerate(open(fin, 'rU')):
+        if line.startswith('#'):
             continue
-        if len(d.shape) == 1:
-            d.shape = (1, d.shape[0])
+        if line.strip() == '':
+            continue
+
+        bits = map(float, line.split())
+        # filter for width
+        if bits[3] < values.wmax and bits[4] > values.dmmin:
+            d.append(bits)
+        else: # ignore it
+            pass
+
+    return np.array(d)
+
+def fof_file(fin, values):
+    d = load(fin, values)
+    if len(d) == 0:
+        logging.info('%s is empty', fin)
+        return
+    if len(d.shape) == 1:
+        d.shape = (1, d.shape[0])
 
         assert d.shape[1] == 7
         # make new array. Concatenate time twice and dm twice at the end, along with a counter
-        hstack = (d, d[:, t0:t0+1], d[:, t0:t0+1], d[:, d0:d0+1], d[:, d0:d0+1], np.ones((d.shape[0], 1)))
-        dnew = np.hstack(hstack)
-        dout = fof(dnew, values)
-        np.savetxt(fin+'.fof', dout, fmt=formats, header=header)
-        logging.info('%s reduced from %d to %d candidates', fin, dnew.shape[0], dout.shape[0])
+    hstack = (d, d[:, t0:t0+1], d[:, t0:t0+1], d[:, d0:d0+1], d[:, d0:d0+1], np.ones((d.shape[0], 1)))
+    dnew = np.hstack(hstack)
+    dout = fof(dnew, values)
+    np.savetxt(fin+'.fof', dout, fmt=formats, header=header)
+    logging.info('%s reduced from %d to %d candidates', fin, dnew.shape[0], dout.shape[0])
 
 
 def errplot(alldarr, **kwargs):
