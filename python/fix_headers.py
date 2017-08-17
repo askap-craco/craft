@@ -143,6 +143,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-p', '--parset', help='Parset to get field names from')
     parser.add_argument('-l','--sblist', help='Sschedblock list to get data from', default='sbpars/sblist.txt')
+    parser.add_argument('--fix', action='store_true', help='Actually fix the header - otherwise dont change anything')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -173,20 +174,23 @@ def _main():
 
 def fix_header(hdr_file, sbdata, pset, values):
     hdr = DadaHeader.fromfile(hdr_file)
+    logging.info('Fixing header %s', hdr_file)
 
     sbid = int(hdr['SBID'][0])
     
     if pset is None:
-        pset = TargetParset(os.path.join('sbpars', 'SB%04d.parset'%sbid))
+        pset = TargetParset(os.path.join('sbpars', 'SB%05d.parset'%sbid))
 
     sbinfo = sbdata[sbid]
     
     sbtemplate = sbinfo[3]
     if 'FIXED_VERSION' in hdr.keys():
         last_version = int(hdr.get_value('FIXED_VERSION'))
-        hdr.set_value('FIXED_VERSION', last_version+1)
+        new_version = last_version+1
+        hdr.set_value('FIXED_VERSION', new_version)
     else:
-        hdr += 'FIXED_VERSION', 1, 'Fix version - increments by 1 on each change'
+        new_version = 2
+        hdr += 'FIXED_VERSION', new_version, 'Fix version - increments by 1 on each change'
 
     hdr += ('FIXED_UTC', datetime.datetime.utcnow().isoformat(), 'Dated fixed')
     hdr += ('SB_ALIAS', sbinfo[1],'SB alias')
@@ -223,10 +227,13 @@ def fix_header(hdr_file, sbdata, pset, values):
 
         guess_intent(hdr)
 
-    shutil.move(hdr_file, hdr_file+'.beforefix')
+    #shutil.move(hdr_file, hdr_file+'.beforefix')
+    outfile = '{}.v{}'.format(hdr_file, new_version)
+    logging.info('Writing new header to %s', outfile)
     
-    with open(hdr_file, 'w') as fout:
-        hdr.tofile(fout, add_zeros=False)
+    if values.fix:
+        with open(outfile, 'w') as fout:
+            hdr.tofile(fout, add_zeros=False)
         
 
 if __name__ == '__main__':
