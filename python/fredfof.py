@@ -36,10 +36,9 @@ def _main():
     parser.add_argument('-t', '--tdist', type=int, help='Sample distance', default=32)
     parser.add_argument('-d','--ddist', type=int, help='Idt distance', default=20)
     parser.add_argument('-p', '--plot', action='store_true', help='Show plots', default=False)
-    parser.add_argument('-w','--wmax', type=int, help='Maxium width to allow, above which we discard all candidates', default=32)
-    parser.add_argument('--dmmin', type=float, help='Minimum DM to consider', default=0.)
+    parser.add_argument('-w','--wmax', type=int, help='Maxium width to consider', default=32)
+    parser.add_argument('--dmmin', type=float, help='Minimum DM to consider (pc/cm3)', default=0.)
     parser.add_argument('--snmin', type=float, help='Minimum S/N to consider', default=0.)
-    parser.add_argument('-n','--nblock', type=int, help='Number  of candidates to process in a block')
     
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
@@ -81,6 +80,7 @@ def fof_file(fin, values):
         # make new array. Concatenate time twice and dm twice at the end, along with a counter
     hstack = (d, d[:, t0:t0+1], d[:, t0:t0+1], d[:, d0:d0+1], d[:, d0:d0+1], np.ones((d.shape[0], 1)))
     dnew = np.hstack(hstack)
+    del hstack
     dout = fof(dnew, values)
     np.savetxt(fin+'.fof', dout, fmt=formats, header=header)
     logging.info('%s reduced from %d to %d candidates', fin, dnew.shape[0], dout.shape[0])
@@ -138,7 +138,8 @@ def fof(d, values):
             old_d = d.copy()
             alld = []
 
-    pylab.show()
+    if values.plot:
+        pylab.show()
 
     return d
         
