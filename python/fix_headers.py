@@ -14,7 +14,7 @@ import glob
 import re
 import shutil
 from astropy.coordinates import SkyCoord
-from aces.footprint_class import Footprint
+#from aces.footprint_class import Footprint
 from aces.skypos import skypos
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -104,14 +104,16 @@ class TargetParset(dict):
             data['pol_type'] = pol_type
             data['pol_angle'] = float(pol_angle)
 
-            fp = Footprint.named('square_6x6', np.radians(0.9), np.radians(float(pol_angle)+45))
-            fp.setRefpos(sp)
-            data['footprint'] = fp
+            #fp = Footprint.named('square_6x6', np.radians(0.9), np.radians(float(pol_angle)+45))
+            #fp.setRefpos(sp)
+            #data['footprint'] = fp
 
     def get_nearest_source(self, pos, tol_deg=0.1):
         sources = [s for s in self.sources.values() if 'skycoord' in s]
         nearest = min(sources, key=lambda p: mysep(p['skycoord'], pos))
-        assert mysep(nearest['skycoord'], pos) <= np.radians(tol_deg)
+        sepdeg  = np.degrees(mysep(nearest['skycoord'], pos) )
+        if sepdeg < tol_deg:
+            raise ValueError('Nearest source to pos {} was {} but separation was {}'.format(pos, nearest, sepdeg))
 
         return nearest
 
@@ -120,12 +122,10 @@ def guess_intent(hdr):
     field_name = hdr.get_value('FIELD_NAME')
     scan_intent = 'UNKNOWN'
     if sbtemplate.lower() == 'flyseye':
-        if field_name.startswith('G'):
-            scan_intent = 'FRB_FLYSEYE'
-        elif field_name.startswith('PSR'):
+        if field_name.startswith('PSR'):
             scan_intent = 'PSR_CHECK'
         else:
-            logging.error('Could not work out intent for sbtempalte %s field_name %s', sbtemplate, field_name)
+            scan_intent = 'FRB_FLYSEYE'
     elif sbtemplate.lower() == 'standard':
         if field_name.startswith('PSR') and 'beam' in field_name:
             scan_intent = 'PSR_CAL'
@@ -170,7 +170,6 @@ def _main():
             fix_header(hdr_file, sbdata, pset, values)
         except:
             logging.exception('Could not fix header file %s', hdr_file)
-            raise
 
 def fix_header(hdr_file, sbdata, pset, values):
     hdr = DadaHeader.fromfile(hdr_file)
@@ -202,7 +201,7 @@ def fix_header(hdr_file, sbdata, pset, values):
         ra, dec = map(float, (hdr['RA'][0], hdr['DEC'][0]))
         pos = SkyCoord(ra, dec, unit='deg')
         src = pset.get_nearest_source(pos)
-        fp = src['footprint']
+        #fp = src['footprint']
         # some headers had incorrect positions - not sure which now. Some headers don't have footprints either
         #hdr.set_value('BEAM_RA', ','.join(map(str, np.degrees([p.ra for p in fp.getPositions()]))))
         #hdr.set_value('BEAM_DEC', ','.join(map(str, np.degrees([p.dec for p in fp.getPositions()]))))
@@ -233,6 +232,7 @@ def fix_header(hdr_file, sbdata, pset, values):
     
     if values.fix:
         with open(outfile, 'w') as fout:
+            hdr.add_comment = False
             hdr.tofile(fout, add_zeros=False)
         
 

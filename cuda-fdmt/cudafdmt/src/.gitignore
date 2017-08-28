@@ -3,4 +3,5 @@ test.in
 test.out
 *.o
 cudafdmt
+git_version
 
