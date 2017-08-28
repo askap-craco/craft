@@ -122,6 +122,8 @@ class SigprocFile(object):
 
         for k, v in header.iteritems():
             print k, v
+            if v is None:
+                continue
             if k in STRING_PARAMS:
                 write_str(f, k)
                 write_str(f, v)

@@ -67,7 +67,12 @@ def detect(f, values):
            'tstart': tstart,
            'fch1':fch1,
            'foff':foff,
-           'nbits':32
+           'nbits':32,
+           'nifs':1,
+           'nchans':8,
+           'src_raj':0.0,
+           'src_dej':0.0
+           
     }
     foutname = f.replace('.vcraft','.fil')
     fout = SigprocFile(foutname, 'w', hdr)
