@@ -518,6 +518,9 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		rescale_dtype dm0sum = dm0arr[dm0idx] ; // sum accros dm0 - not normalised
 		rescale_dtype dm0z = dm0sum*rsqrtf(dm0count);
 		rescale_dtype dm0mean = dm0sum/dm0count;
+		if (subtract_dm0) {
+			sout -= dm0mean;
+		}
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && fabs(dm0sum) < block_dm0thresh;
 		bool this_sample_ok = fabs(dm0z) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh;
@@ -527,18 +530,15 @@ __global__ void rescale_update_and_transpose_float_kernel (
 			sum3 += vin*vin*vin;
 			sum4 += vin*vin*vin*vin;
 			// non-coalesced write (transpose. Sorry)
-			if (subtract_dm0) {
-				outarr[outidx] = sout - dm0mean;
-			} else {
-				outarr[outidx] = sout;
-			}
+
+			outarr[outidx] = sout;
 			nsamps += 1;
 		} else {
-			printf("NOK ibeam/c/t %d/%d/%d dm0/sout/dm0min %f/%f/%f flags %d/%d/%d\n", ibeam, c, t,
-					fabs(dm0z), fabs(sout), dm0min,
-					fabs(dm0z) < dm0_thresh,
-					fabs(sout) < cell_thresh,
-					dm0min > -3*dm0_thresh);
+//			printf("FLAG ibeam/c/t %d/%d/%d dm0/sout/dm0min %f/%f/%f flags %d/%d/%d\n", ibeam, c, t,
+//					fabs(dm0z), fabs(sout), dm0min,
+//					fabs(dm0z) < dm0_thresh,
+//					fabs(sout) < cell_thresh,
+//					dm0min > -3*dm0_thresh);
 			outarr[outidx] = 0.0;
 		}
 
