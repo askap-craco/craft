@@ -500,6 +500,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 	bool last_sample_ok = true;
 	float block_dm0thresh = dm0_thresh/sqrtf((float) nt);
 	rescale_dtype dm0min = dm0statarr[ibeam + 1]; // broadcast read. This is to catch dropouts
+	rescale_dtype dm0stat_mean = dm0statarr[ibeam + 2]; // broadcast read. This is to catch dropouts
 
 	for (int t = 0; t < nt; ++t) {
 		int inidx = c + nf*(t + nt*ibeam);
@@ -517,7 +518,13 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		rescale_dtype dm0count = dm0countarr[dm0idx];
 		rescale_dtype dm0sum = dm0arr[dm0idx] ; // sum accros dm0 - not normalised
 		rescale_dtype dm0z = dm0sum*rsqrtf(dm0count);
-		rescale_dtype dm0mean = dm0sum/dm0count;
+
+		// the mean accross the dm0 trace is the dm0sum/dm0count (that's a mean)
+		// We also subtract off the mean of the dm0 trace - the dm0state_mean has *already*
+		// been normalised by rsqrtf(dm0count) - so we need todo that again to get it into a mean.
+		// Bleah - I should have thorught about this harder.
+
+		rescale_dtype dm0mean = dm0sum/dm0count - dm0stat_mean*rsqrtf(dm0count);
 		if (subtract_dm0) {
 			sout -= dm0mean;
 		}
