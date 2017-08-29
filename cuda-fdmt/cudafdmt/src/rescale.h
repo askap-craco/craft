@@ -33,6 +33,7 @@ typedef struct _rescale_gpu_t {
 	array4d_t std; // stdev
 	array4d_t kurt; // kurtosis
 	array4d_t dm0; // dm0 series
+	array4d_t dm0count; // dm0 valid frequencies count
 	array4d_t dm0stats; // max/min/mean/variance of Dm0 accross time
 	array4d_t nsamps; // number of used samples summed
 	array4d_t decay_offset;
@@ -70,7 +71,8 @@ void rescale_update_decay_float(rescale_t* rescale, float* in, float* out);
 float rescale_update_decay_float_single(rescale_t* rescale, uint64_t i, float in);
 void rescale_update_decay_uint8(rescale_t* rescale, float* in, uint8_t* out);
 void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale);
-void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& rescale_buf, const uint8_t* read_buf, bool invert_freq);
+void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& rescale_buf,
+		const uint8_t* read_buf, bool invert_freq, bool subtract_dm0);
 
 
 #endif

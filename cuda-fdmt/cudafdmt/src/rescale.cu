@@ -288,6 +288,7 @@ rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uin
 	rescale_arraymalloc(&rescale->std, nbeams, nf, alloc_host);
 	rescale_arraymalloc(&rescale->kurt, nbeams, nf, alloc_host);
 	rescale_arraymalloc(&rescale->dm0, nbeams, nt, alloc_host);
+	rescale_arraymalloc(&rescale->dm0count, nbeams, nt, alloc_host);
 	rescale_arraymalloc(&rescale->dm0stats, nbeams, 4, alloc_host); // max, min, mean, var
 	rescale_arraymalloc(&rescale->nsamps, nbeams, nf, alloc_host);
 	rescale_arraymalloc(&rescale->scale, nbeams, nf, alloc_host);
@@ -356,6 +357,7 @@ __global__ void rescale_calc_dm0_kernel (
 		const rescale_dtype* __restrict__ offsetarr,
 		const rescale_dtype* __restrict__ scalearr,
 		rescale_dtype* __restrict__ dm0arr,
+		rescale_dtype* __restrict__ dm0count,
 		int nf,
 		int nt,
 		rescale_dtype cell_thresh)
@@ -378,7 +380,7 @@ __global__ void rescale_calc_dm0_kernel (
 			// coalesced read from global
 			rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
 			rescale_dtype vout = (vin + offset) * scale;
-			if (fabs(vout) < cell_thresh) {
+			if (fabs(vout) < cell_thresh && scale != 0.0f) {
 				dm0sum += vout;
 				++nsamp;
 			}
@@ -386,12 +388,15 @@ __global__ void rescale_calc_dm0_kernel (
 
 		int dm0idx = t + nt*ibeam;
 		rescale_dtype correction = rsqrtf((float) nsamp);
-		dm0arr[dm0idx] = dm0sum * correction;
+		//dm0arr[dm0idx] = dm0sum * correction;
+		dm0arr[dm0idx] = dm0sum;
+		dm0count[dm0idx] = (float)nsamp;
 	}
 }
 
 __global__ void rescale_calc_dm0stats_kernel (
 		const rescale_dtype* __restrict__ dm0arr,
+		const rescale_dtype* __restrict__ dm0countarr,
 		rescale_dtype* __restrict__ dm0statarr,
 		int nt)
 {
@@ -402,13 +407,17 @@ __global__ void rescale_calc_dm0stats_kernel (
 	int ibeam = threadIdx.x;
 	rescale_dtype dm0sum = 0.0;
 	rescale_dtype dm0sum2 = 0.0;
-	rescale_dtype dm0min = dm0arr[ibeam];
-	rescale_dtype dm0max = dm0arr[ibeam];
+	rescale_dtype nsampinit = dm0countarr[ibeam];
+	rescale_dtype vinit =  dm0arr[ibeam] * rsqrtf(nsampinit); // normalise to sqrt number of additions
+	rescale_dtype dm0min = vinit;
+	rescale_dtype dm0max = vinit;
 
 
 	for (int t = 0; t < nt; ++t) {
 		int dmidx = t + nt*ibeam;
-		rescale_dtype v = dm0arr[dmidx];
+		rescale_dtype nsamp = dm0countarr[dmidx];
+		rescale_dtype v = dm0arr[dmidx] * rsqrtf(nsamp); // normalise to sqrt number of additions
+
 		dm0sum += v;
 		dm0sum2 += v*v;
 		if (v < dm0min) {
@@ -445,13 +454,15 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		const rescale_dtype* __restrict__ offsetarr,
 		const rescale_dtype* __restrict__ scalearr,
 		const rescale_dtype* __restrict__ dm0arr,
+		const rescale_dtype* __restrict__ dm0countarr,
 		const rescale_dtype* __restrict__ dm0statarr,
 		rescale_dtype* __restrict__ outarr,
 		float decay_constant,
 		float dm0_thresh,
 		float cell_thresh,
 		int nt,
-		bool invert_freq)
+		bool invert_freq,
+		bool subtract_dm0)
 {
 	int ibeam = blockIdx.x;
 	int c = threadIdx.x;
@@ -490,7 +501,6 @@ __global__ void rescale_update_and_transpose_float_kernel (
 	float block_dm0thresh = dm0_thresh/sqrtf((float) nt);
 	rescale_dtype dm0min = dm0statarr[ibeam + 1]; // broadcast read. This is to catch dropouts
 
-
 	for (int t = 0; t < nt; ++t) {
 		int inidx = c + nf*(t + nt*ibeam);
 		int outidx = t + nt*(outc + nf*ibeam);
@@ -504,9 +514,12 @@ __global__ void rescale_update_and_transpose_float_kernel (
 		}
 		rescale_dtype sout = vout - decay_offset;
 		int dm0idx = t + nt*ibeam; // DM0 idx: BT order
-		rescale_dtype dm0 = dm0arr[dm0idx];
+		rescale_dtype dm0count = dm0countarr[dm0idx];
+		rescale_dtype dm0sum = dm0arr[dm0idx] ; // sum accros dm0 - not normalised
+		rescale_dtype dm0z = dm0sum*rsqrtf(dm0count);
+		rescale_dtype dm0mean = dm0sum/dm0count;
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && fabs(dm0sum) < block_dm0thresh;
-		bool this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
+		bool this_sample_ok = fabs(dm0z) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh;
 		if (this_sample_ok && last_sample_ok) {
 			sum += vin;
@@ -514,14 +527,18 @@ __global__ void rescale_update_and_transpose_float_kernel (
 			sum3 += vin*vin*vin;
 			sum4 += vin*vin*vin*vin;
 			// non-coalesced write (transpose. Sorry)
-			outarr[outidx] = sout;
+			if (subtract_dm0) {
+				outarr[outidx] = sout - dm0mean;
+			} else {
+				outarr[outidx] = sout;
+			}
 			nsamps += 1;
 		} else {
-//			printf("NOK ibeam/c/t %d/%d/%d dm0/sout/dm0min %f/%f/%f flags %d/%d/%d\n", ibeam, c, t,
-//					fabs(dm0), fabs(sout), dm0min,
-//					fabs(dm0) < dm0_thresh,
-//					fabs(sout) < cell_thresh,
-//					dm0min > -3*dm0_thresh);
+			printf("NOK ibeam/c/t %d/%d/%d dm0/sout/dm0min %f/%f/%f flags %d/%d/%d\n", ibeam, c, t,
+					fabs(dm0z), fabs(sout), dm0min,
+					fabs(dm0z) < dm0_thresh,
+					fabs(sout) < cell_thresh,
+					dm0min > -3*dm0_thresh);
 			outarr[outidx] = 0.0;
 		}
 
@@ -538,7 +555,7 @@ __global__ void rescale_update_and_transpose_float_kernel (
 	nsampsarr[rsidx] = (float)nsamps;
 }
 
-void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& rescale_buf, const uint8_t* read_buf, bool invert_freq)
+void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& rescale_buf, const uint8_t* read_buf, bool invert_freq, bool subtract_dm0)
 {
 	int nbeams = rescale_buf.nw;
 	int nf = rescale_buf.nx;
@@ -550,6 +567,7 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 			rescale.offset.d_device,
 			rescale.scale.d_device,
 			rescale.dm0.d_device,
+			rescale.dm0count.d_device,
 			nf, nt,
 			rescale.cell_thresh);
 
@@ -557,8 +575,11 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 
 	// Take the mean all the dm0 times into one big number per beam - this is the how we flag
 	// short dropouts see ACES-209
+	// probably could do this in rescale_calc_dm0_kernel after yu've done it
+	// But i Haven't got htere yet.
 	rescale_calc_dm0stats_kernel<<<1, nbeams>>>(
 			rescale.dm0.d_device,
+			rescale.dm0count.d_device,
 			rescale.dm0stats.d_device,
 			nt);
 
@@ -575,13 +596,15 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 			rescale.offset.d_device,
 			rescale.scale.d_device,
 			rescale.dm0.d_device,
+			rescale.dm0count.d_device,
 			rescale.dm0stats.d_device,
 			rescale_buf.d_device,
 			rescale.decay_constant,
 			rescale.dm0_thresh,
 			rescale.cell_thresh*rescale.target_stdev,
 			nt,
-			invert_freq);
+			invert_freq,
+			subtract_dm0);
 	rescale.sampnum += nt;
 	gpuErrchk(cudaDeviceSynchronize());
 

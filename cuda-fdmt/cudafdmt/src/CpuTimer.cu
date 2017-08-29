@@ -14,10 +14,10 @@
 #ifdef __MACH__
 #include <mach/clock.h>
 #include <mach/mach.h>
-#define CLOCK_THREAD_CPUTIME_ID CALENDAR_CLOCK
-#define CLOCK_PROCESS_CPUTIME_ID CALENDAR_CLOCK
-#define CLOCK_MONOTONIC CALENDAR_CLOCK
-typedef long clockid_t;
+//#define CLOCK_THREAD_CPUTIME_ID CALENDAR_CLOCK
+//#define CLOCK_PROCESS_CPUTIME_ID CALENDAR_CLOCK
+//#define CLOCK_MONOTONIC CALENDAR_CLOCK
+//typedef long clockid_t;
 #endif
 
 timespec diff(timespec& start, timespec& end)

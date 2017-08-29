@@ -49,6 +49,7 @@ void runtest_usage() {
 			"   -G N - Channel flag channel growing (flags N channels either side of a bad channel)\n"
 			"   -z Z - Zap times with 0 DM above threshold Z\n"
 			"   -C C - Zap time/frequency cells with S/N above threshold C\n"
+			"   -u   - Subtract DM0 time series from spectrum\n"
 			"   -n ncand - Maximum mumber of candidates to write per block\n"
 			"   -m mindm - Minimum DM to report candidates for (to ignore 0 DM junk)\n"
 			"   -b maxbc - Maximum boxcar to create a candidate. Candidates with peaks above this boxcar are ignored\n"
@@ -110,6 +111,7 @@ int main(int argc, char* argv[])
 	int mindm = 0;
 	int maxbc = 32;
 	int max_nblocks = INT_MAX;
+	bool subtract_dm0 = false;
 
 	printf("Fredda version %s starting. Cmdline: ", VERSION);
 	for (int c = 0; c < argc; ++c) {
@@ -117,7 +119,7 @@ int main(int argc, char* argv[])
 	}
 	printf("\n");
 
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:C:n:m:b:z:N:h")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:C:n:m:b:z:N:uh")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -166,6 +168,9 @@ int main(int argc, char* argv[])
 			break;
 		case 'm':
 			mindm = atoi(optarg);
+			break;
+		case 'u':
+			subtract_dm0 = true;
 			break;
 		case 'b':
 			maxbc = atoi(optarg);
@@ -340,7 +345,7 @@ int main(int argc, char* argv[])
 		gpuErrchk(cudaMemcpy(read_buf_device, read_buf, in_chunk_size*sizeof(uint8_t), cudaMemcpyHostToDevice));
 		fdmt.t_copy_in.stop();
 		trescale.start();
-		rescale_update_and_transpose_float_gpu(rescale, rescale_buf, read_buf_device, invert_freq);
+		rescale_update_and_transpose_float_gpu(rescale, rescale_buf, read_buf_device, invert_freq, subtract_dm0);
 		trescale.stop();
 
 		if (dump_data) {
@@ -389,6 +394,8 @@ int main(int argc, char* argv[])
 				dumparr("kurt", iblock, &rescale.kurt);
 				dumparr("nsamps", iblock, &rescale.nsamps);
 				dumparr("dm0", iblock, &rescale.dm0);
+				dumparr("dm0count", iblock, &rescale.dm0count);
+
 			}
 		}
 
@@ -419,6 +426,8 @@ int main(int argc, char* argv[])
 		iblock++;
 	}
 
+	float boxcar_ngops = nbeams*nt*nd*2*NBOX/1e9;
+
 	float flagged_percent = ((float) num_flagged_beam_chans) / ((float) nf*nbeams*blocknum) * 100.0f;
 	float dm0_flagged_percent = ((float) num_flagged_times) / ((float) blocknum*nbeams*nt*nf) * 100.0f;
 	printf("FREDDA Finished\nFound %llu candidates \n", total_candidates);
@@ -435,8 +444,8 @@ int main(int argc, char* argv[])
 	cout << "FDMT " << fdmt.nops/1e9
 			<< " Gops/iteration ran at: " << fdmt.nops / (fdmt.t_iterations.get_average_time()/1e3)/1e9
 			<< " GFLOPS" << endl;
-	cout << "Boxcar " << 2*nd*nt*NBOX/1e9
-			<< " Gops/iteration. ran at: " << 2*nd*nt*NBOX/(tboxcar.get_average_time()/1e3)/1e9
+	cout << "Boxcar " << boxcar_ngops
+			<< " Gops/iteration. ran at: " << boxcar_ngops/(tboxcar.get_average_time()/1e3)
 			<< " GFLOPS" << endl;
 	struct rusage usage;
 	getrusage(RUSAGE_SELF, &usage);

@@ -136,7 +136,7 @@ def plot_dir(din, values, scmap=None):
 
 def onpick(event):
     thisline = event.artist
-    print event, dir(event), event.artist, dir(event.artist)
+    print event, dir(event), event.artist
 
 
 def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=None):

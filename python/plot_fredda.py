@@ -155,11 +155,13 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         dmax2 = p(gs[1,2])
         ndt, _ = v.shape
         dts = np.arange(ndt)
-        dmax2.plot(v.std(axis=1), dts)
-        dmax2.plot(v.mean(axis=1), dts)
+        stdline, = dmax2.plot(v.std(axis=1), dts)
+        meanline, = dmax2.plot(v.mean(axis=1), dts)
         dmax2.set_ylabel('Delta_t')
         dmax2.set_xlabel('StdDev/Mean')
         dmax2.set_ylim(min(dts), max(dts))
+        dmax2.axvline(0, c=meanline.get_color(), ls=':')
+        dmax2.axvline(1, c=stdline.get_color(), ls=':')
         
         dmax = p(gs[:, 3:6])
         maxdm, maxt = maxpos
@@ -181,6 +183,11 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         statplot(stdax, fname, 'std')
         statplot(kurtax, fname, 'kurt')
         statplot(dm0ax, fname, 'dm0')
+        dm0ax.plot(rawd.sum(axis=0))
+        dm0count = load4d(fname.replace('fdmt','dm0count'))
+        dm0countax = dm0ax.twinx()
+        dm0countax.plot(dm0count[0,0,0,:])
+        dm0countax.set_ylim(0, None)
 
         pylab.show()
 
