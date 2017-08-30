@@ -396,6 +396,8 @@ int main(int argc, char* argv[])
 				dumparr("dm0", iblock, &rescale.dm0);
 				dumparr("dm0count", iblock, &rescale.dm0count);
 				dumparr("dm0stats", iblock, &rescale.dm0stats);
+				dumparr("scale", iblock, &rescale.scale);
+				dumparr("offset", iblock, &rescale.offset);
 			}
 		}
 

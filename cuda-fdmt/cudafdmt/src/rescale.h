@@ -156,7 +156,7 @@ template <bool subtract_dm0> __global__ void rescale_update_and_transpose_float_
 		// been normalised by rsqrtf(dm0count) - so we need todo that again to get it into a mean.
 		// Bleah - I should have thorught about this harder.
 
-		if (subtract_dm0) {
+		if (subtract_dm0 && scale != 0) {
 			rescale_dtype dm0mean = dm0sum/dm0count - dm0stat_mean*rsqrtf(dm0count);
 			sout -= dm0mean;
 		}
