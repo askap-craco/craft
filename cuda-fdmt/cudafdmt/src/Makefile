@@ -9,9 +9,9 @@ CUB_PATH=$(HOME)/build/cub/cub-1.6.4/cub/
 # See http://stackoverflow.com/questions/1704907/how-can-i-get-my-c-code-to-automatically-print-out-its-git-version-hash
 GIT_VERSION := $(shell git describe --dirty --always --tags)
 
-NVCCFLAGS=-g -O3 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_35,code=compute_35 -gencode arch=compute_35,code=sm_35  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH)
+NVCCFLAGS=-g -O3 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_35,code=sm_35 -gencode arch=compute_61,code=sm_61  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH)
 
-NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=compute_35,code=compute_35 -gencode arch=compute_35,code=sm_35 -link -Xcompiler -fopenmp
+NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=compute_35,code=compute_35 -gencode arch=compute_61,code=sm_61 -link -Xcompiler -fopenmp
 
 # Force rebuild on git change:http://stackoverflow.com/questions/3236145/force-gnu-make-to-rebuild-objects-affected-by-compiler-definition
 
