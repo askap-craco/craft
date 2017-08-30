@@ -395,7 +395,7 @@ int main(int argc, char* argv[])
 				dumparr("nsamps", iblock, &rescale.nsamps);
 				dumparr("dm0", iblock, &rescale.dm0);
 				dumparr("dm0count", iblock, &rescale.dm0count);
-
+				dumparr("dm0stats", iblock, &rescale.dm0stats);
 			}
 		}
 

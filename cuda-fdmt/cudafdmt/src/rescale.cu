@@ -405,8 +405,8 @@ __global__ void rescale_calc_dm0stats_kernel (
 	int ibeam = threadIdx.x;
 	rescale_dtype dm0sum = 0.0;
 	rescale_dtype dm0sum2 = 0.0;
-	rescale_dtype nsampinit = dm0countarr[ibeam];
-	rescale_dtype vinit =  dm0arr[ibeam] * rsqrtf(nsampinit); // normalise to sqrt number of additions
+	rescale_dtype nsampinit = dm0countarr[ibeam*nt];
+	rescale_dtype vinit =  dm0arr[ibeam*nt] * rsqrtf(nsampinit); // normalise to sqrt number of additions
 	rescale_dtype dm0min = vinit;
 	rescale_dtype dm0max = vinit;
 
@@ -432,10 +432,11 @@ __global__ void rescale_calc_dm0stats_kernel (
 	rescale_dtype mean2 = dm0sum2/nsamp;
 	rescale_dtype dm0var = mean2 - dm0mean*dm0mean;
 
-	dm0statarr[ibeam + 0] = dm0max;
-	dm0statarr[ibeam + 1] = dm0min;
-	dm0statarr[ibeam + 2] = dm0mean;
-	dm0statarr[ibeam + 3] = dm0var;
+	int stati = ibeam*4;
+	dm0statarr[stati + 0] = dm0max;
+	dm0statarr[stati + 1] = dm0min;
+	dm0statarr[stati + 2] = dm0mean;
+	dm0statarr[stati + 3] = dm0var;
 
 	//printf("DM stats ibeam=%d max/min/mean/var %f/%f/%f/%f\n", ibeam, dm0max, dm0min, dm0mean, dm0var);
 }

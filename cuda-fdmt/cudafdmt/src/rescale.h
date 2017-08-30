@@ -130,8 +130,9 @@ template <bool subtract_dm0> __global__ void rescale_update_and_transpose_float_
 	// Easy way of expanding the time flagging by 1. Useful for killing dropouts. ACES-209
 	bool last_sample_ok = true;
 	float block_dm0thresh = dm0_thresh/sqrtf((float) nt);
-	rescale_dtype dm0min = dm0statarr[ibeam + 1]; // broadcast read. This is to catch dropouts
-	rescale_dtype dm0stat_mean = dm0statarr[ibeam + 2]; // broadcast read. This is to catch dropouts
+	int stati = 4*ibeam;
+	rescale_dtype dm0min = dm0statarr[stati + 1]; // broadcast read. This is to catch dropouts
+	rescale_dtype dm0stat_mean = dm0statarr[stati + 2]; // broadcast read.
 
 	for (int t = 0; t < nt; ++t) {
 		int inidx = c + nf*(t + nt*ibeam);

@@ -183,10 +183,11 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         statplot(stdax, fname, 'std')
         statplot(kurtax, fname, 'kurt')
         statplot(dm0ax, fname, 'dm0')
-        dm0ax.plot(rawd.sum(axis=0))
+        rawdm0 = rawd.sum(axis=1).T
+        dm0ax.plot(rawd.sum(axis=0).T)
         dm0count = load4d(fname.replace('fdmt','dm0count'))
         dm0countax = dm0ax.twinx()
-        dm0countax.plot(dm0count[0,0,0,:])
+        dm0countax.plot(dm0count[0,0,ibeam,:])
         dm0countax.set_ylim(0, None)
 
         pylab.show()
@@ -203,7 +204,7 @@ def _main():
     from argparse import ArgumentParser
     parser = ArgumentParser(description='Script description')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-b','--beam', type=float, help='beam number')
+    parser.add_argument('-b','--beam', type=int, help='beam number')
     parser.add_argument('-d','--dmrange', type=comma_list, help='Dm range to show in time series plot')
     parser.add_argument('-s','--start', type=int, help='Start block')
     parser.add_argument('-n','--maxn', type=int, help='max number of blocks ot plot')
