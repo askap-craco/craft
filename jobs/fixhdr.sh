@@ -19,7 +19,7 @@ thedir=$1
 thebase=`basename $thedir`
 # Array = co or ak
 array=co
-pset=/home/ban115/fixheaders/$array/sbpars/
+pset=$GHOME/fixheaders/$array/sbpars/
 parset=$pset/${thebase}.parset
 sblist=$pset/sblist.txt
 

@@ -19,6 +19,6 @@ echo `date` starting fixheaders
 
 CRAFTDATA=/scratch2/askap/askapops/craft/co/
 
-aprun -B fix_headers_parallel.sh 
+aprun -B fix_headers_parallel.sh  $@
 
 echo `date` finished fixheaders
