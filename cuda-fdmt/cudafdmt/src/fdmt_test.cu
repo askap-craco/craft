@@ -300,6 +300,14 @@ int main(int argc, char* argv[])
 	boxcar_history.nz = NBOX;
 	array4d_malloc(&boxcar_history, dump_data, true);
 	array4d_zero(&boxcar_history);
+	// make boxcar discards
+	array4d_t boxcar_discards;
+	boxcar_discards.nw = 1;
+	boxcar_discards.nx = 1;
+	boxcar_discards.ny = nbeams;
+	boxcar_discards.nz = nd;
+	array4d_malloc(&boxcar_discards, true, true);
+	array4d_cuda_memset(&boxcar_discards, 0);
 
 	// make boxcar output.
 	// TODO: Only allocate on GPU if we'll be dumping it to dis.
@@ -415,6 +423,7 @@ int main(int argc, char* argv[])
 					&fdmt.ostate,
 					&boxcar_data,
 					&boxcar_history,
+					&boxcar_discards,
 					thresh, max_ncand_per_block, mindm, maxbc, &candidate_list);
 			tboxcar.stop();
 			total_candidates += candidate_list.copy_to_sink(sink, sampno);
@@ -428,13 +437,23 @@ int main(int argc, char* argv[])
 		iblock++;
 	}
 
+	tall.stop();
+
+	// calculate array discards
+	array4d_copy_to_host(&boxcar_discards);
+	int total_discards = 0;
+	for (int i = 0; i < array4d_size(&boxcar_discards); ++i) {
+		total_discards += (int)boxcar_discards.d[i];
+	}
+
 	float boxcar_ngops = nbeams*nt*nd*2*NBOX/1e9;
 
 	float flagged_percent = ((float) num_flagged_beam_chans) / ((float) nf*nbeams*blocknum) * 100.0f;
 	float dm0_flagged_percent = ((float) num_flagged_times) / ((float) blocknum*nbeams*nt*nf) * 100.0f;
-	printf("FREDDA Finished\nFound %llu candidates \n", total_candidates);
+	cout << " FREDDA Finished" << endl;
+	cout << "Found " << total_candidates << " candidates" << endl;
+	cout << "Discarded " << total_discards << " candidates for being too wide" << endl;
 	float data_nsecs = blocknum*nt*source.tsamp();
-	tall.stop();
 	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << data_nsecs << " seconds" << " at " << data_nsecs/tall.wall_total()<< "x real time"<< endl;
 	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;
 	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;

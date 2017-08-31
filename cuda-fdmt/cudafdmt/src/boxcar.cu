@@ -367,12 +367,14 @@ __global__ void boxcar_do_kernel3 (
 		const __restrict__ fdmt_dtype* indata,
 		fdmt_dtype* __restrict__ outdata,
 		fdmt_dtype* __restrict__ historydata,
+		fdmt_dtype* __restrict__ discarddata,
 		int nt,
 		int ndt,
 		fdmt_dtype threshold,
 		candidate_t* m_candidates,
 		unsigned int* m_max_cand,
-		unsigned int* m_ncand)
+		unsigned int* m_ncand,
+		int maxbc)
 {
 	// gridDim.x = nbeams
 	// gridDim.y = ndt_blocks // number of blocks of dispersion trials
@@ -383,6 +385,7 @@ __global__ void boxcar_do_kernel3 (
 	// indata.shape = [nbeams, 1, ndt, ndt + nt]
 	// outdata.shape = [nbeams,ndt, nt, nbox]
 	// history.shape = [1, nbeams, ndt, NBOX]
+	// discard data.shape [1,1, nbeams,ndt]
 
 	int nbeams = gridDim.x;
 
@@ -395,6 +398,7 @@ __global__ void boxcar_do_kernel3 (
 	int in_off = array4d_idx(nbeams, 1, ndt, ndt + nt, ibeam, 0, idt, 0); // input offset
 	int out_off = array4d_idx(nbeams, ndt, nt, NBOX, ibeam, idt, 0, 0); // output offset
 	int hist_off = array4d_idx(1, nbeams, ndt, NBOX, 0, ibeam, idt, 0); // history offset
+	int discard_off = array4d_idx(1,1,nbeams,ndt,0,0,ibeam,idt); // discard offset
 
 	// Shared memory
 	__shared__ fdmt_dtype thread_indata[DT_BLOCKS][NBOX];
@@ -489,9 +493,15 @@ __global__ void boxcar_do_kernel3 (
 
 					// if you're the winner, you get to write to memory. Lucky you!
 					if (ibc == best_ibc) {
-						cand.sn = scaled_sn;
-						// rescale sn, which is currently unrescaled
-						add_candidate(&cand,  m_candidates,  m_ncand, m_max_cand);
+						if (ibc <= maxbc) {
+							cand.sn = scaled_sn	;
+							// rescale sn, which is currently unrescaled
+							add_candidate(&cand,  m_candidates,  m_ncand, m_max_cand);
+						} else {
+							// Global read/write by a single thread - bleah, but oh well.
+							// todo: for speed keep in a register and do a warp sum at the end....
+							discarddata[discard_off] += 1.0f;
+						}
 					}
 
 					// setup for next detection
@@ -546,6 +556,7 @@ __global__ void test_cub_prefix_sum() {
 int boxcar_do_gpu(const array4d_t* indata,
 		array4d_t* boxcar_data,
 		array4d_t* boxcar_history,
+		array4d_t* boxcar_discards,
 		fdmt_dtype thresh, int max_ncand_per_block, int mindm, int maxbc,
 		CandidateList* sink)
 {
@@ -583,10 +594,12 @@ int boxcar_do_gpu(const array4d_t* indata,
 			indata->d_device,
 			boxcar_data->d_device,
 			boxcar_history->d_device,
+			boxcar_discards->d_device,
 			nt, ndt, thresh,
 			sink->m_candidates,
 			sink->m_max_cand,
-			sink->m_ncand);
+			sink->m_ncand,
+			maxbc);
 
 	gpuErrchk(cudaDeviceSynchronize());
 	return 0;

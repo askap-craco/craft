@@ -25,6 +25,7 @@ int boxcar_do_cpu(const array4d_t* indata,
 int boxcar_do_gpu(const array4d_t* indata,
 		array4d_t* boxcar_data,
 		array4d_t* boxcar_history,
+		array4d_t* boxcar_discards,
 		fdmt_dtype thresh, int max_ncand_per_block,  int mindm, int maxbc,
 		CandidateList* sink);
 
