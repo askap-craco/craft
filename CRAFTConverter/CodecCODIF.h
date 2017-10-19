@@ -74,6 +74,8 @@ namespace NCodec
             void DumpHeader ( void );
             bool operator ()( void );
             bool Flush( void );
+	    int DataArraySize();
+	    bool Initialise();
 
         private:
 

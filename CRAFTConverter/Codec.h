@@ -36,7 +36,8 @@ namespace NCodec
             // Public attributes.
 
             int                 m_iFileHeaderSize;
-            int                 m_iBitsPerComplexSample;
+            int                 m_iBitsPerSample;
+            int                 m_iNumberofPol;
             int                 m_iNumberOfWords;
             int                 m_iNumberOfChannels;
             int                 m_iMode;
@@ -86,7 +87,7 @@ namespace NCodec
             void ResetContent( void )
             {
                 m_iFileHeaderSize       = 0;
-                m_iBitsPerComplexSample = 0;
+                m_iBitsPerSample = 0;
                 m_iNumberOfWords        = 0;
                 m_iNumberOfChannels     = 0;
                 m_iMode                 = 0;
@@ -272,6 +273,9 @@ namespace NCodec
             virtual void DumpHeader( void )         {}
             virtual bool operator () ( void )       { return true; }
             virtual bool Flush( void )              { return true; }
+	    virtual int DataArraySize( void )	    { return -1; }
+	    virtual bool Initialise( void )	    { return true; }
+	    virtual bool setBlockSize( int blockSize )	    { return true; }
 
         protected:
 

@@ -67,7 +67,7 @@ namespace NCodec
             // Attributes.
 
             int         m_iMode;
-            int         m_iBitsPerComplexSample;
+            int         m_iBitsPerSample;
             int         m_iNumberOfChannels;
 
             ByteDeque_t m_VoltageSamples;
