@@ -1,0 +1,542 @@
+# depslib dependency file v1.0
+1506761179 source:/home/warcus/PhD/CRAFT/CRAFTConverter/CodecVCRAFT.cpp
+	"StdApp.h"
+	"CodecVCRAFT.h"
+	<algorithm>
+	<cstring>
+
+1506230046 /home/warcus/PhD/CRAFT/CRAFTConverter/CodecVCRAFT.h
+	"Codec.h"
+	"VCRAFTParser.h"
+	<string>
+	<array>
+	<memory>
+
+1506351687 /home/warcus/PhD/CRAFT/CRAFTConverter/Codec.h
+	"SampleData.h"
+	"FileDescriptor.h"
+
+1506152737 /home/warcus/PhD/CRAFT/CRAFTConverter/FileDescriptor.h
+	<stdio.h>
+	<cstdio>
+	<string>
+	<vector>
+
+1473322355 source:/home/warcus/PhD/CRAFT/CRAFTConverter/CodecVDIF2.cpp
+	"StdApp.h"
+	"CodecVDIF2.h"
+	<cstring>
+	<cmath>
+
+1473321488 /home/warcus/PhD/CRAFT/CRAFTConverter/CodecVDIF2.h
+	"Codec.h"
+
+1506761202 source:/home/warcus/PhD/CRAFT/CRAFTConverter/CommandLineParser.cpp
+	"StdApp.h"
+	"CommandLineParser.h"
+	<array>
+	<cstdio>
+	<getopt.h>
+
+1472576714 /home/warcus/PhD/CRAFT/CRAFTConverter/CommandLineParser.h
+	<string>
+	<vector>
+	<map>
+	<unistd.h>
+	<getopt.h>
+
+1497704021 source:/home/warcus/PhD/CRAFT/CRAFTConverter/DecodeVoltages.cpp
+	"StdApp.h"
+	"DecodeVoltages.h"
+	"FileDescriptor.h"
+	"SampleData.h"
+	<memory>
+	<cstring>
+
+1497702855 /home/warcus/PhD/CRAFT/CRAFTConverter/DecodeVoltages.h
+	"Codec.h"
+	<array>
+	<vector>
+	<complex>
+
+1506152951 source:/home/warcus/PhD/CRAFT/CRAFTConverter/FileDescriptor.cpp
+	"StdApp.h"
+	"FileDescriptor.h"
+	<assert.h>
+	<cstdio>
+
+1506355059 source:/home/warcus/PhD/CRAFT/CRAFTConverter/FileProcessor.cpp
+	"StdApp.h"
+	"FileProcessor.h"
+	"CodecVCRAFT.h"
+	"CodecVDIF1.h"
+	"CodecCODIF.h"
+	<assert.h>
+	<array>
+
+1506049084 /home/warcus/PhD/CRAFT/CRAFTConverter/FileProcessor.h
+	"FileDescriptor.h"
+	<string>
+
+1470916494 /home/warcus/PhD/CRAFT/CRAFTConverter/FormatConverter.h
+
+1470972117 source:/home/warcus/PhD/CRAFT/CRAFTConverter/FormatConverter.cpp
+	"FormatConverter.h"
+	<assert.h>
+	<string>
+
+1506761217 source:/home/warcus/PhD/CRAFT/CRAFTConverter/main.cpp
+	"StdApp.h"
+	"FileProcessor.h"
+	"CommandLineParser.h"
+	"FileDescriptor.h"
+	<string>
+	<vector>
+
+1506230046 source:/home/warcus/PhD/CRAFT/CRAFTConverter/CodecVDIF1.cpp
+	"StdApp.h"
+	"CodecVDIF1.h"
+	<cstring>
+	<cmath>
+
+1506230046 /home/warcus/PhD/CRAFT/CRAFTConverter/CodecVDIF1.h
+	"Codec.h"
+
+1472899348 /home/warcus/PhD/CRAFT/CRAFTConverter/DataExchange.h
+	<vector>
+
+1472880381 source:/home/warcus/PhD/CRAFT/CRAFTConverter/DataExchange.cpp
+	"StdApp.h"
+	"DataExchange.h"
+	<cstring>
+	<utility>
+
+1506761259 /home/warcus/PhD/CRAFT/CRAFTConverter/StdApp.h
+	<cstdint>
+	<assert.h>
+	<string>
+	"Codec.h"
+
+1472789684 source:/home/warcus/PhD/CRAFT/CRAFTConverter/VCRAFTParams.cpp
+	"StdApp.h"
+	"VCRAFTParams.h"
+	<cstring>
+	<vector>
+
+1472790973 /home/warcus/PhD/CRAFT/CRAFTConverter/VCRAFTParams.h
+	<string>
+	<map>
+
+1506761162 /home/warcus/PhD/CRAFT/CRAFTConverter/VCRAFTParser.h
+	<string>
+	<map>
+
+1506761230 source:/home/warcus/PhD/CRAFT/CRAFTConverter/VCRAFTParser.cpp
+	"StdApp.h"
+	"VCRAFTParser.h"
+	<cstring>
+	<vector>
+
+1506767478 /home/warcus/PhD/CRAFT/CRAFTConverter/SampleData.h
+	<vector>
+
+1506768571 source:/home/warcus/PhD/CRAFT/CRAFTConverter/SampleData.cpp
+	"StdApp.h"
+	"SampleData.h"
+	<cstring>
+
+1506766112 source:/home/warcus/PhD/CRAFT/CRAFTConverter/CodecCODIF.cpp
+	"StdApp.h"
+	"CodecCODIF.h"
+	"VCRAFTBitMode.h"
+	<string>
+	<cstring>
+	<cmath>
+	<ctime>
+	<assert.h>
+
+1506766112 /home/warcus/PhD/CRAFT/CRAFTConverter/CodecCODIF.h
+	"Codec.h"
+	"CODIFDataFrameHeader.h"
+	<vector>
+	<deque>
+
+1474779351 source:/home/warcus/PhD/CRAFT/CRAFTConverter/CODIFUtils.cpp
+	"StdApp.h"
+	"CODIFUtils.h"
+
+1474779337 /home/warcus/PhD/CRAFT/CRAFTConverter/CODIFUtils.h
+
+1474748904 source:/home/warcus/PhD/CRAFT/CRAFTConverter/DateTime.cpp
+	"StdApp.h"
+	"DateTime.h"
+	"dateutils.h"
+
+1476569280 /home/warcus/PhD/CRAFT/CRAFTConverter/DateTime.h
+
+1506655267 /home/warcus/PhD/CRAFT/CRAFTConverter/dateutils.h
+
+1506655248 source:/home/warcus/PhD/CRAFT/CRAFTConverter/dateutils.c
+	"dateutils.h"
+
+1506662391 /home/warcus/PhD/CRAFT/CRAFTConverter/CODIFDataFrameHeader.h
+	"Codec.h"
+	<ctime>
+	<cstdint>
+
+1506662391 source:/home/warcus/PhD/CRAFT/CRAFTConverter/CODIFDataFrameHeader.cpp
+	"StdApp.h"
+	"CODIFDataFrameHeader.h"
+	"DateTime.h"
+	<cstring>
+	<cmath>
+	<assert.h>
+
+1476884388 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/CodecCODIF.cpp
+	"StdApp.h"
+	"CodecCODIF.h"
+	"CODIFDataFrameHeader.h"
+	"DateTime.h"
+	<string>
+	<cstring>
+	<cmath>
+
+1473252023 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/StdApp.h
+	<cstdint>
+	<assert.h>
+	"Codec.h"
+
+1473251642 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/Codec.h
+	"SampleData.h"
+	"FileDescriptor.h"
+
+1473241971 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/SampleData.h
+	<vector>
+
+1474373418 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/FileDescriptor.h
+	<stdio.h>
+	<cstdio>
+	<string>
+	<vector>
+
+1476882948 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/CodecCODIF.h
+	"Codec.h"
+
+1479300167 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/CODIFDataFrameHeader.h
+	"Codec.h"
+	<ctime>
+	<cstdint>
+
+1476598081 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/DateTime.h
+
+1473251966 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/CodecVCRAFT.cpp
+	"StdApp.h"
+	"CodecVCRAFT.h"
+
+1473251748 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/CodecVCRAFT.h
+	"Codec.h"
+	"DecodeVoltages.h"
+	"VCRAFTParser.h"
+	<string>
+	<array>
+	<memory>
+
+1473254916 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/DecodeVoltages.h
+	"Codec.h"
+	<array>
+	<vector>
+	<complex>
+
+1473252745 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/VCRAFTParser.h
+	<string>
+	<map>
+
+1473252400 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/CodecVDIF1.cpp
+	"StdApp.h"
+	"CodecVDIF1.h"
+	<cstring>
+	<cmath>
+
+1473252113 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/CodecVDIF1.h
+	"Codec.h"
+
+1483763234 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/CODIFDataFrameHeader.cpp
+	"StdApp.h"
+	"CODIFDataFrameHeader.h"
+	"DateTime.h"
+	<cstring>
+	<cmath>
+	<assert.h>
+
+1472617705 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/CommandLineParser.cpp
+	"StdApp.h"
+	"CommandLineParser.h"
+	<array>
+	<cstdio>
+	<getopt.h>
+
+1472605515 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/CommandLineParser.h
+	<string>
+	<vector>
+	<map>
+	<unistd.h>
+	<getopt.h>
+
+1474777705 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/DateTime.cpp
+	"StdApp.h"
+	"DateTime.h"
+	"dateutils.h"
+
+1472695503 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/dateutils.h
+
+1472695503 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/dateutils.c
+	"dateutils.h"
+
+1473256124 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/DecodeVoltages.cpp
+	"StdApp.h"
+	"DecodeVoltages.h"
+	"FileDescriptor.h"
+	"SampleData.h"
+	<memory>
+	<cstring>
+
+1473256682 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/FileDescriptor.cpp
+	"StdApp.h"
+	"FileDescriptor.h"
+	<assert.h>
+	<cstdio>
+
+1474377690 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/FileProcessor.cpp
+	"StdApp.h"
+	"FileProcessor.h"
+	"CodecVCRAFT.h"
+	"CodecVDIF1.h"
+	"CodecCODIF.h"
+	<assert.h>
+	<array>
+
+1473254148 /home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/FileProcessor.h
+	"FileDescriptor.h"
+	<string>
+
+1474373854 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/main.cpp
+	"StdApp.h"
+	"FileProcessor.h"
+	"CommandLineParser.h"
+	"FileDescriptor.h"
+	<string>
+	<vector>
+
+1473250307 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/SampleData.cpp
+	"StdApp.h"
+	"SampleData.h"
+
+1473253335 source:/home/warcus/VM Shared/PhD/CRAFT/CRAFTConverter/VCRAFTParser.cpp
+	"StdApp.h"
+	"VCRAFTParser.h"
+	<cstring>
+	<vector>
+
+1508075320 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CodecVCRAFT.cpp
+	"StdApp.h"
+	"CodecVCRAFT.h"
+	<algorithm>
+	<cstring>
+	<cmath>
+
+1508077192 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/StdApp.h
+	<cstdint>
+	<assert.h>
+	<string>
+	<deque>
+	"Codec.h"
+
+1508075395 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/Codec.h
+	"SampleData.h"
+	"FileDescriptor.h"
+
+1508067493 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/SampleData.h
+
+1507354257 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/FileDescriptor.h
+	<stdio.h>
+	<cstdio>
+	<vector>
+
+1508075320 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CodecVCRAFT.h
+	"Codec.h"
+	"VCRAFTParser.h"
+	<array>
+	<memory>
+
+1473254916 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/DecodeVoltages.h
+	"Codec.h"
+	<array>
+	<vector>
+	<complex>
+
+1508061813 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/VCRAFTParser.h
+	<map>
+
+1508075320 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CodecVDIF1.cpp
+	"StdApp.h"
+	"CodecVDIF1.h"
+	<cstring>
+	<cmath>
+
+1508075320 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CodecVDIF1.h
+	"Codec.h"
+
+1506662391 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CODIFDataFrameHeader.cpp
+	"StdApp.h"
+	"CODIFDataFrameHeader.h"
+	"DateTime.h"
+	<cstring>
+	<cmath>
+	<assert.h>
+
+1506662391 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CODIFDataFrameHeader.h
+	"Codec.h"
+	<ctime>
+	<cstdint>
+
+1476569280 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/DateTime.h
+
+1506761202 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CommandLineParser.cpp
+	"StdApp.h"
+	"CommandLineParser.h"
+	<array>
+	<cstdio>
+	<getopt.h>
+
+1507354257 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CommandLineParser.h
+	<vector>
+	<map>
+	<unistd.h>
+	<getopt.h>
+
+1474748904 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/DateTime.cpp
+	"StdApp.h"
+	"DateTime.h"
+	"dateutils.h"
+
+1506655267 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/dateutils.h
+
+1506655248 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/dateutils.c
+	"dateutils.h"
+
+1497170129 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/DecodeVoltages.cpp
+	"StdApp.h"
+	"DecodeVoltages.h"
+	"FileDescriptor.h"
+	"SampleData.h"
+	<memory>
+	<cstring>
+
+1507353979 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/FileDescriptor.cpp
+	"StdApp.h"
+	"FileDescriptor.h"
+	<cstdio>
+
+1508075320 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/FileProcessor.cpp
+	"StdApp.h"
+	"FileProcessor.h"
+	"CodecVCRAFT.h"
+	"CodecVDIF1.h"
+	"CodecCODIF.h"
+	<array>
+
+1508073659 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/FileProcessor.h
+	"FileDescriptor.h"
+
+1508075319 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CodecCODIF.h
+	"Codec.h"
+	"DFH.h"
+	<vector>
+
+1507354257 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/main.cpp
+	"StdApp.h"
+	"FileProcessor.h"
+	"CommandLineParser.h"
+	"FileDescriptor.h"
+	<vector>
+
+1508067565 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/SampleData.cpp
+	"StdApp.h"
+	"SampleData.h"
+	<cstring>
+
+1508061740 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/VCRAFTParser.cpp
+	"StdApp.h"
+	"VCRAFTParser.h"
+	<cstring>
+	<vector>
+
+1508078106 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CodecCODIF.cpp
+	"StdApp.h"
+	"CodecCODIF.h"
+	"VCRAFTBitMode.h"
+	<cstring>
+	<cmath>
+	<ctime>
+	<cstdlib>
+
+1501386218 source:/home/warcus/PhD/CRAFT/CRAFTConverter/VCRAFTBitMode.cpp
+	"VCRAFTBitMode.h"
+
+1501386249 /home/warcus/PhD/CRAFT/CRAFTConverter/VCRAFTBitMode.h
+	<array>
+
+1501386249 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/VCRAFTBitMode.h
+	<array>
+
+1501386218 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/VCRAFTBitMode.cpp
+	"VCRAFTBitMode.h"
+
+1506655207 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/codifio.c
+	<stdlib.h>
+	<stdio.h>
+	<string.h>
+	<assert.h>
+	<inttypes.h>
+	<limits.h>
+	"dateutils.h"
+	"codifio.h"
+
+1506655239 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/codifio.h
+	<stdint.h>
+	<stdio.h>
+	<time.h>
+
+1506655207 source:/home/warcus/PhD/CRAFT/CRAFTConverter/codifio.c
+	<stdlib.h>
+	<stdio.h>
+	<string.h>
+	<assert.h>
+	<inttypes.h>
+	<limits.h>
+	"dateutils.h"
+	"codifio.h"
+
+1506655239 /home/warcus/PhD/CRAFT/CRAFTConverter/codifio.h
+	<stdint.h>
+	<stdio.h>
+	<time.h>
+
+1506823107 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CRAFTMode.h
+
+1507970941 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/CRAFTMode.cpp
+	"StdApp.h"
+	"CRAFTMode.h"
+	<array>
+
+1508045747 /mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/DFH.h
+	"codifio.h"
+	"codifio.h"
+
+1508045778 source:/mnt/Win7/Users/warcus/PhD/CRAFT/CRAFTConverter/DFH.cpp
+	"StdApp.h"
+	"DFH.h"
+	"dateutils.h"
+	<cstring>
+	<cmath>
+
