@@ -167,6 +167,7 @@ namespace NCodec
                 { "SAMP_RATE",            eParamTypeDouble,  "", ""  },
                 { "CRAFT_MODE",           eParamTypeInt,     "", ""  },
                 { "NBITS",                eParamTypeInt,     "", ""  },
+                { "NPOL",                 eParamTypeInt,     "", ""  },
                 { "BEAMID",               eParamTypeInt,     "", ""  },
                 { "FPGA_ID",              eParamTypeInt,     "", ""  },
                 { "CARD_NO",              eParamTypeInt,     "", ""  },

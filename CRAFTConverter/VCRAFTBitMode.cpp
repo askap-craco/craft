@@ -23,9 +23,9 @@
 
 CVCRAFTBitMode::CVCRAFTBitMode( int iMode )
                :m_iModeMask( 0x03 ),
-                m_aWordMasks{ 0xff, 0xff, 0x0f, 0x01 },
-                m_aWordSizes{    2,    1,    1,    1 },
-                m_aBitWidths{   16,    8,    4,    1 }
+                m_aWordMasks{{ 0xff, 0xff, 0x0f, 0x01 }},
+                m_aWordSizes{{    2,    1,    1,    1 }},
+                m_aBitWidths{{   16,    8,    4,    1 }}
 {
     m_eMode = static_cast<EMode>( iMode & m_iModeMask );
 }
@@ -43,9 +43,9 @@ CVCRAFTBitMode::~CVCRAFTBitMode( void )
 
 CVCRAFTBitMode::CVCRAFTBitMode( const CVCRAFTBitMode &rRhs )
                :m_iModeMask( 0x03 ),
-                m_aWordMasks{ 0xff, 0xff, 0x0f, 0x01 },
-                m_aWordSizes{ 2,    1,    1,    1 },
-                m_aBitWidths{ 16,   8,    4,    1 }
+                m_aWordMasks{{ 0xff, 0xff, 0x0f, 0x01 }},
+		m_aWordSizes{{ 2,    1,    1,    1 }},
+		m_aBitWidths{{ 16,   8,    4,    1 }}
 {
     if ( &rRhs != this )
     {

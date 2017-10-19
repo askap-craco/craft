@@ -116,16 +116,7 @@ namespace NCodec        // Part of the Codec namespace.
 
     void CDFH::NextFrame( void )
     {
-        int iDataFrameNumber = getCODIFFrameNumber( this );
-
-        iDataFrameNumber = ( iDataFrameNumber + 1 ) % m_uMaxDataFramePlusOne;
-
-        setCODIFFrameNumber( this, iDataFrameNumber );
-        assert( getCODIFFrameNumber( this ) == iDataFrameNumber );
-
-        const int iNextSecond = getCODIFFrameSecond( this ) + 1;
-
-        setCODIFFrameEpochSecOffset( this, iNextSecond );
+      nextCODIFHeader(this, m_uMaxDataFramePlusOne-1);
     }
 
     //////////

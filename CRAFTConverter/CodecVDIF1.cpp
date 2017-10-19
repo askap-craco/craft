@@ -256,7 +256,7 @@ namespace NCodec
             m_sDFH.uRefEpoch         = 0;
 
             // No. bits in each sample. Complex => 2 x bits for I then Q.
-            m_sDFH.uBitsPerSample    = m_iBitsPerComplexSample;
+            m_sDFH.uBitsPerSample    = m_iBitsPerSample;
 
            // The station id is 2 ASCII id chars or an unsigned numeric. If first 8 bits <48 (0x30)
            // then ASCII assumed. Here we use it to represent the antenna number as a numeric.

@@ -129,6 +129,8 @@ int CFileDescriptor::Read( byte_t *pbyReadArray, const int &riNumberOfBytes,
 {
     int iBytesRead = 0;
 
+    printf("CFileDescriptor::Read   offset=%d  bytes=%d\n", riOffset, riNumberOfBytes);
+
     if ( IsOpen() && ( fseek( m_pFile, riOffset, riOrigin ) == 0 ) )
     {
         iBytesRead = std::fread( pbyReadArray, sizeof( byte_t ), riNumberOfBytes, m_pFile );
@@ -145,6 +147,7 @@ int  CFileDescriptor::Read( ByteDeque_t& rQueue, const int &riNumberOfBytes,
 {
     int iBytesRead = 0;
 
+    
     if ( IsOpen() && ( fseek( m_pFile, riOffset, riOrigin ) == 0 ) )
     {
         for ( int i = 0; i < riNumberOfBytes; i++ )
@@ -163,6 +166,8 @@ int  CFileDescriptor::Read( ByteDeque_t& rQueue, const int &riNumberOfBytes,
         }
     }
 
+    printf("CFileDescriptor::Read   offset=%d  bytes=%d\n", riOffset, iBytesRead);
+    
     return iBytesRead;
 }
 

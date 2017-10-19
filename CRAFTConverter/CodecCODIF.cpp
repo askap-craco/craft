@@ -30,8 +30,8 @@
 #include <ctime>
 #include <cstdlib>
 
-#undef _VERBOSE
-//#define _VERBOSE
+//#undef _VERBOSE
+#define _VERBOSE
 
 ///////////////////////////////////////////////////////////////////////////////
 // CodecCODIF class implementation and associated helpers.
@@ -48,7 +48,7 @@ namespace               // Anonymous namespace for internal helpers.
     // Constants.
 
     constexpr int      iMaxPacketSize_c            = 9000;   // Maximum bytes for network transport.
-    constexpr int      iSamplesPerFrame_c          = 224;    // Samples per frame (a multipe of 32 bytes).
+    constexpr int      iSamplesPerFrame_c          = 128;    // Samples per frame (a multipe of 32 bytes).
     constexpr int      iMaxSyncTries_c             = 3;      // Maximum number of tries before sync deemed to have failed.
     constexpr int      iBitsPerByte_c              = 8;      // Number of bits in a byte.
     constexpr uint64_t ui64TimeForIntegerSamples_c = 27;     // Period in seconds, for a whole number of samples.
@@ -184,6 +184,40 @@ namespace NCodec        // Part of the Codec namespace.
     ///////////////////////////////////////////////////////////////////////////
     // Decoding methods.
 
+    bool CCodecCODIF::Initialise( void )
+    {
+        bool bSuccess = true;
+
+        try
+        {
+            // Check that the output file is open and ready for writing.
+
+            if ( ! m_pFile->IsOpen() )
+            {
+                throw string{ "Output file is not open" };
+            }
+
+	    if ( ! ConfigureDFH() )
+	    {
+		throw string{ "Error forming the Data Frame Header (DFH)" };
+	    }
+	}
+
+	catch ( string sMessage )
+        {
+            fprintf( stderr, "CCodecCODIF::Initialise(), %s.\n", sMessage.c_str() );
+            bSuccess = false;
+        }
+
+	catch ( ... )
+        {
+            fprintf( stderr, "CCodecCODIF::Initialise(), Unspecified exception.\n" );
+            bSuccess = false;
+        }
+
+	return bSuccess;
+    }
+	
     bool CCodecCODIF::EncodeAndWriteChannelData( void )
     {
         bool bSuccess = false;      // Assume failure for now.
@@ -203,12 +237,12 @@ namespace NCodec        // Part of the Codec namespace.
             if ( m_bFirstInputBlock )
             {
                 // Initialise and configure the Data Frame Header (DFH).
-
-                if ( ! ConfigureDFH() )
+#if 0
+	      if ( ! ConfigureDFH() )
                 {
                     throw string{ "Error forming the Data Frame Header (DFH)" };
                 }
-
+#endif
                 // Reserve storage for a data frame.
 
                 if ( m_DataFrameBuffer.capacity() < static_cast<size_t>( m_iDataFrameSize ) )
@@ -219,14 +253,12 @@ namespace NCodec        // Part of the Codec namespace.
 
                 m_bFirstInputBlock = false;
             }
-
             // Process the input data into CODIF-encoded frames and write to file.
 
             if ( ! HandleCODIFFrameData() )
             {
                 throw string{ "Error processing the initial data frame" };
             }
-
             bSuccess = true;
         }
         catch ( string sMessage )
@@ -269,6 +301,11 @@ namespace NCodec        // Part of the Codec namespace.
         return WriteDataFrames( true );
     }
 
+    int CCodecCODIF::DataArraySize()
+    {
+      return m_iDataArraySize;
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // Private internal helpers.
 
@@ -299,6 +336,7 @@ namespace NCodec        // Part of the Codec namespace.
             m_iSampleBlockSize = BytesPerTimeSampleForChannels();
             m_iDataArraySize   = iSamplesPerFrame_c  * m_iSampleBlockSize;
             m_iDataFrameSize   = iDFHSize_c + m_iDataArraySize;
+	    printf("DEBUG: I set the dataframe to %d\n", m_iDataFrameSize);
             assert( m_iDataFrameSize <= iMaxPacketSize_c );
 
             // Initialise the remaining DFH parameters. Remember:
@@ -319,10 +357,18 @@ namespace NCodec        // Part of the Codec namespace.
             // Create the header anew prior to encoding.
 
             m_DFH.Reset();
-
+#ifdef _VERBOSE
+	    printf("createCODIFHeader: %d %d %d %d %d %d %d %lu %ld %d %s\n",
+		   m_iDataArraySize, ui16ThreadId,
+		   ui16GroupId, m_iBitsPerSample,
+		   ui16Channels, m_iNumberofPol, m_iSampleBlockSize,
+		   ui64TimeForIntegerSamples_c,
+		   uiSampleIntervalsPerPeriod,
+		   iIsComplex, caStationId);
+#endif
             if ( createCODIFHeader( pDFH, m_iDataArraySize, ui16ThreadId,
-                                        ui16GroupId, m_iBitsPerComplexSample,
-                                            ui16Channels, m_iSampleBlockSize,
+                                        ui16GroupId, m_iBitsPerSample,
+                                            ui16Channels*m_iNumberofPol, m_iSampleBlockSize,
                                                 ui64TimeForIntegerSamples_c,
                                                     uiSampleIntervalsPerPeriod,
                                                         iIsComplex, caStationId )
@@ -333,7 +379,7 @@ namespace NCodec        // Part of the Codec namespace.
 
             // Set to zero throughout; drive the period frame time via
             // CDFH::SetFrameTime().
-
+	    // CJP: CHANGE THIS IS BAD
             if ( setCODIFEpochMJD( pDFH, 0 ) != CODIF_NOERROR )
             {
                 throw string { "setCODIFEpochMJD() failed" };
@@ -425,6 +471,7 @@ namespace NCodec        // Part of the Codec namespace.
 
         bool bSuccess = false;  // Assume failure for now.
 
+	
         try
         {
             // If we are already syncrhonised then there is nothing to do.
@@ -439,7 +486,7 @@ namespace NCodec        // Part of the Codec namespace.
                 dMJDFracSec = std::modf( m_dMJDNow, &dMJDWholeSec );
 
                 assert( m_dSampleRate > 0.0 );
-                assert( m_iBitsPerComplexSample > 0 );
+                assert( m_iBitsPerSample > 0 );
 
                 // Compute the number of samples to the next whole seconds.
 
@@ -477,6 +524,7 @@ namespace NCodec        // Part of the Codec namespace.
         {
             m_iNumberOfSyncRetries++;
         }
+	exit(1);
 
         return bSuccess;
     }
@@ -496,6 +544,7 @@ namespace NCodec        // Part of the Codec namespace.
     bool CCodecCODIF::WriteDataFrames( bool bForceFlush )
     {
         bool bSuccess = false;      // Assume failure for now.
+
 
         try
         {
@@ -536,6 +585,7 @@ namespace NCodec        // Part of the Codec namespace.
                 // frame-time reference now that the preamble frames have been handled.
 
                 int iTotalFrames = iBytesToProcess / m_iDataArraySize;
+		printf("Processing %d frames of %d bytes\n", iTotalFrames, m_iDataFrameSize);
 
                 if ( ( iBytesToProcess % m_iDataArraySize ) != 0 )
                 {
@@ -565,6 +615,7 @@ namespace NCodec        // Part of the Codec namespace.
 
                     // Write the data frame to disk.
 
+		    //printf("DEBUG%d: Write %d bytes\n", iFrame, m_iDataFrameSize);
                     if ( ! m_pFile->Write( pbyDataFrame, m_iDataFrameSize ) )
                     {
                         throw string{ "Error writing to the encoded file" };
@@ -574,8 +625,9 @@ namespace NCodec        // Part of the Codec namespace.
 
                     m_DFH.NextFrame();
                 }
-
                 iBytesToProcess -= iByteCount;
+		printf("DEBUG: BytesToProcess=%d\n", iBytesToProcess);
+
             }
 
             bSuccess = true;
@@ -709,7 +761,11 @@ namespace NCodec        // Part of the Codec namespace.
 
     int CCodecCODIF::BytesPerTimeSampleForChannels( void ) const
     {
-        return ( m_iNumberOfChannels * m_iBitsPerComplexSample / iBitsPerByte_c );
+      // Assume Complex samples - I and Q per sample
+      printf("BytesPerTimeSampleForChannels: %d %d %d\n",
+	     m_iNumberOfChannels, m_iBitsPerSample, iBitsPerByte_c);
+      
+      return ( m_iNumberOfChannels * m_iNumberofPol * m_iBitsPerSample * 2 / iBitsPerByte_c );
     }
 
     //////////

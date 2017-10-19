@@ -58,6 +58,7 @@ namespace NCodec
         assert( m_aHeaderStream.size() == iVCRAFTFileHeaderSizeInBytes_c );
 
         m_bBuffersInitialised = false;
+	m_iInputBlockSize = iInputBlockSize_c;
     }
 
     //////////
@@ -184,7 +185,8 @@ namespace NCodec
 
             if ( ! m_bBuffersInitialised )
             {
-                m_SampleData.SetSampleParams( m_iMode, m_iBitsPerComplexSample,
+	      printf("DEBUG: BitsPerSample=%d\n", m_iBitsPerSample);
+	      m_SampleData.SetSampleParams( m_iMode, m_iBitsPerSample,
                                               m_iNumberOfChannels );
 
                 m_bBuffersInitialised = true;
@@ -194,7 +196,7 @@ namespace NCodec
 
             ByteDeque_t &rDeque = m_SampleData.GetSamples();
 
-            bDataToProcess = ( m_pFile->Read( rDeque, iInputBlockSize_c, 0, SEEK_CUR ) > 0 );
+            bDataToProcess = ( m_pFile->Read( rDeque, m_iInputBlockSize, 0, SEEK_CUR ) > 0 );
         }
         catch ( ... )
         {
@@ -207,6 +209,14 @@ namespace NCodec
     //////////
     //
 
+  bool CCodecVCRAFT::setBlockSize(int blockSize)
+  {
+    printf("setBlockSize %d\n", blockSize);
+    m_iInputBlockSize = blockSize;
+    return true;
+  }
+
+  
     void CCodecVCRAFT::DumpHeader( void )
     {
         fprintf( stdout, "VCRAFT File header:\n size: %d, mode = %d, "
@@ -216,7 +226,7 @@ namespace NCodec
 
         fprintf( stdout, "beam = %d, bits/sample (complex) = %d, words = %d, "
                          "FPGA id = %d, card = %d\n",
-                            m_iBeamId, m_iBitsPerComplexSample, m_iNumberOfWords,
+                            m_iBeamId, m_iBitsPerSample, m_iNumberOfWords,
                                 m_iFPGAId, m_iCardNumber );
 
     }
@@ -230,6 +240,7 @@ namespace NCodec
 
         return true;
     }
+
 
     //////////
     // Private methods.
@@ -267,7 +278,8 @@ namespace NCodec
             RetrieveParameter( "HDR_SIZE",              m_iFileHeaderSize );
             RetrieveParameter( "SAMP_RATE",             m_dSampleRate );
             RetrieveParameter( "CRAFT_MODE",            m_iMode );
-            RetrieveParameter( "NBITS",                 m_iBitsPerComplexSample );
+            RetrieveParameter( "NBITS",                 m_iBitsPerSample );
+            RetrieveParameter( "NPOL",                  m_iNumberofPol );
             RetrieveParameter( "BEAMID",                m_iBeamId );
             RetrieveParameter( "FPGA_ID",               m_iFPGAId );
             RetrieveParameter( "CARD_NO",               m_iCardNumber );
@@ -281,6 +293,8 @@ namespace NCodec
             RetrieveParameter( "START_WRITE_BAT",       m_ullStartWriteBAT );
             RetrieveParameter( "STOP_WRITE_BAT",        m_ullFinishWriteBAT );
             RetrieveParameter( "TRIGGER_BAT",           m_ullTriggerWriteBAT );
+
+	    m_iBitsPerSample /= 2;
 
             // UTC string (ISO formatted) verbatim from the VCRAFT header.
 

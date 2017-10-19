@@ -30,7 +30,7 @@ namespace NCodec
     CSampleData::CSampleData ( void )
     {
         m_iMode               = 0;
-        m_iBitsPerComplexSample      = 0;
+        m_iBitsPerSample      = 0;
         m_iNumberOfChannels   = 0;
 
         m_VoltageSamples.clear();
@@ -44,7 +44,7 @@ namespace NCodec
         m_VoltageSamples.clear();
 
         m_iNumberOfChannels   = 0;
-        m_iBitsPerComplexSample      = 0;
+        m_iBitsPerSample      = 0;
         m_iMode               = 0;
     }
 
@@ -55,9 +55,11 @@ namespace NCodec
                                        const int &riBitsPerComplexSample,
                                        const int &riNumberOfChannels )
     {
-        m_iMode                 = riMode;
-        m_iBitsPerComplexSample = riBitsPerComplexSample;
+      printf("SetSampleParams: %d %d %d\n", riMode, riBitsPerComplexSample, riNumberOfChannels);
+      m_iMode                 = riMode;
+        m_iBitsPerSample        = riBitsPerComplexSample/2;
         m_iNumberOfChannels     = riNumberOfChannels;
+	printf("  Set:   m_iBitsPerSample %d m_iNumberOfChannels %d\n", m_iBitsPerSample, m_iNumberOfChannels);
     }
 
     //////////
@@ -68,7 +70,7 @@ namespace NCodec
                                        int &riNumberOfChannels )
     {
         riMode                  = m_iMode;
-        riBitsPerComplexSample  = m_iBitsPerComplexSample;
+        riBitsPerComplexSample  = m_iBitsPerSample*2;
         riNumberOfChannels      = m_iNumberOfChannels;
     }
 

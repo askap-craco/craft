@@ -28,12 +28,12 @@ namespace               // Anonymous namespace for internal helpers.
     //////////
     // Constants & aliases.
 
-    constexpr int       iNumberOfVCRAFTChannels_c = 8;
+    //constexpr int       iNumberOfVCRAFTChannels_c = 8;
     constexpr int       iNumberOfModes_c          = 4;
 
     using ModeArray_t = std::array<int, iNumberOfModes_c>;
 
-    const ModeArray_t   aSampleSizeInBytes_c{ 2, 1, 1, 1 };
+    const ModeArray_t   aSampleSizeInBytes_c{{ 2, 1, 1, 1 }};
 }
 
 namespace NCodec
