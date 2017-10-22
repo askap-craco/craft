@@ -138,7 +138,7 @@ namespace NCodec
 
             case eParamTypeHex:
 
-                rParam =  std::stol( Item.m_sParameter, 0, 16 );
+                rParam =  std::stoll( Item.m_sParameter, 0, 16 );
                 bConverted = true;
                 break;
 

@@ -326,6 +326,12 @@ bool CFileProcessor::EncodeAndWriteOutputFile( ICodec &rEncoder,
 	// Want read blocksize to be multiple of output data array. May need to be tweaked if multiple files read
 	int blockSize = ((2 * 1024 * 1024) / rEncoder.DataArraySize()) * rEncoder.DataArraySize();
 	rDecoder.setBlockSize(blockSize);
+
+	// We may need to skip some blocks from the input file to allow alignment
+	
+	if (rEncoder.skipBytes()>0) {
+	  rDecoder.SeekForward(rEncoder.skipBytes());
+	}
 	
         // Next, have the Decoder read the sample data in sucessive blocks and
         // the Encoder take this blocked-data, convert format and write to the

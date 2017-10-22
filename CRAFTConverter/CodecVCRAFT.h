@@ -66,6 +66,7 @@ namespace NCodec
             void DumpHeader ( void );
             bool operator ()( void );
             bool setBlockSize( int blockSize );
+	    bool SeekForward( int skipBytes );
 
         private:
 

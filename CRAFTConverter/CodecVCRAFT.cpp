@@ -185,7 +185,6 @@ namespace NCodec
 
             if ( ! m_bBuffersInitialised )
             {
-	      printf("DEBUG: BitsPerSample=%d\n", m_iBitsPerSample);
 	      m_SampleData.SetSampleParams( m_iMode, m_iBitsPerSample,
                                               m_iNumberOfChannels );
 
@@ -206,16 +205,20 @@ namespace NCodec
         return bDataToProcess;
     }
 
+    bool CCodecVCRAFT::SeekForward(int skipBytes )
+    {
+        // Skip skipBytes forward through the file
+        return m_pFile->SeekForward(skipBytes);
+    }
+  
     //////////
     //
 
-  bool CCodecVCRAFT::setBlockSize(int blockSize)
-  {
-    printf("setBlockSize %d\n", blockSize);
-    m_iInputBlockSize = blockSize;
-    return true;
-  }
-
+    bool CCodecVCRAFT::setBlockSize(int blockSize)
+    {
+      m_iInputBlockSize = blockSize;
+      return true;
+    }
   
     void CCodecVCRAFT::DumpHeader( void )
     {

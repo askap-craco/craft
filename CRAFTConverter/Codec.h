@@ -270,12 +270,14 @@ namespace NCodec
             //////////
             // Virtual methods that may (optionally) be overridden.
 
-            virtual void DumpHeader( void )         {}
-            virtual bool operator () ( void )       { return true; }
-            virtual bool Flush( void )              { return true; }
-	    virtual int DataArraySize( void )	    { return -1; }
-	    virtual bool Initialise( void )	    { return true; }
-	    virtual bool setBlockSize( int blockSize )	    { return true; }
+            virtual void DumpHeader( void )            {}
+            virtual bool operator () ( void )          { return true; }
+            virtual bool Flush( void )                 { return true; }
+	    virtual int DataArraySize( void )	       { return -1; }
+	    virtual bool Initialise( void )	       { return true; }
+	    virtual bool setBlockSize( int blockSize ) { return true; }
+	    virtual int skipBytes ()                   { return 0; }
+	    virtual bool SeekForward ( int skipBytes ) { return true; }
 
         protected:
 

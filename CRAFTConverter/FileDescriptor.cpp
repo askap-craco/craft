@@ -78,8 +78,6 @@ bool CFileDescriptor::Open( const EFileMode &rMode )
             Mode = "wb";
         }
 
-        //fprintf( stderr, "File: %s, Mode: %s\n", m_FileName.c_str(), Mode.c_str() );
-
         m_pFile = std::fopen( m_FileName.c_str(), Mode.c_str() );
 
         bSuccess = ( m_pFile != nullptr );
@@ -121,6 +119,16 @@ bool CFileDescriptor::SeekPastFileHeader( const int &riChannelSeekPosition )
     return false;
 }
 
+bool CFileDescriptor::SeekForward( const int &SeekPosition )
+{
+    if ( IsOpen() )
+    {
+        return ( std::fseek( m_pFile, SeekPosition, SEEK_CUR ) == 0 );
+    }
+
+    return false;
+}
+
 //////////
 //
 
@@ -128,8 +136,6 @@ int CFileDescriptor::Read( byte_t *pbyReadArray, const int &riNumberOfBytes,
                            const int &riOffset,  const int &riOrigin )
 {
     int iBytesRead = 0;
-
-    printf("CFileDescriptor::Read   offset=%d  bytes=%d\n", riOffset, riNumberOfBytes);
 
     if ( IsOpen() && ( fseek( m_pFile, riOffset, riOrigin ) == 0 ) )
     {
@@ -166,8 +172,6 @@ int  CFileDescriptor::Read( ByteDeque_t& rQueue, const int &riNumberOfBytes,
         }
     }
 
-    printf("CFileDescriptor::Read   offset=%d  bytes=%d\n", riOffset, iBytesRead);
-    
     return iBytesRead;
 }
 

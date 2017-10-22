@@ -212,9 +212,10 @@ namespace NCodec
             // identifier_parameter_#_comment<lf> where '_' is a space. For example, the UTC_NOW tag thus:
             // "2016-08-04T07:09:24.161595+00:00 # UTC date stamp for when the file was written (ISO format)"
 
-            const string    sIdentifier( pItem->second.m_sKey );
+            string    sIdentifier( pItem->second.m_sKey );
+	    sIdentifier += ' ';
             const char     *pResult  = reinterpret_cast<const char *>( pbyHeader );
-            const char     *pTarget1 = pItem->second.m_sKey.c_str();
+            const char     *pTarget1 = sIdentifier.c_str();
 
             // Find the target substring in the header. If found, decode the token,
             // delimited by a # then extract the parameter and the comment into pItem.
@@ -306,7 +307,7 @@ namespace NCodec
 
         try
         {
-            switch ( pItem->second.m_eParamType )
+  	     switch ( pItem->second.m_eParamType )
             {
                 case eParamTypeInt:         // Next single token as an int.
                 case eParamTypeDouble:      // Next single token as a double.

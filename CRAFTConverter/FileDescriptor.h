@@ -73,7 +73,8 @@ class CFileDescriptor
         bool IsOpen( void ) const;
 
         bool SeekPastFileHeader( const int &riChannelSeekPosition );
-
+	bool SeekForward( const int &SeekPosition );
+	  
         int  Read( byte_t *pbyReadArray, const int &riNumberOfBytes,
                    const int &riOffset,  const int &riOrigin = SEEK_SET );
 

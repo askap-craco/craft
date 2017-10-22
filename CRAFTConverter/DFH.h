@@ -20,6 +20,8 @@
 // Temporarily disable various warnings leaked from the external codifio module
 // until resolved.
 
+#pragma pack ( push, 1 )                    // Set single byte alignment.
+
 #if defined(__GNUC__)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -31,6 +33,8 @@
 #else
     #include "codifio.h"
 #endif
+
+#pragma pack ( pop )                        // Restore the previous byte alignment.
 
 ///////////////////////////////////////////////////////////////////////////////
 // CDFH class definition and supporting helpers.
@@ -44,6 +48,7 @@ namespace NCodec        // Part of the Codec namespace.
     constexpr int iDFHSizeExpected_c = 64;
     constexpr int iDFHSize_c         = sizeof( CODIFDFH_t );
 
+    static_assert( alignof( CODIFDFH_t ) == 1,       "CODIFDFH_t does not have single byte alignment." );
     static_assert( iDFHSize_c == iDFHSizeExpected_c, "CODIF DFH has an unexpected size." );
 
     //////////
@@ -89,3 +94,4 @@ namespace NCodec        // Part of the Codec namespace.
 }               // End Codec namespace.
 
 #endif // DFH_H
+

@@ -30,8 +30,8 @@
 #include <ctime>
 #include <cstdlib>
 
-//#undef _VERBOSE
-#define _VERBOSE
+#undef _VERBOSE
+//#define _VERBOSE
 
 ///////////////////////////////////////////////////////////////////////////////
 // CodecCODIF class implementation and associated helpers.
@@ -48,10 +48,10 @@ namespace               // Anonymous namespace for internal helpers.
     // Constants.
 
     constexpr int      iMaxPacketSize_c            = 9000;   // Maximum bytes for network transport.
-    constexpr int      iSamplesPerFrame_c          = 128;    // Samples per frame (a multipe of 32 bytes).
+    constexpr int      iSamplesPerFrame_c          = 128;    // Samples per frame (really should be calculated)
     constexpr int      iMaxSyncTries_c             = 3;      // Maximum number of tries before sync deemed to have failed.
     constexpr int      iBitsPerByte_c              = 8;      // Number of bits in a byte.
-    constexpr uint64_t ui64TimeForIntegerSamples_c = 27;     // Period in seconds, for a whole number of samples.
+    constexpr int      iTimeForIntegerSamples_c    = 27;     // Period in seconds, for a whole number of samples.
     constexpr double   dTolerance_c                = 0.001;  // Tolerance for floating point calculations.
 
 }                       // End anonymous namespace.
@@ -78,6 +78,8 @@ namespace NCodec        // Part of the Codec namespace.
 
         m_DFH.Reset();
         m_DataFrameBuffer.clear();
+	ull_BAT0 = 0;
+	m_iSkipSamples = 0;
     }
 
     //////////
@@ -197,6 +199,28 @@ namespace NCodec        // Part of the Codec namespace.
                 throw string{ "Output file is not open" };
             }
 
+	    // Set the time base
+	    
+	    // Need to determine epoch zero for correlator frames and
+	    // set this to epoch zero for CODIF heaaders.  When
+	    // processing multiples files, this logic will need to be
+	    // figured out for the first file then propogated to later
+	    // files. If processing files independently, this epoch
+	    // zero will need to be "stored" somewhere. Epoch zero
+	    // *will* be different for different antenna Note that the
+	    // following essentially is a guess at the correlator
+	    // reset time but this approach Should allow stable time
+	    // determination. It is essentially that data which will
+	    // be processed at the same time use the same "epoch zero"
+	    // otherwise there will be delay shifts
+
+	    unsigned long long startBAT = m_ullStartWriteBAT - (m_ulStartWriteFrameId * 1.0e6 / 1185185.18519);
+	    ull_BAT0 = (startBAT / 1e6); // Round to full second
+	    ull_BAT0 *= 1e6;  // Need tp do in two lines and compiler is too clever it seems
+	    long long BATerr = startBAT - ull_BAT0;
+	    if (BATerr>5e5) BATerr -= 1e6;
+	    printf("Note: BAT offset for implied correlator reset is %.2f msec\n", BATerr/1.0e3);
+
 	    if ( ! ConfigureDFH() )
 	    {
 		throw string{ "Error forming the Data Frame Header (DFH)" };
@@ -231,20 +255,14 @@ namespace NCodec        // Part of the Codec namespace.
                 throw string{ "Output file is not open" };
             }
 
-            // For the first block, initialise the DFH (from which others will
-            // be derived) then form and output the data frames.
+            // For the first block, form and output the data frames.
 
             if ( m_bFirstInputBlock )
             {
-                // Initialise and configure the Data Frame Header (DFH).
-#if 0
-	      if ( ! ConfigureDFH() )
-                {
-                    throw string{ "Error forming the Data Frame Header (DFH)" };
-                }
-#endif
-                // Reserve storage for a data frame.
 
+	      // Reserve storage for a data frame.
+
+	      
                 if ( m_DataFrameBuffer.capacity() < static_cast<size_t>( m_iDataFrameSize ) )
                 {
                     m_DataFrameBuffer.reserve( m_iDataFrameSize );
@@ -306,6 +324,11 @@ namespace NCodec        // Part of the Codec namespace.
       return m_iDataArraySize;
     }
 
+    int CCodecCODIF::skipBytes()
+    {
+      return m_iSkipSamples * m_iSampleBlockSize;
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // Private internal helpers.
 
@@ -328,7 +351,7 @@ namespace NCodec        // Part of the Codec namespace.
             char           caStationId[ 3 ] = { static_cast<char>( m_iAntennaNumber ), 0, 0 };
 
             // Following an initial recommendation from Chris Philips to choose a
-            // Data Frame close to (but less than) 9000 bytes for convinience of decoding,
+            // Data Frame close to (but less than) 9000 bytes for convenience of decoding,
             // it was decided, in discussion with Adam Deller, to reduce this further,
             // to minimise any pre-time-syncrhonised samples being potentially dropped
             // due to a partially filled frame.
@@ -336,7 +359,6 @@ namespace NCodec        // Part of the Codec namespace.
             m_iSampleBlockSize = BytesPerTimeSampleForChannels();
             m_iDataArraySize   = iSamplesPerFrame_c  * m_iSampleBlockSize;
             m_iDataFrameSize   = iDFHSize_c + m_iDataArraySize;
-	    printf("DEBUG: I set the dataframe to %d\n", m_iDataFrameSize);
             assert( m_iDataFrameSize <= iMaxPacketSize_c );
 
             // Initialise the remaining DFH parameters. Remember:
@@ -347,7 +369,7 @@ namespace NCodec        // Part of the Codec namespace.
             // 32/27 MHz, this means that in 27s there should be 32 x 10^6 samples.
 
             uint64_t uiSampleIntervalsPerPeriod =
-                static_cast<uint64_t>( floor( m_dSampleRate * ui64TimeForIntegerSamples_c ) );
+                static_cast<uint64_t>( floor( m_dSampleRate * iTimeForIntegerSamples_c ) );
             assert( fabs( ( uiSampleIntervalsPerPeriod / 1.0e+6 ) - 32.0 ) < dTolerance_c );
 
             // Get a pointer to the underlying DFH structure.
@@ -358,18 +380,18 @@ namespace NCodec        // Part of the Codec namespace.
 
             m_DFH.Reset();
 #ifdef _VERBOSE
-	    printf("createCODIFHeader: %d %d %d %d %d %d %d %lu %ld %d %s\n",
+	    printf("createCODIFHeader: %d %d %d %d %d %d %d %d %ld %d %s\n",
 		   m_iDataArraySize, ui16ThreadId,
 		   ui16GroupId, m_iBitsPerSample,
 		   ui16Channels, m_iNumberofPol, m_iSampleBlockSize,
-		   ui64TimeForIntegerSamples_c,
+		   iTimeForIntegerSamples_c,
 		   uiSampleIntervalsPerPeriod,
 		   iIsComplex, caStationId);
 #endif
             if ( createCODIFHeader( pDFH, m_iDataArraySize, ui16ThreadId,
                                         ui16GroupId, m_iBitsPerSample,
                                             ui16Channels*m_iNumberofPol, m_iSampleBlockSize,
-                                                ui64TimeForIntegerSamples_c,
+                                                iTimeForIntegerSamples_c,
                                                     uiSampleIntervalsPerPeriod,
                                                         iIsComplex, caStationId )
                                   != CODIF_NOERROR )
@@ -377,10 +399,8 @@ namespace NCodec        // Part of the Codec namespace.
                 throw string { "createCODIFHeader() failed" };
             }
 
-            // Set to zero throughout; drive the period frame time via
-            // CDFH::SetFrameTime().
-	    // CJP: CHANGE THIS IS BAD
-            if ( setCODIFEpochMJD( pDFH, 0 ) != CODIF_NOERROR )
+            // Set the epoch based on our BAT0
+            if ( setCODIFEpochMJD( pDFH, ull_BAT0/(24*60*60*1e6)) != CODIF_NOERROR )
             {
                 throw string { "setCODIFEpochMJD() failed" };
             }
@@ -393,7 +413,30 @@ namespace NCodec        // Part of the Codec namespace.
             // CODIF Period.
 
             m_DFH.SetMaxDataFrameNumber( uiSampleIntervalsPerPeriod / iSamplesPerFrame_c );
-            m_DFH.ResetDataFrameNumber();
+	    
+	    // Figure out the "previous" Period restart
+	    unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
+	    unsigned long long BAT0MJDSec = ull_BAT0/1e6;
+	    unsigned long PeriodsSinceBAT0 = m_ulStartWriteFrameId / uiSampleIntervalsPerPeriod; // Will round down
+	    int frameseconds = (BAT0MJDSec - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
+	    unsigned long framenumber = (m_ulStartWriteFrameId % uiSampleIntervalsPerPeriod) / iSamplesPerFrame_c;
+	      
+	    // Finally set the  seconds and frame number
+	    setCODIFFrameEpochSecOffset(pDFH, frameseconds);
+	    setCODIFFrameNumber(pDFH, framenumber);
+	    //printf("DEBUG: First frame# = %lu\n", framenumber);
+
+	    // There will be samples that don't fit in a frame (ie first sample may start between frames)
+	    // These will need to be calculated and eventually discarded
+	    int initialSamples = m_ulStartWriteFrameId % iSamplesPerFrame_c;
+	    if (initialSamples!=0) {
+	      m_iSkipSamples = iSamplesPerFrame_c - initialSamples;
+	      printf("Warning: Will skipx %d samples for frame alignment\n", m_iSkipSamples);
+	    } else {
+	      m_iSkipSamples = 0;
+	    }
+	    
+            m_DFH.NextFrame(); // Allow for the sample skipping which will happen
 
             bSuccess = true;
         }
@@ -426,21 +469,10 @@ namespace NCodec        // Part of the Codec namespace.
             // then wait for subsequent input data blocks until we have sufficient samples
             // before flagging an error.
 
-            if ( SyncAndHandlePreSyncSamples() )
-            {
-                if ( ! WriteDataFrames() )
-                {
-                    throw string{ "Error writing data frames" };
-                }
-            }
-            else if ( m_iNumberOfSyncRetries >= iMaxSyncTries_c )
-            {
-                // Reset counter ahead of any recovery attempt.
-
-                m_iNumberOfSyncRetries = 0;
-
-                throw string{ "Cannot sync to the first whole-second boundary" };
-            }
+	  if ( ! WriteDataFrames() )
+	    {
+	      throw string{ "Error writing data frames" };
+	    }
 
             bSuccess = true;
         }
@@ -496,7 +528,7 @@ namespace NCodec        // Part of the Codec namespace.
                 // here and defer to normal sample-aligned processing.
 
 #ifdef _VERBOSE
-                fprintf( stderr, "SyncAndHandlePreSyncSamples(), %d Samples to synchronise\n", iTimeSamplesToWholeSec );
+                fprintf( stderr, "SyncAndHandlePreSyncSamples(), %d Samples to synchronise \n", iTimeSamplesToWholeSec );
 #endif
 
                 if ( ! WritePreambleFrames( iTimeSamplesToWholeSec ) )
@@ -524,7 +556,6 @@ namespace NCodec        // Part of the Codec namespace.
         {
             m_iNumberOfSyncRetries++;
         }
-	exit(1);
 
         return bSuccess;
     }
@@ -585,7 +616,6 @@ namespace NCodec        // Part of the Codec namespace.
                 // frame-time reference now that the preamble frames have been handled.
 
                 int iTotalFrames = iBytesToProcess / m_iDataArraySize;
-		printf("Processing %d frames of %d bytes\n", iTotalFrames, m_iDataFrameSize);
 
                 if ( ( iBytesToProcess % m_iDataArraySize ) != 0 )
                 {
@@ -615,7 +645,6 @@ namespace NCodec        // Part of the Codec namespace.
 
                     // Write the data frame to disk.
 
-		    //printf("DEBUG%d: Write %d bytes\n", iFrame, m_iDataFrameSize);
                     if ( ! m_pFile->Write( pbyDataFrame, m_iDataFrameSize ) )
                     {
                         throw string{ "Error writing to the encoded file" };
@@ -626,8 +655,6 @@ namespace NCodec        // Part of the Codec namespace.
                     m_DFH.NextFrame();
                 }
                 iBytesToProcess -= iByteCount;
-		printf("DEBUG: BytesToProcess=%d\n", iBytesToProcess);
-
             }
 
             bSuccess = true;
@@ -762,9 +789,6 @@ namespace NCodec        // Part of the Codec namespace.
     int CCodecCODIF::BytesPerTimeSampleForChannels( void ) const
     {
       // Assume Complex samples - I and Q per sample
-      printf("BytesPerTimeSampleForChannels: %d %d %d\n",
-	     m_iNumberOfChannels, m_iBitsPerSample, iBitsPerByte_c);
-      
       return ( m_iNumberOfChannels * m_iNumberofPol * m_iBitsPerSample * 2 / iBitsPerByte_c );
     }
 

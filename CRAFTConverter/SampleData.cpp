@@ -55,11 +55,9 @@ namespace NCodec
                                        const int &riBitsPerComplexSample,
                                        const int &riNumberOfChannels )
     {
-      printf("SetSampleParams: %d %d %d\n", riMode, riBitsPerComplexSample, riNumberOfChannels);
-      m_iMode                 = riMode;
+        m_iMode                 = riMode;
         m_iBitsPerSample        = riBitsPerComplexSample/2;
         m_iNumberOfChannels     = riNumberOfChannels;
-	printf("  Set:   m_iBitsPerSample %d m_iNumberOfChannels %d\n", m_iBitsPerSample, m_iNumberOfChannels);
     }
 
     //////////
