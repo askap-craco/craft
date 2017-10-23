@@ -48,7 +48,7 @@ namespace               // Anonymous namespace for internal helpers.
     // Constants.
 
     constexpr int      iMaxPacketSize_c            = 9000;   // Maximum bytes for network transport.
-    constexpr int      iSamplesPerFrame_c          = 128;    // Samples per frame (really should be calculated)
+    constexpr int      iSamplesPerFrame_c          = 256;    // Samples per frame (really should be calculated)
     constexpr int      iMaxSyncTries_c             = 3;      // Maximum number of tries before sync deemed to have failed.
     constexpr int      iBitsPerByte_c              = 8;      // Number of bits in a byte.
     constexpr int      iTimeForIntegerSamples_c    = 27;     // Period in seconds, for a whole number of samples.
@@ -214,8 +214,8 @@ namespace NCodec        // Part of the Codec namespace.
 	    // be processed at the same time use the same "epoch zero"
 	    // otherwise there will be delay shifts
 
-	    unsigned long long startBAT = m_ullStartWriteBAT - (m_ulStartWriteFrameId * 1.0e6 / 1185185.18519);
-	    ull_BAT0 = (startBAT / 1e6); // Round to full second
+	    unsigned long long startBAT = m_ullStartWriteBAT - (m_ulStartWriteFrameId * (27.0/32.0));
+	    ull_BAT0 = ((startBAT +5e5)/ 1e6); // Round to full second
 	    ull_BAT0 *= 1e6;  // Need tp do in two lines and compiler is too clever it seems
 	    long long BATerr = startBAT - ull_BAT0;
 	    if (BATerr>5e5) BATerr -= 1e6;
@@ -374,7 +374,7 @@ namespace NCodec        // Part of the Codec namespace.
 
             // Get a pointer to the underlying DFH structure.
 
-            CODIFDFH_t *pDFH = static_cast<CODIFDFH_t *>( m_DFH );
+	    CODIFDFH_t *pDFH = static_cast<CODIFDFH_t *>( m_DFH );
 
             // Create the header anew prior to encoding.
 
@@ -388,7 +388,7 @@ namespace NCodec        // Part of the Codec namespace.
 		   uiSampleIntervalsPerPeriod,
 		   iIsComplex, caStationId);
 #endif
-            if ( createCODIFHeader( pDFH, m_iDataArraySize, ui16ThreadId,
+            if ( createCODIFHeader(pDFH, m_iDataArraySize, ui16ThreadId,
                                         ui16GroupId, m_iBitsPerSample,
                                             ui16Channels*m_iNumberofPol, m_iSampleBlockSize,
                                                 iTimeForIntegerSamples_c,
@@ -400,14 +400,14 @@ namespace NCodec        // Part of the Codec namespace.
             }
 
             // Set the epoch based on our BAT0
-            if ( setCODIFEpochMJD( pDFH, ull_BAT0/(24*60*60*1e6)) != CODIF_NOERROR )
+            if ( setCODIFEpochMJD(pDFH, ull_BAT0/(24*60*60*1e6)) != CODIF_NOERROR )
             {
                 throw string { "setCODIFEpochMJD() failed" };
             }
 
             // Use offset binary.
 
-            setCODIFRepresentation( pDFH, 0 );
+            setCODIFRepresentation(pDFH, 0 );
 
             // Clear the data frame counter and prepare to count data frames in a
             // CODIF Period.
@@ -417,21 +417,20 @@ namespace NCodec        // Part of the Codec namespace.
 	    // Figure out the "previous" Period restart
 	    unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
 	    unsigned long long BAT0MJDSec = ull_BAT0/1e6;
-	    unsigned long PeriodsSinceBAT0 = m_ulStartWriteFrameId / uiSampleIntervalsPerPeriod; // Will round down
+	    unsigned long long PeriodsSinceBAT0 = m_ulStartWriteFrameId / uiSampleIntervalsPerPeriod; // Will round down
 	    int frameseconds = (BAT0MJDSec - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
 	    unsigned long framenumber = (m_ulStartWriteFrameId % uiSampleIntervalsPerPeriod) / iSamplesPerFrame_c;
 	      
 	    // Finally set the  seconds and frame number
 	    setCODIFFrameEpochSecOffset(pDFH, frameseconds);
 	    setCODIFFrameNumber(pDFH, framenumber);
-	    //printf("DEBUG: First frame# = %lu\n", framenumber);
 
 	    // There will be samples that don't fit in a frame (ie first sample may start between frames)
 	    // These will need to be calculated and eventually discarded
 	    int initialSamples = m_ulStartWriteFrameId % iSamplesPerFrame_c;
 	    if (initialSamples!=0) {
 	      m_iSkipSamples = iSamplesPerFrame_c - initialSamples;
-	      printf("Warning: Will skipx %d samples for frame alignment\n", m_iSkipSamples);
+	      printf("Warning: Will skip %d samples for frame alignment\n", m_iSkipSamples);
 	    } else {
 	      m_iSkipSamples = 0;
 	    }
@@ -579,18 +578,6 @@ namespace NCodec        // Part of the Codec namespace.
 
         try
         {
-            if ( m_bInitialiseFrameTime )
-            {
-                if ( ! m_DFH.SetFrameTime( m_dMJDNow ) )
-                {
-                    throw string { "SetFrameTime(), error" };
-                }
-
-                m_DFH.SetFrameNumber( 0 );
-
-                m_bInitialiseFrameTime = false;
-            }
-
             ByteDeque_t & rInput = SampleData();
 
             byte_t *pbyDataFrame = m_DataFrameBuffer.data();
@@ -631,8 +618,8 @@ namespace NCodec        // Part of the Codec namespace.
 
                     // Copy over the formatted Data Frame Header.
 
-                    std::memcpy( pbyDataFrame, static_cast<byte_t *>(m_DFH), iDFHSize_c * sizeof( byte_t ) );
 
+		    std::memcpy( pbyDataFrame, static_cast<CODIFDFH_t *>(m_DFH), iDFHSize_c );
                     // Copy over the sample data where it exists. Note that this approach
                     // should leave the last partial frame zeroed out.
 
