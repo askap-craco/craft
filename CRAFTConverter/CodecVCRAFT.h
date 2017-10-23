@@ -65,8 +65,8 @@ namespace NCodec
 
             void DumpHeader ( void );
             bool operator ()( void );
-            bool setBlockSize( int blockSize );
-	    bool SeekForward( int skipBytes );
+            bool SetBlockSize( int iBlockSize );
+            bool SeekForward( int iSkipBytes );
 
         private:
 
@@ -78,7 +78,8 @@ namespace NCodec
             HeaderStream_t  m_aHeaderStream;        // Raw file header as a byte stream.
             CVCRAFTParser   m_HeaderDecoder;        // Helper for header decoding.
             bool            m_bBuffersInitialised;  // Buffering configured flag.
-	    int             m_iInputBlockSize;      // Size of read chunk
+            int             m_iInputBlockSize;      // Size of read chunk
+
             //////////
             // Private methods.
 

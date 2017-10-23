@@ -87,7 +87,7 @@ namespace NCodec
             void ResetContent( void )
             {
                 m_iFileHeaderSize       = 0;
-                m_iBitsPerSample = 0;
+                m_iBitsPerSample        = 0;
                 m_iNumberOfWords        = 0;
                 m_iNumberOfChannels     = 0;
                 m_iMode                 = 0;
@@ -257,7 +257,7 @@ namespace NCodec
             virtual bool DecodeHeader( void )                 = 0;
             virtual bool ReadNextBlock( void )                = 0;
 
-            virtual bool DecodeChannelData( void )              // Obsolete.
+            virtual bool DecodeChannelData( void )      // Obsolete.
             { return true; }
 
             //////////
@@ -273,11 +273,21 @@ namespace NCodec
             virtual void DumpHeader( void )            {}
             virtual bool operator () ( void )          { return true; }
             virtual bool Flush( void )                 { return true; }
-	    virtual int DataArraySize( void )	       { return -1; }
-	    virtual bool Initialise( void )	       { return true; }
-	    virtual bool setBlockSize( int blockSize ) { return true; }
-	    virtual int skipBytes ()                   { return 0; }
-	    virtual bool SeekForward ( int skipBytes ) { return true; }
+            virtual int  DataArraySize( void )	       { return -1;   }
+            virtual bool Initialise( void )	           { return true; }
+            virtual int  SkipBytes( void )             { return 0;    }
+
+            virtual bool SetBlockSize( int iBlockSize )
+            {
+                UNREFERENCED_PARAMETER( iBlockSize );
+                return true;
+            }
+
+            virtual bool SeekForward( int iSkipBytes )
+            {
+                UNREFERENCED_PARAMETER( iSkipBytes );
+                return true;
+            }
 
         protected:
 

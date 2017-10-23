@@ -74,9 +74,9 @@ namespace NCodec
             void DumpHeader ( void );
             bool operator ()( void );
             bool Flush( void );
-	    int DataArraySize();
-	    bool Initialise();
-	    int skipBytes();
+            int  DataArraySize( void );
+            bool Initialise( void );
+            int  SkipBytes( void );
 
         private:
 
@@ -95,8 +95,8 @@ namespace NCodec
             int      m_iNumberOfSyncRetries;
 
             CDFH     m_DFH;
-	    unsigned long long ull_BAT0;
-	    int m_iSkipSamples;
+            unsigned long long ull_BAT0;
+            int      m_iSkipSamples;
             Buffer_t m_DataFrameBuffer;
 
             //////////

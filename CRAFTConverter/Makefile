@@ -1,5 +1,5 @@
 
-COMMON = -Wall -g
+COMMON = -Wall -Wunused-parameter -Wunused-variable -Wtype-limits -Wsign-compare -g
 
 CC=gcc $(COMMON)
 CXX = g++ $(COMMON) -std=c++11 

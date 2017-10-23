@@ -21,6 +21,9 @@
 #include <cstring>
 #include <cmath>
 
+using std::memcpy;
+using std::memset;
+
 ///////////////////////////////////////////////////////////////////////////////
 // CDFH class implementation.
 
@@ -28,7 +31,7 @@ namespace NCodec        // Part of the Codec namespace.
 {
     CDFH::CDFH( void )
     {
-        std::memset( this, 0x00, iDFHSize_c );
+        memset( this, 0x00, iDFHSize_c );
 
         m_uMaxDataFramePlusOne = 0;
     }
@@ -39,7 +42,7 @@ namespace NCodec        // Part of the Codec namespace.
     CDFH::~CDFH( void )
     {
         m_uMaxDataFramePlusOne = 0;
-        std::memset( this, 0x00, iDFHSize_c );
+        memset( this, 0x00, iDFHSize_c );
     }
 
     //////////
@@ -49,7 +52,7 @@ namespace NCodec        // Part of the Codec namespace.
     {
         if ( &rRhs != this )
         {
-            std::memcpy( this, &rRhs, iDFHSize_c );
+            memcpy( this, &rRhs, iDFHSize_c );
             m_uMaxDataFramePlusOne = rRhs.m_uMaxDataFramePlusOne;
         }
     }
@@ -61,7 +64,7 @@ namespace NCodec        // Part of the Codec namespace.
     {
         if ( &rRhs != this )
         {
-            std::memcpy( this, &rRhs, iDFHSize_c );
+            memcpy( this, &rRhs, iDFHSize_c );
             m_uMaxDataFramePlusOne = rRhs.m_uMaxDataFramePlusOne;
         }
 
@@ -73,7 +76,7 @@ namespace NCodec        // Part of the Codec namespace.
 
     void CDFH::Reset( void )
     {
-        std::memset( this, 0x00, iDFHSize_c );
+        memset( this, 0x00, iDFHSize_c );
         m_uMaxDataFramePlusOne = 0;
     }
 
@@ -83,14 +86,6 @@ namespace NCodec        // Part of the Codec namespace.
     CDFH::operator CODIFDFH_t * ( void )
     {
         return static_cast<CODIFDFH_t *>( this );
-    }
-
-    //////////
-    //
-
-    CDFH::operator byte_t * ( void )
-    {
-        return reinterpret_cast<byte_t *>( this );
     }
 
     //////////

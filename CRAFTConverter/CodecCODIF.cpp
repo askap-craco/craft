@@ -41,6 +41,8 @@
 
 using std::vector;
 using std::deque;
+using std::memset;
+using std::memcpy;
 
 namespace               // Anonymous namespace for internal helpers.
 {
@@ -78,8 +80,9 @@ namespace NCodec        // Part of the Codec namespace.
 
         m_DFH.Reset();
         m_DataFrameBuffer.clear();
-	ull_BAT0 = 0;
-	m_iSkipSamples = 0;
+
+        ull_BAT0 = 0;
+        m_iSkipSamples = 0;
     }
 
     //////////
@@ -87,6 +90,8 @@ namespace NCodec        // Part of the Codec namespace.
 
     CCodecCODIF::~CCodecCODIF( void )
     {
+        ull_BAT0 = 0;
+        m_iSkipSamples = 0;
         m_DataFrameBuffer.clear();
         m_DFH.Reset();
 
@@ -199,49 +204,51 @@ namespace NCodec        // Part of the Codec namespace.
                 throw string{ "Output file is not open" };
             }
 
-	    // Set the time base
-	    
-	    // Need to determine epoch zero for correlator frames and
-	    // set this to epoch zero for CODIF heaaders.  When
-	    // processing multiples files, this logic will need to be
-	    // figured out for the first file then propogated to later
-	    // files. If processing files independently, this epoch
-	    // zero will need to be "stored" somewhere. Epoch zero
-	    // *will* be different for different antenna Note that the
-	    // following essentially is a guess at the correlator
-	    // reset time but this approach Should allow stable time
-	    // determination. It is essentially that data which will
-	    // be processed at the same time use the same "epoch zero"
-	    // otherwise there will be delay shifts
+            // Set the time base
 
-	    unsigned long long startBAT = m_ullStartWriteBAT - (m_ulStartWriteFrameId * (27.0/32.0));
-	    ull_BAT0 = ((startBAT +5e5)/ 1e6); // Round to full second
-	    ull_BAT0 *= 1e6;  // Need tp do in two lines and compiler is too clever it seems
-	    long long BATerr = startBAT - ull_BAT0;
-	    if (BATerr>5e5) BATerr -= 1e6;
-	    printf("Note: BAT offset for implied correlator reset is %.2f msec\n", BATerr/1.0e3);
+            // Need to determine epoch zero for correlator frames and
+            // set this to epoch zero for CODIF heaaders.  When
+            // processing multiples files, this logic will need to be
+            // figured out for the first file then propogated to later
+            // files. If processing files independently, this epoch
+            // zero will need to be "stored" somewhere. Epoch zero
+            // *will* be different for different antenna Note that the
+            // following essentially is a guess at the correlator
+            // reset time but this approach Should allow stable time
+            // determination. It is essentially that data which will
+            // be processed at the same time use the same "epoch zero"
+            // otherwise there will be delay shifts
 
-	    if ( ! ConfigureDFH() )
-	    {
-		throw string{ "Error forming the Data Frame Header (DFH)" };
-	    }
-	}
+            unsigned long long startBAT = m_ullStartWriteBAT - (m_ulStartWriteFrameId * (27.0/32.0));
+            ull_BAT0 = ((startBAT +5e5)/ 1e6); // Round to full second
+            ull_BAT0 *= 1e6;  // Need tp do in two lines and compiler is too clever it seems
+            long long BATerr = startBAT - ull_BAT0;
+            if (BATerr>5e5) BATerr -= 1e6;
+            printf("Note: BAT offset for implied correlator reset is %.2f msec\n", BATerr/1.0e3);
 
-	catch ( string sMessage )
+            if ( ! ConfigureDFH() )
+            {
+                throw string{ "Error forming the Data Frame Header (DFH)" };
+            }
+        }
+        catch ( string sMessage )
         {
             fprintf( stderr, "CCodecCODIF::Initialise(), %s.\n", sMessage.c_str() );
             bSuccess = false;
         }
 
-	catch ( ... )
+        catch ( ... )
         {
             fprintf( stderr, "CCodecCODIF::Initialise(), Unspecified exception.\n" );
             bSuccess = false;
         }
 
-	return bSuccess;
+        return bSuccess;
     }
-	
+
+    //////////
+    //
+
     bool CCodecCODIF::EncodeAndWriteChannelData( void )
     {
         bool bSuccess = false;      // Assume failure for now.
@@ -259,10 +266,8 @@ namespace NCodec        // Part of the Codec namespace.
 
             if ( m_bFirstInputBlock )
             {
+                // Reserve storage for a data frame.
 
-	      // Reserve storage for a data frame.
-
-	      
                 if ( m_DataFrameBuffer.capacity() < static_cast<size_t>( m_iDataFrameSize ) )
                 {
                     m_DataFrameBuffer.reserve( m_iDataFrameSize );
@@ -271,12 +276,14 @@ namespace NCodec        // Part of the Codec namespace.
 
                 m_bFirstInputBlock = false;
             }
+
             // Process the input data into CODIF-encoded frames and write to file.
 
             if ( ! HandleCODIFFrameData() )
             {
                 throw string{ "Error processing the initial data frame" };
             }
+
             bSuccess = true;
         }
         catch ( string sMessage )
@@ -315,18 +322,23 @@ namespace NCodec        // Part of the Codec namespace.
         fprintf( stderr, "In Flush()\n" );
 #endif
 
-
         return WriteDataFrames( true );
     }
 
-    int CCodecCODIF::DataArraySize()
+    //////////
+    //
+
+    int CCodecCODIF::DataArraySize( void )
     {
-      return m_iDataArraySize;
+        return m_iDataArraySize;
     }
 
-    int CCodecCODIF::skipBytes()
+    //////////
+    //
+
+    int CCodecCODIF::SkipBytes( void )
     {
-      return m_iSkipSamples * m_iSampleBlockSize;
+        return m_iSkipSamples * m_iSampleBlockSize;
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -374,21 +386,25 @@ namespace NCodec        // Part of the Codec namespace.
 
             // Get a pointer to the underlying DFH structure.
 
-	    CODIFDFH_t *pDFH = static_cast<CODIFDFH_t *>( m_DFH );
+            CODIFDFH_t *pDFH = static_cast<CODIFDFH_t *>( m_DFH );
 
             // Create the header anew prior to encoding.
 
             m_DFH.Reset();
+
 #ifdef _VERBOSE
-	    printf("createCODIFHeader: %d %d %d %d %d %d %d %d %ld %d %s\n",
-		   m_iDataArraySize, ui16ThreadId,
-		   ui16GroupId, m_iBitsPerSample,
-		   ui16Channels, m_iNumberofPol, m_iSampleBlockSize,
-		   iTimeForIntegerSamples_c,
-		   uiSampleIntervalsPerPeriod,
-		   iIsComplex, caStationId);
+
+            printf("createCODIFHeader: %d %d %d %d %d %d %d %d %ld %d %s\n",
+                        m_iDataArraySize, ui16ThreadId,
+                        ui16GroupId, m_iBitsPerSample,
+                        ui16Channels, m_iNumberofPol, m_iSampleBlockSize,
+                        iTimeForIntegerSamples_c,
+                        uiSampleIntervalsPerPeriod,
+                        iIsComplex, caStationId);
+
 #endif
-            if ( createCODIFHeader(pDFH, m_iDataArraySize, ui16ThreadId,
+
+            if ( createCODIFHeader( pDFH, m_iDataArraySize, ui16ThreadId,
                                         ui16GroupId, m_iBitsPerSample,
                                             ui16Channels*m_iNumberofPol, m_iSampleBlockSize,
                                                 iTimeForIntegerSamples_c,
@@ -400,41 +416,49 @@ namespace NCodec        // Part of the Codec namespace.
             }
 
             // Set the epoch based on our BAT0
-            if ( setCODIFEpochMJD(pDFH, ull_BAT0/(24*60*60*1e6)) != CODIF_NOERROR )
+
+            if ( setCODIFEpochMJD( pDFH, ull_BAT0/(24*60*60*1e6)) != CODIF_NOERROR )
             {
                 throw string { "setCODIFEpochMJD() failed" };
             }
 
             // Use offset binary.
 
-            setCODIFRepresentation(pDFH, 0 );
+            setCODIFRepresentation( pDFH, 0 );
 
             // Clear the data frame counter and prepare to count data frames in a
             // CODIF Period.
 
             m_DFH.SetMaxDataFrameNumber( uiSampleIntervalsPerPeriod / iSamplesPerFrame_c );
-	    
-	    // Figure out the "previous" Period restart
-	    unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
-	    unsigned long long BAT0MJDSec = ull_BAT0/1e6;
-	    unsigned long long PeriodsSinceBAT0 = m_ulStartWriteFrameId / uiSampleIntervalsPerPeriod; // Will round down
-	    int frameseconds = (BAT0MJDSec - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
-	    unsigned long framenumber = (m_ulStartWriteFrameId % uiSampleIntervalsPerPeriod) / iSamplesPerFrame_c;
-	      
-	    // Finally set the  seconds and frame number
-	    setCODIFFrameEpochSecOffset(pDFH, frameseconds);
-	    setCODIFFrameNumber(pDFH, framenumber);
 
-	    // There will be samples that don't fit in a frame (ie first sample may start between frames)
-	    // These will need to be calculated and eventually discarded
-	    int initialSamples = m_ulStartWriteFrameId % iSamplesPerFrame_c;
-	    if (initialSamples!=0) {
-	      m_iSkipSamples = iSamplesPerFrame_c - initialSamples;
-	      printf("Warning: Will skip %d samples for frame alignment\n", m_iSkipSamples);
-	    } else {
-	      m_iSkipSamples = 0;
-	    }
-	    
+            // Figure out the "previous" Period restart
+
+            unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
+            unsigned long long BAT0MJDSec = ull_BAT0/1e6;
+            unsigned long long PeriodsSinceBAT0 = m_ulStartWriteFrameId / uiSampleIntervalsPerPeriod; // Will round down
+            int frameseconds = (BAT0MJDSec - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
+            unsigned long framenumber = (m_ulStartWriteFrameId % uiSampleIntervalsPerPeriod) / iSamplesPerFrame_c;
+
+            // Finally set the  seconds and frame number
+
+            setCODIFFrameEpochSecOffset(pDFH, frameseconds);
+            setCODIFFrameNumber(pDFH, framenumber);
+
+            // There will be samples that don't fit in a frame (ie first sample may start between frames)
+            // These will need to be calculated and eventually discarded
+
+            int initialSamples = m_ulStartWriteFrameId % iSamplesPerFrame_c;
+
+            if ( initialSamples!=0 )
+            {
+              m_iSkipSamples = iSamplesPerFrame_c - initialSamples;
+              printf("Warning: Will skip %d samples for frame alignment\n", m_iSkipSamples);
+            }
+            else
+            {
+                m_iSkipSamples = 0;
+            }
+
             m_DFH.NextFrame(); // Allow for the sample skipping which will happen
 
             bSuccess = true;
@@ -468,12 +492,12 @@ namespace NCodec        // Part of the Codec namespace.
             // then wait for subsequent input data blocks until we have sufficient samples
             // before flagging an error.
 
-	  if ( ! WriteDataFrames() )
-	    {
-	      throw string{ "Error writing data frames" };
-	    }
+            if ( ! WriteDataFrames() )
+            {
+              throw string{ "Error writing data frames" };
+            }
 
-            bSuccess = true;
+                bSuccess = true;
         }
         catch ( string Message )
         {
@@ -502,7 +526,6 @@ namespace NCodec        // Part of the Codec namespace.
 
         bool bSuccess = false;  // Assume failure for now.
 
-	
         try
         {
             // If we are already syncrhonised then there is nothing to do.
@@ -575,7 +598,6 @@ namespace NCodec        // Part of the Codec namespace.
     {
         bool bSuccess = false;      // Assume failure for now.
 
-
         try
         {
             ByteDeque_t & rInput = SampleData();
@@ -614,12 +636,12 @@ namespace NCodec        // Part of the Codec namespace.
                     // Zero the output data frame, which covers the case where there
                     // are insufficient samples to form an entire frame.
 
-                    std::memset( pbyDataFrame, 0x00, m_iDataFrameSize );
+                    memset( pbyDataFrame, 0x00, m_iDataFrameSize );
 
                     // Copy over the formatted Data Frame Header.
 
+                    memcpy( pbyDataFrame, static_cast<CODIFDFH_t *>(m_DFH), iDFHSize_c );
 
-		    std::memcpy( pbyDataFrame, static_cast<CODIFDFH_t *>(m_DFH), iDFHSize_c );
                     // Copy over the sample data where it exists. Note that this approach
                     // should leave the last partial frame zeroed out.
 
@@ -715,11 +737,11 @@ namespace NCodec        // Part of the Codec namespace.
                     // Zero the output data frame, which covers the case where there
                     // are insufficient samples to form an entire frame.
 
-                    std::memset( pbyDataFrame, 0x00, m_iDataFrameSize );
+                    memset( pbyDataFrame, 0x00, m_iDataFrameSize );
 
                     // Copy over the formatted Data Frame Header.
 
-                    std::memcpy( pbyDataFrame, static_cast<byte_t *>(m_DFH), iDFHSize_c * sizeof( byte_t ) );
+                    memcpy( pbyDataFrame, static_cast<CODIFDFH_t *>(m_DFH), iDFHSize_c );
 
                     // Copy over the sample data where it exists. Note that this approach
                     // should leave the last partial frame zeroed out.
@@ -775,8 +797,8 @@ namespace NCodec        // Part of the Codec namespace.
 
     int CCodecCODIF::BytesPerTimeSampleForChannels( void ) const
     {
-      // Assume Complex samples - I and Q per sample
-      return ( m_iNumberOfChannels * m_iNumberofPol * m_iBitsPerSample * 2 / iBitsPerByte_c );
+        // Assume Complex samples - I and Q per sample
+        return ( m_iNumberOfChannels * m_iNumberofPol * m_iBitsPerSample * 2 / iBitsPerByte_c );
     }
 
     //////////

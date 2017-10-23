@@ -28,8 +28,7 @@ namespace               // Anonymous namespace for internal helpers.
     //////////
     // Constants & aliases.
 
-    //constexpr int       iNumberOfVCRAFTChannels_c = 8;
-    constexpr int       iNumberOfModes_c          = 4;
+    constexpr int iNumberOfModes_c = 4;
 
     using ModeArray_t = std::array<int, iNumberOfModes_c>;
 

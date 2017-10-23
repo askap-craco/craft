@@ -81,7 +81,6 @@ namespace NCodec        // Part of the Codec namespace.
             // Cast operators for pointer access the base-class structure.
 
             operator CODIFDFH_t * ( void );
-            operator byte_t *     ( void );
 
         private:
 
