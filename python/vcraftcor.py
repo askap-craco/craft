@@ -12,7 +12,7 @@ import os
 import sys
 import logging
 import vcraft
-from scipy import signal
+
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -20,6 +20,8 @@ def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
+    parser.add_argument('-o','--offset', type=int, help='Offset samples')
+    parser.add_argument('-c','--channel', type=int, help='Channel to plot', default=0)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -60,29 +62,41 @@ def _main():
             
     nsamp, nchan = d1.shape
 
+
     fig, axes = pylab.subplots(4,1)
     d1ax, d2ax,lagax,pax = axes.flatten()
     N = 4096
     Nc = N*512
+    if values.offset is None:
+        h = 'TRIGGER_FRAMEID'
+        offset = int(f2.hdr[h][0]) - int(f1.hdr[h][0])
+    else:
+        offset = values.offset
 
-    c = 0
-    d1ax.plot(d1[:N, c].real)
-    d1ax.plot(d1[:N, c].imag)
+    c = values.channel
+    d1ax.plot(d1[:N, c].real, label='real')
+    d1ax.plot(d1[:N, c].imag, label='imag')
+    d1ax.legend()
     d2ax.plot(d2[:N, c].real)
     d2ax.plot(d2[:N, c].imag)
 
-
     Nf = 128
+    shortsamp = ((nsamp-offset)/Nf)*Nf
 
     assert f1.freqs[c] == f2.freqs[c]
-    x1 = d1[:, c].reshape(nsamp/Nf, Nf)
+    x1 = d1[offset:shortsamp+offset, c].reshape(-1, Nf)
     xf1 = np.fft.fftshift(np.fft.fft(x1, axis=1), axes=1)
-    
-    x2 = d2[:, c].reshape(nsamp/Nf, Nf)
+
+    x2 = d2[:shortsamp, c].reshape(-1, Nf)
     xf2 = np.fft.fftshift(np.fft.fft(x2, axis=1), axes=1)
     xx12 = xf1 * np.conj(xf2)
     xx11 = xf1 * np.conj(xf1)
     xx22 = xf2 * np.conj(xf2)
+    punwrap = np.unwrap(np.angle(xx12.mean(axis=0)))
+    xx = np.arange(len(punwrap))
+    gradient, phase = np.polyfit(xx, punwrap, 1)
+    delay = 32./27.*gradient/2./np.pi*len(punwrap)
+    print 'Unwrapped phase = {} rad, graidnet={} rad per channel, delay={} us'.format(phase, gradient, delay)
 
     lagax.plot(abs(xx11.mean(axis=0)), label='auto0')
     lagax.plot(abs(xx22.mean(axis=0)), label='auto1')
