@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="CRAFTConverter" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/CRAFTConverter" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option parameters="-c  ak8_c1_f0.vcraft fred.codif" />
+				<Compiler>
+					<Add option="-Wall" />
+					<Add option="-std=c++11" />
+					<Add option="-g" />
+					<Add option="-D_DEBUG" />
+				</Compiler>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/CRAFTConverter" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+			<Add option="-fexceptions" />
+		</Compiler>
+		<Unit filename="CRAFTMode.cpp" />
+		<Unit filename="CRAFTMode.h" />
+		<Unit filename="Codec.h" />
+		<Unit filename="CodecCODIF.cpp" />
+		<Unit filename="CodecCODIF.h" />
+		<Unit filename="CodecVCRAFT.cpp" />
+		<Unit filename="CodecVCRAFT.h" />
+		<Unit filename="CodecVDIF1.cpp" />
+		<Unit filename="CodecVDIF1.h" />
+		<Unit filename="CommandLineParser.cpp" />
+		<Unit filename="CommandLineParser.h" />
+		<Unit filename="DFH.cpp" />
+		<Unit filename="DFH.h" />
+		<Unit filename="FileDescriptor.cpp" />
+		<Unit filename="FileDescriptor.h" />
+		<Unit filename="FileProcessor.cpp" />
+		<Unit filename="FileProcessor.h" />
+		<Unit filename="SampleData.cpp" />
+		<Unit filename="SampleData.h" />
+		<Unit filename="StdApp.h" />
+		<Unit filename="VCRAFTBitMode.cpp" />
+		<Unit filename="VCRAFTBitMode.h" />
+		<Unit filename="VCRAFTParser.cpp" />
+		<Unit filename="VCRAFTParser.h" />
+		<Unit filename="codifio.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="dateutils.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="dateutils.h" />
+		<Unit filename="main.cpp" />
+		<Extensions>
+			<code_completion />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
