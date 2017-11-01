@@ -405,9 +405,9 @@ namespace NCodec        // Part of the Codec namespace.
                 throw string { "setCODIFEpochMJD() failed" };
             }
 
-            // Use offset binary.
+            // Two's complement
 
-            setCODIFRepresentation(pDFH, 0 );
+            setCODIFRepresentation(pDFH, 1);
 
             // Clear the data frame counter and prepare to count data frames in a
             // CODIF Period.
