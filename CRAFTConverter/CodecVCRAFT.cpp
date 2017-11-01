@@ -27,7 +27,6 @@
 namespace
 {
     constexpr int iNumberOfVCRAFTChannels_c = 8;                    // VCRAFT number of channels.
-
     constexpr int iInputBlockSize_c         = 2 * 1042 * 1024;      // Make 2MB for now. NB: VCRAFT
                                                                     // data is sampled at 32/27 Msps so
                                                                     // we could use a multiple/divisor of this.
@@ -58,7 +57,8 @@ namespace NCodec
         assert( m_aHeaderStream.size() == iVCRAFTFileHeaderSizeInBytes_c );
 
         m_bBuffersInitialised = false;
-	m_iInputBlockSize = iInputBlockSize_c;
+
+        m_iInputBlockSize = iInputBlockSize_c;
     }
 
     //////////
@@ -185,8 +185,7 @@ namespace NCodec
 
             if ( ! m_bBuffersInitialised )
             {
-	      m_SampleData.SetSampleParams( m_iMode, m_iBitsPerSample,
-                                              m_iNumberOfChannels );
+                m_SampleData.SetSampleParams( m_iMode, m_iBitsPerSample, m_iNumberOfChannels );
 
                 m_bBuffersInitialised = true;
             }
@@ -205,21 +204,27 @@ namespace NCodec
         return bDataToProcess;
     }
 
-    bool CCodecVCRAFT::SeekForward(int skipBytes )
-    {
-        // Skip skipBytes forward through the file
-        return m_pFile->SeekForward(skipBytes);
-    }
-  
     //////////
     //
 
-    bool CCodecVCRAFT::setBlockSize(int blockSize)
+    bool CCodecVCRAFT::SeekForward( int iSkipBytes )
     {
-      m_iInputBlockSize = blockSize;
-      return true;
+        // Skip SkipBytes forward through the file
+        return m_pFile->SeekForward( iSkipBytes );
     }
-  
+
+    //////////
+    //
+
+    bool CCodecVCRAFT::SetBlockSize( int iBlockSize )
+    {
+        m_iInputBlockSize = iBlockSize;
+        return true;
+    }
+
+    //////////
+    //
+
     void CCodecVCRAFT::DumpHeader( void )
     {
         fprintf( stdout, "VCRAFT File header:\n size: %d, mode = %d, "
@@ -231,7 +236,6 @@ namespace NCodec
                          "FPGA id = %d, card = %d\n",
                             m_iBeamId, m_iBitsPerSample, m_iNumberOfWords,
                                 m_iFPGAId, m_iCardNumber );
-
     }
 
     //////////
@@ -297,8 +301,8 @@ namespace NCodec
             RetrieveParameter( "STOP_WRITE_BAT",        m_ullFinishWriteBAT );
             RetrieveParameter( "TRIGGER_BAT",           m_ullTriggerWriteBAT );
 
-	    m_iBitsPerSample /= 2;
-	    printf("Warning: Forcing NPOL==1\n");  m_iNumberofPol = 1;
+            m_iBitsPerSample /= 2;
+            printf("Warning: Forcing NPOL==1\n");  m_iNumberofPol = 1;
 
             // UTC string (ISO formatted) verbatim from the VCRAFT header.
 

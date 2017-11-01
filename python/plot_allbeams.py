@@ -321,8 +321,8 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
-        beams -= 128
-        beams /= 18
+        #beams -= 128
+        #beams /= 18
         f0 = files[0]
         self.beams = beams
         print 'Loaded beams', beams.shape
@@ -387,10 +387,14 @@ class Plotter(object):
         if imzmin is None and imzmax is None:
             self.imzrange = (bi.min(), bi.max())
             
-        fax.plot(bi.mean(axis=1)*np.sqrt(ntimes), freqs, label='mean')
+        fax.plot(bi.mean(axis=1), freqs, label='mean')
+        fax.plot(bi.max(axis=1), freqs, label='max')
+        fax.plot(bi.min(axis=1), freqs, label='min')
         #fax.plot(bi.std(axis=1)*np.sqrt(ntimes),freqs, label='std')
         fax.set_ylim(freqs.min(), freqs.max())
-        tax.plot(times, bi.mean(axis=0)*np.sqrt(nfreq), label='mean')
+        tax.plot(times, bi.mean(axis=0), label='mean')
+        tax.plot(times, bi.max(axis=0), label='max')
+        tax.plot(times, bi.min(axis=0), label='min')
         #tax.plot(times, bi.std(axis=0)*np.sqrt(nfreq), label='std')
         tax.set_xlim(times.min(), times.max())
 

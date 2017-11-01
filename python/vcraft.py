@@ -15,8 +15,27 @@ from crafthdr import DadaHeader
 bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
 frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 
+def unpack_craft(fin, nsamp_per_word):
+    dwords = np.fromfile(fin, dtype=np.uint32)
+    nwords = len(dwords)/nchan
+    nsamps = nwords*nsamp_per_word
+    assert len(dwords) == nchan*nwords
+    dwords.shape = (nwords, nchan)
+    
+    d = np.empty((nsamps, nchan, 2), dtype=np.int8)
+    bitshift = 32/nsamp_per_word
+    assert nsamp_per_word*bitshift == 32
+    
+    for samp in xrange(nsamp_per_word):
+        # convert from 4-bit two's complement to int8
+        d[samp::4, :, 0] = (dwords & 0xf) - (dwords & 0x8)*2 # real 
+        dwords >> 4
+        d[samp::4, :, 1] = (dwords & 0xf) - (dwords & 0x8)*2 # imag 
+        dwords >> 4
+        
+
 class VcraftFile(object):
-    def __init__(self, fname):
+    def __init__(self, fname, mode=None):
         self.fname = fname
         f = fname
         hdr = DadaHeader.fromfile(f)
@@ -24,7 +43,11 @@ class VcraftFile(object):
         self.fin = open(f, 'r')
         self.hdrsize = int(hdr['HDR_SIZE'][0])
         self.fin.seek(self.hdrsize)
-        self.mode = int(hdr['CRAFT_MODE'][0]) & 0x3
+        if mode is None:
+            self.mode = int(hdr['CRAFT_MODE'][0]) & 0x3
+        else:
+            self.mode = mode
+            
         self.nbits = int(hdr['NBITS'][0])
         self.infsamp = float(hdr['SAMP_RATE'][0])
         # TODO: Calculate frequencies a bit better - tricky because individual
@@ -54,6 +77,7 @@ class VcraftFile(object):
         mode = self.mode
         fin = self.fin
         nchan = len(self.freqs)
+
         self.fin.seek(self.hdrsize)
 
         if mode == 0: # 16b+16b
@@ -62,32 +86,65 @@ class VcraftFile(object):
             assert 2*nchan*nsamps == len(d), 'Not integral number of samples'
             d.shape = (nsamps, nchan, 2)
         elif mode == 1: # 8b + 8b:
-            d = np.fromfile(fin, dtype=np.int8)
-            nsamps = len(d)/2/nchan
-            assert 2*nchan*nsamps == len(d), 'Not integral number of samples'
-            d.shape = (nsamps, nchan, 2)
-        elif mode == 2: # 4b+4b
-            dbytes = np.fromfile(fin, dtype=np.int8)
-            nsamps = len(dbytes)/2/nchan*2
-            assert len(dbytes) == nsamps*nchan
+
+            # This works perfectly, but we need some practice at the other method with non-native types
+            #d = np.fromfile(fin, dtype=np.int8)
+            #print 'mode1 = 8+8', d[0:6]
+            #nsamps = len(d)/2/nchan
+            #assert 2*nchan*nsamps == len(d), 'Not integral number of samples'
+            # each 32 bit word contains 4x8 bit numbers imag/real/imag/real is two seuential samplesfrom a single channel
+            #d.shape =(nsamps/2, nchan, 2, 2)
+            # let's put those axes next to each other
+            #d = d.transpose(0,2,1,3)
+            # and reshape it to the orrect shape
+            #d = d.reshape(nsamps, nchan, 2)
+            dwords = np.fromfile(fin, dtype=np.uint32)
+            # each word contains 4 8 bit numbers, (imag/real)*2
+            nwords = len(dwords)/nchan
+            assert len(dwords) == nchan*nwords
+            dwords.shape = nwords, nchan
+
+            nsamps = nwords*2
             d = np.empty((nsamps, nchan, 2), dtype=np.int8)
-            dbytes.shape = (nsamps, nchan)
-            d[:, :, 0] = (dbytes & 0xf) - (dbytes & 0x8)*2 # real
-            dbytes >>= 4
-            d[:, :, 1] = (dbytes & 0xf) - (dbytes & 0x8)*2 # imag
+            for samp in xrange(2):
+                # convert from 4-bit two's complement to int8
+                d[samp::2, :, 0] = (dwords & 0xff) - (dwords & 0x80)*2 # real 
+                dwords >> 8
+                d[samp::2, :, 1] = (dwords & 0xff) - (dwords & 0x80)*2 # imag 
+                dwords >> 8
+
+            
+        elif mode == 2: # 4b+4b
+            # each 32 bit word contais 8 4 bit numbers (imag/real)*4 for the same channel
+            dwords = np.fromfile(fin, dtype=np.uint32)
+            nwords = len(dwords)/nchan
+            nsamps = nwords*4
+            assert len(dwords) == nchan*nwords
+            dwords.shape = (nwords, nchan)
+            
+            d = np.empty((nsamps, nchan, 2), dtype=np.int8)
+
+            for samp in xrange(4):
+                # convert from 4-bit two's complement to int8
+                d[samp::4, :, 0] = (dwords & 0xf) - (dwords & 0x8)*2 # real 
+                dwords >> 4
+                d[samp::4, :, 1] = (dwords & 0xf) - (dwords & 0x8)*2 # imag 
+                dwords >> 4
         
         elif mode == 3: # 1b+1b
-            dbytes = np.fromfile(fin, dtype=np.int8)
-            nsamps = len(dbytes)/2/nchan*4
-            assert len(dbytes) == nsamps*nchan*4
+            # each 32 bit word contais 32 1 bit numbers (imag/real)*16 for the same channel
+            dwords = np.fromfile(fin, dtype='<i32')
+            nwords = len(dwords)/nchan
+            assert len(dwords) == nchan*nwords
+            nsamps = nwords*16
             d = np.empty((nsamps, nchan, 2), dtype=np.int8)
-            dbytes.shape = (nsamps, nchan)
-            for t in xrange(4):
+            dwords.shape = (nwords, nchan)
+            for samp in xrange(16):
                 # Convert 0 into +1 and 1 into -1
-                d[t::4, :, 0] = 1 - 2*(dbytes & 0x1) # real
-                dbytes >>= 1
-                d[t::4, :, 1] = 1 - 2*(dbytes & 0x1) # imag
-                dbytes >>= 1
+                d[samp::16, :, 0] = 1 - 2*(dwords & 0x1) # real
+                dwords >>= 1
+                d[samp::16, :, 1] = 1 - 2*(dwords & 0x1) # imag
+                dwords >>= 1
 
         else:
             raise ValueError('Unsupported mode (yet) {}'.format(mode))

@@ -13,6 +13,7 @@ import sys
 import logging
 from crafthdr import DadaHeader
 from sigproc import SigprocFile
+import vcraft
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -37,12 +38,11 @@ bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
 frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 
 def detect(f, values):
-    hdr = DadaHeader.fromfile(f)
-    fin = open(f, 'r')
-    hdrsize = int(hdr['HDR_SIZE'][0])
-    fin.seek(hdrsize)
-    mode = int(hdr['CRAFT_MODE'][0]) & 0x3
-    nbits = int(hdr['NBITS'][0])
+    vfile = vcraft.VcraftFile(values.files[0])
+
+    hdr = vfile.hdr
+    df = vfile.read()
+    nsamps, nchan = df.shape
     infsamp = float(hdr['SAMP_RATE'][0])
     tsamp = float(values.nsamps)/infsamp
     # TODO: Calculate frequencies a bit better - tricky because individual
@@ -56,6 +56,8 @@ def detect(f, values):
     frames = np.array([int(hdr[c][0]) for c in frame_cards])
     bat0 = int(hdr['NOW_BAT'][0], base=16)
     bat0_40 = bat0 & 0xffffffffff
+    nbits = 32
+    
 
     print 'BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6
     # lowest 32 bits of bat from the time the file was written
@@ -67,7 +69,7 @@ def detect(f, values):
            'tstart': tstart,
            'fch1':fch1,
            'foff':foff,
-           'nbits':32,
+           'nbits':nbits,
            'nifs':1,
            'nchans':8,
            'src_raj':0.0,
@@ -78,55 +80,17 @@ def detect(f, values):
     fout = SigprocFile(foutname, 'w', hdr)
     nchan = len(freqs)
            
-    # See https://svn.atnf.csiro.au/askapsoft/Src/trunk/Code/Base/adbe/current/adbe/Beamformer.cc
-    if mode == 0: # 16b+16b
-        d = np.fromfile(fin, dtype=np.int16)
-        nsamps = len(d)/2/nchan
-        assert 2*nchan*nsamps == len(d), 'Not integral number of samples'
-        
-        d.shape = (nsamps, nchan, 2)
-    elif mode == 1: # 8b + 8b:
-        d = np.fromfile(fin, dtype=np.int8)
-        nsamps = len(d)/2/nchan
-        assert 2*nchan*nsamps == len(d), 'Not integral number of samples'
-        d.shape = (nsamps, nchan, 2)
-    elif mode == 2: # 4b+4b
-        dbytes = np.fromfile(fin, dtype=np.int8)
-        nsamps = len(dbytes)/2/nchan*2
-        assert len(dbytes) == nsamps*nchan
-        d = np.empty((nsamps, nchan, 2), dtype=np.int8)
-        dbytes.shape = (nsamps, nchan)
-        d[:, :, 0] = (dbytes & 0xf) - (dbytes & 0x8)*2 # real
-        dbytes >>= 4
-        d[:, :, 1] = (dbytes & 0xf) - (dbytes & 0x8)*2 # imag
-        
-    elif mode == 3: # 1b+1b
-        dbytes = np.fromfile(fin, dtype=np.int8)
-        nsamps = len(dbytes)/2/nchan*4
-        assert len(dbytes) == nsamps*nchan*4
-        d = np.empty((nsamps, nchan, 2), dtype=np.int8)
-        dbytes.shape = (nsamps, nchan)
-        for t in xrange(4):
-            # Convert 0 into +1 and 1 into -1
-            d[t::4, :, 0] = 1 - 2*(dbytes & 0x1) # real
-            dbytes >>= 1
-            d[t::4, :, 1] = 1 - 2*(dbytes & 0x1) # imag
-            dbytes >>= 1
-
-    else:
-        raise ValueError('Unsupported mode (yet) {}'.format(mode))
-        
-
-    df = np.empty((nsamps, nchan), dtype=np.complex64)
-    df.real = d[:, :, 0]
-    df.imag = d[:, :, 1]
     
     # detect
     dout = abs(df)**2
+    
     dfil = np.add.reduceat(dout, np.arange(0, nsamps, values.nsamps), axis=0)
     # get rid of last sample
     dfil = dfil[0:-1:, :]
-    print 'Input shape', d.shape, 'output shape', dfil.shape
+    # subtract mean over time
+    dfil -= dfil.mean(axis=0)
+    dfil /= dfil.std(axis=0)
+    print 'Input shape', df.shape, 'output shape', dfil.shape
     
     
     dfil.tofile(fout.fin)
@@ -151,11 +115,17 @@ def detect(f, values):
         axes[1].set_xlabel('Imag Codeword')
         axes[0].set_xlim(df.real.min(), df.real.max())
 
-        pylab.figure()
+        fig, ax = pylab.subplots(3,3, sharex=True)
         int_times = np.arange(dfil.shape[0])*tsamp
-        pylab.plot(int_times, dfil)
-        pylab.xlabel('Time (s)')
-        pylab.ylabel('Power')
+        ax = ax.flatten()
+        for f in xrange(nchan):
+            ax[f].plot(int_times*1e3, dfil[:, f])
+            ax[f].set_xlabel('Time (ms)')
+            ax[f].set_ylabel('Power')
+
+        pylab.figure()
+        pylab.imshow(dfil.T, aspect='auto', interpolation='None')
+
         pylab.figure()
         df = np.fft.rfft(dfil, axis=0)
         fsamp = 1./tsamp
