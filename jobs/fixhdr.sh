@@ -19,7 +19,7 @@ thedir=$1
 thebase=`basename $thedir`
 # Array = co or ak
 array=co
-pset=$GHOME/fixheaders/$array/sbpars/
+pset=/home/ban115/fixheaders/$array/sbpars/
 parset=$pset/${thebase}.parset
 sblist=$pset/sblist.txt
 
@@ -36,3 +36,5 @@ if [[ ! -e $sblist ]] ; then
 fi
 
 find $thedir -name "${array}*.hdr" | xargs fix_headers.py --parset $parset  --sblist  $sblist --fix
+find $thedir -name "${array}*.hdr.v2" | xargs summarise_scans.py --write-meta-files --outfile /home/ban115/archive/v7/$thebase.json
+
