@@ -38,7 +38,7 @@ def fixlon(l):
     
     return l
 
-metafile_cards = ('tsamp','az_start','duration_secs','za_start','data_size_bytes','nifs','filesize','nbits','source','foff','tstart','beamra','beamdec','nchans','data_type','abspath','beamno','field_name','fch1','nsamples')
+metafile_cards = ('tsamp','az_start','duration_secs','za_start','nifs','nbits','source','foff','tstart','beamra','beamdec','nchans','data_type','beamno','field_name','fch1','nsamples')
 
 def write_filterbank_meta_file(f, summary, fb, values):
     filname = fb['abspath']
@@ -48,8 +48,8 @@ def write_filterbank_meta_file(f, summary, fb, values):
     asset = {}
     #asset['namespace'] = namespace
     #asset['name'] = filshort
-    asset['geoshape/point/latitude'] = fb['beamra']
-    asset['geoshape/point/longitude'] = fb['beamdec']
+    asset['geoshape/point/latitude'] = fb['beamdec']
+    asset['geoshape/point/longitude'] = fb['beamra']
     asset['geoshape/point/elevation'] = 0
     #asset['geoshape/datum'] = 'J2000'
 
@@ -59,15 +59,10 @@ def write_filterbank_meta_file(f, summary, fb, values):
         metafile.write('{} = "{}"\n'.format(k, str(v)))
 
 
-    filterbank = dict(fb)
-#    for c in metafile_cards:
- #       filterbank[c] = fb[c]
-    del filterbank['beamradec']
-    del filterbank['filesize']
-    del filterbank['abspath']
-    del filterbank['atime']
-    del filterbank['mtime']
-    del filterbank['ctime']
+    filterbank = {}
+    for c in metafile_cards:
+        filterbank[c] = fb[c]
+
     metafile.write('\n\n[filterbank]\n')
     for k, v in filterbank.iteritems():
         metafile.write('{} = "{}"\n'.format(k, str(v)))
@@ -135,12 +130,13 @@ def summarise_scan(f):
     dec = d['dec']
     del d['ra']
     del d['dec']
-    d['ant_direction'] = [fixlon(ra), dec]
+    d['ant_direction'] = [dec, fixlon(ra)]
     beam_ra = d['beam_ra']
     beam_dec = d['beam_dec']
     del d['beam_ra']
     del d['beam_dec']
-    d['beam_directions'] = zip(map(fixlon, beam_ra), beam_dec)
+    # convention for elasticsearch is lat, lon, latitude first.
+    d['beam_directions'] = zip( beam_dec, map(fixlon, beam_ra))
     d['scanname'] = os.path.abspath(f).split('/')[-4]
     assert d['scanname'].startswith('201')
 
@@ -151,9 +147,9 @@ def summarise_scan(f):
         f = {}
         beamno = int(ff.split('.')[-2])
         f['beamno'] = beamno
-        f['beamra'] = d['beam_directions'][beamno][0]
-        f['beamdec'] = d['beam_directions'][beamno][1]
-        f['beamradec'] = d['beam_directions']
+        f['beamra'] = d['beam_directions'][beamno][1]
+        f['beamdec'] = d['beam_directions'][beamno][0]
+        f['beam_direction'] = d['beam_directions'][beamno]
         f['abspath'] = os.path.abspath(ff)
         f['atime'] = int(os.path.getatime(ff))
         f['mtime'] = int(os.path.getmtime(ff))
@@ -169,6 +165,7 @@ def summarise_scan(f):
         f['nsamples'] = fpfile.nsamples
         f['duration_secs'] = fpfile.observation_duration
         f['duration_hrs'] = fpfile.observation_duration/3600.
+        f['duration_days'] = fpfile.observation_duration/86400.
         f['source'] = d['source']
         f['field_name'] = d['field_name']
         fdetails.append(f)
@@ -181,6 +178,8 @@ def summarise_scan(f):
         d['scan_start'] = tstart.isot
         d['tsamp'] = fdetails[0]['tsamp']
         d['duration_secs'] = fdetails[0]['duration_secs']
+        d['duration_hrs'] = fdetails[0]['duration_hrs']
+        d['duration_days'] = fdetails[0]['duration_days']
         d['nbits'] =  int(fdetails[0]['nbits'])
         d['nifs'] = int(fdetails[0]['nifs'])
 
