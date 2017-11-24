@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --nodes=1
 #SBATCH --time=8:00:00
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=12
 
 export CRAFT=/home/ban115/craft/craft/
 export PATH=$CRAFT/cuda-fdmt/cudafdmt/src:$CRAFT/python:$PATH:/home/ban115/bin:$CRAFT/jobs/
