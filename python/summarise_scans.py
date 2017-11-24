@@ -182,6 +182,7 @@ def summarise_scan(f):
         d['duration_days'] = fdetails[0]['duration_days']
         d['nbits'] =  int(fdetails[0]['nbits'])
         d['nifs'] = int(fdetails[0]['nifs'])
+        d['total_filesize'] = sum([f['filesize'] for f in fdetails])
 
     return d
 
