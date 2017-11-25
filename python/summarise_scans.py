@@ -130,13 +130,13 @@ def summarise_scan(f):
     dec = d['dec']
     del d['ra']
     del d['dec']
-    d['ant_direction'] = [dec, fixlon(ra)]
+    d['ant_direction'] = [fixlon(ra), dec]
     beam_ra = d['beam_ra']
     beam_dec = d['beam_dec']
     del d['beam_ra']
     del d['beam_dec']
     # convention for elasticsearch is lat, lon, latitude first.
-    d['beam_directions'] = zip( beam_dec, map(fixlon, beam_ra))
+    d['beam_directions'] = zip(  map(fixlon, beam_ra), beam_dec))
     d['scanname'] = os.path.abspath(f).split('/')[-4]
     assert d['scanname'].startswith('201')
 
@@ -147,8 +147,8 @@ def summarise_scan(f):
         f = {}
         beamno = int(ff.split('.')[-2])
         f['beamno'] = beamno
-        f['beamra'] = d['beam_directions'][beamno][1]
-        f['beamdec'] = d['beam_directions'][beamno][0]
+        f['beamra'] = d['beam_directions'][beamno][0]
+        f['beamdec'] = d['beam_directions'][beamno][1]
         f['beam_direction'] = d['beam_directions'][beamno]
         f['abspath'] = os.path.abspath(ff)
         f['atime'] = int(os.path.getatime(ff))
@@ -182,6 +182,7 @@ def summarise_scan(f):
         d['duration_days'] = fdetails[0]['duration_days']
         d['nbits'] =  int(fdetails[0]['nbits'])
         d['nifs'] = int(fdetails[0]['nifs'])
+        d['total_filesize'] = sum([f['filesize'] for f in fdetails])
 
     return d
 

@@ -19,6 +19,6 @@ echo `date` starting fixheaders
 
 CRAFTDATA=/scratch2/askap/askapops/craft/co/
 
-ls -d $CRAFTDATA/SB* | parallel -j 128 fixhdr.sh
+ls -d $CRAFTDATA/SB00* | parallel -j 24 fixhdr.sh
 
 echo `date` finished fixheaders

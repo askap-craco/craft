@@ -1,4 +1,4 @@
-PUT craftscans
+curl -XPUT 'akingest01.atnf.csiro.au:9200/craftscans?pretty' -d 'Content-Type:application/json' -d'
 {
  "mappings": {
    "antscan": {
@@ -33,4 +33,4 @@ PUT craftscans
      }
    }
  }
-}
+}'
