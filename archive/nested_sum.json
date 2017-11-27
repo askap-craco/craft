@@ -1,0 +1,19 @@
+GET /craftscans/antscan/_search
+{
+  "size": 0,
+  "aggs": {
+    "filterbanks": {
+      "nested": {
+        "path": "filterbanks"
+      },
+      "aggs": {
+        "sum_filesize": {
+          "sum": {
+            "field": "filterbanks.filesize"
+          }
+        }
+      }
+    }
+  }
+  
+}
