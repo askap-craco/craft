@@ -29,18 +29,22 @@ shift $((OPTIND-1))
 for f in $@ ; do
     f=`basename $f`
     echo "Checking $f"
+    cmpfile="/tmp/$f.compare"
     if [[ ! -d $f ]] ; then
 	echo $f is not an SB
 	continue
     fi
-
-    pshellresult=`pshell "cd $pdir && compare $f" | grep -v meta | tee $f.compare`
+    pshellresult=`pshell "cd $pdir && compare $f" | grep -v meta | tee $cmpfile`
     pshellerr=$?
     echo "PSHELL returned code $pshellerr"
-    nmissing=`echo $pshellresult | awk '/=== Missing remote/{flag=1;next}/=== Compare complete/{flag=0}flag' < $f.compare| wc -l`
+    if [[ $pshellerr != 0 ]] ; then
+	echo "PSHELL FAILED. Quitting"
+	exit 1
+    fi
 
+    nmissing=`echo $pshellresult | awk '/=== Missing remote/{flag=1;next}/=== Compare complete/{flag=0}flag' < $cmpfile  wc -l`
+    rm $cmpfile
     echo "Missing $nmissing" files
-    rm $f.compare
     if [[ $nmissing == 0 ]] ; then
 	echo "$f No missing files"
     else
@@ -68,5 +72,7 @@ for f in $@ ; do
 		exit $delret
 	    fi
 	fi
+    else
+	echo "$f CANNOT be safely deleted"
     fi
 done
