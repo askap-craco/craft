@@ -61,7 +61,9 @@ for f in $@ ; do
 	    echo "Deleting filterbanks in $f"
 	    find $f -name '*.fil' -delete
 	    delret=$?
-	    if [[ $delret != 0 ]] ; then
+	    if [[ $delret == 0 ]] ; then
+		echo "Filterbanks successfully deleted"
+	    else
 		echo "Delete failed with error code $delret"
 		exit $delret
 	    fi
