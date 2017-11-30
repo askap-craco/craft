@@ -32,6 +32,19 @@ def guess_intent(s):
 
 name_map = {'16:44:49.281,-45:59:09.5':'J1644-4559'}
 
+
+def fixra(ra):
+    # we have a stupid bug where we put the wrong ra in. So for RA > 180, I think we need to reset it to
+
+    if ra < 0:
+        ra = -ra + 180
+
+    if ra > 180:
+        ra = ra - 360
+        
+    return ra
+
+
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
@@ -80,6 +93,9 @@ def _main():
                 s['duration_hrs'] = s['duration_secs']/3600.
 
                 ra, dec = s['ant_direction']
+                ra = fixra(ra)
+                s['ant_direction'] = (ra, dec)
+
                 pos = SkyCoord(ra, dec, unit='deg')
                 try:
                     src = pset.get_nearest_source(pos)
@@ -92,11 +108,15 @@ def _main():
                     s['source']  = src['src']
                     s['target'] = field_name
                     s['field_name'] = field_name
+                    print field_name, src['src'], ra, dec, s['ant_direction'], s['filterbanks'][0]['source_name'], s['antname'], s['scanname']
+                    s['beam_directions'] = [(fixra(ra), dec) for ra, dec in s['beam_directions']]
+
                 except ValueError, e:
-                    logging.exception('Couldnnt find neares source for scan s%s', s)
+                    logging.exception('Couldnnt find neares source forra=%s dec=%s pos=%s', ra, dec, pos)
                     s['source'] = 'UNKNOWN'
                     s['target'] = 'UNKNOWN'
                     s['field_name'] = 'UNKNOWN'
+                    assert False
 
                 if 'footprint_pitch' not in s.keys():
                     s['footprint_pitch'] = 0
