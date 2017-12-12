@@ -70,8 +70,10 @@ for f in $@ ; do
 		cp $metafile ${tarfile}.meta
 	    fi
 	    echo "Taring $antdir to $tarfile"
-	    tar -cvf $tarfile $antdir/*
+	    pushd $antdir
+	    tar -cvf $tarfile .
 	    tarerr=$?
+	    popd
 	    if [[ $tarerr != 0 ]] ; then
 		echo "Tar failed with $tarerr. Exiting"
 		exit $tarerr
