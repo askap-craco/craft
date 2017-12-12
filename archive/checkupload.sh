@@ -42,7 +42,7 @@ for f in $@ ; do
 	exit 1
     fi
 
-    nmissing=`echo $pshellresult | awk '/=== Missing remote/{flag=1;next}/=== Compare complete/{flag=0}flag' < $cmpfile  wc -l`
+    nmissing=`echo $pshellresult | awk '/=== Missing remote/{flag=1;next}/=== Compare complete/{flag=0}flag' < $cmpfile | wc -l`
     rm $cmpfile
     echo "Missing $nmissing" files
     if [[ $nmissing == 0 ]] ; then
