@@ -136,7 +136,7 @@ def summarise_scan(f):
     del d['beam_ra']
     del d['beam_dec']
     # convention for elasticsearch is lat, lon, latitude first.
-    d['beam_directions'] = zip(  map(fixlon, beam_ra), beam_dec))
+    d['beam_directions'] = zip(map(fixlon, beam_ra), beam_dec)
     d['scanname'] = os.path.abspath(f).split('/')[-4]
     assert d['scanname'].startswith('201')
 
