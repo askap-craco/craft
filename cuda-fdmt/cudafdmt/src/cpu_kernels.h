@@ -8,7 +8,7 @@
 #ifndef CPU_KERNELS_H_
 #define CPU_KERNELS_H_
 
-#import "array.h"
+#include "array.h"
 
 void cpu_copy1(fdmt_dtype* dst, const fdmt_dtype* src, const int count) {
 	assert(count >= 0);

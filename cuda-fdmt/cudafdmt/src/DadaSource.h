@@ -15,7 +15,7 @@
 
 class DadaSource: public fdmt::DataSource {
 public:
-	DadaSource(key_t key);
+	DadaSource(key_t key, bool lock);
 	virtual ~DadaSource();
 
 	int get_header_int(const char* name);
@@ -47,8 +47,8 @@ public:
 	}
 
 private:
-	dada_hdu_t* m_hdu = 0;
-	char* m_hdr = 0;
+	dada_hdu_t* m_hdu;
+	char* m_hdr;
     int m_npols;
     int m_nbeams;
     int m_nchans;

@@ -78,7 +78,6 @@ public:
 	size_t seek_sample(size_t t);
 
 
-
 private:
 	double m_fch1;
 	double m_foff;
