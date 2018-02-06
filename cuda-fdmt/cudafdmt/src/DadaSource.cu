@@ -78,11 +78,11 @@ DadaSource::DadaSource(int key, bool lock) {
 	ipcbuf_mark_cleared (m_hdu->header_block);
 
 	m_npols = get_header_int("NPOL");
-	m_nbeams = get_header_int("NBEAMS");
-	m_nchans = get_header_int("NCHANS");
+	m_nbeams = get_header_int("NBEAM");
+	m_nchans = get_header_int("NCHAN");
 	m_tsamp = get_header_double("TSAMP");
-	m_fch1 = get_header_double("FCH1");
-	m_foff = get_header_double("FOFF");
+	m_fch1 = get_header_double("FREQ");
+	m_foff = get_header_double("BW");
 	m_tstart = get_header_double("MJD_START");
 
 }

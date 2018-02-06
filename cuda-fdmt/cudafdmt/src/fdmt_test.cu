@@ -214,15 +214,22 @@
 			SigprocFileSet* fs_source = new SigprocFileSet(argc, argv);
 			source = fs_source;
 		} catch (InvalidSourceFormat& e) {
-			DadaSource* dada_source = new DadaSource(atoi(argv[0]), true);
-			source = dada_source;
+			try {
+				int key;
+				sscanf(argv[0], "%x",&key);
+				DadaSource* dada_source = new DadaSource(key, true);
+				source = dada_source;
+			} catch (InvalidSourceFormat& e) {
+				printf("No valid inputs\n");
+				exit(EXIT_FAILURE);
+			}
 		}
 		assert(source != NULL);
 
 		bool negdm = (nd < 0);
 		CandidateSink sink(source, out_filename, negdm);
 		cout << "spf tsamp " << source->tsamp()<< " nbeams " << source->nbeams() << " fch1 " << source->fch1() << " nchans "
-				<< source->nchans() << "foff " << source->foff() << endl;
+				<< source->nchans() << " foff " << source->foff() << endl;
 		int nbeams = source->nbeams();
 		int nf = source->nchans();
 		size_t in_chunk_size = nbeams*nf*nt;
