@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <math.h>
+#include "InvalidSourceFormat.h"
 
 /* Same as strstr but goes through *all* the string - even if it contains nulls
  *
@@ -39,8 +40,7 @@ SigprocFile::SigprocFile(const char* filename) {
 
 	if (! m_file) {
 		printf("SigprocFile: could not open file: %s - %s\n",filename, strerror(errno));
-		assert(m_file);
-		exit(EXIT_FAILURE);
+		throw InvalidSourceFormat();
 	}
 
 	// find end of header
@@ -48,8 +48,7 @@ SigprocFile::SigprocFile(const char* filename) {
 	char* hdr_end = mystrnstr(m_hdr, "HEADER_END", MAX_HDR_SIZE);
 	if (hdr_end == NULL) {
 		printf("SigprocFile: File %s does not contain HEADER_END\n", filename);
-		assert(hdr_end != NULL);
-		exit(EXIT_FAILURE);
+		throw InvalidSourceFormat();
 	}
 	// TODO: Check it starts with HEADER_START
 	m_hdr_nbytes = (size_t)((hdr_end - m_hdr) + strlen("HEADER_END"));
@@ -139,15 +138,3 @@ double SigprocFile::last_sample_mjd()
 	double mjd = m_tstart + last_sample_elapsed_seconds()/86400.0;
 	return mjd;
 }
-
-float SigprocFile::dm_of_idt(int idt)
-{
-	float nu1 = m_fch1/1e3;
-	float nu2 = (m_fch1 + m_foff*m_nchans)/1e3;
-	float dm = fabs(idt*m_tsamp / 4.15e-3 / (1.0/(nu1*nu1) - 1.0/(nu2*nu2)));
-
-	return dm;
-}
-
-
-

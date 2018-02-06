@@ -6,11 +6,10 @@
  */
 
 #include "CandidateSink.h"
-#include "SigprocFileSet.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-CandidateSink::CandidateSink(SigprocFileSet* srcfile, const char* filename, bool negdm) {
+CandidateSink::CandidateSink(DataSource* srcfile, const char* filename, bool negdm) {
 	m_srcfile = srcfile;
 	m_negdm = negdm;
 	if (filename == NULL) {
@@ -28,8 +27,10 @@ CandidateSink::CandidateSink(SigprocFileSet* srcfile, const char* filename, bool
 }
 
 CandidateSink::~CandidateSink() {
-	fflush(m_candfile);
-	fclose(m_candfile);
+	if (m_candfile) {
+		fflush(m_candfile);
+		fclose(m_candfile);
+	}
 }
 
 void CandidateSink::add_candidate(int ibeam, int idt, int t, int ibc, float sn)

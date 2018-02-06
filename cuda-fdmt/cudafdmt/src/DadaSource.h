@@ -13,9 +13,9 @@
 #include "dada_def.h"
 #include "ipcio.h"
 
-class DadaSource: public fdmt::DataSource {
+class DadaSource: public DataSource {
 public:
-	DadaSource(key_t key, bool lock);
+	DadaSource(int key, bool lock);
 	virtual ~DadaSource();
 
 	int get_header_int(const char* name);
@@ -45,6 +45,10 @@ public:
 	double foff() {
 		return m_foff;
 	}
+	size_t read_samples_uint8(size_t nt, uint8_t* output);
+	size_t seek_sample(size_t t);
+	size_t samples_read();
+	char* name();
 
 private:
 	dada_hdu_t* m_hdu;

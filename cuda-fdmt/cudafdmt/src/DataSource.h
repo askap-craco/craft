@@ -9,8 +9,8 @@
 #define DATASOURCE_H_
 #include <stdio.h>
 #include <stdint.h>
+#include "CpuTimer.h"
 
-namespace fdmt {
 
 class DataSource {
 public:
@@ -30,11 +30,21 @@ public:
 	virtual size_t seek_sample(size_t t) = 0;
 	virtual size_t samples_read() =0;
 	virtual char* name() = 0;
-	virtual float dm_of_idt(int idt) = 0;
+	float dm_of_idt(int idt) {
+
+			float nu1 = fch1()/1e3;
+			float nu2 = (fch1() + foff()*nchans())/1e3;
+			float dm = fabs(idt*tsamp() / 4.15e-3 / (1.0/(nu1*nu1) - 1.0/(nu2*nu2)));
+
+			return dm;
+
+	};
+
+
+	CpuTimer m_read_timer;
+
 
 
 };
-
-} /* namespace fdmt */
 
 #endif /* DATASOURCE_H_ */

@@ -1,17 +1,18 @@
 #CUDA_PATH?=/Developer/NVIDIA/CUDA-7.5
 #CUDA_PATH=/usr/local/cuda-5.5/
 CUDA_PATH=$(CUDA)
-objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_test.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o CandidateList.o
+objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_test.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o CandidateList.o DadaSource.o  InvalidSourceFormat.o
 NVCC=$(CUDA_PATH)/bin/nvcc
 CUB_PATH=$(HOME)/build/cub/cub-1.6.4/cub/
+DADA_PATH=$(HOME)/psrdada-install
 
 #Embed version
 # See http://stackoverflow.com/questions/1704907/how-can-i-get-my-c-code-to-automatically-print-out-its-git-version-hash
 GIT_VERSION := $(shell git describe --dirty --always --tags)
 
-NVCCFLAGS=-g -O3 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_61,code=sm_61  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH)
+NVCCFLAGS=-g -O3 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_61,code=sm_61  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH) -I$(DADA_PATH)/include
 
-NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=compute_61,code=compute_61 -gencode arch=compute_61,code=sm_61 -link -Xcompiler -fopenmp
+NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=compute_61,code=compute_61 -gencode arch=compute_61,code=sm_61 -link -Xcompiler -fopenmp -lpsrdada -L$(DADA_PATH)/lib
 
 # Force rebuild on git change:http://stackoverflow.com/questions/3236145/force-gnu-make-to-rebuild-objects-affected-by-compiler-definition
 

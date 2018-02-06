@@ -10,15 +10,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include "InvalidSourceFormat.h"
 
-DadaSource::DadaSource(key_t key, bool lock) {
+DadaSource::DadaSource(int key, bool lock) {
 	m_hdu = dada_hdu_create(NULL); // create hdu without logger
 	assert(m_hdu != NULL);
-	dada_hdu_set_key(m_hdu, key);
+	dada_hdu_set_key(m_hdu, (key_t)key);
 	// connect to the ringbuffer
 	if (dada_hdu_connect(m_hdu) < 0) {
 		printf("Could not connect to DADA buffer key=0x%x\n", key);
-		exit(EXIT_FAILURE);
+		throw InvalidSourceFormat();
 	}
 
 	if (lock) {
@@ -113,4 +114,20 @@ double DadaSource::get_header_double(const char* name) {
 		exit(EXIT_FAILURE);
 	}
 	return d;
+}
+size_t DadaSource::read_samples_uint8(size_t nt, uint8_t* output)
+{
+	return size_t(0);
+}
+size_t DadaSource::seek_sample(size_t t)
+{
+	return size_t(0);
+}
+size_t DadaSource::samples_read()
+{
+	return size_t(0);
+}
+char* DadaSource::name()
+{
+	return "Hello";
 }

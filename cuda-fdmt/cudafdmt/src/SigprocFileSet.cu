@@ -39,8 +39,8 @@ SigprocFileSet::~SigprocFileSet() {
 
 size_t SigprocFileSet::read_samples_uint8(size_t nt, uint8_t* output)
 {
+	m_read_timer.start();
 	// Returns BFT ordering
-	read_timer.start();
 	int beamno = 0;
 	size_t nread;
 	for(int i = 0; i < m_files.size(); i++) {
@@ -51,6 +51,6 @@ size_t SigprocFileSet::read_samples_uint8(size_t nt, uint8_t* output)
 		}
 		beamno += fin->nbeams();
 	}
-	read_timer.stop();
+	m_read_timer.stop();
 	return nread;
 }

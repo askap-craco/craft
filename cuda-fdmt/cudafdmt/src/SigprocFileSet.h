@@ -11,11 +11,9 @@
 #include <vector>
 #include "DataSource.h"
 #include "SigprocFile.h"
-#include "CpuTimer.h"
 
 
-//class FileGroup : public fdmt::DataSource { // GOD I hate C++ classes
-class SigprocFileSet {
+class SigprocFileSet : public DataSource {
 
 public:
 	SigprocFileSet(int argc, char* filenames[]);
@@ -39,6 +37,9 @@ public:
 	int nchans() {
 		return first_file->nchans();
 	}
+	int npols() {
+		return first_file->npols();
+	}
 	int nants() {
 		return 1;
 	}
@@ -55,7 +56,7 @@ public:
 		return first_file->curr_sample();
 	}
 
-	size_t seek_sample(int t) {
+	size_t seek_sample(size_t t) {
 		size_t boff;
 		for(int i = 0; i < m_files.size(); i++) {
 			boff = m_files.at(i)->seek_sample(t);
@@ -64,9 +65,6 @@ public:
 	}
 
 	size_t read_samples_uint8(size_t nt, uint8_t* output);
-
-	CpuTimer read_timer;
-
 
 private:
 	std::vector<SigprocFile*> m_files;

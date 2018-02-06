@@ -7,7 +7,6 @@
 
 #include "DataSource.h"
 
-namespace fdmt {
 
 DataSource::DataSource() {
 	// TODO Auto-generated constructor stub
@@ -17,5 +16,3 @@ DataSource::DataSource() {
 DataSource::~DataSource() {
 	// TODO Auto-generated destructor stub
 }
-
-} /* namespace fdmt */

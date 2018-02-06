@@ -22,7 +22,7 @@ const size_t MAX_HDR_SIZE = 4096;
  *
  * @see http://sigproc.sourceforge.net/sigproc.pdf
  */
-class SigprocFile : public fdmt::DataSource {
+class SigprocFile : public DataSource {
 public:
 	SigprocFile(const char* filename);
 	virtual ~SigprocFile();
@@ -32,7 +32,6 @@ public:
 	size_t read_samples_uint8(size_t nt, uint8_t* output);
 	double last_sample_elapsed_seconds();
 	double last_sample_mjd();
-	float dm_of_idt(int idt);
 
 	int nifs() {
 		return m_nifs;
