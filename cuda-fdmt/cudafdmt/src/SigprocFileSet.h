@@ -39,6 +39,9 @@ public:
 	int nchans() {
 		return first_file->nchans();
 	}
+	int nants() {
+		return 1;
+	}
 	double tsamp() {
 		return first_file->tsamp();
 	}

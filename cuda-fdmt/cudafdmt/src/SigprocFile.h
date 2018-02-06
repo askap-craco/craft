@@ -46,6 +46,12 @@ public:
 	int nchans() {
 		return m_nchans;
 	}
+	int npols() {
+		return 1;
+	}
+	int nants() {
+		return 1;
+	}
 	size_t samples_read() {
 		return m_samples_read;
 	}
