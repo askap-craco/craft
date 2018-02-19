@@ -38,6 +38,43 @@ def fixlon(l):
     
     return l
 
+metafile_cards = ('tsamp','az_start','duration_secs','za_start','nifs','nbits','source','foff','tstart','beamra','beamdec','nchans','data_type','beamno','field_name','fch1','nsamples')
+
+def write_filterbank_meta_file(f, summary, fb, values):
+    filname = fb['abspath']
+    filshort = os.path.basename(filname)
+    metaname = filname+'.meta'
+    namespace = 'SB{sbid}/{scanname}/{antname}'.format(**summary)
+    asset = {}
+    #asset['namespace'] = namespace
+    #asset['name'] = filshort
+    asset['geoshape/point/latitude'] = fb['beamdec']
+    asset['geoshape/point/longitude'] = fb['beamra']
+    asset['geoshape/point/elevation'] = 0
+    #asset['geoshape/datum'] = 'J2000'
+
+    metafile = open(metaname, 'w+')
+    metafile.write('[asset]\n')
+    for k, v in asset.iteritems():
+        metafile.write('{} = "{}"\n'.format(k, str(v)))
+
+
+    filterbank = {}
+    for c in metafile_cards:
+        filterbank[c] = fb[c]
+
+    metafile.write('\n\n[filterbank]\n')
+    for k, v in filterbank.iteritems():
+        metafile.write('{} = "{}"\n'.format(k, str(v)))
+    
+    logging.debug('wrote metafile %s', metaname)
+    metafile.close()
+    
+
+def write_meta_files(f, summary, values):
+    for fb in summary['filterbanks']:
+        write_filterbank_meta_file(f, summary, fb, values)
+    
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
@@ -45,6 +82,8 @@ def _main():
     parser.add_argument(dest='files', nargs='+')
     parser.add_argument('-f','--fname', help='Candidate filename')
     parser.add_argument('-o','--outfile',help='Output json file')
+    parser.add_argument('-m','--write-meta-files',help='Write meta files for mediaflux', action='store_true')
+
  
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -52,7 +91,6 @@ def _main():
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
-
         
     fout = open(values.outfile, 'w')
 
@@ -66,11 +104,16 @@ def _main():
         fout.write('\n')
         logging.info('Summarised scan %s', f)
 
+        if values.write_meta_files:
+            write_meta_files(f, summary, values)
+        
+
     fout.close()
 
 def summarise_scan(f):
     hdr = DadaHeader.fromfile(f)
     d = {}
+    d['dada_header'] = str(d)
     for key, (v, comment) in hdr.iteritems():
         if 'CHANMAP' in key or key == 'BEAM_ID':
             d[key.lower()] = map(int, v.split(','))
@@ -92,29 +135,39 @@ def summarise_scan(f):
     beam_dec = d['beam_dec']
     del d['beam_ra']
     del d['beam_dec']
+    # convention for elasticsearch is lat, lon, latitude first.
     d['beam_directions'] = zip(map(fixlon, beam_ra), beam_dec)
-    d['scanname'] = f.split('/')[-4]
+    d['scanname'] = os.path.abspath(f).split('/')[-4]
     assert d['scanname'].startswith('201')
 
     filfiles = glob.glob(os.path.join(os.path.dirname(f), '*.fil'))
     d['num_filfiles'] = len(filfiles)
     fdetails = []
-    for ff in filfiles:
+    for iff, ff in enumerate(filfiles):
         f = {}
+        beamno = int(ff.split('.')[-2])
+        f['beamno'] = beamno
+        f['beamra'] = d['beam_directions'][beamno][0]
+        f['beamdec'] = d['beam_directions'][beamno][1]
+        f['beam_direction'] = d['beam_directions'][beamno]
         f['abspath'] = os.path.abspath(ff)
         f['atime'] = int(os.path.getatime(ff))
         f['mtime'] = int(os.path.getmtime(ff))
         f['ctime'] = int(os.path.getctime(ff))
-        f['size'] = int(os.path.getsize(ff))
+        f['filesize'] = int(os.path.getsize(ff))
+
         fpfile = SigprocFile(ff)
         for hname, value in fpfile.header.iteritems():
             f[hname.lower().replace('.','_')] = value
             
+        
         f['data_size_bytes']  = fpfile.data_size_bytes
         f['nsamples'] = fpfile.nsamples
         f['duration_secs'] = fpfile.observation_duration
         f['duration_hrs'] = fpfile.observation_duration/3600.
         f['duration_days'] = fpfile.observation_duration/86400.
+        f['source'] = d['source']
+        f['field_name'] = d['field_name']
         fdetails.append(f)
             
     d['filterbanks'] = fdetails
@@ -129,6 +182,7 @@ def summarise_scan(f):
         d['duration_days'] = fdetails[0]['duration_days']
         d['nbits'] =  int(fdetails[0]['nbits'])
         d['nifs'] = int(fdetails[0]['nifs'])
+        d['total_filesize'] = sum([f['filesize'] for f in fdetails])
 
     return d
 

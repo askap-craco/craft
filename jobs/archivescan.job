@@ -1,0 +1,101 @@
+#!/bin/bash -l
+#SBATCH --ntasks=4
+#SBATCH --ntasks-per-node=4
+#SBATCH --time=36:00:00
+#SBATCH --cluster=zeus
+#SBATCH --partition=copyq
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-user=keith.bannister@csiro.au
+#SBATCH --output=/group/askap/ban115/craft/archive/logfiles/archivescan-%j.out
+#SBATCH --export=NONE
+
+export CRAFT=/home/ban115/craft/craft/
+#export PATH=$CRAFT/cuda-fdmt/cudafdmt/src:$CRAFT/python:$PATH:/home/ban115/bin:$CRAFT/jobs/:$PATH
+#export PYTHONPATH=$CRAFT/python:$PYTHONPATH
+NTASKS=$SLURM_TASKS_PER_NODE
+
+#module swap PrgEnv-cray PrgEnv-gnu
+#module load mpibash
+module unload gcc/4.9.0
+module load python/2.7.10 > /dev/null
+
+echo `date` starting archivescan with $@
+
+CRAFTDATA=/scratch2/askap/askapops/craft/co/
+OUTDIR=askap-craft/co
+logfile=/group/askap/ban115/craft/archive/archived_scans.txt
+tempdir=/scratch2/askap/ban115/craft/tartemp
+
+if [[ ! -d $tempdir ]] ; then
+    mkdir -p $tempdir
+fi
+
+for f in $@ ; do
+    f=`basename $f`
+    echo "ARCHIVING $f"
+    sbdir=$CRAFTDATA/$f
+    if [[ ! -d $sbdir ]] ; then
+	echo "$sbdir is not a directory. Skipping.."
+	continue
+    fi
+
+    cd $sbdir
+    tarname=contents.tar
+
+    #make SBDIR name in mediaflux
+    pshell "mkdir $OUTDIR/$f"
+    pshellerr=$?
+    if [[ $pshellerr != 0 ]] ; then
+	echo "PSHELL couldn't create directory $OUTDIR/$f. Probably already exisits. Will muscle on"
+    fi
+
+    for scandir in 2*/ ; do
+	pushd $scandir
+	isfinished=`grep $f/$scandir $logfile`
+	echo "FINISHED file contains $isfinished"
+	if [[ $isfinished != '' ]] ; then
+	    echo $f/$scandir was imported on $isfinished. Continuing
+	    popd
+	    continue
+	fi
+
+	for antdir in */*/ ; do
+	    antpath="${f}/${scandir}/${antdir}"
+	    temppath="${tempdir}/${antpath}"
+	    mkdir -p $temppath
+	    tarfile="${temppath}/${tarname}"
+	    metafile=`ls $antdir/*00.fil.meta`
+	    if [[ -f $metafile ]] ; then
+		echo "Copying metafile $metafile"
+		cp $metafile ${tarfile}.meta
+	    fi
+	    echo "Taring $antdir to $tarfile"
+	    pushd $antdir
+	    tar -cvf $tarfile .
+	    tarerr=$?
+	    popd
+	    if [[ $tarerr != 0 ]] ; then
+		echo "Tar failed with $tarerr. Exiting"
+		exit $tarerr
+	    fi
+	done
+	popd
+	echo "Importing $scandir to $OUTDIR/$f "
+	pshell "cd $OUTDIR/$f && import $scandir"
+	pshellerr=$?
+	if [[ $pshellerr == 0 ]] ; then
+	    echo $f/$scandir `date` >> $logfile
+	    echo "Deleting teporary files from $tempdir/$f/$scandir"
+	    find $tempdir/$f/$scandir -name $tarname  -print0 | xargs -0 munlink
+	    delerr=$?
+	    if [[ $delerr != 0 ]] ; then
+		echo "Could not delete temp files in $scandir. Error code $delerr Continuing"
+	    fi
+	else
+	    echo "PSHELL Import of $scandir failed with error $pshellerr. Quitting"
+	    exit $pshellerr
+	fi
+    done	
+done
+
+echo `date` finished archiveSB
