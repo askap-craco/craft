@@ -114,6 +114,7 @@ def summarise_scan(f):
         f['nsamples'] = fpfile.nsamples
         f['duration_secs'] = fpfile.observation_duration
         f['duration_hrs'] = fpfile.observation_duration/3600.
+        f['duration_days'] = fpfile.observation_duration/86400.
         fdetails.append(f)
             
     d['filterbanks'] = fdetails
@@ -124,6 +125,8 @@ def summarise_scan(f):
         d['scan_start'] = tstart.isot
         d['tsamp'] = fdetails[0]['tsamp']
         d['duration_secs'] = fdetails[0]['duration_secs']
+        d['duration_hrs'] = fdetails[0]['duration_hrs']
+        d['duration_days'] = fdetails[0]['duration_days']
         d['nbits'] =  int(fdetails[0]['nbits'])
         d['nifs'] = int(fdetails[0]['nifs'])
 
