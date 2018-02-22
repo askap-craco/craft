@@ -73,7 +73,6 @@ SigprocFile::SigprocFile(const char* filename) {
 	  perror("Could not set advice\n");
 	  exit(EXIT_FAILURE);
 	}
-	
 }
 
 SigprocFile::~SigprocFile() {
@@ -127,7 +126,7 @@ size_t SigprocFile::seek_sample(size_t t)
 
 void SigprocFile::advise_block(off_t bytes_per_block)
 {
-  int nblocks = 16;
+  int nblocks = 1;
   off_t offset = ftell(m_file);
   if (posix_fadvise(m_fd, offset, bytes_per_block*nblocks, POSIX_FADV_WILLNEED) != 0) {
     perror("Couln't set advice for next block\n");
@@ -152,7 +151,6 @@ size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
 	m_samples_read += ont;
 	m_curr_sample += nt;
 	advise_block(sizeof(uint8_t)*nreq);
-	
 	return ont;
 }
 
