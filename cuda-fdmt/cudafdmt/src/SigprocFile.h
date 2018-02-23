@@ -74,6 +74,8 @@ public:
 		return m_filename;
 	}
 
+	void advise_block(off_t nt);
+
 	size_t seek_sample(size_t t);
 
 
@@ -90,6 +92,7 @@ private:
 	size_t m_curr_sample;
 
 	FILE* m_file;
+	int m_fd;
 	char* m_filename;
 	char m_hdr[MAX_HDR_SIZE];
 	size_t m_hdr_nbytes;

@@ -465,24 +465,25 @@
 			total_discards += (int)boxcar_discards.d[i];
 		}
 
-		float boxcar_ngops = nbeams*nt*nd*2*NBOX/1e9;
 
-		float flagged_percent = ((float) num_flagged_beam_chans) / ((float) nf*nbeams*blocknum) * 100.0f;
-		float dm0_flagged_percent = ((float) num_flagged_times) / ((float) blocknum*nbeams*nt*nf) * 100.0f;
+		double boxcar_ngops = (double)nbeams*(double)nt*(double)nd*2.0f*(double)NBOX/1e9f;
+
+		double flagged_percent = ((double) num_flagged_beam_chans) / ((double) nf*nbeams*blocknum) * 100.0f;
+		double dm0_flagged_percent = ((double) num_flagged_times) / ((double) blocknum*nbeams*nt*nf) * 100.0f;
 		cout << " FREDDA Finished" << endl;
 		cout << "Found " << total_candidates << " candidates" << endl;
 		cout << "Discarded " << total_discards << " candidates for being too wide" << endl;
-		float data_nsecs = blocknum*nt*source->tsamp();
+		float data_nsecs = blocknum*nt*source.tsamp();
 		cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << data_nsecs << " seconds" << " at " << data_nsecs/tall.wall_total()<< "x real time"<< endl;
 		cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;
 		cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;
 		cout << "FREDDA CPU "<< endl << tall << endl;
 		cout << "Rescale "<< endl << trescale << endl;
 		cout << "Boxcar "<< endl << tboxcar << endl;
-		cout << "File reading " << endl << source->m_read_timer << endl;
+		cout << "File reading " << endl << source.read_timer << endl;
 		fdmt_print_timing(&fdmt);
-		cout << "FDMT " << fdmt.nops/1e9
-				<< " Gops/iteration ran at: " << fdmt.nops / (fdmt.t_iterations.get_average_time()/1e3)/1e9
+		cout << "FDMT " << ((double)fdmt.nops)/1e9
+			 << " Gops/iteration ran at: " << ((double)fdmt.nops) / (fdmt.t_iterations.get_average_time()/1e3)/1e9
 				<< " GFLOPS" << endl;
 		cout << "Boxcar " << boxcar_ngops
 				<< " Gops/iteration. ran at: " << boxcar_ngops/(tboxcar.get_average_time()/1e3)
@@ -492,5 +493,5 @@
 		cout << "Resources User: " << usage.ru_utime.tv_sec <<
 				"s System:" << usage.ru_stime.tv_sec << "s MaxRSS:" << usage.ru_maxrss/1024/1024 << "MB" << endl;
 		cout << "GPU Memory used " << (gpu_total_bytes - gpu_free_bytes)/1024/1024 << " of " << gpu_total_bytes /1024/124 << " MiB" << endl;
-	}
+}
 

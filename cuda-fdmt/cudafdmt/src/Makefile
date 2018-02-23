@@ -10,9 +10,15 @@ DADA_PATH=$(HOME)/psrdada-install
 # See http://stackoverflow.com/questions/1704907/how-can-i-get-my-c-code-to-automatically-print-out-its-git-version-hash
 GIT_VERSION := $(shell git describe --dirty --always --tags)
 
+<<<<<<< HEAD
 NVCCFLAGS=-g -O3 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_61,code=sm_61  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH) -I$(DADA_PATH)/include
 
 NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=compute_61,code=compute_61 -gencode arch=compute_61,code=sm_61 -link -Xcompiler -fopenmp -lpsrdada -L$(DADA_PATH)/lib
+=======
+NVCCFLAGS=-g -O3 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_60,code=sm_60  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH)
+
+NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=compute_60,code=compute_60 -gencode arch=compute_60,code=sm_60 -link -Xcompiler -fopenmp
+>>>>>>> origin/master
 
 # Force rebuild on git change:http://stackoverflow.com/questions/3236145/force-gnu-make-to-rebuild-objects-affected-by-compiler-definition
 

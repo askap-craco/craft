@@ -1,5 +1,7 @@
 #!/bin/bash
 
+trap 'kill $(jobs -p)' EXIT
+
 DADA_KEY=babb
 infile=/DATA/SERPENS_2/ban115/craft/rtfredda/co25.dada
 hdr=/DATA/SERPENS_2/ban115/craft/rtfredda/co25*.hdr

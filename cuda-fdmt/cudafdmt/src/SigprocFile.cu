@@ -14,7 +14,11 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <math.h>
+<<<<<<< HEAD
 #include "InvalidSourceFormat.h"
+=======
+#include <fcntl.h> // posix_fadvise
+>>>>>>> origin/master
 
 /* Same as strstr but goes through *all* the string - even if it contains nulls
  *
@@ -63,6 +67,14 @@ SigprocFile::SigprocFile(const char* filename) {
 	m_foff = header_double("foff");
 	m_tstart = header_double("tstart");
 	m_tsamp = header_double("tsamp");
+
+	// tell_linux we'll be reading sequentailly
+	m_fd = fileno(m_file);
+
+	if (posix_fadvise(m_fd, 0, 0, POSIX_FADV_SEQUENTIAL) != 0) {
+	  perror("Could not set advice\n");
+	  exit(EXIT_FAILURE);
+	}
 }
 
 SigprocFile::~SigprocFile() {
@@ -114,6 +126,22 @@ size_t SigprocFile::seek_sample(size_t t)
 	return boff;
 }
 
+void SigprocFile::advise_block(off_t bytes_per_block)
+{
+  int nblocks = 1;
+  off_t offset = ftell(m_file);
+  if (posix_fadvise(m_fd, offset, bytes_per_block*nblocks, POSIX_FADV_WILLNEED) != 0) {
+    perror("Couln't set advice for next block\n");
+    exit(EXIT_FAILURE);
+  }
+
+  // tell linux we don't need the stuff we've read
+  if (posix_fadvise(m_fd, 0, offset, POSIX_FADV_DONTNEED) != 0) {
+    perror("Coulnt set advise for previous data\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
 size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
 {
 	// RETURNS TBF ordering. WARNING: This will deeply confuse the output if nbeams != 1
@@ -124,6 +152,7 @@ size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
 	size_t ont = nelements/m_nifs/m_nchans;
 	m_samples_read += ont;
 	m_curr_sample += nt;
+	advise_block(sizeof(uint8_t)*nreq);
 	return ont;
 }
 
