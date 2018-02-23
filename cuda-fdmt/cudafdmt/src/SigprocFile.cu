@@ -14,11 +14,8 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <math.h>
-<<<<<<< HEAD
 #include "InvalidSourceFormat.h"
-=======
 #include <fcntl.h> // posix_fadvise
->>>>>>> origin/master
 
 /* Same as strstr but goes through *all* the string - even if it contains nulls
  *
@@ -128,7 +125,7 @@ size_t SigprocFile::seek_sample(size_t t)
 
 void SigprocFile::advise_block(off_t bytes_per_block)
 {
-  int nblocks = 1;
+  int nblocks = 16;
   off_t offset = ftell(m_file);
   if (posix_fadvise(m_fd, offset, bytes_per_block*nblocks, POSIX_FADV_WILLNEED) != 0) {
     perror("Couln't set advice for next block\n");
