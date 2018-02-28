@@ -49,9 +49,9 @@ namespace NCodec
             double              m_dSampleRate;
             double              m_dMJDNow;
 
-            unsigned long       m_ulStartWriteFrameId;
-            unsigned long       m_ulFinishWriteFrameId;
-            unsigned long       m_ulTriggerFrameId;
+            unsigned long long  m_ullStartWriteFrameId;
+            unsigned long long  m_ullFinishWriteFrameId;
+            unsigned long long  m_ullTriggerFrameId;
 
             unsigned long long  m_ullStartWriteBAT;
             unsigned long long  m_ullFinishWriteBAT;
@@ -99,9 +99,9 @@ namespace NCodec
                 m_dSampleRate           = 0.0;
                 m_dMJDNow               = 0.0;
 
-                m_ulStartWriteFrameId   = 0;
-                m_ulFinishWriteFrameId  = 0;
-                m_ulTriggerFrameId      = 0;
+                m_ullStartWriteFrameId   = 0;
+                m_ullFinishWriteFrameId  = 0;
+                m_ullTriggerFrameId      = 0;
                 m_ullStartWriteBAT      = 0;
                 m_ullFinishWriteBAT     = 0;
                 m_ullTriggerWriteBAT    = 0;
