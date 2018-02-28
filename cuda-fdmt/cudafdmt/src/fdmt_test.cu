@@ -446,7 +446,7 @@ int main(int argc, char* argv[])
 		total_discards += (int)boxcar_discards.d[i];
 	}
 
-	float boxcar_ngops = nbeams*nt*nd*2*NBOX/1e9;
+	float boxcar_ngops = (float)nbeams*(float)nt*(float)nd*2.0f*(float)NBOX/1e9f;
 
 	float flagged_percent = ((float) num_flagged_beam_chans) / ((float) nf*nbeams*blocknum) * 100.0f;
 	float dm0_flagged_percent = ((float) num_flagged_times) / ((float) blocknum*nbeams*nt*nf) * 100.0f;
@@ -462,8 +462,8 @@ int main(int argc, char* argv[])
 	cout << "Boxcar "<< endl << tboxcar << endl;
 	cout << "File reading " << endl << source.read_timer << endl;
 	fdmt_print_timing(&fdmt);
-	cout << "FDMT " << fdmt.nops/1e9
-			<< " Gops/iteration ran at: " << fdmt.nops / (fdmt.t_iterations.get_average_time()/1e3)/1e9
+	cout << "FDMT " << ((double)fdmt.nops)/1e9
+	     << " Gops/iteration ran at: " << ((double)fdmt.nops) / (fdmt.t_iterations.get_average_time()/1e3)/1e9
 			<< " GFLOPS" << endl;
 	cout << "Boxcar " << boxcar_ngops
 			<< " Gops/iteration. ran at: " << boxcar_ngops/(tboxcar.get_average_time()/1e3)

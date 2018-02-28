@@ -19,11 +19,11 @@ thedir=$1
 thebase=`basename $thedir`
 # Array = co or ak
 array=co
-pset=$GHOME/fixheaders/$array/sbpars/
+pset=/home/ban115/fixheaders/$array/sbpars/
 parset=$pset/${thebase}.parset
 sblist=$pset/sblist.txt
 
-echo "`date` Fixing SB in directory $thedir with base $thebase. Parset=$parset sblist=$sblist"
+echo "`date` Fixing SB in directory $thedir with base $thebase. Parset=$parset sblist=$sblist on host `hostname`"
 
 if [[ ! -e $parset ]] ; then
     echo Parset $parset doesnt exist
@@ -35,4 +35,7 @@ if [[ ! -e $sblist ]] ; then
     exit 1
 fi
 
-find $thedir -name "${array}*.hdr" | xargs fix_headers.py --parset $parset  --sblist  $sblist --fix
+find $thedir -name "${array}*.hdr" | xargs fix_headers.py --parset-dir $pset  --sblist  $sblist --fix
+find $thedir -name "${array}*.hdr.v2" | xargs summarise_scans.py --write-meta-files --outfile /home/ban115/archive/v8/$thebase.json
+
+echo "`date` Finished ixing SB in directory $thedir with base $thebase. Parset=$parset sblist=$sblist on host `hostname`"

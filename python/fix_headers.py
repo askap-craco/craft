@@ -112,7 +112,7 @@ class TargetParset(dict):
         sources = [s for s in self.sources.values() if 'skycoord' in s]
         nearest = min(sources, key=lambda p: mysep(p['skycoord'], pos))
         sepdeg  = np.degrees(mysep(nearest['skycoord'], pos) )
-        if sepdeg < tol_deg:
+        if sepdeg > tol_deg:
             raise ValueError('Nearest source to pos {} was {} but separation was {}'.format(pos, nearest, sepdeg))
 
         return nearest
@@ -143,6 +143,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-p', '--parset', help='Parset to get field names from')
     parser.add_argument('-l','--sblist', help='Sschedblock list to get data from', default='sbpars/sblist.txt')
+    parser.add_argument('-d','--parset-dir', help='Directory containing parset', default='sbpars')
     parser.add_argument('--fix', action='store_true', help='Actually fix the header - otherwise dont change anything')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
@@ -178,7 +179,7 @@ def fix_header(hdr_file, sbdata, pset, values):
     sbid = int(hdr['SBID'][0])
     
     if pset is None:
-        pset = TargetParset(os.path.join('sbpars', 'SB%05d.parset'%sbid))
+        pset = TargetParset(os.path.join(values.parset_dir, 'SB%05d.parset'%sbid))
 
     sbinfo = sbdata[sbid]
     
@@ -196,6 +197,10 @@ def fix_header(hdr_file, sbdata, pset, values):
     hdr += ('SB_TEMPLATE', sbtemplate, 'SB template')
     hdr += ('SB_TEMPLATE_VERSION', sbinfo[4], 'SB template version')
     hdr += ('SB_OWNER', sbinfo[5], 'SB owner')
+    if hdr['FOOTPRINT_NAME'][0].lower() == 'unknown':
+        hdr.set_value('FOOTPRINT_NAME', 'closepack36')
+        hdr.set_value('FOOTPRINT_PITCH',0.9)
+        hdr.set_value('FOOTPRINT_ROTATION', 60)
 
     if sbtemplate.lower() != 'beamform':
         ra, dec = map(float, (hdr['RA'][0], hdr['DEC'][0]))

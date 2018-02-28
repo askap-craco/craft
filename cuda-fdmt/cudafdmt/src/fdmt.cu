@@ -193,10 +193,10 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
      		// Now we work on the remaining times that are guaranteed not to overrun the input dimensions
 			itmin = dt_middle_larger;
 			itmax = fdmt->max_dt;
+			assert(itmax > itmin);
 
 # 			// save number of operations the FDMT takes
-			fdmt->nops += (itmax - itmin)*fdmt->nbeams;
-
+                        fdmt->nops += (itmax - itmin)*fdmt->nbeams;
 			// src and dst now start from a bit offset
 			src1_start.z = dt_middle_larger;
 			dst_start.z = dt_middle_larger;
@@ -247,6 +247,7 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	fdmt->order = (int)ceil(log(fdmt->nf)/log(2.0));
 	fdmt->nbeams = nbeams;
 	fdmt->dump_data = dump_data;
+	fdmt->nops = 0;
 	bool host_alloc = dump_data;
 	assert(nf > 0);
 	assert(max_dt > 0);
@@ -977,9 +978,10 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 				//indata->nz, outdata->nz, nt, delta_t_local, tmax, tend);
 
 
+		int nthread = 128;
 		if(2*iif + 1 < indata->nx) { // do sum if there's a channel to sum
 
-			cuda_fdmt_iteration_kernel5_sum<<<grid_size, 256>>>(dst_start, src_start,
+			cuda_fdmt_iteration_kernel5_sum<<<grid_size, nthread>>>(dst_start, src_start,
 					src_beam_stride,
 					dst_beam_stride,
 					tmax,tend,
@@ -988,7 +990,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		} else { // Do copy if there's no channel to add
 
 
-			cuda_fdmt_iteration_kernel5_copy<<<grid_size, 256>>>(dst_start, src_start,
+			cuda_fdmt_iteration_kernel5_copy<<<grid_size, nthread>>>(dst_start, src_start,
 								src_beam_stride,
 								dst_beam_stride,
 								tmax, ts_data);
