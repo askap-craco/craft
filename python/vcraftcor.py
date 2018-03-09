@@ -116,11 +116,15 @@ def _main():
     pax.set_ylabel('Cross phase (deg)')
     pax.set_xlabel('Channel')
 
-    pylab.figure()
-    pylab.imshow(np.angle(xx12), aspect='auto')
+    Navg = 128
+    Nout = xx12.shape[0]/Navg
+    xx12 = xx12[:Nout*Navg, :]
+    xx12.shape = [Nout, Navg, -1 ]
+    xx12a = xx12.mean(axis=1)
 
     pylab.figure()
-    pylab.plot(np.angle(xx12)[:,:200].mean(axis=1))
+    pylab.imshow(np.angle(xx12a), aspect='auto')
+
     pylab.show()
     
 
