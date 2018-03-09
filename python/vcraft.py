@@ -15,6 +15,9 @@ from crafthdr import DadaHeader
 bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
 frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 
+# number of samples per 32 bit word indexed by mode
+SAMPS_PER_WORD32 = [1,2,4,16,1,2,4,16]
+
 def unpack_craft(fin, nsamp_per_word):
     dwords = np.fromfile(fin, dtype=np.uint32)
     nwords = len(dwords)/nchan
@@ -32,7 +35,6 @@ def unpack_craft(fin, nsamp_per_word):
         dwords >> 4
         d[samp::4, :, 1] = (dwords & 0xf) - (dwords & 0x8)*2 # imag 
         dwords >> 4
-        
 
 class VcraftFile(object):
     def __init__(self, fname, mode=None):
@@ -61,6 +63,21 @@ class VcraftFile(object):
         self.bat0 = int(hdr['NOW_BAT'][0], base=16)
         self.bat0_40 = self.bat0 & 0xffffffffff
 
+
+    @property
+    def nsamps(self):
+        ''' Return the number of complex samples in the file'''
+        
+        file_bytes= os.path.getsize(self.fname)
+        data_bytes = file_bytes - self.hdrsize
+        nchan = len(self.freqs)
+        smp_per_word = SAMPS_PER_WORD32[self.mode]
+        data_words = data_bytes/4
+        
+        nsamp = data_words/smp_per_word/2/nchan # 2 for complex
+
+        return nsamp
+
     def print_times(self):
         bats = self.bats
         frames = self.frames
@@ -69,7 +86,7 @@ class VcraftFile(object):
         # lowest 32 bits of bat from the time the file was written
         print 'FRAMES duration', (frames[0] - frames[1])/infsamp,'offset', (frames[2] - frames[0])/infsamp
 
-    def read(self):
+    def read(self, nsamp=None):
         ''' Reads everything and returns a numpy array
         with shape dtype=(nsamps,nchan) and dtype=np.complex64
         '''
@@ -77,12 +94,12 @@ class VcraftFile(object):
         mode = self.mode
         fin = self.fin
         nchan = len(self.freqs)
-
         self.fin.seek(self.hdrsize)
-
         if mode == 0: # 16b+16b
             d = np.fromfile(fin, dtype=np.int16)
             nsamps = len(d)/2/nchan
+            # truncate if required
+            d = d[:2*nchan*nsamps]
             assert 2*nchan*nsamps == len(d), 'Not integral number of samples'
             d.shape = (nsamps, nchan, 2)
         elif mode == 1: # 8b + 8b:
@@ -133,7 +150,7 @@ class VcraftFile(object):
         
         elif mode == 3: # 1b+1b
             # each 32 bit word contais 32 1 bit numbers (imag/real)*16 for the same channel
-            dwords = np.fromfile(fin, dtype='<i32')
+            dwords = np.fromfile(fin, dtype=np.int32)
             nwords = len(dwords)/nchan
             assert len(dwords) == nchan*nwords
             nsamps = nwords*16
