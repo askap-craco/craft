@@ -71,8 +71,6 @@ def _main():
             print h, 'd1=',d1t, 'd2=',d2t, 'diff=',d2t - d1t,mul*(d2t-d1t)
             
     nsamp, nchan = d1.shape
-
-
     fig, axes = pylab.subplots(4,1)
     d1ax, d2ax,lagax,pax = axes.flatten()
     N = 4096
@@ -102,6 +100,8 @@ def _main():
     xx12 = xf1 * np.conj(xf2)
     xx11 = xf1 * np.conj(xf1)
     xx22 = xf2 * np.conj(xf2)
+
+    print 'PRODUCT SIZE', xx12.shape, xx12.shape[0]*Nf, nsamp
     punwrap = np.unwrap(np.angle(xx12.mean(axis=0)))
     xx = np.arange(len(punwrap))
     gradient, phase = np.polyfit(xx, punwrap, 1)
@@ -115,6 +115,12 @@ def _main():
     pax.plot(np.degrees(np.angle(xx12.mean(axis=0))), 'o')
     pax.set_ylabel('Cross phase (deg)')
     pax.set_xlabel('Channel')
+
+    pylab.figure()
+    pylab.imshow(np.angle(xx12), aspect='auto')
+
+    pylab.figure()
+    pylab.plot(np.angle(xx12)[:,:200].mean(axis=1))
     pylab.show()
     
 

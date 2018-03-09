@@ -150,7 +150,7 @@ class VcraftFile(object):
         
         elif mode == 3: # 1b+1b
             # each 32 bit word contais 32 1 bit numbers (imag/real)*16 for the same channel
-            dwords = np.fromfile(fin, dtype=np.int32)
+            dwords = np.fromfile(fin, dtype=np.uint32)
             nwords = len(dwords)/nchan
             assert len(dwords) == nchan*nwords
             nsamps = nwords*16
@@ -170,8 +170,8 @@ class VcraftFile(object):
         df = np.empty((nsamps, nchan), dtype=np.complex64)
         df.real = d[:, :, 0]
         df.imag = d[:, :, 1]
-
         return df
+    
     def print_summary(self):
         d1 = self.read()
         print 'Data shape', d1.shape, 'freqs', self.freqs
