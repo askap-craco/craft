@@ -95,7 +95,8 @@ namespace NCodec
             int      m_iNumberOfSyncRetries;
 
             CDFH     m_DFH;
-            unsigned long long ull_BAT0;
+            unsigned long long m_ullBAT0;
+            unsigned long long m_ullFrame0;
             int      m_iSkipSamples;
             Buffer_t m_DataFrameBuffer;
 

@@ -51,7 +51,6 @@ namespace               // Anonymous namespace for internal helpers.
 
     constexpr int      iMaxPacketSize_c            = 9000;   // Maximum bytes for network transport.
     constexpr int      iSamplesPerFrame_c          = 256;    // Samples per frame (really should be calculated)
-    constexpr int      iMaxSyncTries_c             = 3;      // Maximum number of tries before sync deemed to have failed.
     constexpr int      iBitsPerByte_c              = 8;      // Number of bits in a byte.
     constexpr int      iTimeForIntegerSamples_c    = 27;     // Period in seconds, for a whole number of samples.
     constexpr double   dTolerance_c                = 0.001;  // Tolerance for floating point calculations.
@@ -81,7 +80,8 @@ namespace NCodec        // Part of the Codec namespace.
         m_DFH.Reset();
         m_DataFrameBuffer.clear();
 
-        ull_BAT0 = 0;
+        m_ullBAT0 = 0;
+        m_ullFrame0 = 0;
         m_iSkipSamples = 0;
     }
 
@@ -90,7 +90,8 @@ namespace NCodec        // Part of the Codec namespace.
 
     CCodecCODIF::~CCodecCODIF( void )
     {
-        ull_BAT0 = 0;
+        m_ullBAT0 = 0;
+        m_ullFrame0 = 0;
         m_iSkipSamples = 0;
         m_DataFrameBuffer.clear();
         m_DFH.Reset();
@@ -212,20 +213,35 @@ namespace NCodec        // Part of the Codec namespace.
             // figured out for the first file then propogated to later
             // files. If processing files independently, this epoch
             // zero will need to be "stored" somewhere. Epoch zero
-            // *will* be different for different antenna Note that the
+            // *may* be different for different antenna. Note that the
             // following essentially is a guess at the correlator
-            // reset time but this approach Should allow stable time
+            // reset time but this approach should allow stable time
             // determination. It is essentially that data which will
             // be processed at the same time use the same "epoch zero"
-            // otherwise there will be delay shifts
+            // otherwise there will be delay shifts. If the same Epoch
+            // zero is used between different events (but the system
+            // has not been reset then there should be no phase shift
+            // between data sets. If the system has been reset this
+            // approach will introduce a phase shift, even if the
+            // underlying sampling clock was not reset, or was
+            // syncronysly reset (unless you happen to be very luck
+            // and choose the right sample to resyncronise on.
 
-            unsigned long long startBAT = m_ullStartWriteBAT - (m_ulStartWriteFrameId * (27.0/32.0));
-            ull_BAT0 = ((startBAT +5e5)/ 1e6); // Round to full second
-            ull_BAT0 *= 1e6;  // Need tp do in two lines and compiler is too clever it seems
-            long long BATerr = startBAT - ull_BAT0;
-            if (BATerr>5e5) BATerr -= 1e6;
-            printf("Note: BAT offset for implied correlator reset is %.2f msec\n", BATerr/1.0e3);
+	    // The approach is to compare the BAT and frame ID of the
+	    // captured data. Knowing the data sampling rate we can
+	    // calculate the BAT of frame ID zero.  We then need to
+	    // work out which frame(sample) starts on the next second boundary
+	    // There *will* be an up to  +-1/2 sample time rounding with this approach
 
+            unsigned long long startBAT = m_ullTriggerWriteBAT - (m_ullTriggerFrameId * (27.0/32.0));
+            m_ullBAT0 = ((startBAT +5e5)/ 1e6); // Round up to full second
+            m_ullBAT0 *= 1e6;  // Need to do in two lines as compiler is too clever it seems (optimises it away)
+	    m_ullFrame0 = (m_ullBAT0-startBAT)*(32.0/27.0); // Number of frames(samples) from startBAT till first 1sec boundary
+
+	    printf("DEBUG: startBAT=0x%llX\n", startBAT);
+	    printf("DEBUG: BAT0=0x%llX\n", m_ullBAT0);
+	    printf("DEBUG: Frame0=%llu\n", m_ullFrame0);
+	      
             if ( ! ConfigureDFH() )
             {
                 throw string{ "Error forming the Data Frame Header (DFH)" };
@@ -338,6 +354,7 @@ namespace NCodec        // Part of the Codec namespace.
 
     int CCodecCODIF::SkipBytes( void )
     {
+      printf("CCodecCODIF::SkipBytes: Skipping %d blocks of %d bytes\n", m_iSkipSamples, m_iSampleBlockSize);
         return m_iSkipSamples * m_iSampleBlockSize;
     }
 
@@ -417,13 +434,12 @@ namespace NCodec        // Part of the Codec namespace.
 
             // Set the epoch based on our BAT0
 
-            if ( setCODIFEpochMJD( pDFH, ull_BAT0/(24*60*60*1e6)) != CODIF_NOERROR )
+            if ( setCODIFEpochMJD( pDFH, m_ullBAT0/(24*60*60*1e6)) != CODIF_NOERROR )
             {
                 throw string { "setCODIFEpochMJD() failed" };
             }
 
             // Two's complement
-
             setCODIFRepresentation(pDFH, 1);
 
             // Clear the data frame counter and prepare to count data frames in a
@@ -434,32 +450,30 @@ namespace NCodec        // Part of the Codec namespace.
             // Figure out the "previous" Period restart
 
             unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
-            unsigned long long BAT0MJDSec = ull_BAT0/1e6;
-            unsigned long long PeriodsSinceBAT0 = m_ulStartWriteFrameId / uiSampleIntervalsPerPeriod; // Will round down
+            unsigned long long BAT0MJDSec = m_ullBAT0/1e6;
+            unsigned long long PeriodsSinceBAT0 = (m_ullTriggerFrameId-m_ullFrame0) / uiSampleIntervalsPerPeriod; // Will round down
             int frameseconds = (BAT0MJDSec - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
-            unsigned long framenumber = (m_ulStartWriteFrameId % uiSampleIntervalsPerPeriod) / iSamplesPerFrame_c;
+            unsigned long framenumber = ((m_ullTriggerFrameId-m_ullFrame0) % uiSampleIntervalsPerPeriod) / iSamplesPerFrame_c;
 
             // Finally set the  seconds and frame number
-
             setCODIFFrameEpochSecOffset(pDFH, frameseconds);
             setCODIFFrameNumber(pDFH, framenumber);
 
             // There will be samples that don't fit in a frame (ie first sample may start between frames)
             // These will need to be calculated and eventually discarded
 
-            int initialSamples = m_ulStartWriteFrameId % iSamplesPerFrame_c;
+            int initialSamples = (m_ullTriggerFrameId-m_ullFrame0) % iSamplesPerFrame_c;
 
             if ( initialSamples!=0 )
             {
               m_iSkipSamples = iSamplesPerFrame_c - initialSamples;
               printf("Warning: Will skip %d samples for frame alignment\n", m_iSkipSamples);
+	      m_DFH.NextFrame(); // Allow for the sample skipping which will happen
             }
             else
             {
                 m_iSkipSamples = 0;
             }
-
-            m_DFH.NextFrame(); // Allow for the sample skipping which will happen
 
             bSuccess = true;
         }

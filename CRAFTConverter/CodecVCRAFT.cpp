@@ -294,9 +294,9 @@ namespace NCodec
             RetrieveParameter( "NCHANS",                m_iNumberOfChannels );
             RetrieveParameter( "NOW_MJD",               m_dMJDNow );
             RetrieveParameter( "NOW_BAT",               m_ullNowBAT );
-            RetrieveParameter( "START_WRITE_FRAMEID",   m_ulStartWriteFrameId );
-            RetrieveParameter( "STOP_WRITE_FRAMEID",    m_ulFinishWriteFrameId );
-            RetrieveParameter( "TRIGGER_FRAMEID",       m_ulTriggerFrameId );
+            RetrieveParameter( "START_WRITE_FRAMEID",   m_ullStartWriteFrameId );
+            RetrieveParameter( "STOP_WRITE_FRAMEID",    m_ullFinishWriteFrameId );
+            RetrieveParameter( "TRIGGER_FRAMEID",       m_ullTriggerFrameId );
             RetrieveParameter( "START_WRITE_BAT",       m_ullStartWriteBAT );
             RetrieveParameter( "STOP_WRITE_BAT",        m_ullFinishWriteBAT );
             RetrieveParameter( "TRIGGER_BAT",           m_ullTriggerWriteBAT );
