@@ -1,0 +1,10 @@
+ 
+ VERSION = "2017Aug10-05:07:44"
+
+Name = ak20cm Station = ASKAP01, ASKAP02, ASKAP03, ASKAP04, ASKAP05, ASKAP06, ASKAP07, ASKAP08, ASKAP09    priority = 0
+  rf1 =  1130, 1130     ifname = '2N',  '1N'  
+  rf2 =  1830, 1830    
+  pol =  RCP, LCP       lo1 = 1000, 1000
+  note = 'Updated from CJP 20131121. Fake LO (is tunable)'
+/
+

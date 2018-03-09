@@ -18,6 +18,8 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-D', '--directory', help='Directory to write results to')
     parser.add_argument('-t','--times', help='samp-start,nsamps comma-separated')
+    parser.add_argument('-m','--mjd', help='mjdmiddle,nsec comma-separated')
+    
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -26,15 +28,27 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    samp_start, nsamps = map(int, values.times.split(','))
+    mjd_mid = None
+    nsec = None
+    if values.mjd:
+        mjd_mid, nsec = map(float, values.mjd.split(','))
+    elif values.times:
+        samp_start, nsamps = map(int, values.times.split(','))
+
     block_nsamps = 1024
 
     for f in values.files:
-        foutname = os.path.join(values.directory, f)
-        assert os.path.abspath(foutname) != os.path.abspath(f), 'Input and output paths are equal'
+        foutname = os.path.join(values.directory, os.path.basename(f))
+        assert os.path.abspath(foutname) != os.path.abspath(f), 'Input and output paths are equal: {}={}'.format(os.path.abspath(foutname), os.path.abspath(f))
         fin = sigproc.SigprocFile(f)
-        print dir(fin)
-        print fin.header.keys()
+        tint = fin.header['tsamp']
+        if mjd_mid is not None:
+            samp_mid = np.round((mjd_mid - fin.header['tstart'])*86400./tint)
+            nsamps = np.round(nsec/tint)
+            samp_start = samp_mid - nsamps/2
+            if samp_start < 0:
+                samp_start = 0
+
         hdr = fin.header.copy()
         fout_tstart = fin.tstart + fin.tsamp * samp_start
         hdr['tstart'] = fout_tstart
@@ -43,10 +57,10 @@ def _main():
         del hdr['fchannel']
         del hdr['period']
         hdr['rawdatafile'] = f
-        print hdr
         fout = sigproc.SigprocFile(foutname, header=hdr, mode='w')
+
         fin.seek_sample(samp_start)
-        nblocks = (nsamps + block_nsamps -1)/block_nsamps
+        nblocks = int((nsamps + block_nsamps +11)/block_nsamps)
         block_size = fin.nchans * fin.nifs * fin.nbits*block_nsamps/8
         for blk in xrange(nblocks):
             b = fin.fin.read(block_size)

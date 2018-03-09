@@ -22,6 +22,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-o','--offset', type=int, help='Offset samples')
     parser.add_argument('-c','--channel', type=int, help='Channel to plot', default=0)
+    parser.add_argument('-n','--fft-size', type=int, help='FFT size per coarse channel', default=128)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -36,6 +37,15 @@ def _main():
 
     d1 = f1.read()
     d2 = f2.read()
+
+    # truncate to identical nsamp
+    nsamp = min(d1.shape[0], d2.shape[0])
+    print 'SHAPE BEFORE', d1.shape, d2.shape, nsamp
+
+    d1 = d1[:nsamp, :]
+    d2 = d2[:nsamp, :]
+    print 'SHAPE AFTER', d1.shape, d2.shape
+
     assert d1.shape == d2.shape
 
     print 'Data shape', d1.shape, 'freqs', f1.freqs
@@ -61,8 +71,6 @@ def _main():
             print h, 'd1=',d1t, 'd2=',d2t, 'diff=',d2t - d1t,mul*(d2t-d1t)
             
     nsamp, nchan = d1.shape
-
-
     fig, axes = pylab.subplots(4,1)
     d1ax, d2ax,lagax,pax = axes.flatten()
     N = 4096
@@ -80,7 +88,7 @@ def _main():
     d2ax.plot(d2[:N, c].real)
     d2ax.plot(d2[:N, c].imag)
 
-    Nf = 128
+    Nf = values.fft_size
     shortsamp = ((nsamp-offset)/Nf)*Nf
 
     assert f1.freqs[c] == f2.freqs[c]
@@ -92,6 +100,8 @@ def _main():
     xx12 = xf1 * np.conj(xf2)
     xx11 = xf1 * np.conj(xf1)
     xx22 = xf2 * np.conj(xf2)
+
+    print 'PRODUCT SIZE', xx12.shape, xx12.shape[0]*Nf, nsamp
     punwrap = np.unwrap(np.angle(xx12.mean(axis=0)))
     xx = np.arange(len(punwrap))
     gradient, phase = np.polyfit(xx, punwrap, 1)
@@ -105,6 +115,12 @@ def _main():
     pax.plot(np.degrees(np.angle(xx12.mean(axis=0))), 'o')
     pax.set_ylabel('Cross phase (deg)')
     pax.set_xlabel('Channel')
+
+    pylab.figure()
+    pylab.imshow(np.angle(xx12), aspect='auto')
+
+    pylab.figure()
+    pylab.plot(np.angle(xx12)[:,:200].mean(axis=1))
     pylab.show()
     
 
