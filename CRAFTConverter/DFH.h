@@ -47,6 +47,7 @@ namespace NCodec        // Part of the Codec namespace.
 
     constexpr int iDFHSizeExpected_c = 64;
     constexpr int iDFHSize_c         = sizeof( CODIFDFH_t );
+    constexpr int iDFHWord_c         = iDFHSize_c/sizeof(uint32_t);
 
     static_assert( alignof( CODIFDFH_t ) == 1,       "CODIFDFH_t does not have single byte alignment." );
     static_assert( iDFHSize_c == iDFHSizeExpected_c, "CODIF DFH has an unexpected size." );

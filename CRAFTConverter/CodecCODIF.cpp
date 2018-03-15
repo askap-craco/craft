@@ -50,7 +50,7 @@ namespace               // Anonymous namespace for internal helpers.
     // Constants.
 
     constexpr int      iMaxPacketSize_c            = 9000;   // Maximum bytes for network transport.
-    constexpr int      iSamplesPerFrame_c          = 256;    // Samples per frame (really should be calculated)
+  //    constexpr int      iSamplesPerFrame_c          = 256;    // Samples per frame (really should be calculated)   //CJP TODO CALCULATE
     constexpr int      iBitsPerByte_c              = 8;      // Number of bits in a byte.
     constexpr int      iTimeForIntegerSamples_c    = 27;     // Period in seconds, for a whole number of samples.
     constexpr double   dTolerance_c                = 0.001;  // Tolerance for floating point calculations.
@@ -74,6 +74,7 @@ namespace NCodec        // Part of the Codec namespace.
         m_bInitialiseFrameTime = true;
         m_iSampleBlockSize     = 0;
         m_iDataArraySize       = 0;
+        m_iDataArrayWords      = 0;
         m_iDataFrameSize       = 0;
         m_iNumberOfSyncRetries = 0;
 
@@ -99,6 +100,7 @@ namespace NCodec        // Part of the Codec namespace.
         m_iNumberOfSyncRetries = 0;
         m_iDataFrameSize       = 0;
         m_iDataArraySize       = 0;
+        m_iDataArrayWords      = 0;
         m_iSampleBlockSize     = 0;
         m_bInitialiseFrameTime = false;
         m_bSynced              = false;
@@ -385,23 +387,40 @@ namespace NCodec        // Part of the Codec namespace.
             // to minimise any pre-time-syncrhonised samples being potentially dropped
             // due to a partially filled frame.
 
-            m_iSampleBlockSize = BytesPerTimeSampleForChannels();
-            m_iDataArraySize   = iSamplesPerFrame_c  * m_iSampleBlockSize;
-            m_iDataFrameSize   = iDFHSize_c + m_iDataArraySize;
-            assert( m_iDataFrameSize <= iMaxPacketSize_c );
+	    // CJP Need to set based on # bits
 
-            // Initialise the remaining DFH parameters. Remember:
-            // Data Frame = Data Frame Header + Data Array.
+            m_iSampleBlockSize = BytesPerTimeSampleForChannels();
 
             // NB: Period in CODIF is the number of seconds during which there is
             // an integral number of sample periods. Given a sample rate of
             // 32/27 MHz, this means that in 27s there should be 32 x 10^6 samples.
 
-            uint64_t uiSampleIntervalsPerPeriod =
-                static_cast<uint64_t>( floor( m_dSampleRate * iTimeForIntegerSamples_c ) );
+            uint64_t uiSampleIntervalsPerPeriod = llrint( m_dSampleRate * iTimeForIntegerSamples_c );
             assert( fabs( ( uiSampleIntervalsPerPeriod / 1.0e+6 ) - 32.0 ) < dTolerance_c );
 
-            // Get a pointer to the underlying DFH structure.
+	    // Maximum number of samples/frame given the max frame size
+	    int samplesPerFrame = iMaxPacketSize_c / m_iSampleBlockSize;
+
+	    // Frame size needs to conform to a number of criteria - keep reducing size until all there are met. Specifically:
+	    //    Size multiple of 8 bytes
+	    //    Integer number of frames/period
+	    //    Original samples packed into 32bit words, so DataArraySize in bytes must equal 4*nchan
+	    assert (m_iBitsPerSample <= 16);
+	    while (samplesPerFrame >0 && (samplesPerFrame*m_iSampleBlockSize%8
+					  || uiSampleIntervalsPerPeriod%samplesPerFrame
+					  || samplesPerFrame % (16/m_iBitsPerSample))) {
+	      samplesPerFrame--;
+	    }
+	    assert (samplesPerFrame > 0);
+
+            m_iDataArraySize   = samplesPerFrame * m_iSampleBlockSize;
+            m_iDataFrameSize   = iDFHSize_c + m_iDataArraySize;
+	    m_iDataArrayWords  = m_iDataArraySize/sizeof(uint32_t);
+            assert( m_iDataFrameSize <= iMaxPacketSize_c );
+
+	    printf("********samplesPerFrame=%d  DataArray=%d\n", samplesPerFrame, m_iDataFrameSize);
+
+	    // Get a pointer to the underlying DFH structure.
 
             CODIFDFH_t *pDFH = static_cast<CODIFDFH_t *>( m_DFH );
 
@@ -445,7 +464,7 @@ namespace NCodec        // Part of the Codec namespace.
             // Clear the data frame counter and prepare to count data frames in a
             // CODIF Period.
 
-            m_DFH.SetMaxDataFrameNumber( uiSampleIntervalsPerPeriod / iSamplesPerFrame_c );
+            m_DFH.SetMaxDataFrameNumber( uiSampleIntervalsPerPeriod / samplesPerFrame );
 
             // Figure out the "previous" Period restart
 
@@ -453,7 +472,7 @@ namespace NCodec        // Part of the Codec namespace.
             unsigned long long BAT0MJDSec = m_ullBAT0/1e6;
             unsigned long long PeriodsSinceBAT0 = (m_ullTriggerFrameId-m_ullFrame0) / uiSampleIntervalsPerPeriod; // Will round down
             int frameseconds = (BAT0MJDSec - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
-            unsigned long framenumber = ((m_ullTriggerFrameId-m_ullFrame0) % uiSampleIntervalsPerPeriod) / iSamplesPerFrame_c;
+            unsigned long framenumber = ((m_ullTriggerFrameId-m_ullFrame0) % uiSampleIntervalsPerPeriod) / samplesPerFrame;
 
             // Finally set the  seconds and frame number
             setCODIFFrameEpochSecOffset(pDFH, frameseconds);
@@ -462,11 +481,12 @@ namespace NCodec        // Part of the Codec namespace.
             // There will be samples that don't fit in a frame (ie first sample may start between frames)
             // These will need to be calculated and eventually discarded
 
-            int initialSamples = (m_ullTriggerFrameId-m_ullFrame0) % iSamplesPerFrame_c;
+            int initialSamples = (m_ullTriggerFrameId-m_ullFrame0) % samplesPerFrame;
 
             if ( initialSamples!=0 )
             {
-              m_iSkipSamples = iSamplesPerFrame_c - initialSamples;
+              m_iSkipSamples = samplesPerFrame
+		- initialSamples;
               printf("Warning: Will skip %d samples for frame alignment\n", m_iSkipSamples);
 	      m_DFH.NextFrame(); // Allow for the sample skipping which will happen
             }
@@ -527,79 +547,11 @@ namespace NCodec        // Part of the Codec namespace.
         return bSuccess;
     }
 
-    //////////
-    //
-
-    bool CCodecCODIF::SyncAndHandlePreSyncSamples( void )
-    {
-        // Locate the first whole second and process all preamble samples
-        // into a set of frames in a partial-period, if/as required.
-
-        // Upon exit we should have removed leading samples so that the remaining
-        // queued data starts at the boundary of the first CODIF Period.
-
-        bool bSuccess = false;  // Assume failure for now.
-
-        try
-        {
-            // If we are already syncrhonised then there is nothing to do.
-
-            if ( ! m_bSynced )
-            {
-                // Decompose the time into whole and fractional parts.
-
-                double  dMJDWholeSec    = 0.0;
-                double  dMJDFracSec     = 0.0;
-
-                dMJDFracSec = std::modf( m_dMJDNow, &dMJDWholeSec );
-
-                assert( m_dSampleRate > 0.0 );
-                assert( m_iBitsPerSample > 0 );
-
-                // Compute the number of samples to the next whole seconds.
-
-                const int iTimeSamplesToWholeSec = std::abs( ( 1.0 - dMJDFracSec ) * m_dSampleRate );
-
-                // Handle the preamble samples, if any, then forego further processing
-                // here and defer to normal sample-aligned processing.
-
-#ifdef _VERBOSE
-                fprintf( stderr, "SyncAndHandlePreSyncSamples(), %d Samples to synchronise \n", iTimeSamplesToWholeSec );
-#endif
-
-                if ( ! WritePreambleFrames( iTimeSamplesToWholeSec ) )
-                {
-                    throw string{ "Can't write preamble samples to data frames" };
-                }
-
-                m_bSynced = true;
-            }
-
-            bSuccess = true;
-        }
-        catch ( string Message )
-        {
-            fprintf( stderr, "CCodecCODIF::SyncAndHandlePreSyncSamples(), %s.\n", Message.c_str() );
-            bSuccess = false;
-        }
-        catch ( ... )
-        {
-            fprintf( stderr, "CCodecCODIF::SyncAndHandlePreSyncSamples(), Unspecified exception caught.\n" );
-            bSuccess = false;
-        }
-
-        if ( ! bSuccess )
-        {
-            m_iNumberOfSyncRetries++;
-        }
-
-        return bSuccess;
-    }
 
     //////////
     //
 
-    ByteDeque_t & CCodecCODIF::SampleData( void ) const
+    WordDeque_t & CCodecCODIF::SampleData( void ) const
     {
         assert ( m_pDecoder != nullptr );
         return m_pDecoder->GetSampleData().GetSamples();
@@ -612,35 +564,38 @@ namespace NCodec        // Part of the Codec namespace.
     {
         bool bSuccess = false;      // Assume failure for now.
 
+	vector<uint32_t> vcraftData(m_iNumberOfChannels*m_iNumberofPol);
+	vector<uint32_t> codifData(m_iNumberOfChannels*m_iNumberofPol);
+
         try
         {
-            ByteDeque_t & rInput = SampleData();
+            WordDeque_t & rInput = SampleData();
 
-            byte_t *pbyDataFrame = m_DataFrameBuffer.data();
+            uint32_t *pbyDataFrame = m_DataFrameBuffer.data();
             assert( pbyDataFrame != nullptr );
 
             // Process the frames in each period. Ensure we have at least enough
             // samples to form a complete frame unless we are required to perform
             // a forced flush.
 
-            int iByteCount = 0;
-            int iBytesToProcess = static_cast<int>( rInput.size() );
+            int iWordCount = 0;
+            int iWordsToProcess = static_cast<int>( rInput.size() );
 
 #ifdef _VERBOSE
-            fprintf( stderr, "WriteDataFrames(), %d bytes to process\n",
-                              iBytesToProcess );
+            fprintf( stderr, "WriteDataFrames(), %d words to process\n",
+                              iWordsToProcess );
 #endif
 
-            while ( ( iBytesToProcess >= m_iDataArraySize    ) ||
-                    ( bForceFlush && ( iBytesToProcess > 0 ) )  )
+            while ( ( iWordsToProcess >= m_iDataArrayWords    ) ||
+                    ( bForceFlush && ( iWordsToProcess > 0 ) )  )
             {
                 // Start of a new CODIF period hence set the time parameters for
                 // this frame and reset the frame counter. We also need to set the
                 // frame-time reference now that the preamble frames have been handled.
 
-                int iTotalFrames = iBytesToProcess / m_iDataArraySize;
+                int iTotalFrames = iWordsToProcess / m_iDataArrayWords;
 
-                if ( ( iBytesToProcess % m_iDataArraySize ) != 0 )
+                if ( ( iWordsToProcess % m_iDataArrayWords ) != 0 )
                 {
                     iTotalFrames++;
                 }
@@ -658,26 +613,67 @@ namespace NCodec        // Part of the Codec namespace.
 
                     // Copy over the sample data where it exists. Note that this approach
                     // should leave the last partial frame zeroed out.
+		    //  Swizzle samples if necessary
 
-                    for ( int iByte = 0; ( iByte < m_iDataArraySize ) && ( ! rInput.empty() ); iByte++ )
-                    {
-                        pbyDataFrame[ iDFHSize_c + iByte ] = rInput.front();
-                        rInput.pop_front();
-                        iByteCount++;
-                    }
+		    if (m_iBitsPerSample==16) { // No change
+		      for ( int iWord = 0; ( iWord < m_iDataArrayWords ) && ( ! rInput.empty() ); iWord++ )
+			{
+			  pbyDataFrame[ iDFHWord_c + iWord ] = rInput.front();
+			  rInput.pop_front();
+			  iWordCount++;
+			}
+		    } else if (m_iBitsPerSample==1) {
+		      printf("DEBUG: Processing %d words\n", m_iDataArrayWords);
 
-                    // Write the data frame to disk.
+		      
+		      int mask = (1<<(m_iBitsPerSample*2))-1;
+		      assert(mask==0x3); // Temp check - remove
 
-                    if ( ! m_pFile->Write( pbyDataFrame, m_iDataFrameSize ) )
-                    {
-                        throw string{ "Error writing to the encoded file" };
-                    }
+		      printf("DEBUG:  nbit=%d nchan= %d  nPol=%d\n", m_iBitsPerSample, m_iNumberOfChannels, m_iNumberofPol);
+		      int samplesPerWord = sizeof(uint32_t)*8/(m_iBitsPerSample*2); // 16
+		      printf("DEBUG: samplesPerWord = %d\n", samplesPerWord);
+		      assert(samplesPerWord % m_iNumberOfChannels*m_iNumberofPol == 0); // Must have an integer number of channels per word
+		      int samplePerOutword = samplesPerWord/  m_iNumberOfChannels*m_iNumberofPol;
+		      printf("DEBUG: samplesPerOutWord = %d\n", samplePerOutword);
+		      
+		      for ( int iWord = 0; ( iWord < m_iDataArrayWords/(m_iNumberOfChannels*m_iNumberofPol) ) && ( ! rInput.empty() ); iWord++ ) {
+			// Grab next set of original samples
+			for (int c=0; c< (m_iNumberOfChannels*m_iNumberofPol) && ( ! rInput.empty()); c++) {
+			  vcraftData[c] = rInput.front();
+			  rInput.pop_front();
+			  iWordCount++;
+			}
+
+			for (int i=0; i< samplesPerWord/samplePerOutword; i++) {
+			  codifData[i] = 0;
+			  for (int j=0; j<samplePerOutword; j++) {
+			    for (int k=0; k<m_iNumberOfChannels*m_iNumberofPol; k++) {
+			      codifData[i] |= ((vcraftData[k]>>(j+i*2)*m_iBitsPerSample*2)&mask)<<(k+j*m_iNumberOfChannels*m_iNumberofPol)*m_iBitsPerSample*2;
+			    }
+			  }
+			}
+
+			for (int i=0; i<m_iNumberOfChannels*m_iNumberofPol; i++) {
+			  pbyDataFrame[ iDFHWord_c + iWord*(m_iNumberOfChannels*m_iNumberofPol) + i ] = codifData[i];
+			}
+		      }
+		    } else {
+		      fprintf(stderr, "Do not support %d bits\n", m_iBitsPerSample);
+		      exit(1);
+		    }
+
+                    // Write the data frame to disk
+
+		    if ( ! m_pFile->Write( pbyDataFrame, m_iDataFrameSize/sizeof(uint32_t) ) )
+		      {
+			throw string{ "Error writing to the encoded file" };
+		      }
 
                     // Increment the frame counter and handle time increment.
 
                     m_DFH.NextFrame();
                 }
-                iBytesToProcess -= iByteCount;
+                iWordsToProcess -= iWordCount;
             }
 
             bSuccess = true;
@@ -699,119 +695,13 @@ namespace NCodec        // Part of the Codec namespace.
     //////////
     //
 
-    bool CCodecCODIF::WritePreambleFrames( const int &riPreambleTimeSamples )
-    {
-        bool bSuccess = false;       // Assume failure for now.
-
-        try
-        {
-            ByteDeque_t &rInput = SampleData();
-
-            byte_t *pbyDataFrame = m_DataFrameBuffer.data();
-            assert( pbyDataFrame != nullptr );
-
-            // Process the preamble frames in this partial period.
-
-            int iByteCount = 0;
-            int iBytesToProcess = riPreambleTimeSamples * BytesPerTimeSampleForChannels();
-
-            bool bInitialiseFrameTime = true;
-
-#ifdef _VERBOSE
-            fprintf( stderr, "WritePreambleFrames(), %d samples to synchronise (%d bytes), Queued: %ld\n",
-                              riPreambleTimeSamples,
-                              iBytesToProcess,
-                              rInput.size() );
-#endif
-
-            while ( rInput.size() >= static_cast<size_t>( m_iDataArraySize ) )
-            {
-                // Work out how many frames there will be in this partial period
-                // and the header parameters to suit.
-
-                int iTotalFrames = iBytesToProcess / m_iDataArraySize;
-
-                if ( ( iBytesToProcess % m_iDataArraySize ) != 0 )
-                {
-                    iTotalFrames++;
-                }
-
-                // Set the preamble-frame's time, number etc.
-
-                if ( bInitialiseFrameTime )
-                {
-                    SetPartialFrameParams( iTotalFrames );
-                    bInitialiseFrameTime = false;
-                }
-
-                // Form and output the frames.
-
-                for ( int iFrame = 0; iFrame < iTotalFrames; iFrame++ )
-                {
-                    // Zero the output data frame, which covers the case where there
-                    // are insufficient samples to form an entire frame.
-
-                    memset( pbyDataFrame, 0x00, m_iDataFrameSize );
-
-                    // Copy over the formatted Data Frame Header.
-
-                    memcpy( pbyDataFrame, static_cast<CODIFDFH_t *>(m_DFH), iDFHSize_c );
-
-                    // Copy over the sample data where it exists. Note that this approach
-                    // should leave the last partial frame zeroed out.
-
-                    for ( int iByte = 0; ( iByte < m_iDataArraySize ) && ( ! rInput.empty() ); iByte++ )
-                    {
-                        pbyDataFrame[ iDFHSize_c + iByte ] = rInput.front();
-                        rInput.pop_front();
-                        iByteCount++;
-                    }
-
-                    // Write the data frame to disk.
-
-                    if ( ! m_pFile->Write( pbyDataFrame, m_iDataFrameSize ) )
-                    {
-                        throw string{ "Error writing to the encoded file" };
-                    }
-                }
-
-                iBytesToProcess -= iByteCount;
-            }
-
-            // Finally, should there be any residual unread samples, clear
-            // them from the input queue thereby ensuring we are synced to the whole
-            // second for subsequent processing.
-
-            const int iBytesToRemove = iBytesToProcess - iByteCount;
-
-            if ( ( iBytesToRemove > 0 ) &&
-                 ( iBytesToRemove <= static_cast<int>( rInput.size() ) ) )
-            {
-                rInput.erase( rInput.begin(), rInput.begin() + iBytesToRemove );
-            }
-
-            bSuccess = true;
-        }
-        catch ( string sMessage )
-        {
-            fprintf( stderr, "CCodecCODIF::WritePreambleFrames(), %s.\n", sMessage.c_str() );
-            bSuccess = false;
-        }
-        catch ( ... )
-        {
-            fprintf( stderr, "CCodecCODIF::WritePreambleFrames(), Unspecified exception.\n" );
-            bSuccess = false;
-        }
-
-        return bSuccess;
-    }
-
     //////////
     //
 
     int CCodecCODIF::BytesPerTimeSampleForChannels( void ) const
     {
         // Assume Complex samples - I and Q per sample
+        assert ( m_iNumberOfChannels * m_iNumberofPol * m_iBitsPerSample * 2 % 8 ==0);
         return ( m_iNumberOfChannels * m_iNumberofPol * m_iBitsPerSample * 2 / iBitsPerByte_c );
     }
 
