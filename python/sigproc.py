@@ -278,7 +278,7 @@ class SigprocFile(object):
 
             data = data2
             
-        data.shape = (self.nchans, self.num_samples)
+        data.shape = (num_samples, self.nchans)
 
         return data
     
