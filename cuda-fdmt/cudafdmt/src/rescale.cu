@@ -349,49 +349,6 @@ void rescale_update_and_transpose_float(rescale_t& rescale, array4d_t& read_arr,
 	}
 }
 
-
-__global__ void rescale_calc_dm0_kernel (
-		const uint8_t* __restrict__ inarr,
-		const rescale_dtype* __restrict__ offsetarr,
-		const rescale_dtype* __restrict__ scalearr,
-		rescale_dtype* __restrict__ dm0arr,
-		rescale_dtype* __restrict__ dm0count,
-		int nf,
-		int nt,
-		rescale_dtype cell_thresh)
-{
-	// input = BTF order
-	// dm0 order: BT
-	// Rescale: BF order
-
-	int ibeam = blockIdx.x;
-	for(int t = threadIdx.x; t < nt; t += blockDim.x) {
-		rescale_dtype dm0sum = 0.0;
-		int nsamp = 0;
-		for (int c = 0; c < nf; ++c) {
-			int rsidx = c + nf*ibeam; // rescale index BF order
-			// all these reads are nice and coalesced
-			rescale_dtype offset = offsetarr[rsidx]; // read from global
-			rescale_dtype scale = scalearr[rsidx]; // read from global
-			int inidx = c + nf*(t + nt*ibeam); // input index : BTF order
-
-			// coalesced read from global
-			rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
-			rescale_dtype vout = (vin + offset) * scale;
-			if (fabs(vout) < cell_thresh && scale != 0.0f) {
-				dm0sum += vout;
-				++nsamp;
-			}
-		}
-
-		int dm0idx = t + nt*ibeam;
-		rescale_dtype correction = rsqrtf((float) nsamp);
-		//dm0arr[dm0idx] = dm0sum * correction;
-		dm0arr[dm0idx] = dm0sum;
-		dm0count[dm0idx] = (float)nsamp;
-	}
-}
-
 __global__ void rescale_calc_dm0stats_kernel (
 		const rescale_dtype* __restrict__ dm0arr,
 		const rescale_dtype* __restrict__ dm0countarr,
@@ -443,84 +400,6 @@ __global__ void rescale_calc_dm0stats_kernel (
 
 
 
-
-void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& rescale_buf, const uint8_t* read_buf, bool invert_freq, bool subtract_dm0)
-{
-	int nbeams = rescale_buf.nw;
-	int nf = rescale_buf.nx;
-	int nt = rescale_buf.nz;
-
-	// Calculate dm0 for flagging
-	rescale_calc_dm0_kernel<<<nbeams, 256>>>(
-			read_buf,
-			rescale.offset.d_device,
-			rescale.scale.d_device,
-			rescale.dm0.d_device,
-			rescale.dm0count.d_device,
-			nf, nt,
-			rescale.cell_thresh);
-
-	gpuErrchk(cudaDeviceSynchronize());
-
-	// Take the mean all the dm0 times into one big number per beam - this is the how we flag
-	// short dropouts see ACES-209
-	// probably could do this in rescale_calc_dm0_kernel after yu've done it
-	// But i Haven't got htere yet.
-	rescale_calc_dm0stats_kernel<<<1, nbeams>>>(
-			rescale.dm0.d_device,
-			rescale.dm0count.d_device,
-			rescale.dm0stats.d_device,
-			nt);
-
-	gpuErrchk(cudaDeviceSynchronize());
-
-	if (subtract_dm0) {
-		rescale_update_and_transpose_float_kernel< true ><<<nbeams, nf>>>(
-				read_buf,
-				rescale.sum.d_device,
-				rescale.sum2.d_device,
-				rescale.sum3.d_device,
-				rescale.sum4.d_device,
-				rescale.decay_offset.d_device,
-				rescale.nsamps.d_device,
-				rescale.offset.d_device,
-				rescale.scale.d_device,
-				rescale.dm0.d_device,
-				rescale.dm0count.d_device,
-				rescale.dm0stats.d_device,
-				rescale_buf.d_device,
-				rescale.decay_constant,
-				rescale.dm0_thresh,
-				rescale.cell_thresh*rescale.target_stdev,
-				nt,
-				invert_freq);
-	} else {
-		rescale_update_and_transpose_float_kernel< false ><<<nbeams, nf>>>(
-				read_buf,
-				rescale.sum.d_device,
-				rescale.sum2.d_device,
-				rescale.sum3.d_device,
-				rescale.sum4.d_device,
-				rescale.decay_offset.d_device,
-				rescale.nsamps.d_device,
-				rescale.offset.d_device,
-				rescale.scale.d_device,
-				rescale.dm0.d_device,
-				rescale.dm0count.d_device,
-				rescale.dm0stats.d_device,
-				rescale_buf.d_device,
-				rescale.decay_constant,
-				rescale.dm0_thresh,
-				rescale.cell_thresh*rescale.target_stdev,
-				nt,
-				invert_freq);
-	}
-
-
-	rescale.sampnum += nt;
-	gpuErrchk(cudaDeviceSynchronize());
-
-}
 
 __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype* __restrict__ sum,

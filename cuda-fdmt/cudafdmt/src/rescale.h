@@ -74,9 +74,39 @@ void rescale_update_decay_uint8(rescale_t* rescale, float* in, uint8_t* out);
 void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale);
 void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& rescale_buf,
 		const uint8_t* read_buf, bool invert_freq, bool subtract_dm0);
+__global__ void rescale_calc_dm0stats_kernel (
+		const rescale_dtype* __restrict__ dm0arr,
+		const rescale_dtype* __restrict__ dm0countarr,
+		rescale_dtype* __restrict__ dm0statarr,
+		int nt);
 
-template <bool subtract_dm0> __global__ void rescale_update_and_transpose_float_kernel (
-		const uint8_t* __restrict__ inarr,
+template <int nsamps_per_word, typename wordT> __device__ __host__ inline rescale_dtype extract_sample(const wordT word, const int samp)
+{
+	const int nbits_per_samp = sizeof(wordT)*8/nsamps_per_word;
+	// Shift desired sample down to bottom of w
+	wordT shiftsamp = word >> (sizeof(wordT)*8 - nbits_per_samp*(samp-1));
+
+	// this mask has 1s in the bottom nbits_per_samp bits
+	wordT mask = (nbits_per_samp << 1) - 1;
+
+	rescale_dtype sample = (rescale_dtype) (shiftsamp && mask);
+
+	return sample;
+
+}
+
+template <> __device__ __host__ inline rescale_dtype extract_sample<32, float>(const float word, int sampno)
+{
+	return (rescale_dtype) word;
+}
+
+template <> __device__ __host__ inline rescale_dtype extract_sample<64, double>(const double word, int sampno)
+{
+	return (rescale_dtype) word;
+}
+
+template <int nsamps_per_word, typename wordT> __global__ void rescale_update_and_transpose_float_kernel (
+		const wordT* __restrict__ inarr,
 		rescale_dtype* __restrict__ sumarr,
 		rescale_dtype* __restrict__ sum2arr,
 		rescale_dtype* __restrict__ sum3arr,
@@ -93,20 +123,25 @@ template <bool subtract_dm0> __global__ void rescale_update_and_transpose_float_
 		float dm0_thresh,
 		float cell_thresh,
 		int nt,
-		bool invert_freq)
+		bool invert_freq,
+		bool subtract_dm0)
 {
 	int ibeam = blockIdx.x;
-	int c = threadIdx.x;
-	int nf = blockDim.x;
+	int s = threadIdx.x; // sample index within a word
+	int w = threadIdx.y; // word index
+	int nwords = blockDim.y;
+	const int nf = nwords * nsamps_per_word;
+	const int c = w*nsamps_per_word + s; // channel number
 	const rescale_dtype k = decay_constant;
 
-
+	// on input F axis is broken further into words and samples. all X threads load the same word
 	// input = BTF order
 	// output = BFT order
 	// Rescale order: BF
 	// dm0 order: BT
 	// dm0sum order: B
 	// nsamps order: BF
+
 
 	int rsidx = c + nf*ibeam; // rescale index: BF order
 	// all these reads are nice and coalesced
@@ -135,10 +170,12 @@ template <bool subtract_dm0> __global__ void rescale_update_and_transpose_float_
 	rescale_dtype dm0stat_mean = dm0statarr[stati + 2]; // broadcast read.
 
 	for (int t = 0; t < nt; ++t) {
-		int inidx = c + nf*(t + nt*ibeam);
-		int outidx = t + nt*(outc + nf*ibeam);
-		// coalesced read from global
-		rescale_dtype vin = (rescale_dtype)inarr[inidx]; // read from global
+		int wordidx = w + nwords*(t + nt*ibeam);
+
+		// coalesced read from global for all x threads.
+		wordT word = inarr[word];
+		rescale_dtype vin = extract_sample<nsamps_per_word, wordT>(word, s);
+
 		rescale_dtype vout = (vin + offset) * scale;
 		if (k == 0) { // If we set the timescale to zero, we just don't do any decaying
 			decay_offset = 0;
@@ -163,6 +200,8 @@ template <bool subtract_dm0> __global__ void rescale_update_and_transpose_float_
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && fabs(dm0sum) < block_dm0thresh;
 		bool this_sample_ok = fabs(dm0z) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh;
+		int outidx = t + nt*(outc + nf*ibeam);
+
 		if (this_sample_ok && last_sample_ok) {
 			sum += vin;
 			sum2 += vin*vin;
@@ -170,7 +209,10 @@ template <bool subtract_dm0> __global__ void rescale_update_and_transpose_float_
 			sum4 += vin*vin*vin*vin;
 			// non-coalesced write (transpose. Sorry)
 
-			outarr[outidx] = sout;
+			//outarr[outidx] += sout;
+
+			// doing an atomic add for polarisation summing and antenna summing - probably adds some overhead but we'll see.t
+			atomicAdd(outarr + outidx, sout);
 			nsamps += 1;
 		} else {
 //			printf("FLAG ibeam/c/t %d/%d/%d dm0/sout/dm0min %f/%f/%f flags %d/%d/%d\n", ibeam, c, t,
@@ -178,10 +220,11 @@ template <bool subtract_dm0> __global__ void rescale_update_and_transpose_float_
 //					fabs(dm0z) < dm0_thresh,
 //					fabs(sout) < cell_thresh,
 //					dm0min > -3*dm0_thresh);
-			outarr[outidx] = 0.0;
+			//outarr[outidx] = 0.0;
 		}
 
 		last_sample_ok = this_sample_ok;
+
 
 	}
 
@@ -194,5 +237,123 @@ template <bool subtract_dm0> __global__ void rescale_update_and_transpose_float_
 	nsampsarr[rsidx] = (float)nsamps;
 }
 
+template <int nsamps_per_word, typename wordT> __global__ void rescale_calc_dm0_kernel (
+		const wordT* __restrict__ inarr,
+		const rescale_dtype* __restrict__ offsetarr,
+		const rescale_dtype* __restrict__ scalearr,
+		rescale_dtype* __restrict__ dm0arr,
+		rescale_dtype* __restrict__ dm0count,
+		int nf,
+		int nt,
+		rescale_dtype cell_thresh)
+{
+	// input = BTF order
+	// dm0 order: BT
+	// Rescale: BF order
+
+	int ibeam = blockIdx.x;
+
+	// to take advantage of having a word in a register, we have to have two loops to loop
+	// over channels - one loop over the words, and the next over the samples in the word
+	int nwords = nf/nsamps_per_word;
+
+	for(int t = threadIdx.x; t < nt; t += blockDim.x) {
+		rescale_dtype dm0sum = 0.0;
+		int nsamp = 0;
+		for (int w = 0; w < nwords; w++) {
+			int inidx = w + nwords*(t + nt*ibeam); // input index : BTF order
+			// coalesced read from global
+			wordT word = inarr[inidx];
+
+			for (int s = 0; s < nsamps_per_word; ++s) {
+				int c = w*nwords + s; // channel number
+				int rsidx = c + nf*ibeam; // rescale index BF order
+				// all these reads are nice and coalesced
+				rescale_dtype offset = offsetarr[rsidx]; // read from global
+				rescale_dtype scale = scalearr[rsidx]; // read from global
+
+				// extract channel out of word
+				rescale_dtype vin = extract_sample<nsamps_per_word, wordT>(word, s); // read from global
+				rescale_dtype vout = (vin + offset) * scale;
+				if (fabs(vout) < cell_thresh && scale != 0.0f) {
+					dm0sum += vout;
+					++nsamp;
+				}
+
+			}
+		}
+
+		int dm0idx = t + nt*ibeam;
+		rescale_dtype correction = rsqrtf((float) nsamp);
+		//dm0arr[dm0idx] = dm0sum * correction;
+		dm0arr[dm0idx] = dm0sum;
+		dm0count[dm0idx] = (float)nsamp;
+	}
+}
+
+
+
+template <int nsamps_per_word, typename wordT> void
+	rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale,
+										array4d_t& rescale_buf,
+										const wordT* read_buf,
+										bool invert_freq,
+										bool subtract_dm0)
+{
+	int nbeams = rescale_buf.nw;
+	int nf = rescale_buf.nx;
+	int nt = rescale_buf.nz;
+	int nwords = nf / nsamps_per_word;
+	assert(nf % nsamps_per_word == 0);
+
+	// Calculate dm0 for flagging
+
+	rescale_calc_dm0_kernel<<<nbeams, 256>>>(
+			read_buf,
+			rescale.offset.d_device,
+			rescale.scale.d_device,
+			rescale.dm0.d_device,
+			rescale.dm0count.d_device,
+			nf, nt,
+			rescale.cell_thresh);
+
+	// Take the mean all the dm0 times into one big number per beam - this is the how we flag
+	// short dropouts see ACES-209
+	// probably could do this in rescale_calc_dm0_kernel after yu've done it
+	// But i Haven't got htere yet.
+	rescale_calc_dm0stats_kernel<<<1, nbeams>>>(
+			rescale.dm0.d_device,
+			rescale.dm0count.d_device,
+			rescale.dm0stats.d_device,
+			nt);
+
+	dim3 blockdim(nsamps_per_word, nwords);
+
+	rescale_update_and_transpose_float_kernel< nsamps_per_word, wordT ><<<nbeams, blockdim>>>(
+			read_buf,
+			rescale.sum.d_device,
+			rescale.sum2.d_device,
+			rescale.sum3.d_device,
+			rescale.sum4.d_device,
+			rescale.decay_offset.d_device,
+			rescale.nsamps.d_device,
+			rescale.offset.d_device,
+			rescale.scale.d_device,
+			rescale.dm0.d_device,
+			rescale.dm0count.d_device,
+			rescale.dm0stats.d_device,
+			rescale_buf.d_device,
+			rescale.decay_constant,
+			rescale.dm0_thresh,
+			rescale.cell_thresh*rescale.target_stdev,
+			nt,
+			invert_freq,
+			subtract_dm0);
+
+
+	rescale.sampnum += nt;
+	gpuErrchk(cudaDeviceSynchronize());
+
+}
 
 #endif

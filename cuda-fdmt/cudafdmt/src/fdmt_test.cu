@@ -372,7 +372,7 @@
 			gpuErrchk(cudaMemcpy(read_buf_device, read_buf, in_chunk_size*sizeof(uint8_t), cudaMemcpyHostToDevice));
 			fdmt.t_copy_in.stop();
 			trescale.start();
-			rescale_update_and_transpose_float_gpu(rescale, rescale_buf, read_buf_device, invert_freq, subtract_dm0);
+			rescale_update_and_transpose_float_gpu<1, uint8_t>(rescale, rescale_buf, read_buf_device, invert_freq, subtract_dm0);
 			trescale.stop();
 
 			if (dump_data) {
@@ -466,21 +466,21 @@
 		}
 
 
-		double boxcar_ngops = (double)nbeams*(double)nt*(double)nd*2.0f*(double)NBOX/1e9f;
+		double boxcar_ngops = (double)nbeams*(double)nt*(double)nd*2.0*(double)NBOX/1e9;
+		double data_nsecs = blocknum*nt*source->tsamp();
 
-		double flagged_percent = ((double) num_flagged_beam_chans) / ((double) nf*nbeams*blocknum) * 100.0f;
-		double dm0_flagged_percent = ((double) num_flagged_times) / ((double) blocknum*nbeams*nt*nf) * 100.0f;
+		double flagged_percent = ((double) num_flagged_beam_chans) / ((double) nf*nbeams*blocknum) * 100.0;
+		double dm0_flagged_percent = ((double) num_flagged_times) / ((double) blocknum*nbeams*nt*nf) * 100.0;
 		cout << " FREDDA Finished" << endl;
 		cout << "Found " << total_candidates << " candidates" << endl;
 		cout << "Discarded " << total_discards << " candidates for being too wide" << endl;
-		float data_nsecs = blocknum*nt*source.tsamp();
 		cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << data_nsecs << " seconds" << " at " << data_nsecs/tall.wall_total()<< "x real time"<< endl;
 		cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;
 		cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;
 		cout << "FREDDA CPU "<< endl << tall << endl;
 		cout << "Rescale "<< endl << trescale << endl;
 		cout << "Boxcar "<< endl << tboxcar << endl;
-		cout << "File reading " << endl << source.read_timer << endl;
+		cout << "File reading " << endl << source->m_read_timer << endl;
 		fdmt_print_timing(&fdmt);
 		cout << "FDMT " << ((double)fdmt.nops)/1e9
 			 << " Gops/iteration ran at: " << ((double)fdmt.nops) / (fdmt.t_iterations.get_average_time()/1e3)/1e9

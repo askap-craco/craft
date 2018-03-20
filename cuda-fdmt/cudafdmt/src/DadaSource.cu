@@ -62,7 +62,7 @@ DadaSource::DadaSource(int key, bool lock) {
 	if (ascii_header_get (header, "HDR_SIZE", "%"PRIu64, &hdr_size) != 1) {
 		hdr_size = header_size;
 		if (ascii_header_set (header, "HDR_SIZE", "%"PRIu64, hdr_size) < 0) {
-			printf("Couldnt set header size");
+			printf("Couldn't set header size");
 			exit(EXIT_FAILURE);
 		}
 	}
