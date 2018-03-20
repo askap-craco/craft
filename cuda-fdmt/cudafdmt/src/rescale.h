@@ -83,13 +83,20 @@ __global__ void rescale_calc_dm0stats_kernel (
 template <int nsamps_per_word, typename wordT> __device__ __host__ inline rescale_dtype extract_sample(const wordT word, const int samp)
 {
 	const int nbits_per_samp = sizeof(wordT)*8/nsamps_per_word;
-	// Shift desired sample down to bottom of w
-	wordT shiftsamp = word >> (sizeof(wordT)*8 - nbits_per_samp*(samp-1));
+	const int shift = nbits_per_samp * samp;
+
+	// Shift desired sample down to bottom of shiftsamp. Most significant bits are sample=0
+	wordT shiftsamp = word >> shift;
 
 	// this mask has 1s in the bottom nbits_per_samp bits
-	wordT mask = (nbits_per_samp << 1) - 1;
+	wordT mask = (1 << nbits_per_samp) - 1;
 
-	rescale_dtype sample = (rescale_dtype) (shiftsamp && mask);
+	wordT masksamp = shiftsamp & mask;
+
+	rescale_dtype sample = (rescale_dtype) masksamp;
+	printf("nbits_per_samp %d shift %d shiftsamp %d nsamp_per_word %d word %d mask %d masksamp %d sample %f\n",
+			nbits_per_samp, shift, shiftsamp, nsamps_per_word, word, mask, masksamp, sample);
+
 
 	return sample;
 
@@ -173,7 +180,7 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		int wordidx = w + nwords*(t + nt*ibeam);
 
 		// coalesced read from global for all x threads.
-		wordT word = inarr[word];
+		wordT word = inarr[wordidx];
 		rescale_dtype vin = extract_sample<nsamps_per_word, wordT>(word, s);
 
 		rescale_dtype vout = (vin + offset) * scale;
@@ -306,9 +313,10 @@ template <int nsamps_per_word, typename wordT> void
 	int nwords = nf / nsamps_per_word;
 	assert(nf % nsamps_per_word == 0);
 
-	// Calculate dm0 for flagging
+	// clear output
+	array4d_cuda_memset(&rescale_buf, 0);
 
-	rescale_calc_dm0_kernel<<<nbeams, 256>>>(
+	rescale_calc_dm0_kernel< nsamps_per_word, wordT > <<<nbeams, 256>>>(
 			read_buf,
 			rescale.offset.d_device,
 			rescale.scale.d_device,

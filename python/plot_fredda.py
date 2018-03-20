@@ -105,9 +105,11 @@ def statplot(ax, fname, name):
         d = load4d(fname.replace('fdmt',name))
         sl = [0,0,slice(None),slice(None)]
         ax.plot(d[sl].T)
-        ax.set_ylabel(name)
     except IOError:
         print 'No data for ', fname, name
+
+    ax.set_ylabel(name)
+
     return d
 
 def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
@@ -185,10 +187,14 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         statplot(dm0ax, fname, 'dm0')
         rawdm0 = rawd.sum(axis=1).T
         dm0ax.plot(rawd.sum(axis=0).T)
-        dm0count = load4d(fname.replace('fdmt','dm0count'))
-        dm0countax = dm0ax.twinx()
-        dm0countax.plot(dm0count[0,0,ibeam,:])
-        dm0countax.set_ylim(0, None)
+        try:
+            dm0count = load4d(fname.replace('fdmt','dm0count'))
+            dm0countax = dm0ax.twinx()
+            dm0countax.plot(dm0count[0,0,ibeam,:])
+            dm0countax.set_ylim(0, None)
+        except IOError:
+            # dm0count doesn't exist
+            pass
 
         pylab.show()
 

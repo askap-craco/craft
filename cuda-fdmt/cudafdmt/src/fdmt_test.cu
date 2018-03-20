@@ -350,7 +350,6 @@
 		signal(SIGINT, &handle_signal);
 		int num_flagged_beam_chans = 0;
 		int num_flagged_times = 0;
-		int blocks_since_rescale_update = 0;
 
 		while (source->read_samples_uint8(nt, read_buf) == nt) {
 			if (stopped) {
@@ -372,7 +371,7 @@
 			gpuErrchk(cudaMemcpy(read_buf_device, read_buf, in_chunk_size*sizeof(uint8_t), cudaMemcpyHostToDevice));
 			fdmt.t_copy_in.stop();
 			trescale.start();
-			rescale_update_and_transpose_float_gpu<1, uint8_t>(rescale, rescale_buf, read_buf_device, invert_freq, subtract_dm0);
+			rescale_update_and_transpose_float_gpu<4, uint32_t>(rescale, rescale_buf, (uint32_t*) read_buf_device, invert_freq, subtract_dm0);
 			trescale.stop();
 
 			if (dump_data) {
