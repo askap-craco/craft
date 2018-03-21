@@ -113,8 +113,10 @@ template <int nsamps_per_word, typename wordT> __device__ __host__ inline rescal
 	wordT masksamp = shiftsamp & mask;
 
 	rescale_dtype sample = (rescale_dtype) masksamp;
+	/*
 	printf("nbits_per_samp %d shift %d shiftsamp %d nsamp_per_word %d word %d mask %d masksamp %d sample %f\n",
 			nbits_per_samp, shift, shiftsamp, nsamps_per_word, word, mask, masksamp, sample);
+			*/
 
 
 	return sample;
