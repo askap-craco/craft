@@ -31,6 +31,9 @@ public:
 	char* name() {
 		return first_file->name(); // TODO: Replace with siomething more meaningful
 	}
+	int nbits() {
+		return first_file->nbits();
+	}
 	int nbeams() {
 		return m_nbeams;
 	}

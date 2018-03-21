@@ -270,6 +270,9 @@ void rescale_arraymalloc(array4d_t* arr, uint64_t nbeams, uint64_t nf, bool allo
 	arr->nx = 1;
 	arr->ny = nbeams;
 	arr->nz = nf;
+	printf("Allocating array ");
+	array4d_print_shape(arr);
+	printf("for rescaling\n");
 	array4d_malloc(arr, alloc_host, true);
 	array4d_zero(arr);
 }
@@ -277,7 +280,6 @@ void rescale_arraymalloc(array4d_t* arr, uint64_t nbeams, uint64_t nf, bool allo
 rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uint64_t nf, uint64_t nt, bool alloc_host)
 {
 	uint64_t nelements = nbeams*nf;
-	size_t sz = nelements*sizeof(rescale_dtype);
 	rescale_arraymalloc(&rescale->sum, nbeams, nf, alloc_host);
 	rescale_arraymalloc(&rescale->sum2, nbeams, nf, alloc_host);
 	rescale_arraymalloc(&rescale->sum3, nbeams, nf, alloc_host);

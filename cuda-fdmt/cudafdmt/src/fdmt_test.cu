@@ -29,6 +29,7 @@
 #include "DadaSource.h"
 #include "CandidateList.h"
 #include "InvalidSourceFormat.h"
+#include "Rescaler.h"
 
 
 #include "rescale.h"
@@ -251,12 +252,6 @@ int main(int argc, char* argv[])
 	uint8_t* read_buf = (uint8_t*) malloc(sizeof(uint8_t) * in_chunk_size);
 	assert(read_buf);
 
-	array4d_t read_arr;
-	read_arr.nw = 1;
-	read_arr.nx = nt;
-	read_arr.ny = nbeams;
-	read_arr.nz = nf;
-
 	array4d_t rescale_buf;
 	rescale_buf.nw = nbeams;
 	rescale_buf.nx = nf;
@@ -272,10 +267,9 @@ int main(int argc, char* argv[])
 	array4d_malloc(&out_buf, dump_data, true);
 
 	// create rescaler
-	rescale_gpu_t rescale;
+	RescaleOptions rescale = {};
 	rescale.interval_samps = nt;
 	rescale.target_mean = 0.0;
-	//rescale.target_stdev = 1.0/sqrt((float) nf);
 	rescale.target_stdev = 1.0;
 	rescale.decay_constant = 0.35 * decay_timescale / source->tsamp(); // This is how the_decimator.C does it, I think.
 	rescale.mean_thresh = mean_thresh;
@@ -286,6 +280,10 @@ int main(int argc, char* argv[])
 	rescale.cell_thresh = cell_thresh;
 	rescale.invert_freq = (foff < 0);
 	rescale.subtract_dm0 = subtract_dm0;
+	rescale.nt = nt;
+	rescale.nf = nf;
+	rescale.nbeams = nbeams;
+	rescale.nbits = source->nbits();
 	// set guess of initial scale and offset to dm0 thresholding works
 	printf("Rescaling to mean=%f stdev=%f decay constant=%f mean/std/kurtosis/dm0/Cell thresholds: %0.1f/%0.1f/%0.1f/%0.1f/%0.1f grow flags by %d channels\n",
 			rescale.target_mean,rescale.target_stdev,
@@ -294,11 +292,12 @@ int main(int argc, char* argv[])
 			rescale.dm0_thresh, rescale.cell_thresh,
 			rescale.flag_grow);
 	//rescale_allocate(&rescale, nbeams*nf);
-	rescale_allocate_gpu(&rescale, nbeams, nf, nt, true); // Need host memory allocated for rescale because we copy back to count flags
+	//rescale_allocate_gpu(&rescale, nbeams, nf, nt, true); // Need host memory allocated for rescale because we copy back to count flags
+	Rescaler* rescaler = new Rescaler(rescale);
 	if (num_rescale_blocks == 0) {
-		rescale_set_scale_offset_gpu(&rescale, 1.0f, -128.0f); // Just pass it straight through without rescaling
+		rescaler->set_scaleoffset(1.0f, -128.0f); // Just pass it straight through without rescaling
 	} else {
-		rescale_set_scale_offset_gpu(&rescale, rescale.target_stdev/18.0, -128.0f); // uint8 stdev is 18 and mean +128.
+		rescaler->set_scaleoffset(rescale.target_stdev/18.0, -128.0f); // uint8 stdev is 18 and mean +128.
 	}
 
 	fdmt_t fdmt;
@@ -372,7 +371,7 @@ int main(int argc, char* argv[])
 		gpuErrchk(cudaMemcpy(read_buf_device, read_buf, in_chunk_size*sizeof(uint8_t), cudaMemcpyHostToDevice));
 		fdmt.t_copy_in.stop();
 		trescale.start();
-		rescale_update_and_transpose_float_gpu<4, uint32_t>(rescale, rescale_buf, (uint32_t*) read_buf_device);
+		rescaler->update_and_transpose(rescale_buf, read_buf_device);
 		trescale.stop();
 
 		if (dump_data) {
@@ -381,11 +380,11 @@ int main(int argc, char* argv[])
 
 		// Count how many times were flagged
 		assert(num_rescale_blocks >= 0);
-		array4d_copy_to_host(&rescale.nsamps); // must do this before updaing scaleoffset, which resets nsamps to zero
+		array4d_copy_to_host(&rescaler->nsamps); // must do this before updaing scaleoffset, which resets nsamps to zero
 
 		for(int i = 0; i < nf*nbeams; ++i) {
-			int nsamps = (int)rescale.nsamps.d[i]; // nsamps is the number of unflagged samples from this block
-			int nflagged = rescale.sampnum - nsamps;
+			int nsamps = (int)rescaler->nsamps.d[i]; // nsamps is the number of unflagged samples from this block
+			int nflagged = rescaler->sampnum - nsamps;
 			// rescale.sampnum is the total number of samples that has gone into the rescaler
 			assert (nflagged >= 0);
 			num_flagged_times += nflagged;
@@ -395,20 +394,20 @@ int main(int argc, char* argv[])
 
 		// do rescaling if required
 		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
-			rescale_update_scaleoffset_gpu(rescale);
+			rescaler->update_scaleoffset();
 
 			// Count how many  channels have been flagged for this whole block
 			// by looking at how many channels have scale==0
-			array4d_copy_to_host(&rescale.scale);
+			array4d_copy_to_host(&rescaler->scale);
 			for(int i = 0; i < nf*nbeams; ++i) {
-				if (rescale.scale.d[i] == 0) {
+				if (rescaler->scale.d[i] == 0) {
 					// that channel will stay flagged for num_rescale_blocks
 					num_flagged_beam_chans += num_rescale_blocks;
 				}
 				// Count how many times have been flagged for this block
 				// TODO: DANGER DANGER! This doesn't count flagged times if num_rescale_blocks = 0
 				// This gave me a long headache at LAX when I set -s 1e30 stupidly.
-				int nsamps = (int)rescale.nsamps.d[i];
+				int nsamps = (int)rescaler->nsamps.d[i];
 				// nsamps is the number of unflagged samples in nt*num_rescale_blocks samples
 				int nflagged = nt*num_rescale_blocks - nsamps;
 				assert (nflagged >= 0);
@@ -416,15 +415,15 @@ int main(int argc, char* argv[])
 			}
 
 			if (dump_data) {
-				dumparr("mean", iblock, &rescale.mean);
-				dumparr("std", iblock, &rescale.std);
-				dumparr("kurt", iblock, &rescale.kurt);
-				dumparr("nsamps", iblock, &rescale.nsamps);
-				dumparr("dm0", iblock, &rescale.dm0);
-				dumparr("dm0count", iblock, &rescale.dm0count);
-				dumparr("dm0stats", iblock, &rescale.dm0stats);
-				dumparr("scale", iblock, &rescale.scale);
-				dumparr("offset", iblock, &rescale.offset);
+				dumparr("mean", iblock, &rescaler->mean);
+				dumparr("std", iblock, &rescaler->std);
+				dumparr("kurt", iblock, &rescaler->kurt);
+				dumparr("nsamps", iblock, &rescaler->nsamps);
+				dumparr("dm0", iblock, &rescaler->dm0);
+				dumparr("dm0count", iblock, &rescaler->dm0count);
+				dumparr("dm0stats", iblock, &rescaler->dm0stats);
+				dumparr("scale", iblock, &rescaler->scale);
+				dumparr("offset", iblock, &rescaler->offset);
 			}
 		}
 

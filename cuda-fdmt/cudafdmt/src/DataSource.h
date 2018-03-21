@@ -25,6 +25,7 @@ public:
 	virtual int nbeams() = 0;
 	virtual int npols() = 0;
 	virtual int nchans() = 0;
+	virtual int nbits() = 0;
 
 	virtual size_t read_samples_uint8(size_t nt, uint8_t* output) = 0;
 	virtual size_t seek_sample(size_t t) = 0;

@@ -56,6 +56,7 @@ typedef struct _rescale_gpu_t {
 
 } rescale_gpu_t __attribute__((__aligned__(16)));
 
+void rescale_arraymalloc(array4d_t* arr, uint64_t nbeams, uint64_t nf, bool alloc_host);
 
 rescale_t* rescale_allocate(rescale_t* rescale, uint64_t nelements) ;
 rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uint64_t nf, uint64_t nt, bool alloc_host);
@@ -80,6 +81,24 @@ __global__ void rescale_calc_dm0stats_kernel (
 		rescale_dtype* __restrict__ dm0statarr,
 		int nt);
 
+__global__ void rescale_update_scaleoffset_kernel (
+		rescale_dtype* __restrict__ sum,
+		rescale_dtype* __restrict__ sum2,
+		rescale_dtype* __restrict__ sum3,
+		rescale_dtype* __restrict__ sum4,
+		rescale_dtype* __restrict__ meanarr,
+		rescale_dtype* __restrict__ stdarr,
+		rescale_dtype* __restrict__ kurtarr,
+		rescale_dtype* __restrict__ offsetarr,
+		rescale_dtype* __restrict__ scalearr,
+		rescale_dtype* nsamparr,
+		rescale_dtype target_stdev,
+		rescale_dtype target_mean,
+		rescale_dtype mean_thresh,
+		rescale_dtype std_thresh,
+		rescale_dtype kurt_thresh,
+		int flag_grow);
+
 template <int nsamps_per_word, typename wordT> __device__ __host__ inline rescale_dtype extract_sample(const wordT word, const int samp)
 {
 	const int nbits_per_samp = sizeof(wordT)*8/nsamps_per_word;
@@ -102,12 +121,12 @@ template <int nsamps_per_word, typename wordT> __device__ __host__ inline rescal
 
 }
 
-template <> __device__ __host__ inline rescale_dtype extract_sample<32, float>(const float word, int sampno)
+template <> __device__ __host__ inline rescale_dtype extract_sample<1, float>(const float word, int sampno)
 {
 	return (rescale_dtype) word;
 }
 
-template <> __device__ __host__ inline rescale_dtype extract_sample<64, double>(const double word, int sampno)
+template <> __device__ __host__ inline rescale_dtype extract_sample<1, double>(const double word, int sampno)
 {
 	return (rescale_dtype) word;
 }

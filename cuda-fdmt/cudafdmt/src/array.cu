@@ -51,6 +51,11 @@ __host__ __device__ int array4d_idx(int nw, int nx, int ny, int nz, int w, int x
 
 __host__ __device__ size_t array4d_size(const array4d_t* a)
 {
+	assert(a->nw > 0);
+	assert(a->nx > 0);
+	assert(a->ny > 0);
+	assert(a->nz > 0);
+
 	return a->nw * a->nx * a->ny * a->nz;
 }
 
@@ -152,6 +157,7 @@ int array4d_fill_device(array4d_t* a, fdmt_dtype v) {
 	int nblocks = (size + blocksize - 1) / size;
 	_array4d_fill_kernel<<<nblocks, blocksize>>>(a->d_device, size, v);
 	gpuErrchk(cudaDeviceSynchronize());
+	return nblocks;
 }
 
 int array2d_copy_to_device(array2d_t* a)
