@@ -78,10 +78,14 @@ class CFileDescriptor
         int  Read( byte_t *pbyReadArray, const int &riNumberOfBytes,
                    const int &riOffset,  const int &riOrigin = SEEK_SET );
 
-        int  Read( ByteDeque_t& rQueue, const int &riNumberOfBytes,
+        int  Read( WordDeque_t& rQueue, const int &riNumberOfBytes,
                    const int &riOffset,  const int &riOrigin = SEEK_SET );
 
+	//        int  Read( uint32_t *pbyReadArray, const int &riNumberOfWords,
+	//                   const int &riOffset,  const int &riOrigin = SEEK_SET );
+
         bool Write( const byte_t * pbyRecord, const int &riNumBytes );
+        bool Write( const uint32_t * pbyRecord, const int &riNumWords );
 
         EFileFormat FileType( void ) const;
 

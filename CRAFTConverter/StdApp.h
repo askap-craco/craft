@@ -46,9 +46,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 // Alias and namespaces (or part thereof) used.
 
-using byte_t        = std::uint8_t;         // Common alias for a byte.
-using ByteDeque_t   = std::deque<byte_t>;   // Common alias for a byte deque.
-using std::string;                          // Using string throughout.
+using byte_t        = std::uint8_t;          // Common alias for a byte.
+using WordDeque_t   = std::deque<uint32_t>;  // Common alias for a byte deque.
+using std::string;                           // Using string throughout.
 
 #include "Codec.h"                          // Base-class definition for a codec - keep after
                                             // the above alias for byte_t.

@@ -75,7 +75,7 @@ namespace NCodec
     //////////
     // Retrieves a reference to the deque of the byte data.
 
-    ByteDeque_t & CSampleData::GetSamples( void )
+    WordDeque_t & CSampleData::GetSamples( void )
     {
         return m_VoltageSamples;
     }
