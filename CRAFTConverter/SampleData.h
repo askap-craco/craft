@@ -57,7 +57,7 @@ namespace NCodec
             void GetSampleParams( int &riMode, int &riBitsPerComplexSample,
                                   int &riNumberOfChannels );
 
-            ByteDeque_t & GetSamples( void );
+            WordDeque_t & GetSamples( void );
 
             int Size( void ) const;
 
@@ -70,7 +70,7 @@ namespace NCodec
             int         m_iBitsPerSample;
             int         m_iNumberOfChannels;
 
-            ByteDeque_t m_VoltageSamples;
+            WordDeque_t m_VoltageSamples;
     };
 
 }       // end namespace NCodec

@@ -27,7 +27,7 @@
 namespace
 {
     constexpr int iNumberOfVCRAFTChannels_c = 8;                    // VCRAFT number of channels.
-    constexpr int iInputBlockSize_c         = 2 * 1042 * 1024;      // Make 2MB for now. NB: VCRAFT
+  //    constexpr int iInputBlockSize_c         = 2 * 1042 * 1024;      // Make 2MB for now. NB: VCRAFT
                                                                     // data is sampled at 32/27 Msps so
                                                                     // we could use a multiple/divisor of this.
 }
@@ -40,8 +40,7 @@ namespace NCodec
     //////////
     // Construction and destruction.
 
-    CCodecVCRAFT::CCodecVCRAFT( CFileDescriptor *pFile, ECodecMode eCodecMode )
-                 :ICodec( pFile, eCodecMode )
+    CCodecVCRAFT::CCodecVCRAFT( CFileDescriptor *pFile, ECodecMode eCodecMode )                 :ICodec( pFile, eCodecMode )
     {
         if ( eCodecMode == eCodecModeDecode )
         {
@@ -58,7 +57,7 @@ namespace NCodec
 
         m_bBuffersInitialised = false;
 
-        m_iInputBlockSize = iInputBlockSize_c;
+        m_iInputBlockSize = -1;
     }
 
     //////////
@@ -178,6 +177,7 @@ namespace NCodec
         //         otherwise false.
 
         bool bDataToProcess = false;
+	assert ( m_iInputBlockWords>0 );
 
         try
         {
@@ -192,9 +192,9 @@ namespace NCodec
 
             // Read the next data block from the file directly into the codec's deque.
 
-            ByteDeque_t &rDeque = m_SampleData.GetSamples();
+            WordDeque_t &rDeque = m_SampleData.GetSamples();
 
-            bDataToProcess = ( m_pFile->Read( rDeque, m_iInputBlockSize, 0, SEEK_CUR ) > 0 );
+            bDataToProcess = ( m_pFile->Read( rDeque, m_iInputBlockWords, 0, SEEK_CUR ) > 0 );
         }
         catch ( ... )
         {
@@ -219,6 +219,7 @@ namespace NCodec
     bool CCodecVCRAFT::SetBlockSize( int iBlockSize )
     {
         m_iInputBlockSize = iBlockSize;
+	m_iInputBlockWords = iBlockSize / sizeof(uint32_t);
         return true;
     }
 

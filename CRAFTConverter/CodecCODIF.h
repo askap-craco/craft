@@ -83,7 +83,7 @@ namespace NCodec
             //////////
             // Private definitions and attributes.
 
-            using Buffer_t = std::vector<byte_t>;
+            using Buffer_t = std::vector<uint32_t>;
 
             bool     m_bFirstInputBlock;
             bool     m_bSynced;
@@ -91,6 +91,7 @@ namespace NCodec
 
             int      m_iSampleBlockSize;
             int      m_iDataArraySize;
+            int      m_iDataArrayWords;
             int      m_iDataFrameSize;
             int      m_iNumberOfSyncRetries;
 
@@ -107,7 +108,7 @@ namespace NCodec
             bool HandleCODIFFrameData( void );
             bool ConfigureDFH( void );
             bool SetBufferSize( Buffer_t &rBuffer, const int &riLength );
-            ByteDeque_t & SampleData( void ) const;
+            WordDeque_t & SampleData( void ) const;
             bool WriteDataFrames( bool bForceFlush = false );
             bool WritePreambleFrames( const int &riPreambleSamples );
             int  BytesPerTimeSampleForChannels( void ) const;
