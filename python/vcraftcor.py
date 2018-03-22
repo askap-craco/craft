@@ -71,8 +71,8 @@ def _main():
             print h, 'd1=',d1t, 'd2=',d2t, 'diff=',d2t - d1t,mul*(d2t-d1t)
             
     nsamp, nchan = d1.shape
-    fig, axes = pylab.subplots(4,1)
-    d1ax, d2ax,lagax,pax = axes.flatten()
+    fig, axes = pylab.subplots(5,1)
+    d1ax, d2ax,lagax,pax,lax = axes.flatten()
     N = 4096
     Nc = N*512
     if values.offset is None:
@@ -80,6 +80,10 @@ def _main():
         offset = int(f2.hdr[h][0]) - int(f1.hdr[h][0])
     else:
         offset = values.offset
+
+
+    if offset >= d1.shape[0] or offset >= d2.shape[0]:
+        raise ValueError('Requested offset is larger than the number of samples. Offset={}, nsamp1={} nsamp2={}'.format(offset, d1.shape[0], d2.shape[0]))
 
     c = values.channel
     d1ax.plot(d1[:N, c].real, label='real')
@@ -101,7 +105,7 @@ def _main():
     xx11 = xf1 * np.conj(xf1)
     xx22 = xf2 * np.conj(xf2)
 
-    print 'PRODUCT SIZE', xx12.shape, xx12.shape[0]*Nf, nsamp
+    print 'PRODUCT SIZE', xx12.shape, xx12.shape[0]*Nf, nsamp, 'shortsamp', shortsamp, 'offset', offset
     punwrap = np.unwrap(np.angle(xx12.mean(axis=0)))
     xx = np.arange(len(punwrap))
     gradient, phase = np.polyfit(xx, punwrap, 1)
@@ -115,6 +119,7 @@ def _main():
     pax.plot(np.degrees(np.angle(xx12.mean(axis=0))), 'o')
     pax.set_ylabel('Cross phase (deg)')
     pax.set_xlabel('Channel')
+    lax.plot(np.fft.fftshift(abs(np.fft.fft(xx12.mean(axis=0)))), label='lag')
 
     Navg = 128
     Nout = xx12.shape[0]/Navg

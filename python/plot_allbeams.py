@@ -390,13 +390,16 @@ class Plotter(object):
         fax.plot(bi.mean(axis=1), freqs, label='mean')
         fax.plot(bi.max(axis=1), freqs, label='max')
         fax.plot(bi.min(axis=1), freqs, label='min')
-        #fax.plot(bi.std(axis=1)*np.sqrt(ntimes),freqs, label='std')
+        #fax2 = fax.twiny()
+        #fax2.plot(bi.std(axis=1),freqs, 'r', label='std')
         fax.set_ylim(freqs.min(), freqs.max())
         tax.plot(times, bi.mean(axis=0), label='mean')
         tax.plot(times, bi.max(axis=0), label='max')
         tax.plot(times, bi.min(axis=0), label='min')
-        #tax.plot(times, bi.std(axis=0)*np.sqrt(nfreq), label='std')
         tax.set_xlim(times.min(), times.max())
+        #tax2 = tax.twinx()
+        #tax2.plot(times, bi.std(axis=0), 'r', label='std')
+
 
         title, xlab, ylab = self.fig_labels['dynspec']
         rawax.set_ylabel(ylab)
