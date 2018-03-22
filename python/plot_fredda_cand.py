@@ -60,7 +60,15 @@ def _main():
     maxboxcar = 32.
     scalarmap = plt.cm.ScalarMappable(cmap=cmap, norm=mpl.colors.Normalize(1., maxboxcar))
     scalarmap._A = [] # URGH http://stackoverflow.com/questions/8342549/matplotlib-add-colorbar-to-a-sequence-of-line-plots
-    consol = True
+    consol = False
+
+
+    pylab.figure()
+    ax = pylab.gca()
+    for f in values.files:
+        plot_file(f, values, ax, title=f)
+
+    pylab.show()
 
     if consol:
         candlist = find_files_filelist(values.files)
@@ -113,7 +121,7 @@ def _main():
 
 def plot_dir(din, values, scmap=None):
     candfiles = sorted(find_files(din, values.fname))
-    plot_candfiles(candfiles)
+    plot_scans(candfiles)
 
 def plot_scans(candfiles, values, scmap=None):
 
