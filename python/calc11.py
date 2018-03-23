@@ -126,7 +126,8 @@ class Scan(object):
 
     def eval_src0_poly(self, mjd):
         poly = self.get_poly(mjd)
-        secs = mjd - poly.mjdfull
+        secs = (mjd - poly.mjdfull)*86400.
+        print 'Eval offset', secs, 'mjd=', mjd, 'mjdfull', poly.mjdfull
         ant_results = {}
         for ant, polys in poly.source0antpolys.iteritems():
             antname = self.resfile.telnames[ant]
@@ -135,6 +136,17 @@ class Scan(object):
                 ant_results[antname][polyname] = np.polyval(pcoeff[::-1], secs)
 
         return ant_results
+
+    def eval_src0_poly_delta(self, mjd, refant):
+        res = self.eval_src0_poly(mjd)
+        ref_results = res[refant]
+        resdelta = {}
+        for ant, polydata in res.iteritems():
+            resdelta[ant] = {}
+            for polyname, value in polydata.iteritems():
+                resdelta[ant][polyname] = value - ref_results[polyname]
+
+        return resdelta
 
 class ResultsFile(OrderedDict):
     def __init__(self, fname):
