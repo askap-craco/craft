@@ -15,7 +15,7 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 parnames = ('UU','VV','WW','DATE','_DATE','BASELINE','FREQSEL','SOURCE','INTTIM','DATA')
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan=54*240, npol=4):
+    def __init__(self, fname, fcent, foff, nchan, npol, sources, antennas):
         self.dshape = [1,1,1,nchan, npol, 3]
         hdr = pyfits.Header()
         self.hdr = hdr
@@ -24,6 +24,9 @@ class CorrUvFitsFile(object):
         self.fcent = fcent
         self.npol = npol
         self.bandwidth = foff*nchan
+        self.sources = sources
+        self.antennas = antennas
+        self.fname = fname
 
         hdr['SIMPLE'] = True
         hdr['BITPIX'] = -32
@@ -40,21 +43,21 @@ class CorrUvFitsFile(object):
         # CTYPES
         self.add_type(2, ctype='COMPLEX', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
         self.add_type(3, ctype='STOKES', crval=-5.0, cdelt=-1.0, crpix=1.0, crota=0.0)
-        self.add_type(4, ctype='FREQ', crval=fcent, cdelt=foff, crpix=float(nchan)/2., crota=0.0)
+        self.add_type(4, ctype='FREQ', crval=fcent*1e6, cdelt=foff*1e6, crpix=(float(nchan)/2. + 1), crota=0.0)
         self.add_type(5, ctype='IF', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
         self.add_type(6, ctype='RA', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
         self.add_type(7, ctype='DEC', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
 
         #ptypes
-        self.add_type(1, ptype='UU', pscal=1.0, pzero=1.0)
-        self.add_type(2, ptype='VV', pscal=1.0, pzero=1.0)
-        self.add_type(3, ptype='WW', pscal=1.0, pzero=1.0)
-        self.add_type(4, ptype='DATE', pscal=1.0, pzero=1.0, comment='Day number')
-        self.add_type(5, ptype='DATE', pscal=1.0, pzero=1.0, comment='Day fraction')
-        self.add_type(6, ptype='BASELINE', pscal=1.0, pzero=1.0)
-        self.add_type(7, ptype='FREQSEL', pscal=1.0, pzero=1.0)
-        self.add_type(8, ptype='SOURCE', pscal=1.0, pzero=1.0)
-        self.add_type(9, ptype='INTTIM', pscal=1.0, pzero=1.0)
+        self.add_type(1, ptype='UU', pscal=1.0, pzero=0.0)
+        self.add_type(2, ptype='VV', pscal=1.0, pzero=0.0)
+        self.add_type(3, ptype='WW', pscal=1.0, pzero=0.0)
+        self.add_type(4, ptype='DATE', pscal=1.0, pzero=0.0, comment='Day number')
+        self.add_type(5, ptype='DATE', pscal=1.0, pzero=0.0, comment='Day fraction')
+        self.add_type(6, ptype='BASELINE', pscal=1.0, pzero=0.0)
+        self.add_type(7, ptype='FREQSEL', pscal=1.0, pzero=0.0)
+        self.add_type(8, ptype='SOURCE', pscal=1.0, pzero=0.0)
+        self.add_type(9, ptype='INTTIM', pscal=1.0, pzero=0.0)
 
         hdr['OBJECT'] = 'MULTI'
         hdr['DATE_OBS'] = '2018-03-19T11:02:30.909121'
@@ -74,10 +77,10 @@ class CorrUvFitsFile(object):
             ('DATA', '>f4', (1, 1, 1, nchan, npol, 3))]
 
     def fq_table(self):
-        cols = [Col('FREQSEL','1J', array=[1]),
+        cols = [Col('FRQSEL','1J', array=[1]),
                 Col('IF FREQ','1D','HZ', array=[ -4.3272972106933594e-05]), #??
                 Col('CH WIDTH','1E','HZ', array=[self.foff]),
-                Col('TOTAL_BANDWIDTH','1E','HZ', array=[self.bandwidth]),
+                Col('TOTAL BANDWIDTH','1E','HZ', array=[self.bandwidth]),
                 Col('SIDEBAND','1J', array=[1]) #??
         ]
 
@@ -92,7 +95,7 @@ class CorrUvFitsFile(object):
         cols = [
             Col('ANNAME', '8A', array=[a.antname for a in antennas]),
             Col('STABXYZ','3D','METERS', array=[a.antpos for a in antennas]),
-            Col('ORBPARM','0D', array=[]),
+            Col('ORBPARM','1D', array=[]),
             Col('NOSTA','1J', array=np.arange(1,nant+1, dtype=np.int32)),
             Col('MNTSTA','1J', array=np.ones(nant, dtype=np.int32)),
             Col('STAXOF','1E','METERS', array=np.zeros(nant)),
@@ -177,6 +180,17 @@ class CorrUvFitsFile(object):
         fout.flush()
         fout.close()
 
+        hdu = pyfits.open(self.fname, 'append')
+        fq = self.fq_table()
+        hdu.append(fq)
+
+        an = self.an_table(self.antennas)
+        hdu.append(an)
+
+        su = self.su_table(self.sources)
+        hdu.append(su)
+        hdu.close()
+
     def add_type(self, typeno, comment=None, **args):
         hdr = self.hdr
         for k,v, in args.iteritems():
@@ -189,19 +203,29 @@ class CorrUvFitsFile(object):
         visdata = visdata_all[0]
         print visdata.dtype, data.shape, visdata['DATA'].shape
         if weights is None:
-            weights = 1.
+            weights = -7.71604973e-05 #???
+
+
+        jd = mjd + 2400000.5
+        day = np.floor(jd)
+        dayfrac = jd - day
+
         visdata['UU'], visdata['VV'], visdata['WW'] = uvw
-        visdata['DATE'] = np.floor(mjd)
-        visdata['_DATE'] = mjd - np.floor(mjd)
-        visdata['BASELINE'] = (ia1 + 1) + 256 * (ia2 + 1)
+        visdata['DATE'] = day
+        visdata['_DATE'] = dayfrac
+        visdata['BASELINE'] = (ia1 + 1)*256 + ia2 + 1
         visdata['INTTIM'] = inttim
+        visdata['FREQSEL'] = 1
+        visdata['SOURCE'] = 1
+
         d = visdata['DATA']
-        print 'SHAPE', d.shape, data.shape
         npol = data.shape[1]
         d[0,0,0,:,:,0] = data.real
         d[0,0,0,:,:,1] = data.imag
         d[0,0,0,:,:,2] = weights
         self.fout.write(visdata_all.tobytes())
+
+        print visdata
         self.ngroups += 1
 
 

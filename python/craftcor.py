@@ -41,7 +41,7 @@ class PlotOut(object):
     def put_product(self, a1, a2, xxp):
         print a1.antname, a2.antname, xxp.shape
         xx= xxp[:,0]
-        if a1 != a2:
+        if a1 != a2 and False:
             self.stuff.append(xx)
             fig, (ax1, ax2, ax3, ax4) = pylab.subplots(4,1)
             xxang = np.angle(xx)
@@ -148,7 +148,7 @@ class FringeRotParams(object):
 
 
 class Correlator(object):
-    def __init__(self, ants, values):
+    def __init__(self, ants, sources, values):
         self.ants = ants
         self.values = values
 
@@ -158,7 +158,9 @@ class Correlator(object):
             a.ia = ia
             a.antpos = self.get_ant_location(a.antno)
 
-        self.refant = ants[0]
+        refantname = self.parset['cp.ingest.tasks.FringeRotationTask.params.refant'].lower()
+
+        self.refant = filter(lambda a:a.antname == refantname, ants)[0]
         self.calcresults = ResultsFile(values.calcfile)
         self.dutc = 37.0
         self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
@@ -184,9 +186,9 @@ class Correlator(object):
         self.calcmjd()
         self.get_fr_data()
         self.fileout = CorrUvFitsFile('test.fits', self.f0, self.fine_chanbw, \
-            self.nfine_chan, self.npol_out)
+            self.nfine_chan, self.npol_out, sources, ants)
 
-        logging.debug('FINE CHANNEL %f kHz num=%d', self.fine_chanbw*1e3, self.nfine_chan)
+        logging.debug('F0 %f FINE CHANNEL %f kHz num=%d', self.f0, self.fine_chanbw*1e3, self.nfine_chan)
 
 
     def parse_parset(self):
@@ -307,130 +309,24 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     calcresults = ResultsFile(values.calcfile)
+    sources = [{'name':'M87','ra':180.,'dec':15.}]
+
     a1 = AntennaSource(values.files[0])
     a2 = AntennaSource(values.files[1])
 
-    corr = Correlator([a1,a2], values)
-    sources = [{'name':'M87','ra':180.,'dec':15.}]
+    corr = Correlator([a1,a2], sources, values)
     try:
         while(True):
-            fq = corr.fileout.fq_table()
-            an = corr.fileout.an_table(corr.ants)
-            su = corr.fileout.su_table(sources)
+            #fq = corr.fileout.fq_table()
+            #an = corr.fileout.an_table(corr.ants)
+            #su = corr.fileout.su_table(sources)
             corr.do_f()
             corr.do_x()
             corr.next_integration()
+    finally:
+        corr.fileout.close()
 
 
-    except:
-        #corr.prodout.finish()
-        raise
-
-
-
-    f1 = a1.vfile
-    f2 = a2.vfile
-    refant = a1
-    mjdstart = refant.mjdstart
-    frdata0 = calcresults.scans[0].eval_src0_poly_delta(mjdstart, refant.antname.lower())
-    a1.update_frparams(frdata0)
-    a2.update_frparams(frdata0)
-    geom_delay = a2.fr_params['DELAY (us)']
-    frdata0 = calcresults.scans[0].eval_src0_poly_delta(mjdstart+14./86400., refant.antname.lower())
-    a1.update_frparams(frdata0)
-    a2.update_frparams(frdata0)
-    geom_delay2 = a2.fr_params['DELAY (us)']
-    ddif_us = geom_delay2 - geom_delay
-    phasediff = np.degrees(2*np.pi*f1.freqs[0]*1e6*ddif_us/1e6)
-
-    print('mjdstart {} Geoemtric delay is {} at start {} at end diff={} = {} deg'.format(mjdstart, geom_delay, geom_delay2, geom_delay2 - geom_delay, phasediff))
-
-
-
-    d1 = f1.read()
-    d2 = f2.read()
-
-    # truncate to identical nsamp
-    nsamp = min(d1.shape[0], d2.shape[0])
-    print 'SHAPE BEFORE', d1.shape, d2.shape, nsamp
-
-    d1 = d1[:nsamp, :]
-    d2 = d2[:nsamp, :]
-    print 'SHAPE AFTER', d1.shape, d2.shape
-
-    assert d1.shape == d2.shape
-    nsamp, nchan = d1.shape
-    fig, axes = pylab.subplots(5,1)
-    d1ax, d2ax,lagax,pax,lax = axes.flatten()
-    N = 4096
-    Nc = N*512
-    if values.offset is None:
-        h = 'TRIGGER_FRAMEID'
-        offset = int(f2.hdr[h][0]) - int(f1.hdr[h][0])
-    else:
-        offset = values.offset
-
-    geom_delay = a2.fr_params['DELAY (us)']
-    print 'trigger OFFSET IS {} samples. Geoemtric delay is {} us'.format(offset, geom_delay)
-
-    c = values.channel
-    d1ax.plot(d1[:N, c].real, label='real')
-    d1ax.plot(d1[:N, c].imag, label='imag')
-    d1ax.legend()
-    d2ax.plot(d2[:N, c].real)
-    d2ax.plot(d2[:N, c].imag)
-
-    Nf = values.fft_size
-    shortsamp = ((nsamp-offset)/Nf)*Nf
-
-    assert f1.freqs[c] == f2.freqs[c]
-    x1 = d1[offset:shortsamp+offset, c].reshape(-1, Nf)
-    xf1 = np.fft.fftshift(np.fft.fft(x1, axis=1), axes=1)
-
-    x2 = d2[:shortsamp, c].reshape(-1, Nf)
-    xf2 = np.fft.fftshift(np.fft.fft(x2, axis=1), axes=1)
-    xx12 = xf1 * np.conj(xf2)
-    xx11 = xf1 * np.conj(xf1)
-    xx22 = xf2 * np.conj(xf2)
-
-    print 'PRODUCT SIZE', xx12.shape, xx12.shape[0]*Nf, nsamp
-    punwrap = np.unwrap(np.angle(xx12.mean(axis=0)))
-    xx = np.arange(len(punwrap))
-    gradient, phase = np.polyfit(xx, punwrap, 1)
-    delay = 32./27.*gradient/2./np.pi*len(punwrap)
-    print 'Unwrapped phase = {} rad, graidnet={} rad per channel, delay={} us'.format(phase, gradient, delay)
-
-    lagax.plot(abs(xx11.mean(axis=0)), label='auto0')
-    lagax.plot(abs(xx22.mean(axis=0)), label='auto1')
-    lagax.plot(abs(xx12.mean(axis=0)), label='crossamp')
-    lagax.legend(frameon=False)
-    pax.plot(np.degrees(np.angle(xx12.mean(axis=0))), 'o')
-    pax.set_ylabel('Cross phase (deg)')
-    pax.set_xlabel('Channel')
-
-
-    lax.plot(np.fft.fftshift(abs(np.fft.fft(xx12.mean(axis=0)))), label='lag')
-    Navg = 128*8
-    Nout = xx12.shape[0]/Navg
-    xx12 = xx12[:Nout*Navg, :]
-    xx12.shape = [Nout, Navg, -1 ]
-    xx12a = xx12.mean(axis=1)
-
-    pylab.figure()
-    pylab.imshow(np.angle(xx12a), aspect='auto')
-
-    pylab.figure()
-    lagvt = np.fft.fftshift(abs(np.fft.fft(xx12a, axis=1)))
-    pylab.imshow(lagvt)
-
-    pylab.figure()
-    pylab.plot(lagvt.T)
-
-    pylab.figure()
-    phasevst = np.angle(xx12a[:, xx12a.shape[1]/2])
-    pylab.plot(np.degrees(phasevst))
-
-    pylab.show()
 
 
 if __name__ == '__main__':
