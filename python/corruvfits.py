@@ -78,9 +78,9 @@ class CorrUvFitsFile(object):
 
     def fq_table(self):
         cols = [Col('FRQSEL','1J', array=[1]),
-                Col('IF FREQ','1D','HZ', array=[ -4.3272972106933594e-05]), #??
-                Col('CH WIDTH','1E','HZ', array=[self.foff]),
-                Col('TOTAL BANDWIDTH','1E','HZ', array=[self.bandwidth]),
+                Col('IF FREQ','1D','HZ', array=[0]), #??
+                Col('CH WIDTH','1E','HZ', array=[self.foff*1e6]),
+                Col('TOTAL BANDWIDTH','1E','HZ', array=[self.bandwidth*1e6]),
                 Col('SIDEBAND','1J', array=[1]) #??
         ]
 
@@ -115,7 +115,7 @@ class CorrUvFitsFile(object):
         hdr['ARRAYZ'] = 0
         hdr['GSTIA0'] = (1.764940880935E+02 , 'hard coded. ????')
         hdr['DEGPDY'] = (3.609856473692E+02, 'hard coded. ????')
-        hdr['FREQ'] = self.fcent
+        hdr['FREQ'] = self.fcent*1e6
         hdr['RDATE'] = ('2018-03-19T11:02:30.909121', 'hard coded. ????')
         hdr['POLARX'] = 0
         hdr['POLARY'] = 0

@@ -17,6 +17,8 @@ from corruvfits import CorrUvFitsFile
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+CLIGHT=299792458.0
+
 def print_delay(xx):
     xxang = np.angle(xx)
     punwrap = np.unwrap(xxang)
@@ -87,7 +89,7 @@ class AntennaSource(object):
         nsamp = corr.nint*corr.nfft
         logging.debug('F %s sample delays: frame: %f geo %f fixed %f total %f whole: %d frac: %f nsamp: %d',
             self.antname, framediff, geom_delay_samp, fixed_delay_samp, total_delay_samp, whole_delay, frac_delay, nsamp)
-        rawd = self.vfile.read(corr.curr_samp + whole_delay, nsamp)
+        rawd = self.vfile.read(corr.curr_samp*corr.nfft + whole_delay, nsamp)
         assert rawd.shape == (nsamp, corr.ncoarse_chan)
         self.data = np.zeros((corr.nint, corr.nfine_chan, corr.npol_in), dtype=np.complex64)
         d1 = self.data
@@ -162,10 +164,10 @@ class Correlator(object):
 
         self.refant = filter(lambda a:a.antname == refantname, ants)[0]
         self.calcresults = ResultsFile(values.calcfile)
-        self.dutc = 37.0
+        self.dutc = -37.0
         self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
         self.frame0 = self.refant.trigger_frame
-        self.nint = 64*64*8
+        self.nint = 1000
         self.nfft = 64
         self.nguard_chan = 5
         self.oversamp = 32./27.
@@ -222,7 +224,7 @@ class Correlator(object):
     def get_uvw(self, ant1, ant2):
         fr1 = FringeRotParams(self, ant1)
         fr2 = FringeRotParams(self, ant2)
-        uvw = (fr1.u - fr2.u, fr1.v - fr2.v, fr1.w - fr2.w)
+        uvw = np.array([fr1.u - fr2.u, fr1.v - fr2.v, fr1.w - fr2.w])/CLIGHT
 
         return uvw
 
