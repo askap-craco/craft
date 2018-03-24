@@ -13,6 +13,7 @@ import sys
 import logging
 import vcraft
 from calc11 import ResultsFile
+from corruvfits import CorrUvFitsFile
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -29,7 +30,7 @@ class FitsOut(object):
     def __init__(self, fname, corr):
         ants = self.corr.ants
 
-    def put_product(self, corr, a1, a2, c, p1, p2, xx):
+    def put_product(self, corr, a1, a2, xx):
         pass
 
 class PlotOut(object):
@@ -37,8 +38,9 @@ class PlotOut(object):
         self.stuff = []
 
 
-    def put_product(self, a1, a2, c, p1, p2, xx):
-        print a1.antname, a2.antname, c, p1, p2, xx.shape
+    def put_product(self, a1, a2, xxp):
+        print a1.antname, a2.antname, xxp.shape
+        xx= xxp[:,0]
         if a1 != a2:
             self.stuff.append(xx)
             fig, (ax1, ax2, ax3, ax4) = pylab.subplots(4,1)
@@ -79,6 +81,7 @@ class AntennaSource(object):
         total_delay_samp = -geom_delay_samp + framediff + fixed_delay_samp
         whole_delay = int(np.round(total_delay_samp))
         frac_delay = (total_delay_samp - whole_delay)
+        geo_delay_rate = self.frparams.delay_rate
 
         # get data
         nsamp = corr.nint*corr.nfft
@@ -88,12 +91,16 @@ class AntennaSource(object):
         assert rawd.shape == (nsamp, corr.ncoarse_chan)
         self.data = np.zeros((corr.nint, corr.nfine_chan, corr.npol_in), dtype=np.complex64)
         d1 = self.data
-        geo_delay_rate = self.frparams.delay_rate
         nfine = corr.nfft - 2*corr.nguard_chan
+        print self.vfile.freqs
+
         for c in xrange(corr.ncoarse_chan):
             cfreq = self.vfile.freqs[c]
             cbw = corr.coarse_chanbw/2.
-            freqs = np.linspace( - cbw, +cbw, nfine) + (cfreq - corr.f0)
+            coarse_off = cfreq - corr.f0
+            #freqs = np.linspace( -cbw, +cbw, nfine) + (cfreq - corr.f0)
+            # half channel offset because DC bin is in the center of the FFT
+            freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2. + 0)*corr.fine_chanbw
             x1 = rawd[:, c].reshape(-1, corr.nfft)
             xf1 = np.fft.fftshift(np.fft.fft(x1, axis=1), axes=1)
             xfguard = xf1[:, corr.nguard_chan:corr.nguard_chan+nfine]
@@ -101,10 +108,21 @@ class AntennaSource(object):
 
             for i in xrange(corr.nint):
                 delta_t = (frac_delay - i*geo_delay_rate)
-                theta0 = 0
-                phases[i, :] = 2*np.pi*freqs*delta_t + theta0
+                # oh man - hard to explain. Need to draw a picture
+                theta0 = 2*np.pi*coarse_off*float(nfine)*delta_t*corr.fine_chanbw
+                phases[i, :] = 2*np.pi*freqs*delta_t/corr.oversamp + theta0
 
+            # If you plot the phases you're about to correct, after adding a artificial
+            # 1 sample delay ad tryig to get rid of it with a phase ramp, it becaomes
+            # blatetly clear what you should do
             phasor = np.exp(1j*phases)
+
+            '''
+            pylab.figure(10)
+            pylab.plot(np.angle(phasor[0, :]))
+            pylab.plot(np.angle(phasor[-1:, :]))
+            '''
+
             xfguard *= phasor
             # slice out only useful channels
             fcstart = c*nfine
@@ -132,19 +150,27 @@ class FringeRotParams(object):
 class Correlator(object):
     def __init__(self, ants, values):
         self.ants = ants
+        for ia, a in enumerate(self.ants):
+            a.ia = ia
+
         self.refant = ants[0]
         self.calcresults = ResultsFile(values.calcfile)
-        self.mjd0 = self.refant.mjdstart
+        self.dutc = 37.0
+        self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
         self.frame0 = self.refant.trigger_frame
         self.values = values
         self.nint = 64*64*8
         self.nfft = 64
         self.nguard_chan = 5
-        self.fs = 1e6*32./27. # samples per second
+        self.oversamp = 32./27.
+        self.fs = 1e6*self.oversamp # samples per second
         self.ncoarse_chan = 8
         self.coarse_chanbw = 1.0
-        self.nfine_chan = self.ncoarse_chan*(64 - 2*self.nguard_chan)
+        self.nfine_per_coarse = self.nfft - 2*self.nguard_chan
+        self.nfine_chan = self.ncoarse_chan*self.nfine_per_coarse
+        self.fine_chanbw = self.coarse_chanbw / float(self.nfine_per_coarse)
         self.npol_in = 1
+        self.npol_out = 1
         self.f0 = self.ants[0].vfile.freqs.mean() # centre frequency for fringe rotation
         self.inttime_secs = self.nint*self.nfft/self.fs
         self.inttime_days = self.inttime_secs/86400.
@@ -155,8 +181,14 @@ class Correlator(object):
         self.calcmjd()
         self.get_fr_data()
         self.parse_parset()
+        self.fileout = CorrUvFitsFile('test.fits', self.f0, self.fine_chanbw, \
+            self.nfine_chan, self.npol_out)
+
+        logging.debug('FINE CHANNEL %f kHz num=%d', self.fine_chanbw*1e3, self.nfine_chan)
+
 
     def parse_parset(self):
+        self.parset = {}
         with open(self.values.parset, 'rU') as f:
             for line in f:
                 if '=' not in line:
@@ -166,6 +198,7 @@ class Correlator(object):
                 name = name.strip()
                 value = value.strip()
                 namebits = name.split('.')
+                self.parset[name] = value
                 if line.startswith('common.antenna.ant') and namebits[3] == 'delay':
                     antno = int(namebits[2][3:])
                     delayns = float(value.replace('ns',''))
@@ -174,6 +207,23 @@ class Correlator(object):
 
     def get_fixed_delay_usec(self, antno):
         return self.ant_delays[antno]
+
+    def get_uvw(self, ant1, ant2):
+        fr1 = FringeRotParams(self, ant1)
+        fr2 = FringeRotParams(self, ant2)
+        uvw = (fr1.u - fr2.u, fr1.v - fr2.v, fr1.w - fr2.w)
+
+        return uvw
+
+    def get_geometric_delay_delayrate(ant):
+        fr1 = FringeRotParams(self, ant1)
+        fr2 = FringeRotParams(self, self.refant)
+
+        delay = fr1.delay - fr2.delay
+        delayrate = fr1.delay_rate - fr2.delay_rate
+
+        return (delay, delarate)
+
 
     def calcmjd(self):
         i = float(self.curr_intno)
@@ -212,16 +262,22 @@ class Correlator(object):
                 self.do_x_corr(a1, a2)
 
     def do_x_corr(self, a1, a2):
+        npolout = self.npol_out
+        xx = np.empty([self.nfine_chan, npolout], dtype=np.complex64)
         for p1 in xrange(self.npol_in):
             for p2 in xrange(self.npol_in):
                 d1 = a1.data[:, :, p1]
                 d2 = a2.data[:, :, p2]
-                xx = (d1 * np.conj(d2)).mean(axis=0)
-                self.put_product(a1, a2, 0, p1, p2, xx)
+                pout = p2 + p1*self.npol_in
 
-    def put_product(self, a1, a2, c, p1, p2, xx):
-        self.prodout.put_product(a1, a2, c, p1, p2, xx)
+                xx[:,pout] = (d1 * np.conj(d2)).mean(axis=0)
+        self.put_product(a1, a2, xx)
 
+    def put_product(self, a1, a2, xx):
+        self.prodout.put_product(a1, a2, xx)
+        uvw = self.get_uvw(a1, a2)
+        self.fileout.put_data(uvw, self.curr_mjd_mid, a1.ia, a2.ia,
+            self.inttime_secs, xx)
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
