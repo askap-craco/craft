@@ -76,12 +76,12 @@ class AntennaSource(object):
         self.frparams = FringeRotParams(corr, self)
         # calculate sample start
         framediff = corr.refant.trigger_frame - self.trigger_frame
-        geom_delay_samp = self.frparams.delay*corr.fs/1e6
+
+        (geom_delay_samp, geom_delay_rate) = corr.get_geometric_delay_delayrate(self)
         fixed_delay_samp = corr.get_fixed_delay_usec(self.antno)*corr.fs/1e6
         total_delay_samp = -geom_delay_samp + framediff + fixed_delay_samp
         whole_delay = int(np.round(total_delay_samp))
         frac_delay = (total_delay_samp - whole_delay)
-        geo_delay_rate = self.frparams.delay_rate
 
         # get data
         nsamp = corr.nint*corr.nfft
@@ -107,7 +107,7 @@ class AntennaSource(object):
             phases = np.zeros((corr.nint, nfine))
 
             for i in xrange(corr.nint):
-                delta_t = (frac_delay - i*geo_delay_rate)
+                delta_t = (frac_delay - i*geom_delay_rate)
                 # oh man - hard to explain. Need to draw a picture
                 theta0 = 2*np.pi*coarse_off*float(nfine)*delta_t*corr.fine_chanbw
                 phases[i, :] = 2*np.pi*freqs*delta_t/corr.oversamp + theta0
@@ -150,15 +150,19 @@ class FringeRotParams(object):
 class Correlator(object):
     def __init__(self, ants, values):
         self.ants = ants
+        self.values = values
+
+        self.parse_parset()
+
         for ia, a in enumerate(self.ants):
             a.ia = ia
+            a.antpos = self.get_ant_location(a.antno)
 
         self.refant = ants[0]
         self.calcresults = ResultsFile(values.calcfile)
         self.dutc = 37.0
         self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
         self.frame0 = self.refant.trigger_frame
-        self.values = values
         self.nint = 64*64*8
         self.nfft = 64
         self.nguard_chan = 5
@@ -177,10 +181,8 @@ class Correlator(object):
         self.curr_intno = 10
         self.curr_samp = self.curr_intno*self.nint
         self.prodout = PlotOut(self)
-        self.ant_delays = {}
         self.calcmjd()
         self.get_fr_data()
-        self.parse_parset()
         self.fileout = CorrUvFitsFile('test.fits', self.f0, self.fine_chanbw, \
             self.nfine_chan, self.npol_out)
 
@@ -197,16 +199,23 @@ class Correlator(object):
                 name, value = line.strip().split('=')
                 name = name.strip()
                 value = value.strip()
-                namebits = name.split('.')
                 self.parset[name] = value
-                if line.startswith('common.antenna.ant') and namebits[3] == 'delay':
-                    antno = int(namebits[2][3:])
-                    delayns = float(value.replace('ns',''))
-                    delayus = delayns/1e3
-                    self.ant_delays[antno] = delayus
+
+
+    def get_ant_location(self, antno):
+        key = 'common.antenna.ant{}.location.itrf'.format(antno)
+        value = self.parset[key]
+        location = map(float, value.replace('[','').replace(']','').split(','))
+        return location
 
     def get_fixed_delay_usec(self, antno):
-        return self.ant_delays[antno]
+        key = 'common.antenna.ant{}.delay'.format(antno)
+        value = self.parset[key]
+        delayns =  float(value.replace('ns',''))
+        delayus = delayns/1e3
+
+        return delayus
+
 
     def get_uvw(self, ant1, ant2):
         fr1 = FringeRotParams(self, ant1)
@@ -215,14 +224,14 @@ class Correlator(object):
 
         return uvw
 
-    def get_geometric_delay_delayrate(ant):
-        fr1 = FringeRotParams(self, ant1)
+    def get_geometric_delay_delayrate(self, ant):
+        fr1 = FringeRotParams(self, ant)
         fr2 = FringeRotParams(self, self.refant)
 
         delay = fr1.delay - fr2.delay
         delayrate = fr1.delay_rate - fr2.delay_rate
 
-        return (delay, delarate)
+        return (delay*self.fs/1e6, delayrate*self.fs/1e6)
 
 
     def calcmjd(self):
@@ -239,7 +248,8 @@ class Correlator(object):
         self.get_fr_data()
 
     def get_calc_results(self, mjd):
-        res = self.calcresults.scans[0].eval_src0_poly_delta(mjd, self.refant.antname.lower())
+        #res = self.calcresults.scans[0].eval_src0_poly_delta(mjd, self.refant.antname.lower())
+        res = self.calcresults.scans[0].eval_src0_poly(mjd)
 
         return res
 
@@ -301,11 +311,17 @@ def _main():
     a2 = AntennaSource(values.files[1])
 
     corr = Correlator([a1,a2], values)
+    sources = [{'name':'M87','ra':180.,'dec':15.}]
     try:
         while(True):
+            fq = corr.fileout.fq_table()
+            an = corr.fileout.an_table(corr.ants)
+            su = corr.fileout.su_table(sources)
             corr.do_f()
             corr.do_x()
             corr.next_integration()
+
+
     except:
         #corr.prodout.finish()
         raise

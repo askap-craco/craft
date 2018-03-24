@@ -20,6 +20,8 @@ class CorrUvFitsFile(object):
         hdr = pyfits.Header()
         self.hdr = hdr
         self.nchan = nchan
+        self.foff = foff
+        self.fcent = fcent
         self.npol = npol
         self.bandwidth = foff*nchan
 
@@ -75,7 +77,7 @@ class CorrUvFitsFile(object):
         cols = [Col('FREQSEL','1J', array=[1]),
                 Col('IF FREQ','1D','HZ', array=[ -4.3272972106933594e-05]), #??
                 Col('CH WIDTH','1E','HZ', array=[self.foff]),
-                Col('TOTAL_BANDWIDTH','1E','HZ', array=[self.bandwidthg]),
+                Col('TOTAL_BANDWIDTH','1E','HZ', array=[self.bandwidth]),
                 Col('SIDEBAND','1J', array=[1]) #??
         ]
 
@@ -103,34 +105,35 @@ class CorrUvFitsFile(object):
             Col('DIAMETER','1E', array=np.ones(nant)*12.)
         ]
         h = pyfits.BinTableHDU.from_columns(cols)
-        h.hdr['EXTNAME']= 'AIPS AN'
-        h.hdr['ARRAYX'] = 0
-        h.hdr['ARRAYY'] = 0
-        h.hdr['ARRAYZ'] = 0
-        h.hdr['GSTIA0'] = (1.764940880935E+02 , 'hard coded. ????')
-        h.hdr['DEGPDY'] = (3.609856473692E+02, 'hard coded. ????')
-        h.hdr['FREQ'] = self.fcent
-        h.hdr['RDATE'] = ('2018-03-19T11:02:30.909121', 'hard coded. ????')
-        h.hdr['POLARX'] = 0
-        h.hdr['POLARY'] = 0
-        h.hdr['UT1UTC'] = 0
-        h.hdr['IATUTC'] = (3.700000000000E+01, 'hard coded')
-        h.hdr['TIMSYS'] = 'UTC'
-        h.hdr['ARRNAM'] = 'ASKAP'
-        h.hdr['NUMORB'] = 0
-        h.hdr['NOPCAL'] = 0
-        h.hdr['POLTYPE'] = ''
-        h.hdr['XYZHAND'] = 'RIGHT'
-        h.hdr['FRAME'] = 'ITRF'
+        hdr = h.header
+        hdr['EXTNAME']= 'AIPS AN'
+        hdr['ARRAYX'] = 0
+        hdr['ARRAYY'] = 0
+        hdr['ARRAYZ'] = 0
+        hdr['GSTIA0'] = (1.764940880935E+02 , 'hard coded. ????')
+        hdr['DEGPDY'] = (3.609856473692E+02, 'hard coded. ????')
+        hdr['FREQ'] = self.fcent
+        hdr['RDATE'] = ('2018-03-19T11:02:30.909121', 'hard coded. ????')
+        hdr['POLARX'] = 0
+        hdr['POLARY'] = 0
+        hdr['UT1UTC'] = 0
+        hdr['IATUTC'] = (3.700000000000E+01, 'hard coded')
+        hdr['TIMSYS'] = 'UTC'
+        hdr['ARRNAM'] = 'ASKAP'
+        hdr['NUMORB'] = 0
+        hdr['NOPCAL'] = 0
+        hdr['POLTYPE'] = ''
+        hdr['XYZHAND'] = 'RIGHT'
+        hdr['FRAME'] = 'ITRF'
 
         return h
 
     def su_table(self, sources):
         ns = len(sources)
-        zero = np.zeros(ns)
+        zeros = np.zeros(ns)
         cols = [
             Col('ID. NO.', '1J', array=np.arange(1,ns+1, dtype=np.int32)),
-            Col('SOURCE','20A','METERS', array=[s.name for s in sources]),
+            Col('SOURCE','20A','METERS', array=[s['name'] for s in sources]),
             Col('QUAL','1J', array=zeros),
             Col('CALCODE','4A', array=None),
             Col('IFLUX','1E','JY', array=zeros),
@@ -139,11 +142,11 @@ class CorrUvFitsFile(object):
             Col('VFLUX','1E','JY', array=zeros),
             Col('FREQOFF','1D', array=zeros),
             Col('BANDWIDTH','1D','HZ',array=np.ones(ns)*self.bandwidth),
-            Col('RAEPO','1D','DEGREES', array=[s.ra for s in sources]),
-            Col('DECEPO','1D','YEARS', array=[s.dec for s in sources]),
+            Col('RAEPO','1D','DEGREES', array=[s['ra'] for s in sources]),
+            Col('DECEPO','1D','YEARS', array=[s['dec'] for s in sources]),
             Col('EPOCH','1D','DEGREES', array=np.ones(ns)*2000.),
-            Col('RAAPP','1D','DEGREES', array=[s.ra for s in sources]),
-            Col('DECAPP','1D','DEGREES', array=[s.dec for s in sources]),
+            Col('RAAPP','1D','DEGREES', array=[s['ra'] for s in sources]),
+            Col('DECAPP','1D','DEGREES', array=[s['dec'] for s in sources]),
             Col('LSRVEL','1D','M/SEC', array=zeros),
             Col('RESTFREQ','1D','HZ', array=zeros),
             Col('PMRA', '1D', 'DEG/DAY', array=zeros),
@@ -152,7 +155,7 @@ class CorrUvFitsFile(object):
         tbhdu = pyfits.BinTableHDU.from_columns(cols)
         tbhdu.header['EXTNAME'] = 'AIPS SU'
         tbhdu.header['NO_IF'] = 1
-        tbudu.header['FREQID'] = 1
+        tbhdu.header['FREQID'] = 1
 
         return tbhdu
 
