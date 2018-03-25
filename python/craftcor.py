@@ -41,11 +41,10 @@ class PlotOut(object):
 
 
     def put_product(self, a1, a2, xxp):
-        print a1.antname, a2.antname, xxp.shape
         xx= xxp[:,0]
         if a1 != a2 and False:
             self.stuff.append(xx)
-            fig, (ax1, ax2, ax3, ax4) = pylab.subplots(4,1)
+            fig, (ax1, ax2, ax3, ax4, ax5) = pylab.subplots(5,1)
             xxang = np.angle(xx)
             print_delay(xx)
             ax1.plot(abs(xx))
@@ -55,12 +54,13 @@ class PlotOut(object):
                 print_delay(xx[54*i:54*(i+1)])
 
             ax3.plot(np.fft.fftshift(abs(np.fft.fft(xx))), label='lag')
-            ax4.imshow(np.angle(np.array(self.stuff)), aspect='auto')
+            angxx = np.angle(np.array(self.stuff))
+            ax4.imshow(angxx, aspect='auto')
+            ax5.plot(np.degrees(angxx[:, 20:40].mean(axis=1)))
             pylab.show()
 
     def finish(self):
         stuff = np.array(self.stuff)
-        print 'STUFF', stuff
         pylab.imshow(np.angle(stuff))
         pylab.show()
 
@@ -79,22 +79,26 @@ class AntennaSource(object):
         # calculate sample start
         framediff = corr.refant.trigger_frame - self.trigger_frame
 
-        (geom_delay_samp, geom_delay_rate) = corr.get_geometric_delay_delayrate(self)
+        (geom_delay_us, geom_delay_rate_us) = corr.get_geometric_delay_delayrate_us(self)
+        geom_delay_samp = geom_delay_us * corr.fs/1e6
         fixed_delay_samp = corr.get_fixed_delay_usec(self.antno)*corr.fs/1e6
         total_delay_samp = -geom_delay_samp + framediff + fixed_delay_samp
         whole_delay = int(np.round(total_delay_samp))
-        frac_delay = (total_delay_samp - whole_delay)
+        frac_delay_samp = (total_delay_samp - whole_delay)
+        frac_delay_us = frac_delay_samp / (corr.fs/1e6)
+        theta_global = geom_delay_us * corr.f0
 
         # get data
         nsamp = corr.nint*corr.nfft
-        logging.debug('F %s sample delays: frame: %f geo %f fixed %f total %f whole: %d frac: %f nsamp: %d',
-            self.antname, framediff, geom_delay_samp, fixed_delay_samp, total_delay_samp, whole_delay, frac_delay, nsamp)
+        logging.debug('F %s sample delays: frame: %f geo %f fixed %f total %f whole: %d frac: %f nsamp: %d phase=%f deg',
+            self.antname, framediff, geom_delay_samp, fixed_delay_samp,
+            total_delay_samp, whole_delay, frac_delay_samp, nsamp,
+            360.*frac_delay_us*corr.f0)
         rawd = self.vfile.read(corr.curr_samp*corr.nfft + whole_delay, nsamp)
         assert rawd.shape == (nsamp, corr.ncoarse_chan)
         self.data = np.zeros((corr.nint, corr.nfine_chan, corr.npol_in), dtype=np.complex64)
         d1 = self.data
         nfine = corr.nfft - 2*corr.nguard_chan
-        print self.vfile.freqs
 
         for c in xrange(corr.ncoarse_chan):
             cfreq = self.vfile.freqs[c]
@@ -105,19 +109,24 @@ class AntennaSource(object):
             freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2. + 0)*corr.fine_chanbw
             x1 = rawd[:, c].reshape(-1, corr.nfft)
             xf1 = np.fft.fftshift(np.fft.fft(x1, axis=1), axes=1)
-            xfguard = xf1[:, corr.nguard_chan:corr.nguard_chan+nfine]
+            xfguard = xf1[:, corr.nguard_chan:corr.nguard_chan+nfine:]
             phases = np.zeros((corr.nint, nfine))
 
             for i in xrange(corr.nint):
-                delta_t = (frac_delay - i*geom_delay_rate)
+                delta_t = (frac_delay_us - 0*i*geom_delay_rate_us/float(corr.nint))
                 # oh man - hard to explain. Need to draw a picture
-                theta0 = 2*np.pi*coarse_off*float(nfine)*delta_t*corr.fine_chanbw
-                phases[i, :] = 2*np.pi*freqs*delta_t/corr.oversamp + theta0
+                theta_offset = coarse_off*float(nfine)*delta_t*corr.fine_chanbw
+                #theta_global = corr.f0*delta_t
+                theta0 = theta_offset + theta_global
+                phases[i, :] = freqs*delta_t/corr.oversamp + theta0
+                if i == 0:
+                    logging.debug('FR chan=%d delta_t %f offset=%f deg global=%f deg theta0=%f deg',
+                    c, delta_t,theta_offset*360., theta_global*360, theta0*360)
 
             # If you plot the phases you're about to correct, after adding a artificial
             # 1 sample delay ad tryig to get rid of it with a phase ramp, it becaomes
             # blatetly clear what you should do
-            phasor = np.exp(1j*phases)
+            phasor = np.exp(np.pi*2j*phases)
 
             '''
             pylab.figure(10)
@@ -164,10 +173,10 @@ class Correlator(object):
 
         self.refant = filter(lambda a:a.antname == refantname, ants)[0]
         self.calcresults = ResultsFile(values.calcfile)
-        self.dutc = -37.0
+        self.dutc = -37.0*0
         self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
         self.frame0 = self.refant.trigger_frame
-        self.nint = 1000
+        self.nint = 2048
         self.nfft = 64
         self.nguard_chan = 5
         self.oversamp = 32./27.
@@ -179,7 +188,8 @@ class Correlator(object):
         self.fine_chanbw = self.coarse_chanbw / float(self.nfine_per_coarse)
         self.npol_in = 1
         self.npol_out = 1
-        self.f0 = self.ants[0].vfile.freqs.mean() # centre frequency for fringe rotation
+        #self.f0 = self.ants[0].vfile.freqs.mean() # centre frequency for fringe rotation
+        self.f0 = self.ants[0].vfile.freqs[0]
         self.inttime_secs = self.nint*self.nfft/self.fs
         self.inttime_days = self.inttime_secs/86400.
         self.curr_intno = 10
@@ -228,14 +238,14 @@ class Correlator(object):
 
         return uvw
 
-    def get_geometric_delay_delayrate(self, ant):
+    def get_geometric_delay_delayrate_us(self, ant):
         fr1 = FringeRotParams(self, ant)
         fr2 = FringeRotParams(self, self.refant)
 
         delay = fr1.delay - fr2.delay
         delayrate = fr1.delay_rate - fr2.delay_rate
 
-        return (delay*self.fs/1e6, delayrate*self.fs/1e6)
+        return (delay, delayrate)
 
 
     def calcmjd(self):
@@ -313,10 +323,8 @@ def _main():
     calcresults = ResultsFile(values.calcfile)
     sources = [{'name':'M87','ra':180.,'dec':15.}]
 
-    a1 = AntennaSource(values.files[0])
-    a2 = AntennaSource(values.files[1])
-
-    corr = Correlator([a1,a2], sources, values)
+    antennas = [AntennaSource(a) for a in values.files]
+    corr = Correlator(antennas, sources, values)
     try:
         while(True):
             #fq = corr.fileout.fq_table()

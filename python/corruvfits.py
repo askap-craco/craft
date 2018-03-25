@@ -201,7 +201,6 @@ class CorrUvFitsFile(object):
         assert ia2 >= 0
         visdata_all = np.recarray(1, dtype=self.dtype)
         visdata = visdata_all[0]
-        print visdata.dtype, data.shape, visdata['DATA'].shape
         if weights is None:
             weights = -7.71604973e-05 #???
 
@@ -224,8 +223,6 @@ class CorrUvFitsFile(object):
         d[0,0,0,:,:,1] = data.imag
         d[0,0,0,:,:,2] = weights
         self.fout.write(visdata_all.tobytes())
-
-        print visdata
         self.ngroups += 1
 
 

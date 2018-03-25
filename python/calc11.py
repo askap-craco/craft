@@ -12,6 +12,7 @@ import os
 import sys
 import logging
 from collections import OrderedDict
+import warnings
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -127,7 +128,8 @@ class Scan(object):
     def eval_src0_poly(self, mjd):
         poly = self.get_poly(mjd)
         secs = (mjd - poly.mjdfull)*86400.
-        print 'Eval offset', secs, 'mjd=', mjd, 'mjdfull', poly.mjdfull
+        if secs > 120.0 or secs < 0.:
+            warnings.warn('ERR Dodgey offset. mjd={} polymjd ={} secoffset={}'.format(mjd, poly.mjdfull, secs))
         ant_results = {}
         for ant, polys in poly.source0antpolys.iteritems():
             antname = self.resfile.telnames[ant]
