@@ -1,0 +1,53 @@
+
+vex=craft.vex
+
+maxLength = 86400
+maxGap = 86400
+maxSize =  1000000
+minLength=1
+
+dataBufferFactor = 256
+nDataSegments = 64
+tweakIntTime = true
+
+antennas = AB, AJ, AZ
+
+threadsFile = threads
+nCore = 1
+nThread = 3
+startSeries = 0
+
+
+mjdStart = 2018y078d13h16m35s
+mjdStop  = 2018y078d13h16m48s
+outputFormat = ASCII
+
+SETUP default
+{
+  nChan=1024
+  tInt=1
+}
+
+ANTENNA AB {
+ clockOffset = 0
+ phaseCalInt = 0
+ file = /Users/phi196/code/craft/data/20180319131558/ak02/ak2_c2_f1.codif
+}
+
+ANTENNA AJ {
+ clockOffset = 0
+ phaseCalInt = 0
+ file = /Users/phi196/code/craft/data/20180319131558/ak10/ak10_c2_f1.codif
+}
+
+ANTENNA AZ {
+ clockOffset = 0
+ phaseCalInt = 0
+ file = /Users/phi196/code/craft/data/20180319131558/ak30/ak30_c2_f1.codif
+}
+
+EOP 58194 { xPole=0.014930 yPole=0.373090 tai_utc=35 ut1_utc=-1.848827 }
+EOP 58195 { xPole=0.015100 yPole=0.374620 tai_utc=35 ut1_utc=-1.849970 }
+EOP 58196 { xPole=0.015770 yPole=0.376050 tai_utc=35 ut1_utc=-1.851174 }
+EOP 58197 { xPole=0.016820 yPole=0.377510 tai_utc=35 ut1_utc=-1.852417 }
+EOP 58198 { xPole=0.017880 yPole=0.378780 tai_utc=35 ut1_utc=-1.853645 }
