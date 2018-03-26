@@ -33,7 +33,7 @@ def _main():
 
     f1 = vcraft.VcraftFile(values.files[0])
     f2 = vcraft.VcraftFile(values.files[1])
-    assert f1.freqs == f1.freqs
+    assert np.all(f1.freqs == f2.freqs)
 
 
     for s in ('START_WRITE','STOP_WRITE','TRIGGER'):

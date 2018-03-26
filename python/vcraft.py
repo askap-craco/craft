@@ -178,7 +178,7 @@ class VcraftFile(object):
                 dwords >>= 1
                 d[samp::16, :, 1] = 1 - 2*(dwords & 0x1) # imag
                 dwords >>= 1
-            print 'MODE3', startsamp, sampoff, wordidx, nwordsamps, nwords, seekoff, nsamps, dwords.shape, d.shape
+            #print 'MODE3', startsamp, sampoff, wordidx, nwordsamps, nwords, seekoff, nsamps, dwords.shape, d.shape
             d = d[sampoff:sampoff+nsamp, :, :]
             assert d.shape[0] == nsamp, 'Incorrect output shape {} expected {}'.format(d.shape, nsamp)
         else:

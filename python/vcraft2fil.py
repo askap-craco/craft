@@ -41,7 +41,7 @@ def detect(f, values):
     vfile = vcraft.VcraftFile(values.files[0])
 
     hdr = vfile.hdr
-    df = vfile.read()
+    df = vfile.read(0, 1500*100)
     nsamps, nchan = df.shape
     infsamp = float(hdr['SAMP_RATE'][0])
     tsamp = float(values.nsamps)/infsamp
@@ -56,8 +56,8 @@ def detect(f, values):
     frames = np.array([int(hdr[c][0]) for c in frame_cards])
     bat0 = int(hdr['NOW_BAT'][0], base=16)
     bat0_40 = bat0 & 0xffffffffff
-    nbits = 32
-    
+    nbits = 8
+
 
     print 'BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6
     # lowest 32 bits of bat from the time the file was written
@@ -74,25 +74,29 @@ def detect(f, values):
            'nchans':8,
            'src_raj':0.0,
            'src_dej':0.0
-           
+
     }
     foutname = f.replace('.vcraft','.fil')
     fout = SigprocFile(foutname, 'w', hdr)
     nchan = len(freqs)
-           
-    
+
+
+
     # detect
     dout = abs(df)**2
-    
+
     dfil = np.add.reduceat(dout, np.arange(0, nsamps, values.nsamps), axis=0)
     # get rid of last sample
     dfil = dfil[0:-1:, :]
     # subtract mean over time
     dfil -= dfil.mean(axis=0)
     dfil /= dfil.std(axis=0)
+    dfil *= 18
+    dfil += 128
+    dfil = dfil.astype(np.uint8)
     print 'Input shape', df.shape, 'output shape', dfil.shape
-    
-    
+
+
     dfil.tofile(fout.fin)
     fout.fin.close()
 
@@ -135,7 +139,7 @@ def detect(f, values):
         pylab.show()
 
 
-        
-    
+
+
 if __name__ == '__main__':
     _main()

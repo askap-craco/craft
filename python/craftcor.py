@@ -42,22 +42,34 @@ class PlotOut(object):
 
     def put_product(self, a1, a2, xxp):
         xx= xxp[:,0]
-        if a1 != a2 and False:
+        if a1 != a2 and True:
             self.stuff.append(xx)
-            fig, (ax1, ax2, ax3, ax4, ax5) = pylab.subplots(5,1)
-            xxang = np.angle(xx)
-            print_delay(xx)
-            ax1.plot(abs(xx))
-            ax2.plot(np.degrees(xxang))
-            for i in xrange(8):
-                ax2.axvline(54*i)
-                print_delay(xx[54*i:54*(i+1)])
+            self.last_xx = (a1, a2, xx)
+            if len(self.stuff) %10 == 9:
+                self.plot_stuff()
 
-            ax3.plot(np.fft.fftshift(abs(np.fft.fft(xx))), label='lag')
-            angxx = np.angle(np.array(self.stuff))
-            ax4.imshow(angxx, aspect='auto')
-            ax5.plot(np.degrees(angxx[:, 20:40].mean(axis=1)))
-            pylab.show()
+    def plot_stuff(self):
+
+        (a1, a2, xx) = self.last_xx
+        fig, (ax1, ax2, ax3, ax4, ax5) = pylab.subplots(5,1)
+        xxang = np.angle(xx)
+        print_delay(xx)
+        ax1.plot(abs(xx))
+        ax2.plot(np.degrees(xxang))
+        for i in xrange(8):
+            ax2.axvline(54*i)
+            print_delay(xx[54*i:54*(i+1)])
+
+        ax3.plot(np.fft.fftshift(abs(np.fft.fft(xx))), label='lag')
+        angxx = np.angle(np.array(self.stuff))
+        ax4.imshow(angxx, aspect='auto')
+        phase_vt = np.degrees(angxx[:, 10:50].mean(axis=1))
+        t = np.arange(len(phase_vt))
+        rate, offset = np.polyfit(t, phase_vt, 1)
+        fit_std = (np.polyval((rate, offset), t) - phase_vt).std()
+        ax5.plot(phase_vt)
+        print 'Phase rate={} offset={} std={} deg'.format(rate, offset, fit_std)
+        pylab.show()
 
     def finish(self):
         stuff = np.array(self.stuff)
@@ -77,23 +89,31 @@ class AntennaSource(object):
     def do_f(self, corr):
         self.frparams = FringeRotParams(corr, self)
         # calculate sample start
-        framediff = corr.refant.trigger_frame - self.trigger_frame
-
+        framediff_samp = corr.refant.trigger_frame - self.trigger_frame
+        framediff_us = framediff_samp / corr.fs
         (geom_delay_us, geom_delay_rate_us) = corr.get_geometric_delay_delayrate_us(self)
-        geom_delay_samp = geom_delay_us * corr.fs/1e6
-        fixed_delay_samp = corr.get_fixed_delay_usec(self.antno)*corr.fs/1e6
-        total_delay_samp = -geom_delay_samp + framediff + fixed_delay_samp
+        geom_delay_samp = geom_delay_us / corr.fs
+        fixed_delay_us = corr.get_fixed_delay_usec(self.antno)
+        fixed_delay_samp = fixed_delay_us/corr.fs
+        total_delay_samp = -geom_delay_samp*0+ framediff_samp + fixed_delay_samp*0
         whole_delay = int(np.round(total_delay_samp))
+        total_delay_us = total_delay_samp / corr.fs
+        whole_delay_us = whole_delay / corr.fs
+
         frac_delay_samp = (total_delay_samp - whole_delay)
-        frac_delay_us = frac_delay_samp / (corr.fs/1e6)
-        theta_global = geom_delay_us * corr.f0
+        frac_delay_us = frac_delay_samp *corr.fs
 
         # get data
         nsamp = corr.nint*corr.nfft
         logging.debug('F %s sample delays: frame: %f geo %f fixed %f total %f whole: %d frac: %f nsamp: %d phase=%f deg',
-            self.antname, framediff, geom_delay_samp, fixed_delay_samp,
+            self.antname, framediff_samp, geom_delay_samp, fixed_delay_samp,
             total_delay_samp, whole_delay, frac_delay_samp, nsamp,
             360.*frac_delay_us*corr.f0)
+        logging.debug('F %s us delays: frame: %f geo %f fixed %f total %f whole: %d frac: %f nsamp: %d phase=%f deg',
+                self.antname, framediff_us, geom_delay_us, fixed_delay_us,
+                total_delay_us, whole_delay_us, frac_delay_us, nsamp,
+                360.*frac_delay_us*corr.f0)
+
         rawd = self.vfile.read(corr.curr_samp*corr.nfft + whole_delay, nsamp)
         assert rawd.shape == (nsamp, corr.ncoarse_chan)
         self.data = np.zeros((corr.nint, corr.nfine_chan, corr.npol_in), dtype=np.complex64)
@@ -104,24 +124,20 @@ class AntennaSource(object):
             cfreq = self.vfile.freqs[c]
             cbw = corr.coarse_chanbw/2.
             coarse_off = cfreq - corr.f0
-            #freqs = np.linspace( -cbw, +cbw, nfine) + (cfreq - corr.f0)
-            # half channel offset because DC bin is in the center of the FFT
-            freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2. + 0)*corr.fine_chanbw
+            freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2. )*corr.fine_chanbw
             x1 = rawd[:, c].reshape(-1, corr.nfft)
             xf1 = np.fft.fftshift(np.fft.fft(x1, axis=1), axes=1)
             xfguard = xf1[:, corr.nguard_chan:corr.nguard_chan+nfine:]
             phases = np.zeros((corr.nint, nfine))
 
             for i in xrange(corr.nint):
-                delta_t = (frac_delay_us - 0*i*geom_delay_rate_us/float(corr.nint))
-                # oh man - hard to explain. Need to draw a picture
-                theta_offset = coarse_off*float(nfine)*delta_t*corr.fine_chanbw
-                #theta_global = corr.f0*delta_t
-                theta0 = theta_offset + theta_global
-                phases[i, :] = freqs*delta_t/corr.oversamp + theta0
-                if i == 0:
-                    logging.debug('FR chan=%d delta_t %f offset=%f deg global=%f deg theta0=%f deg',
-                    c, delta_t,theta_offset*360., theta_global*360, theta0*360)
+                #delta_t = (frac_delay_us - i*geom_delay_rate_us/float(corr.nint))*0
+                delta_t = fixed_delay_us - geom_delay_us
+                dt2 = fixed_delay_us/corr.fs - geom_delay_us
+
+                theta_offset = coarse_off*float(nfine)*(dt2)*corr.fine_chanbw
+                phases[i, :] = cfreq*geom_delay_us + freqs*delta_t + theta_offset
+
 
             # If you plot the phases you're about to correct, after adding a artificial
             # 1 sample delay ad tryig to get rid of it with a phase ramp, it becaomes
@@ -157,6 +173,11 @@ class FringeRotParams(object):
         self.ant = ant
         self.corr = corr
 
+    def __str__(self):
+        s = 'FR {} uvw=({},{},{}) m = {} us'.format(self.ant.antname, self.u, self.v, self.w, self.delay)
+        return s
+
+    __repr__ = __str__
 
 class Correlator(object):
     def __init__(self, ants, sources, values):
@@ -173,14 +194,14 @@ class Correlator(object):
 
         self.refant = filter(lambda a:a.antname == refantname, ants)[0]
         self.calcresults = ResultsFile(values.calcfile)
-        self.dutc = -37.0*0
+        self.dutc = -37.0
         self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
         self.frame0 = self.refant.trigger_frame
-        self.nint = 2048
+        self.nint = 2048*1
         self.nfft = 64
         self.nguard_chan = 5
         self.oversamp = 32./27.
-        self.fs = 1e6*self.oversamp # samples per second
+        self.fs = self.oversamp # samples per microsecnd
         self.ncoarse_chan = 8
         self.coarse_chanbw = 1.0
         self.nfine_per_coarse = self.nfft - 2*self.nguard_chan
@@ -190,9 +211,10 @@ class Correlator(object):
         self.npol_out = 1
         #self.f0 = self.ants[0].vfile.freqs.mean() # centre frequency for fringe rotation
         self.f0 = self.ants[0].vfile.freqs[0]
-        self.inttime_secs = self.nint*self.nfft/self.fs
+        self.freqs = self.ants[0].vfile.freqs
+        self.inttime_secs = self.nint*self.nfft/(self.fs*1e6)
         self.inttime_days = self.inttime_secs/86400.
-        self.curr_intno = 10
+        self.curr_intno = 20
         self.curr_samp = self.curr_intno*self.nint
         self.prodout = PlotOut(self)
         self.calcmjd()
@@ -200,7 +222,7 @@ class Correlator(object):
         self.fileout = CorrUvFitsFile('test.fits', self.f0, self.fine_chanbw, \
             self.nfine_chan, self.npol_out, sources, ants)
 
-        logging.debug('F0 %f FINE CHANNEL %f kHz num=%d', self.f0, self.fine_chanbw*1e3, self.nfine_chan)
+        logging.debug('F0 %f FINE CHANNEL %f kHz num=%d freqs=%s', self.f0, self.fine_chanbw*1e3, self.nfine_chan, self.freqs)
 
 
     def parse_parset(self):
