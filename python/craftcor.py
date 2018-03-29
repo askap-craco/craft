@@ -22,7 +22,6 @@ CLIGHT=299792458.0
 def print_delay(xx):
     xxang = np.angle(xx)
     punwrap = np.unwrap(xxang)
-    punwrap -= punwrap[0]
     f = np.arange(len(punwrap)) - len(punwrap)/2
     gradient, phase = np.polyfit(f, punwrap, 1)
     '''
@@ -48,11 +47,12 @@ class FitsOut(object):
 class PlotOut(object):
     def __init__(self, corr):
         self.stuff = []
+        self.corr = corr
 
 
     def put_product(self, a1, a2, xxp):
-        xx= xxp[:,0]
-        if a1 != a2 and True:
+        if a1 != a2 and self.corr.values.show:
+            xx= xxp[:,0]
             self.stuff.append(xx)
             self.last_xx = (a1, a2, xx)
             if len(self.stuff) >0:
@@ -66,9 +66,10 @@ class PlotOut(object):
         print_delay(xx)
         ax1.plot(abs(xx))
         ax2.plot(np.degrees(xxang))
+        nf = self.corr.nfine_per_coarse
         for i in xrange(8):
-            ax2.axvline(54*i)
-            print_delay(xx[54*i:54*(i+1)])
+            ax2.axvline(nf*i)
+            print_delay(xx[nf*i:nf*(i+1)])
 
         ax3.plot(np.fft.fftshift(abs(np.fft.fft(xx))), label='lag')
         angxx = np.angle(np.array(self.stuff))
@@ -102,9 +103,9 @@ class AntennaSource(object):
         framediff_samp = corr.refant.trigger_frame - self.trigger_frame
         framediff_us = framediff_samp / corr.fs
         (geom_delay_us, geom_delay_rate_us) = corr.get_geometric_delay_delayrate_us(self)
-        geom_delay_samp = geom_delay_us / corr.fs
+        geom_delay_samp = geom_delay_us * corr.fs
         fixed_delay_us = corr.get_fixed_delay_usec(self.antno)
-        fixed_delay_samp = fixed_delay_us/corr.fs
+        fixed_delay_samp = fixed_delay_us*corr.fs
         total_delay_samp = framediff_samp
         whole_delay = int(np.round(total_delay_samp))
         total_delay_us = total_delay_samp / corr.fs
@@ -112,6 +113,7 @@ class AntennaSource(object):
 
         frac_delay_samp = (total_delay_samp - whole_delay)
         frac_delay_us = frac_delay_samp *corr.fs
+
 
         # get data
         nsamp = corr.nint*corr.nfft
@@ -133,10 +135,10 @@ class AntennaSource(object):
         nfine = corr.nfft - 2*corr.nguard_chan
 
         for c in xrange(corr.ncoarse_chan):
-            cfreq = self.vfile.freqs[c]
+            cfreq = self.vfile.freqs[c] 
             cbw = corr.coarse_chanbw/2.
             coarse_off = cfreq - corr.f0
-            freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2. )*corr.fine_chanbw
+            freqs = -(np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw
             x1 = rawd[:, c].reshape(-1, corr.nfft)
             xf1 = np.fft.fftshift(np.fft.fft(x1, axis=1), axes=1)
             xfguard = xf1[:, corr.nguard_chan:corr.nguard_chan+nfine:]
@@ -146,24 +148,29 @@ class AntennaSource(object):
                 #delta_t = (frac_delay_us - i*geom_delay_rate_us/float(corr.nint))*0
                 delta_t = fixed_delay_us - geom_delay_us
                 dt2 = fixed_delay_us/corr.fs - geom_delay_us
+                #phases[i, :] = cfreq*geom_delay_us + freqs*delta_t + coarse_off*dt2 # this works
 
-                theta_offset = coarse_off*dt2
-                phases[i, :] = cfreq*geom_delay_us + freqs*delta_t + theta_offset
+                theta_fixed = -fixed_delay_us*(freqs +  c/corr.fs)
+                theta_geom = (cfreq + freqs)*geom_delay_us
+                phases[i, :] = theta_fixed + theta_geom
+
                 if i == 0:
-                    logging.debug('fixed=%f us geom=%f us delta_t %s us dt2=%s us coff*fixed = %f deg coff*geom = %f deg',
-                        fixed_delay_us, geom_delay_us, delta_t, dt2, cfreq*fixed_delay_us*360., cfreq*geom_delay_us*360.)
+                    print 'Fixed offset', (c*fixed_delay_us/corr.fs*360.0) % 360.0, 'deg'
+                    print 'Geometric offset', (cfreq*geom_delay_us*360.0)%360.0, 'deg'
+                    logging.debug('PHASOR %s[%s] fixed=%f us geom=%f us delta_t %s us dt2=%s us coff*fixed = %f deg coff*geom = %f deg',
+                        self.antname, self.ia, fixed_delay_us, geom_delay_us, delta_t, dt2, cfreq*fixed_delay_us*360., cfreq*geom_delay_us*360.)
 
 
             # If you plot the phases you're about to correct, after adding a artificial
             # 1 sample delay ad tryig to get rid of it with a phase ramp, it becaomes
             # blatetly clear what you should do
             phasor = np.exp(np.pi*2j*phases)
-
             '''
             pylab.figure(10)
             pylab.plot(np.angle(phasor[0, :]))
             pylab.plot(np.angle(phasor[-1:, :]))
             '''
+
 
             xfguard *= phasor
             # slice out only useful channels
@@ -207,7 +214,8 @@ class Correlator(object):
 
         refantname = self.parset['cp.ingest.tasks.FringeRotationTask.params.refant'].lower()
 
-        self.refant = filter(lambda a:a.antname == refantname, ants)[0]
+        #self.refant = filter(lambda a:a.antname == refantname, ants)[0]
+        self.refant = ants[0]
         self.calcresults = ResultsFile(values.calcfile)
         self.dutc = -37.0
         self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
@@ -349,6 +357,7 @@ def _main():
     parser.add_argument('-n','--fft-size', type=int, help='FFT size per coarse channel', default=128)
     parser.add_argument('--calcfile', help='Calc file for fringe rotation')
     parser.add_argument('-p','--parset', help='Parset for delays')
+    parser.add_argument('--show', help='Show plot', action='store_true', default=False)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()

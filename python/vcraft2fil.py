@@ -41,8 +41,6 @@ def detect(f, values):
     vfile = vcraft.VcraftFile(values.files[0])
 
     hdr = vfile.hdr
-    df = vfile.read(0, 1500*100)
-    nsamps, nchan = df.shape
     infsamp = float(hdr['SAMP_RATE'][0])
     tsamp = float(values.nsamps)/infsamp
     # TODO: Calculate frequencies a bit better - tricky because individual
@@ -51,13 +49,18 @@ def detect(f, values):
     fch1 = min(freqs)
     foff = freqs[1] - freqs[0]
     # TODO: Get tstart from BATs. This is the easy way
-    tstart = float(hdr['ANT_MJD'][0])
+    tstart = float(hdr['TRIGGER_MJD'][0])
     bats = np.array([int(hdr[c][0], base=16) for c in bat_cards])
     frames = np.array([int(hdr[c][0]) for c in frame_cards])
-    bat0 = int(hdr['NOW_BAT'][0], base=16)
+    bat0 = int(hdr['TRIGGER_BAT'][0], base=16)
     bat0_40 = bat0 & 0xffffffffff
     nbits = 8
-
+    nchan = len(freqs)
+    nfft = 64
+    nguard = 5
+    nint = 4
+    tsamp = float(nfft)*float(nint)/float(infsamp)
+    nchanout = nfft - 2*nguard
 
     print 'BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6
     # lowest 32 bits of bat from the time the file was written
@@ -68,48 +71,49 @@ def detect(f, values):
            'tsamp': tsamp,
            'tstart': tstart,
            'fch1':fch1,
-           'foff':foff,
+           'foff':foff/float(nfft),
            'nbits':nbits,
            'nifs':1,
-           'nchans':8,
+           'nchans':8*nchanout,
            'src_raj':0.0,
            'src_dej':0.0
 
     }
+    print hdr
     foutname = f.replace('.vcraft','.fil')
     fout = SigprocFile(foutname, 'w', hdr)
-    nchan = len(freqs)
 
-    nfft = 64
-    nguard = 5
-    nint = 64
-    nsamp = df.shape[0]
-    nsampout = nsamp/(nfft*nint)
+    nsamps = vfile.nsamps
+    nsampout = nsamps/(nint*nfft)
+    nsampin = nsampout*nint*nfft
 
     # reshape to integral number of integrations
-    df = df[:nsampout, :]
-    df.shape = (nchan, -1, nfft)
+    for s in xrange(nsampout):
+        sampno = s*nint*nfft
+        df = vfile.read(sampno, nint*nfft)
+        for c in xrange(nchan):
+            dc = df[:, c]
+            dc.shape = (-1, nfft)
+            dfft = np.fft.fftshift(np.fft.fft(dc, axis=1))
+            #dfft = dfft[:, nguard:nchanout+nguard]
+            dabs = (dfft * np.conj(dfft)).real.mean(axis=0)
+            dabs -= dabs.mean()
+            dabs /= dabs.std()
+            dabs *= 18
+            dabs += 128
+            #dabs = dabs[::-1]
+            dabs = dabs[nguard:nchanout+nguard]
+            #pylab.plot(dabs)
+            #pylab.show()
+            dabs = dabs.astype(np.uint8)
+            dabs.tofile(fout.fin)
 
 
 
-
-
-    # detect
-    dout = abs(df)**2
-
-    dfil = np.add.reduceat(dout, np.arange(0, nsamps, values.nsamps), axis=0)
+#    dfil = np.add.reduceat(dout, np.arange(0, nsamps, values.nsamps), axis=0)
     # get rid of last sample
-    dfil = dfil[0:-1:, :]
-    # subtract mean over time
-    dfil -= dfil.mean(axis=0)
-    dfil /= dfil.std(axis=0)
-    dfil *= 18
-    dfil += 128
-    dfil = dfil.astype(np.uint8)
-    print 'Input shape', df.shape, 'output shape', dfil.shape
 
-
-    dfil.tofile(fout.fin)
+    #dfil.tofile(fout.fin)
     fout.fin.close()
 
     if values.show:
