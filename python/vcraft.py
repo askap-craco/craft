@@ -160,12 +160,12 @@ class VcraftFile(object):
 
         elif mode == 3: # 1b+1b
             # each 32 bit word contais 32 1 bit numbers (imag/real)*16 for the same channel
-            wordidx = (startsamp / 16)*nchan
-            sampoff = startsamp % 16
-            nwordsamps = (nsamp + 15 + sampoff) / 16
-            nwords = nwordsamps*nchan
-            seekoff = self.hdrsize + wordidx*4
-            fin.seek(seekoff)
+            wordidx = startsamp / 16 # which 32 bit word the start sample is in
+            sampoff = startsamp % 16 # how may samples into the first word the start sample is
+            nwordsamps = (nsamp + 15 + sampoff) / 16 # how many times we need to read (in words)
+            nwords = nwordsamps*nchan # total numberof words including channels
+            seek_bytes = self.hdrsize + wordidx*nchan*4  # seek offset in bytes
+            fin.seek(seek_bytes)
             dwords = np.fromfile(fin, dtype=np.uint32, count=nwords)
             #nwords = len(dwords)/nchan
             assert len(dwords) == nwords
@@ -178,7 +178,7 @@ class VcraftFile(object):
                 dwords >>= 1
                 d[samp::16, :, 1] = 1 - 2*(dwords & 0x1) # imag
                 dwords >>= 1
-            #print 'MODE3', startsamp, sampoff, wordidx, nwordsamps, nwords, seekoff, nsamps, dwords.shape, d.shape
+            print 'MODE3', startsamp, sampoff, wordidx, nwordsamps, nwords, seek_bytes, nsamps, dwords.shape, d.shape
             d = d[sampoff:sampoff+nsamp, :, :]
             assert d.shape[0] == nsamp, 'Incorrect output shape {} expected {}'.format(d.shape, nsamp)
         else:

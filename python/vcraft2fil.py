@@ -80,6 +80,18 @@ def detect(f, values):
     fout = SigprocFile(foutname, 'w', hdr)
     nchan = len(freqs)
 
+    nfft = 64
+    nguard = 5
+    nint = 64
+    nsamp = df.shape[0]
+    nsampout = nsamp/(nfft*nint)
+
+    # reshape to integral number of integrations
+    df = df[:nsampout, :]
+    df.shape = (nchan, -1, nfft)
+
+
+
 
 
     # detect

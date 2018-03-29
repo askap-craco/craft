@@ -22,11 +22,21 @@ CLIGHT=299792458.0
 def print_delay(xx):
     xxang = np.angle(xx)
     punwrap = np.unwrap(xxang)
-    f = np.arange(len(punwrap))
+    punwrap -= punwrap[0]
+    f = np.arange(len(punwrap)) - len(punwrap)/2
     gradient, phase = np.polyfit(f, punwrap, 1)
+    '''
+    pylab.figure(20)
+    pylab.plot(f, xxang)
+    pylab.plot(f, punwrap, 'x')
+    pylab.plot(f, np.polyval((gradient, phase), f))
+    pylab.show()
+    '''
     delay = gradient/2./np.pi*len(punwrap)
     print 'Unwrapped phase = {} rad = {} deg, gradient={} rad per channel, delay={} samples nsamp={}' \
         .format(phase, np.degrees(phase), gradient, delay, len(punwrap))
+
+    return (delay, np.degrees(phase))
 
 class FitsOut(object):
     def __init__(self, fname, corr):
@@ -45,7 +55,7 @@ class PlotOut(object):
         if a1 != a2 and True:
             self.stuff.append(xx)
             self.last_xx = (a1, a2, xx)
-            if len(self.stuff) %10 == 9:
+            if len(self.stuff) >0:
                 self.plot_stuff()
 
     def plot_stuff(self):
@@ -95,7 +105,7 @@ class AntennaSource(object):
         geom_delay_samp = geom_delay_us / corr.fs
         fixed_delay_us = corr.get_fixed_delay_usec(self.antno)
         fixed_delay_samp = fixed_delay_us/corr.fs
-        total_delay_samp = -geom_delay_samp*0+ framediff_samp + fixed_delay_samp*0
+        total_delay_samp = framediff_samp
         whole_delay = int(np.round(total_delay_samp))
         total_delay_us = total_delay_samp / corr.fs
         whole_delay_us = whole_delay / corr.fs
@@ -114,7 +124,9 @@ class AntennaSource(object):
                 total_delay_us, whole_delay_us, frac_delay_us, nsamp,
                 360.*frac_delay_us*corr.f0)
 
-        rawd = self.vfile.read(corr.curr_samp*corr.nfft + whole_delay, nsamp)
+        sampoff = corr.curr_samp*corr.nfft + whole_delay
+        print 'SAMPOFF', self.vfile.fname, 'sampoff', sampoff, sampoff % 32, sampoff % 16
+        rawd = self.vfile.read(sampoff, nsamp)
         assert rawd.shape == (nsamp, corr.ncoarse_chan)
         self.data = np.zeros((corr.nint, corr.nfine_chan, corr.npol_in), dtype=np.complex64)
         d1 = self.data
@@ -135,8 +147,11 @@ class AntennaSource(object):
                 delta_t = fixed_delay_us - geom_delay_us
                 dt2 = fixed_delay_us/corr.fs - geom_delay_us
 
-                theta_offset = coarse_off*float(nfine)*(dt2)*corr.fine_chanbw
+                theta_offset = coarse_off*dt2
                 phases[i, :] = cfreq*geom_delay_us + freqs*delta_t + theta_offset
+                if i == 0:
+                    logging.debug('fixed=%f us geom=%f us delta_t %s us dt2=%s us coff*fixed = %f deg coff*geom = %f deg',
+                        fixed_delay_us, geom_delay_us, delta_t, dt2, cfreq*fixed_delay_us*360., cfreq*geom_delay_us*360.)
 
 
             # If you plot the phases you're about to correct, after adding a artificial
@@ -197,7 +212,7 @@ class Correlator(object):
         self.dutc = -37.0
         self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
         self.frame0 = self.refant.trigger_frame
-        self.nint = 2048*1
+        self.nint = 2048*2
         self.nfft = 64
         self.nguard_chan = 5
         self.oversamp = 32./27.
@@ -214,7 +229,7 @@ class Correlator(object):
         self.freqs = self.ants[0].vfile.freqs
         self.inttime_secs = self.nint*self.nfft/(self.fs*1e6)
         self.inttime_days = self.inttime_secs/86400.
-        self.curr_intno = 20
+        self.curr_intno = 10
         self.curr_samp = self.curr_intno*self.nint
         self.prodout = PlotOut(self)
         self.calcmjd()
