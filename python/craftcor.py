@@ -127,7 +127,6 @@ class AntennaSource(object):
                 360.*frac_delay_us*corr.f0)
 
         sampoff = corr.curr_samp*corr.nfft + whole_delay
-        print 'SAMPOFF', self.vfile.fname, 'sampoff', sampoff, sampoff % 32, sampoff % 16
         rawd = self.vfile.read(sampoff, nsamp)
         assert rawd.shape == (nsamp, corr.ncoarse_chan)
         self.data = np.zeros((corr.nint, corr.nfine_chan, corr.npol_in), dtype=np.complex64)
@@ -135,7 +134,9 @@ class AntennaSource(object):
         nfine = corr.nfft - 2*corr.nguard_chan
 
         for c in xrange(corr.ncoarse_chan):
-            cfreq = self.vfile.freqs[c] 
+            #cfreq = self.vfile.freqs[c]
+            cfreq = corr.freqs[c]
+            foff = corr.drxfs - cfreq
             cbw = corr.coarse_chanbw/2.
             coarse_off = cfreq - corr.f0
             freqs = -(np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw
@@ -146,17 +147,19 @@ class AntennaSource(object):
 
             for i in xrange(corr.nint):
                 #delta_t = (frac_delay_us - i*geom_delay_rate_us/float(corr.nint))*0
-                delta_t = fixed_delay_us - geom_delay_us
+                delta_t = -fixed_delay_us + geom_delay_us
                 dt2 = fixed_delay_us/corr.fs - geom_delay_us
                 #phases[i, :] = cfreq*geom_delay_us + freqs*delta_t + coarse_off*dt2 # this works
 
-                theta_fixed = -fixed_delay_us*(freqs +  c/corr.fs)
-                theta_geom = (cfreq + freqs)*geom_delay_us
-                phases[i, :] = theta_fixed + theta_geom
+                #theta_fixed = -fixed_delay_us*(freqs +  c/corr.fs)
+                #theta_geom = (foff + freqs)*geom_delay_us
+                #phases[i, :] = theta_fixed + theta_geom
+
+                phases[i, :] = delta_t * (freqs + cfreq)
 
                 if i == 0:
-                    print 'Fixed offset', (c*fixed_delay_us/corr.fs*360.0) % 360.0, 'deg'
-                    print 'Geometric offset', (cfreq*geom_delay_us*360.0)%360.0, 'deg'
+                    #logging.debug('Fixed offset %sdeg. Geometric offset=%sdeg', (c*fixed_delay_us/corr.fs*360.0) % 360.0,
+                    # (cfreq*geom_delay_us*360.0)%360.0))
                     logging.debug('PHASOR %s[%s] fixed=%f us geom=%f us delta_t %s us dt2=%s us coff*fixed = %f deg coff*geom = %f deg',
                         self.antname, self.ia, fixed_delay_us, geom_delay_us, delta_t, dt2, cfreq*fixed_delay_us*360., cfreq*geom_delay_us*360.)
 
@@ -227,6 +230,7 @@ class Correlator(object):
         self.fs = self.oversamp # samples per microsecnd
         self.ncoarse_chan = 8
         self.coarse_chanbw = 1.0
+        self.drxfs = 1280.
         self.nfine_per_coarse = self.nfft - 2*self.nguard_chan
         self.nfine_chan = self.ncoarse_chan*self.nfine_per_coarse
         self.fine_chanbw = self.coarse_chanbw / float(self.nfine_per_coarse)
