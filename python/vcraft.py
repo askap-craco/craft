@@ -106,8 +106,9 @@ class VcraftFile(object):
             d = np.fromfile(fin, dtype=np.int16, count=nsamp*nchan*2)
             # truncate if required
             #d = d[:2*nchan*nsamps]
-            assert 2*nchan*nsamps == len(d), 'Not integral number of samples'
-            d.shape = (nsamps, nchan, 2)
+            assert 2*nchan*nsamp == len(d), 'Not integral number of samples'
+            d.shape = (nsamp, nchan, 2)
+            nsamps = nsamp
         elif mode == 1: # 8b + 8b:
             if startsamp != 0:
                 raise NotImplementedError('Give me a sec!')
@@ -166,7 +167,7 @@ class VcraftFile(object):
             nwords = nwordsamps*nchan # total numberof words including channels
             seek_bytes = self.hdrsize + wordidx*nchan*4  # seek offset in bytes
             fin.seek(seek_bytes)
-            dwords = np.fromfile(fin, dtype=np.uint32, count=nwords)
+            dwords = np.fromfile(fin, dtype='<u4', count=nwords)
             #nwords = len(dwords)/nchan
             assert len(dwords) == nwords
             dwords.shape = (nwordsamps, nchan)

@@ -202,7 +202,7 @@ class CorrUvFitsFile(object):
         visdata_all = np.recarray(1, dtype=self.dtype)
         visdata = visdata_all[0]
         if weights is None:
-            weights = -7.71604973e-05 #???
+            weights = 7.71604973e-05 #???
 
 
         jd = mjd + 2400000.5
