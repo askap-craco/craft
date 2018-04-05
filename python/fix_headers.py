@@ -14,20 +14,13 @@ import glob
 import re
 import shutil
 from astropy.coordinates import SkyCoord
-#from aces.footprint_class import Footprint
+from aces.footprint_class import Footprint
 from aces.skypos import skypos
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
-
-def mysep(pos1, pos2):
-    ''' Returns separation in radians'''
-    sep =np.arccos(np.sin(pos1.dec.rad)*np.sin(pos2.dec.rad) + np.cos(pos1.dec.rad)*np.cos(pos2.dec.rad)*np.cos(pos1.ra.rad - pos2.ra.rad))
-    return sep
-
-def mysep_skypos(pos1, pos2):
-    sep =np.arccos(np.sin(pos1.dec)*np.sin(pos2.dec) + np.cos(pos1.dec)*np.cos(pos2.dec)*np.cos(pos1.ra - pos2.ra))
-    return sep
+def mysep2(pos1, pos2):
+    return pos1.separation(pos2).rad
         
 class TargetParset(dict):
     def __init__(self, f):
@@ -110,8 +103,8 @@ class TargetParset(dict):
 
     def get_nearest_source(self, pos, tol_deg=0.1):
         sources = [s for s in self.sources.values() if 'skycoord' in s]
-        nearest = min(sources, key=lambda p: mysep(p['skycoord'], pos))
-        sepdeg  = np.degrees(mysep(nearest['skycoord'], pos) )
+        nearest = min(sources, key=lambda p: mysep2(p['skycoord'], pos))
+        sepdeg  = np.degrees(mysep2(nearest['skycoord'], pos) )
         if sepdeg > tol_deg:
             raise ValueError('Nearest source to pos {} was {} but separation was {}'.format(pos, nearest, sepdeg))
 
@@ -171,6 +164,7 @@ def _main():
             fix_header(hdr_file, sbdata, pset, values)
         except:
             logging.exception('Could not fix header file %s', hdr_file)
+            raise
 
 def fix_header(hdr_file, sbdata, pset, values):
     hdr = DadaHeader.fromfile(hdr_file)
@@ -197,15 +191,25 @@ def fix_header(hdr_file, sbdata, pset, values):
     hdr += ('SB_TEMPLATE', sbtemplate, 'SB template')
     hdr += ('SB_TEMPLATE_VERSION', sbinfo[4], 'SB template version')
     hdr += ('SB_OWNER', sbinfo[5], 'SB owner')
-    if hdr['FOOTPRINT_NAME'][0].lower() == 'unknown':
-        hdr.set_value('FOOTPRINT_NAME', 'closepack36')
-        hdr.set_value('FOOTPRINT_PITCH',0.9)
-        hdr.set_value('FOOTPRINT_ROTATION', 60)
+    #if 'FOOTPRINT_NAME' not in hdr.keys() or hdr['FOOTPRINT_NAME'][0].lower() == 'unknown' or hdr['FOOTPRINT_NAME'][0].lower() == 'null':
+    #        hdr.set_value('FOOTPRINT_NAME', 'closepack36')
+    #        hdr.set_value('FOOTPRINT_PITCH',0.9)
+    #    hdr.set_value('FOOTPRINT_ROTATION', 60)
 
     if sbtemplate.lower() != 'beamform':
         ra, dec = map(float, (hdr['RA'][0], hdr['DEC'][0]))
-        pos = SkyCoord(ra, dec, unit='deg')
-        src = pset.get_nearest_source(pos)
+        ant_pos = SkyCoord(ra, dec, unit='deg')
+        src = pset.get_nearest_source(ant_pos)
+        field_direction = src['field_direction']
+
+        field_ra, field_dec, field_epoch = field_direction.replace("'",'').replace('[','').replace(']','').replace(' ','').split(',')
+        
+        field_pos = SkyCoord(field_ra + ' ' + field_dec, unit=('hourangle','deg'))
+        logging.debug('Nearest src %s', src)
+        logging.debug('Field pos %s = ra %s dec %s, decimal=%s', field_pos.to_string('hmsdms'), field_ra, field_dec, field_pos.to_string('decimal'))
+        logging.debug('Ant pos %s %s Separtion to requrested pos = %sarcsec', ant_pos.to_string('hmsdms'), ant_pos.to_string('decimal'), field_pos.separation(ant_pos).arcsec)
+        assert field_pos.separation(ant_pos).arcsec < 100
+
         #fp = src['footprint']
         # some headers had incorrect positions - not sure which now. Some headers don't have footprints either
         #hdr.set_value('BEAM_RA', ','.join(map(str, np.degrees([p.ra for p in fp.getPositions()]))))
@@ -213,7 +217,6 @@ def fix_header(hdr_file, sbdata, pset, values):
 
         #hdr.set_value('RA', src['skycoord'].ra.deg)
         #hdr.set_value('DEC',  src['skycoord'].dec.deg)
-
         for f in ('field_direction',):
             hdr.set_value(f.upper(), src[f])
 
@@ -228,16 +231,44 @@ def fix_header(hdr_file, sbdata, pset, values):
         hdr.set_value('SOURCE', src['src'])
         hdr.set_value('FIELD_NAME', field_name)
         hdr.set_value('TARGET', field_name)
+        hdr += 'TARGET_POL_ANGLE', src['pol_angle'], 'Target polarisation angle'
+        hdr += 'TARGET_POL_TYPE', src['pol_type'], 'Target polarisation tracking'
+
+        ant_pa = float(hdr['TARGET_POL_ANGLE'][0])
+        antpos = SkyCoord(ra=ra, dec=dec, frame='icrs', unit='deg')
+        fp_shape = hdr['FOOTPRINT_NAME'][0]
+        fp_pitch = float(hdr['FOOTPRINT_PITCH'][0])
+        fp_pa = float(hdr['FOOTPRINT_ROTATION'][0])
+        fp = Footprint.named(fp_shape, np.radians(fp_pitch), np.radians(fp_pa + ant_pa))
+        fp.setRefpos(np.radians([field_pos.ra.deg, field_pos.dec.deg]))
+        logging.debug('FOOTPRINT %s %s %s %s %s %s %s %s', fp_shape, fp_pitch, fp_pa, 'ant pa', ant_pa, 'refpos', ra, dec)
+        fp_ras = np.degrees([p.ra for p in fp.positions])
+        fp_decs = np.degrees([p.dec for p in fp.positions])
+        ra_strings = map(str, fp_ras)
+        ra_strings += ra_strings
+        dec_strings = map(str, fp_decs)
+        dec_strings += dec_strings
+        hdr.set_value('BEAM_RA',','.join(ra_strings))
+        hdr.set_value('BEAM_DEC',','.join(dec_strings))
+        hdr.set_value('RA', field_pos.ra.deg)
+        hdr.set_value('DEC', field_pos.dec.deg)
+        hdr += 'ANT_RA', ant_pos.ra.deg, 'Antenna actual RA at the beginning of the scan (unreliable by a few arcmin)'
+        hdr += 'ANT_DEC', ant_pos.dec.deg, 'Antenna actual dec at the beginning of the scan (unreliable by a few arcmin)'
+        
+
+        
+        
+        
 
         guess_intent(hdr)
 
     #shutil.move(hdr_file, hdr_file+'.beforefix')
     outfile = '{}.v{}'.format(hdr_file, new_version)
-    logging.info('Writing new header to %s', outfile)
     
     if values.fix:
         with open(outfile, 'w') as fout:
             hdr.add_comment = False
+            logging.info('Writing new header to %s', outfile)
             hdr.tofile(fout, add_zeros=False)
         
 
