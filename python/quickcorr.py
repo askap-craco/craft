@@ -83,6 +83,8 @@ def _main():
     assert d1.shape == d2.shape
 
     print 'Data shape', d1.shape, 'freqs', f1.freqs
+    print 'D1 channel0', d1[0:100, 0]
+    print 'D2 channel0', d2[0:100, 0]
 
 
     if offset >= d1.shape[0] or offset >= d2.shape[0]:

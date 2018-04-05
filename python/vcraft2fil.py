@@ -49,17 +49,16 @@ def detect(f, values):
     fch1 = min(freqs)
     foff = freqs[1] - freqs[0]
     # TODO: Get tstart from BATs. This is the easy way
-    tstart = float(hdr['TRIGGER_MJD'][0])
+    tstart = float(hdr['ANT_MJD'][0])
     bats = np.array([int(hdr[c][0], base=16) for c in bat_cards])
     frames = np.array([int(hdr[c][0]) for c in frame_cards])
-    bat0 = int(hdr['TRIGGER_BAT'][0], base=16)
+    bat0 = int(hdr['NOW_BAT'][0], base=16)
     bat0_40 = bat0 & 0xffffffffff
     nbits = 8
     nchan = len(freqs)
     nfft = 64
     nguard = 5
-    nint = 4
-    tsamp = float(nfft)*float(nint)/float(infsamp)
+    nint = 64
     nchanout = nfft - 2*nguard
 
     print 'BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6
@@ -79,7 +78,6 @@ def detect(f, values):
            'src_dej':0.0
 
     }
-    print hdr
     foutname = f.replace('.vcraft','.fil')
     fout = SigprocFile(foutname, 'w', hdr)
 
@@ -91,21 +89,22 @@ def detect(f, values):
     for s in xrange(nsampout):
         sampno = s*nint*nfft
         df = vfile.read(sampno, nint*nfft)
+        df.shape = (nint, nfft, nchan)
+
         for c in xrange(nchan):
-            dc = df[:, c]
-            dc.shape = (-1, nfft)
-            dfft = np.fft.fftshift(np.fft.fft(dc, axis=1))
-            #dfft = dfft[:, nguard:nchanout+nguard]
+            dc = df[:, :, c]
+            dfft = np.fft.fftshift(np.fft.fft(dc, axis=1), axes=1)
+            dfft = dfft[:, nguard:nchanout+nguard]
             dabs = (dfft * np.conj(dfft)).real.mean(axis=0)
+            print dabs.shape
             dabs -= dabs.mean()
             dabs /= dabs.std()
             dabs *= 18
             dabs += 128
-            #dabs = dabs[::-1]
-            dabs = dabs[nguard:nchanout+nguard]
-            #pylab.plot(dabs)
-            #pylab.show()
-            dabs = dabs.astype(np.uint8)
+            dabs = dabs[::-1]
+            dabs= dabs.astype(np.uint8)
+            pylab.plot(dabs)
+            pylab.show()
             dabs.tofile(fout.fin)
 
 
