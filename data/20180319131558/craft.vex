@@ -51,32 +51,33 @@ $MODE;
 *
 def craft;
      ref $PROCEDURES = Mode_01;
-     ref $FREQ = 1142.00MHz8x1MHz:Ab:Aj:Az;
-     ref $IF = LO@1000MHzLPolNoTone:Ab:Aj:Az;
-     ref $BBC = 8BBCs:Ab:Aj:Az;
-* Track lines replaced my addVDIF.pl Sun Mar 25 01:14:04 2018
-*     ref $TRACKS = LBA_.8Ch2bit1to1:Ab:Aj:Az;
-     ref $TRACKS = VDIF.8Ch2bit:Ab:Aj:Az;
-     ref $HEAD_POS = LBAVoid:Ab:Aj:Az;
-     ref $ROLL = NoRoll:Ab:Aj:Az;
-     ref $PASS_ORDER = LBADummy:Ab:Aj:Az;
-     ref $PHASE_CAL_DETECT = NoDetect:Ab:Aj:Az;
+     ref $FREQ = 798.00MHz8x1MHz:Aa:Az;
+     ref $FREQ = 798.00MHz8x1MHz#2:Ab;
+     ref $IF = LO@1000MHzLPolNoTone:Aa:Ab:Az;
+     ref $BBC = 8BBCs:Aa:Ab:Az;
+* Track lines replaced my addVDIF.pl Thu Apr  5 15:35:33 2018
+*     ref $TRACKS = LBA_.8Ch2bit1to1:Aa:Ab:Az;
+     ref $TRACKS = VDIF.8Ch2bit:Aa:Ab:Az;
+     ref $HEAD_POS = LBAVoid:Aa:Ab:Az;
+     ref $ROLL = NoRoll:Aa:Ab:Az;
+     ref $PASS_ORDER = LBADummy:Aa:Ab:Az;
+     ref $PHASE_CAL_DETECT = NoDetect:Aa:Ab:Az;
 enddef;
 *------------------------------------------------------------------------------
 $STATION;
 *
-def Ab;
-     ref $SITE = ASKAP02;
-     ref $ANTENNA = ASKAP02;
-* DAS ref replaced my addVDIF.pl Sun Mar 25 01:14:04 2018
+def Aa;
+     ref $SITE = ASKAP01;
+     ref $ANTENNA = ASKAP01;
+* DAS ref replaced my addVDIF.pl Thu Apr  5 15:35:33 2018
 *     ref $DAS = 1LBA+NONE<LBADR;
      ref $DAS = VDIF;
 enddef;
 *
-def Aj;
-     ref $SITE = ASKAP10;
-     ref $ANTENNA = ASKAP10;
-* DAS ref replaced my addVDIF.pl Sun Mar 25 01:14:04 2018
+def Ab;
+     ref $SITE = ASKAP02;
+     ref $ANTENNA = ASKAP02;
+* DAS ref replaced my addVDIF.pl Thu Apr  5 15:35:33 2018
 *     ref $DAS = 1LBA+NONE<LBADR;
      ref $DAS = VDIF;
 enddef;
@@ -84,7 +85,7 @@ enddef;
 def Az;
      ref $SITE = ASKAP30;
      ref $ANTENNA = ASKAP30;
-* DAS ref replaced my addVDIF.pl Sun Mar 25 01:14:04 2018
+* DAS ref replaced my addVDIF.pl Thu Apr  5 15:35:33 2018
 *     ref $DAS = 1LBA+NONE<LBADR;
      ref $DAS = VDIF;
 enddef;
@@ -107,24 +108,24 @@ enddef;
 *------------------------------------------------------------------------------
 $SITE;
 *
-def ASKAP02;
+def ASKAP01;
      site_type = fixed;
-     site_name = ASKAP02;
-     site_ID = Ab;
-*    elev=  370.00 long=-116:37:54. lat=-26:41:49.6
-     site_position =-2556109.71700 m: 5097388.20100 m:-2848439.87900 m;
+     site_name = ASKAP01;
+     site_ID = Aa;
+*    elev=  370.14 long=-116:37:53. lat=-26:41:49.2
+     site_position =-2556088.33300 m: 5097405.64400 m:-2848428.24400 m;
      site_velocity =  0.000000   m/yr:  0.000000   m/yr:  0.000000  m/yr;
 *    First line below is VEX standard format.  Use only when readers are ready.
 *    site_position_epoch = 1997y001d;
      site_position_epoch =   50449;
 enddef;
 *
-def ASKAP10;
+def ASKAP02;
      site_type = fixed;
-     site_name = ASKAP10;
-     site_ID = Aj;
-*    elev=  370.00 long=-116:37:49. lat=-26:41:40.1
-     site_position =-2556059.19700 m: 5097560.77900 m:-2848178.12500 m;
+     site_name = ASKAP02;
+     site_ID = Ab;
+*    elev=  370.00 long=-116:37:54. lat=-26:41:49.6
+     site_position =-2556109.71700 m: 5097388.20100 m:-2848439.87900 m;
      site_velocity =  0.000000   m/yr:  0.000000   m/yr:  0.000000  m/yr;
 *    First line below is VEX standard format.  Use only when readers are ready.
 *    site_position_epoch = 1997y001d;
@@ -145,14 +146,14 @@ enddef;
 *------------------------------------------------------------------------------
 $ANTENNA;
 *
-def ASKAP02;
+def ASKAP01;
      axis_type = az : el;
      antenna_motion = el :  60.0 deg/min :  2 sec;  *    1.000 deg/sec/sec
      antenna_motion = az : 180.0 deg/min :  2 sec;  *    3.000 deg/sec/sec
      axis_offset =    0.00000 m;
 enddef;
 *
-def ASKAP10;
+def ASKAP02;
      axis_type = az : el;
      antenna_motion = el :  60.0 deg/min :  2 sec;  *    1.000 deg/sec/sec
      antenna_motion = az : 180.0 deg/min :  2 sec;  *    3.000 deg/sec/sec
@@ -168,7 +169,7 @@ enddef;
 *------------------------------------------------------------------------------
 $DAS;
 *
-* Extra DAS ref by addVDIF.pl Sun Mar 25 01:14:04 2018
+* Extra DAS ref by addVDIF.pl Thu Apr  5 15:35:33 2018
 *
 def VDIF;
      record_transport_type = VDIF;
@@ -199,46 +200,64 @@ enddef;
 *------------------------------------------------------------------------------
 $FREQ;
 *
-def 1142.00MHz8x1MHz;
-* mode =  1    stations =Ab:Aj:Az
-     sample_rate =   2.000 Ms/sec;  * (2bits/sample)
-     chan_def = :  798.00 MHz : U :   1.00 MHz : &CH01 : &BBC01 : &NoCal; *Lcp
-     chan_def = :  799.00 MHz : U :   1.00 MHz : &CH02 : &BBC01 : &NoCal; *Lcp
-     chan_def = :  800.00 MHz : U :   1.00 MHz : &CH03 : &BBC02 : &NoCal; *Lcp
-     chan_def = :  801.00 MHz : U :   1.00 MHz : &CH04 : &BBC02 : &NoCal; *Lcp
-     chan_def = :  806.00 MHz : U :   1.00 MHz : &CH05 : &BBC03 : &NoCal; *Lcp
-     chan_def = :  807.00 MHz : U :   1.00 MHz : &CH06 : &BBC03 : &NoCal; *Lcp
-     chan_def = :  808.00 MHz : U :   1.00 MHz : &CH07 : &BBC04 : &NoCal; *Lcp
-     chan_def = :  809.00 MHz : U :   1.00 MHz : &CH08 : &BBC04 : &NoCal; *Lcp
+def 798.00MHz8x1MHz;
+* mode =  1    stations =Aa:Ab:Az
+     sample_rate =   2.37037037037038 Ms/sec;  * (2bits/sample)
+     chan_def = :   798.00 MHz : L :   1.18518518518519 MHz : &CH01 : &BBC01 : &NoCal; *Lcp
+     chan_def = :   799.00 MHz : L :   1.18518518518519 MHz : &CH02 : &BBC02 : &NoCal; *Lcp
+     chan_def = :   800.00 MHz : L :   1.18518518518519 MHz : &CH03 : &BBC03 : &NoCal; *Lcp
+     chan_def = :   801.00 MHz : L :   1.18518518518519 MHz : &CH04 : &BBC04 : &NoCal; *Lcp
+     chan_def = :   806.00 MHz : L :   1.18518518518519 MHz : &CH05 : &BBC05 : &NoCal; *Lcp
+     chan_def = :   807.00 MHz : L :   1.18518518518519 MHz : &CH06 : &BBC06 : &NoCal; *Lcp
+     chan_def = :   808.00 MHz : L :   1.18518518518519 MHz : &CH07 : &BBC07 : &NoCal; *Lcp
+     chan_def = :   809.00 MHz : L :   1.18518518518519 MHz : &CH08 : &BBC08 : &NoCal; *Lcp
 enddef;
+*
+def 798.00MHz8x1MHz#2;
+* mode =  1    stations =Aa:Ab:Az
+     sample_rate =   2.37037037037038 Ms/sec;  * (2bits/sample
+     chan_def = :   801.00 MHz : L :   1.18518518518519 MHz : &CH01 : &BBC01 : &NoCal; *Lcp
+     chan_def = :   806.00 MHz : L :   1.18518518518519 MHz : &CH02 : &BBC02 : &NoCal; *Lcp
+     chan_def = :   807.00 MHz : L :   1.18518518518519 MHz : &CH03 : &BBC03 : &NoCal; *Lcp
+     chan_def = :   808.00 MHz : L :   1.18518518518519 MHz : &CH04 : &BBC04 : &NoCal; *Lcp
+     chan_def = :   809.00 MHz : L :   1.18518518518519 MHz : &CH05 : &BBC05 : &NoCal; *Lcp
+     chan_def = :   798.00 MHz : L :   1.18518518518519 MHz : &CH06 : &BBC06 : &NoCal; *Lcp
+     chan_def = :   799.00 MHz : L :   1.18518518518519 MHz : &CH07 : &BBC07 : &NoCal; *Lcp
+     chan_def = :   800.00 MHz : L :   1.18518518518519 MHz : &CH08 : &BBC08 : &NoCal; *Lcp
+enddef;
+
 *------------------------------------------------------------------------------
 $IF;
 *
 def LO@1000MHzLPolNoTone;
-* mode =  1    stations =Ab:Aj:Az
-     if_def = &IF_1N : 1N : L :  1000.00 MHz : U ; * PCall off!   0.0   0.0  NA     0 NA
+* mode =  1    stations =Aa:Ab:Az
+     if_def = &IF_1N : 1N : L :  1000.00 MHz : L ; * PCall off!   0.0   0.0  NA     0 NA
 enddef;
 *------------------------------------------------------------------------------
 $BBC;
 *
 def 8BBCs;
-* mode =  1    stations =Ab:Aj:Az
+* mode =  1    stations =Aa:Ab:Az
      BBC_assign = &BBC01 :  1 : &IF_1N;
      BBC_assign = &BBC02 :  2 : &IF_1N;
      BBC_assign = &BBC03 :  3 : &IF_1N;
      BBC_assign = &BBC04 :  4 : &IF_1N;
+     BBC_assign = &BBC05 :  5 : &IF_1N;
+     BBC_assign = &BBC06 :  6 : &IF_1N;
+     BBC_assign = &BBC07 :  7 : &IF_1N;
+     BBC_assign = &BBC08 :  8 : &IF_1N;
 enddef;
 *------------------------------------------------------------------------------
 $PHASE_CAL_DETECT;
 *
 def NoDetect;
-* mode =  1    stations =Ab:Aj:Az
+* mode =  1    stations =Aa:Ab:Az
      phase_cal_detect = &NoCal;
 enddef;
 *------------------------------------------------------------------------------
 $TRACKS;
 *
-* Extra Tracks added by addVDIF.pl Sun Mar 25 01:14:04 2018
+* Extra Tracks added by addVDIF.pl Thu Apr  5 15:35:33 2018
 *
 *
 def VDIF.8Ch2bit;
@@ -263,9 +282,9 @@ enddef;
 *
 *
 def LBA_.8Ch2bit1to1;
-* mode =  1    stations =Ab:Aj:Az
+* mode =  1    stations =Aa:Ab:Az
 *    format = LBA, and fan-out = 1
-*    mode requires   2.00Mb/s/tr; stations using disks
+*    mode requires   2.37Mb/s/tr; stations using disks
      S2_data_source = VLBA;
      S2_recording_mode = none;
      fanout_def =   : &CH01 : sign : 1:  0;
@@ -288,14 +307,14 @@ enddef;
 *------------------------------------------------------------------------------
 $HEAD_POS;
 def LBAVoid;
-* mode =  1    stations =Ab:Aj:Az
+* mode =  1    stations =Aa:Ab:Az
 *     Head positions irrelevant for Disk: empty def
 enddef;
 *------------------------------------------------------------------------------
 $PASS_ORDER;
 *
 def LBADummy;
-* mode =  1    stations =Ab:Aj:Az
+* mode =  1    stations =Aa:Ab:Az
 * LBA masquerading as S2 needs a dummy value
      S2_group_order = 0;
 enddef;
@@ -303,7 +322,7 @@ enddef;
 $ROLL;
 *
 def NoRoll;
-* mode =  1    stations =Ab:Aj:Az
+* mode =  1    stations =Aa:Ab:Az
 *    barrel-roll set to 'roll_off', so reverse-roll by  0 (1 head)
      roll = off;
 enddef;
@@ -314,7 +333,7 @@ $SCHED;
 scan No0001;
      start=2018y078d13h16m30s; mode=craft; source=VIRGO;
 *              :data_good:data_stop:goto_foot: pass:  wrap :driv:tape at
+     station=Aa:    0 sec:   20 sec:    0.000 GB:   0 :       : 1;
      station=Ab:    0 sec:   20 sec:    0.000 GB:   0 :       : 1;
-     station=Aj:    0 sec:   20 sec:    0.000 GB:   0 :       : 1;
      station=Az:    0 sec:   20 sec:    0.000 GB:   0 :       : 1;
 endscan;

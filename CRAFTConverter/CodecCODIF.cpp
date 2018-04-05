@@ -357,9 +357,25 @@ namespace NCodec        // Part of the Codec namespace.
     int CCodecCODIF::SkipBytes( void )
     {
       printf("CCodecCODIF::SkipBytes: Skipping %d blocks of %d bytes\n", m_iSkipSamples, m_iSampleBlockSize);
-        return m_iSkipSamples * m_iSampleBlockSize;
+      int bytestoskip = m_iSkipSamples * m_iSampleBlockSize;
+      printf("Skipping %d->", bytestoskip);
+      int vcraftBlock = 4*m_iNumberOfChannels*m_iNumberofPol;
+      bytestoskip /= vcraftBlock;
+      bytestoskip *= vcraftBlock;
+      printf("%d\n", bytestoskip);
+      
+      return bytestoskip;
     }
 
+  // Update the number of samples which need to be skipped, based on a passed number of bytes
+  // Needed because raw data from telescopes groups data into blocks of 32bits (per coarse channel)
+    void CCodecCODIF::updateSkip(int skipBytes )
+    {
+      printf("CCodecCODIF::updateSkip: %d\n", skipBytes);
+      m_iSkipSamples -= skipBytes ;
+    }
+
+  
     ///////////////////////////////////////////////////////////////////////////
     // Private internal helpers.
 
@@ -624,7 +640,6 @@ namespace NCodec        // Part of the Codec namespace.
 			}
 		    } else if (m_iBitsPerSample==1) {
 		      printf("DEBUG: Processing %d words\n", m_iDataArrayWords);
-
 		      
 		      int mask = (1<<(m_iBitsPerSample*2))-1;
 		      assert(mask==0x3); // Temp check - remove

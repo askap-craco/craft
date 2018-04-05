@@ -77,6 +77,7 @@ namespace NCodec
             int  DataArraySize( void );
             bool Initialise( void );
             int  SkipBytes( void );
+            void  updateSkip( int skipBytes );
 
         private:
 

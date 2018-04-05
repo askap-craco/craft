@@ -335,6 +335,7 @@ bool CFileProcessor::EncodeAndWriteOutputFile( ICodec &rEncoder,
         {
 	  printf("DEBUG: SkipBytes\n");
 	  rDecoder.SeekForward( rEncoder.SkipBytes() );
+	  rEncoder.updateSkip( rEncoder.SkipBytes() );
         }
 
         // Next, have the Decoder read the sample data in sucessive blocks and

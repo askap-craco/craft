@@ -276,6 +276,7 @@ namespace NCodec
             virtual int  DataArraySize( void )	       { return -1;   }
             virtual bool Initialise( void )	           { return true; }
             virtual int  SkipBytes( void )             { return 0;    }
+            virtual void updateSkip( int )             {    }
 
             virtual bool SetBlockSize( int iBlockSize )
             {

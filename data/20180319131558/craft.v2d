@@ -10,13 +10,12 @@ dataBufferFactor = 256
 nDataSegments = 64
 tweakIntTime = true
 
-antennas = AB, AJ, AZ
+antennas = AA, AB, AZ
 
 threadsFile = threads
 nCore = 1
 nThread = 3
 startSeries = 0
-
 
 mjdStart = 2018y078d13h16m35s
 mjdStop  = 2018y078d13h16m48s
@@ -28,16 +27,16 @@ SETUP default
   tInt=1
 }
 
+ANTENNA AA {
+ clockOffset = 0
+ phaseCalInt = 0
+ file = /Users/phi196/code/craft/data/20180319131558/ak01/ak1_c2_f1.codif
+}
+
 ANTENNA AB {
  clockOffset = 0
  phaseCalInt = 0
  file = /Users/phi196/code/craft/data/20180319131558/ak02/ak2_c2_f1.codif
-}
-
-ANTENNA AJ {
- clockOffset = 0
- phaseCalInt = 0
- file = /Users/phi196/code/craft/data/20180319131558/ak10/ak10_c2_f1.codif
 }
 
 ANTENNA AZ {
