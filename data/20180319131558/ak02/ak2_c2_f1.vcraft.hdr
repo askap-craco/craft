@@ -1,0 +1,51 @@
+HDR_SIZE 4096 # Header size
+DATA_TYPE CRAFT_VOLTAGES # CRAFT_VOLTAGES
+CMD_ARGS /data/TETHYS_1/ban115/askap/trunk/Code/Components/craft/py-craft/current/install/bin/craft_vdump.py -a 1,2,3,4,5,6,10,12,16,17,19,24,27,28,30 -c 1-2 -m 3 -n 0 --num-threads 4 --footprint square_6x6,0.9,45 --array=ak # Command line arguments
+CMD_NAMESPACE Namespace(antennas=[1, 2, 3, 4, 5, 6, 10, 12, 16, 17, 19, 24, 27, 28, 30], array='ak', beam_number=0, cards=[1, 2], footprint='square_6x6,0.9,45', mode=3, num_threads=4, output_dir='/data/TETHYS_1/ban115/craft//testing/voltages/20180319131558', packet_dump=False, verbose=False) # Arguments including defaults
+SAMP_RATE 1185185.18519 # Sample rate in samples per second
+CRAFT_MODE 3 # The craft mode which describes the applicable bit depth (hex) among other things
+ANT_RA 187.705488853 # RA of antenna (deg, J2000)
+ANT_DEC 11.7542915035 # Dec of antenna (deg, J2000)
+ANT_AZ 61.811832428 # Azimuth of antenna (deg)
+ANT_EL 24.0775241852 # Elevation of antenna (deg)
+ANT_SKYPOL -0.000269122904996 # Skypol of antenna (deg)
+ANT_PARANG -126.483568378 # Paralactic angle of antenna (deg)
+ANT_SKYPOS 126.484298706 # Pol skypos of antenna (deg)
+ANT_MJD 58196.5528233 # MJD as reported by the antenna drives
+ANT_LST 08h:50:44 # LST as reported by the antenna drives
+BEAM 0 # The beam number downloaded
+NBITS 2 # Number of bits per complex sample
+NBEAMS 1 # Number of beams
+NPOL 1 # Number of polarisations
+MODE 3 # CRAFT MODE
+OVERSAMPLING 32/27 # Oversampling factor (N/M)
+BEAMID 0 # The beam ID requested for the download 0-35, I think*
+FPGA_ID 1 # The FPGA from which this data was downloaded
+CARD_NO 2 # The card number from which this data was downloaded
+ANT AK02 # Antenna name (AKNN)
+ANTENNA_NO 2 # The antenna number from which this data was downloaded 1-36
+NCHANS 8 # Number of frequency channels
+FREQS 798,799,800,801,806,807,808,809 # Comma separated list of frequencies applying to each of channels in this file(MHz)
+TELESCOP ASKAP # ASKAP
+INSTRUME CRAFT # CRAFT
+FOOTPRINT square_6x6,0.9,45 # Footprint string
+BEAM_RA 187.705485792 # RA of beam (J2000)
+BEAM_DEC 12.3907006926 # Dec of beam (J2000)
+NOW_UTC 2018-03-19T13:16:04.471182+00:00 # UTC date stamp for when the file was written (ISO format)
+NOW_MJD 58196.552829527573 # MJD date stamp for when the file was written
+NOW_BAT 0x11dd1ae5fc10ce # Current BAT all bits (hex)
+START_WRITE_BAT40 0x1ae58f3785 # Lowest 40 bits of BAT of first sample written into the circular buffer (earliest data available)
+STOP_WRITE_BAT40 0x1ae59e3b1e # Lowest 40 bits of BAT of when the circular buffer was stopped
+TRIGGER_BAT40 0x1ae59e3bb1 # Lowest 40 bits of BAT when the trigger was received(hex)
+START_WRITE_FRAMEID 437545890561 # Frame ID of first sample written into the circular buffer (earliest data available) (decimal)
+STOP_WRITE_FRAMEID 437547056385 # Frame ID of when the circular buffer was stopped (decimal)
+TRIGGER_FRAMEID 437547056897 # Frame ID when the trigger was received (should equal STOP_WRITE_FRAMEID) (decimal)
+START_WRITE_BAT 0x11dd1ae58f3785 # Full bat calculated by masking and adding NOW_BAT to START_WRITE
+STOP_WRITE_BAT 0x11dd1ae59e3b1e # Full bat calculated by masking and adding NOW_BAT to STOP_WRITE
+TRIGGER_BAT 0x11dd1ae59e3bb1 # Full bat calculated by masking and adding NOW_BAT to TRIGGER
+START_WRITE_UTC 2018-03-19T13:15:57.337669+00:00 # UTC dt calculated from full bat
+STOP_WRITE_UTC 2018-03-19T13:15:58.321630+00:00 # UTC dt calculated from full bat
+TRIGGER_UTC 2018-03-19T13:15:58.321777+00:00 # UTC dt calculated from full bat
+START_WRITE_MJD 58196.552746963760 # MJD calculated from START_WRITE_BAT
+STOP_WRITE_MJD 58196.552758352198 # MJD calculated from STOP_WRITE_BAT
+TRIGGER_MJD 58196.552758353901 # MJD calculated from TRIGGER_BAT
