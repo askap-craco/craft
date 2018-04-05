@@ -135,7 +135,7 @@ def _main():
     parser = ArgumentParser(description='Fix headers', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-p', '--parset', help='Parset to get field names from')
-    parser.add_argument('-l','--sblist', help='Sschedblock list to get data from', default='sbpars/sblist.txt')
+    parser.add_argument('-l','--sblist', help='Sschedblock list to get data from')
     parser.add_argument('-d','--parset-dir', help='Directory containing parset', default='sbpars')
     parser.add_argument('--fix', action='store_true', help='Actually fix the header - otherwise dont change anything')
     parser.add_argument(dest='files', nargs='+')
@@ -151,13 +151,13 @@ def _main():
         pset = TargetParset(values.parset)
     
     sbdata = {}
-        
-    for line in open(values.sblist, 'rU'):
-        if line[0] == '=' or line.startswith('id'):
-            continue
-        bits = line.split()
-        sbdata[int(bits[0])] = bits
 
+    if values.sblist is not None:
+        for line in open(values.sblist, 'rU'):
+            if line[0] == '=' or line.startswith('id'):
+                continue
+            bits = line.split()
+            sbdata[int(bits[0])] = bits
 
     for hdr_file in values.files:
         try:
@@ -175,9 +175,11 @@ def fix_header(hdr_file, sbdata, pset, values):
     if pset is None:
         pset = TargetParset(os.path.join(values.parset_dir, 'SB%05d.parset'%sbid))
 
-    sbinfo = sbdata[sbid]
+    if len(sbdata) > 0: # if sbinfo is there, we should use it and fail if the SBID isn't in there.
+        sbinfo = sbdata[sbid]
+    else:
+        sbinfo = None # if there's no sbdata at all, then don't complain
     
-    sbtemplate = sbinfo[3]
     if 'FIXED_VERSION' in hdr.keys():
         last_version = int(hdr.get_value('FIXED_VERSION'))
         new_version = last_version+1
@@ -186,15 +188,16 @@ def fix_header(hdr_file, sbdata, pset, values):
         new_version = 2
         hdr += 'FIXED_VERSION', new_version, 'Fix version - increments by 1 on each change'
 
+
     hdr += ('FIXED_UTC', datetime.datetime.utcnow().isoformat(), 'Dated fixed')
-    hdr += ('SB_ALIAS', sbinfo[1],'SB alias')
-    hdr += ('SB_TEMPLATE', sbtemplate, 'SB template')
-    hdr += ('SB_TEMPLATE_VERSION', sbinfo[4], 'SB template version')
-    hdr += ('SB_OWNER', sbinfo[5], 'SB owner')
-    #if 'FOOTPRINT_NAME' not in hdr.keys() or hdr['FOOTPRINT_NAME'][0].lower() == 'unknown' or hdr['FOOTPRINT_NAME'][0].lower() == 'null':
-    #        hdr.set_value('FOOTPRINT_NAME', 'closepack36')
-    #        hdr.set_value('FOOTPRINT_PITCH',0.9)
-    #    hdr.set_value('FOOTPRINT_ROTATION', 60)
+    if sbinfo is None:
+        sbtemplate = hdr['SB_TEMPLATE'][0]
+    else:
+        sbtemplate = sbinfo[3]
+        hdr += ('SB_ALIAS', sbinfo[1],'SB alias')
+        hdr += ('SB_TEMPLATE', sbtemplate, 'SB template')
+        hdr += ('SB_TEMPLATE_VERSION', sbinfo[4], 'SB template version')
+        hdr += ('SB_OWNER', sbinfo[5], 'SB owner')
 
     if sbtemplate.lower() != 'beamform':
         ra, dec = map(float, (hdr['RA'][0], hdr['DEC'][0]))
@@ -210,13 +213,6 @@ def fix_header(hdr_file, sbdata, pset, values):
         logging.debug('Ant pos %s %s Separtion to requrested pos = %sarcsec', ant_pos.to_string('hmsdms'), ant_pos.to_string('decimal'), field_pos.separation(ant_pos).arcsec)
         assert field_pos.separation(ant_pos).arcsec < 100
 
-        #fp = src['footprint']
-        # some headers had incorrect positions - not sure which now. Some headers don't have footprints either
-        #hdr.set_value('BEAM_RA', ','.join(map(str, np.degrees([p.ra for p in fp.getPositions()]))))
-        #hdr.set_value('BEAM_DEC', ','.join(map(str, np.degrees([p.dec for p in fp.getPositions()]))))
-
-        #hdr.set_value('RA', src['skycoord'].ra.deg)
-        #hdr.set_value('DEC',  src['skycoord'].dec.deg)
         for f in ('field_direction',):
             hdr.set_value(f.upper(), src[f])
 
