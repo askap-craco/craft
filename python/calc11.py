@@ -32,7 +32,6 @@ class CalcFile(object):
         else:
             value = antdata.get(vkey, default)
 
-        print antdata
         assert value is not None, 'Unknown value for ant {} key {} {}'.format(self.telno, cname, vkey)
         if index is not None:
             bits = value.replace('[','').replace(']','').split(',')
@@ -105,7 +104,7 @@ class Scan(object):
     def update(self, name, value):
         namebits = name.split()
         if 'POINTING SRC' in name:
-            self.pointing_source = value
+            self.pointing_source = value # source name = e.g. M87
         if 'NUM PHS CTRS' in name:
             self.num_phase_centers = int(value)
             assert self.num_phase_centers == 1 # limitation for now
@@ -122,20 +121,40 @@ class Scan(object):
             self.curr_poly.update(name, value)
 
     def get_poly(self, mjd):
-        the_poly = min(self.polys, key=lambda p: abs(mjd - p.mjdfull))
+        #the_poly = min(self.polys, key=lambda p: abs(mjd - p.mjdfull))
+        after_polys = filter(lambda p: p.mjdfull <= mjd, self.polys)
+        if len(after_polys) == 0:
+            the_poly = max(self.polys, key=lambda p:p.mjdfull)
+            warnings.warn('Past last polynomial. mjd={} last mjd={}'.format(mjd, the_poly.mjdfull))
+        else:
+            the_poly = max(after_polys, key=lambda p:p.mjdfull)
+
+    
         return the_poly
 
     def eval_src0_poly(self, mjd):
+        ''' evaluates polynomials for given mjd for source 0
+        :returns: Dictionry of dictionaries. First key: antenna name. Second key: polynomialname
+        '''
         poly = self.get_poly(mjd)
         secs = (mjd - poly.mjdfull)*86400.
-        if secs > 120.0 or secs < 0.:
+        
+        if secs < 0.:
             warnings.warn('ERR Dodgey offset. mjd={} polymjd ={} secoffset={}'.format(mjd, poly.mjdfull, secs))
+            
         ant_results = {}
         for ant, polys in poly.source0antpolys.iteritems():
             antname = self.resfile.telnames[ant]
             ant_results[antname] = {}
             for polyname, pcoeff in polys.iteritems():
                 ant_results[antname][polyname] = np.polyval(pcoeff[::-1], secs)
+
+            elevation = ant_results[antname]['EL GEOM']
+            if abs(elevation) < 2:
+                warnings.warn('ERR: Evaluating geoemtry at very low elevation. Be careful! Elevation={} mjd={} poly={}'.format(elevation, mjd, polys))
+
+        ant_results['secoff'] = secs
+        ant_results['poly'] = poly
 
         return ant_results
 
@@ -186,7 +205,7 @@ class ResultsFile(OrderedDict):
             rfile.scans[0].polys[0].source0antpolys.iteritems()
 
 
-def plot_polys(rfile):
+def plot_polys(rfile, tmax):
     polynames = ('DELAY (us)','U (m)', 'V (m)', 'W (m)')
     polyid = 0
     for polyname in polynames:
@@ -195,7 +214,7 @@ def plot_polys(rfile):
         print  rfile.scans[0].polys[0]
         for ant, polys in rfile.scans[0].polys[0].source0antpolys.iteritems():
             pcoeff = polys[polyname]
-            t = np.arange(120.)
+            t = np.arange(tmax)
             pvalue = np.polyval(pcoeff[::-1], t)
             if p0 is None:
                 p0 = pvalue
@@ -204,6 +223,64 @@ def plot_polys(rfile):
     pylab.show()
 
 
+def plot_polys_range(rfile, mjdstart, tmax):
+    '''
+    :rfile: Calcfile
+    :mjdstart: MJD
+    :tmax: seconds
+    '''
+    toff = np.arange(tmax, step=60.)
+    mjds = toff/86400. + mjdstart
+    values = []
+    for imjd, mjd in enumerate(mjds):
+        p = rfile.scans[0].eval_src0_poly(mjd) 
+        values.append(p)
+        if imjd == 563 or imjd == 560:
+            print 'MJD set', mjd
+
+        
+    polynames = ('DELAY (us)','U (m)', 'V (m)', 'W (m)')
+    fig, (ax1, ax2, ax3, ax4, ax5) = pylab.subplots(5,1, sharex=True)
+    
+    for ia1, a1 in enumerate(rfile.telnames):
+        for ia2, a2 in enumerate(rfile.telnames[ia1:]):
+            u = [val[a1]['U (m)'] - val[a2]['U (m)'] for val in values]
+            v = [val[a1]['V (m)'] - val[a2]['V (m)'] for val in values]
+            w = [val[a1]['W (m)'] - val[a2]['W (m)'] for val in values]
+            el = [val[a1]['EL GEOM'] for val in values]
+            secoffs = [val['secoff'] for val in values]
+            u,v,w,secoffs = map(np.array, (u,v,w, secoffs))
+            if np.any(abs(u) > 1e5):
+                bad_times = np.where(abs(u) > 1e5)[0]
+                print 'BAD TIMES',bad_times, mjds[bad_times]
+                print values[bad_times[0]]['poly']
+                
+            pylab.figure(2)
+            line, = pylab.plot(u,v)
+            pylab.plot(-u,-v, color=line.get_color())
+
+            ax1.plot(toff, u)
+            ax2.plot(toff, v)
+            ax3.plot(toff, w)
+            ax4.plot(toff, secoffs)
+            ax5.plot(toff, el)
+
+
+
+    ax1.set_ylabel('U (m)')
+    ax2.set_ylabel('V (m)')
+    ax3.set_ylabel('W (m)')
+    ax4.set_ylabel('Secoff')
+    ax5.set_ylabel('Elevation')
+    ax5.set_xlabel('Seconds from MJD {:.5f}'.format(mjdstart))
+    fig.savefig(rfile.fname + '.uvt.png')
+    pylab.xlabel('U (m)')
+    pylab.ylabel('V (m)')
+    pylab.grid(True)
+    pylab.savefig(rfile.fname + '.uv.png')
+    pylab.show()
+
+    
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -218,11 +295,15 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     f = ResultsFile(values.files[0])
-    mjd = 58154 + 39360./86400.
-    results = f.scans[0].eval_src0_poly(mjd)
-    print 'TELNAMES', f.telnames
-    print results
-    plot_polys(f)
+    #mjd = 58154 + 39360./86400.
+    #results = f.scans[0].eval_src0_poly(mjd)
+    #plot_polys(f,10)
+    mjd = 58196 + 47640./86400.
+    #mjd = 58196.9
+    print 'PLotting mjds starting from', mjd
+    plot_polys_range(f, mjd, 3600*8)
+    
+
 
 
 

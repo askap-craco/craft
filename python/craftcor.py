@@ -14,6 +14,7 @@ import logging
 import vcraft
 from calc11 import ResultsFile
 from corruvfits import CorrUvFitsFile
+from astropy.coordinates import SkyCoord
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -371,8 +372,10 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     calcresults = ResultsFile(values.calcfile)
-    sources = [{'name':'M87','ra':180.,'dec':15.}]
-
+    m87pos = SkyCoord(3.276089, 0.21626172, unit=('rad','rad'), frame='icrs')
+    sources = [{'name':'M87','ra':m87pos.ra.deg,'dec':m87pos.dec.deg}]
+    print sources
+    
     antennas = [AntennaSource(a) for a in values.files]
     corr = Correlator(antennas, sources, values)
     try:
