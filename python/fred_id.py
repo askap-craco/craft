@@ -79,9 +79,16 @@ def fredda_read(fredda,beamno):
     '''
     #open fredda
     #dm_values=fredda.T[5+1][np.where(fredda.T[6+1]==beamno)] ###+1 for good mode
-
-    fof_array=np.where(fredda.T[7].astype(int)==beamno)[0]
-    bm_values=fredda[fof_array]
+    if fredda.shape==(13,):
+        if fredda.T[7].astype(int)==beamno:
+            bm_values=fredda
+            fof_array=np.array([0])
+        else:
+            fof_array=np.where(fredda.T[7].astype(int)==beamno)[0]
+            bm_values=np.array([])
+    else:
+        fof_array=np.where(fredda.T[7].astype(int)==beamno)[0]
+        bm_values=fredda[fof_array]
     #ra = coords.ra.deg
     #dec = coords.dec.deg
     return bm_values,fof_array
@@ -89,31 +96,38 @@ def fredda_read(fredda,beamno):
 def searcher(beamno,ra,dec,blist,foflines,idio,psrname,psrdm,psrra,psrdec):
     #searcher(i,ra,dec,dm_list,f1,f2,cat_name,cat_dm,cat_ra,cat_dec)
     #os.system("psrcat -c '"+format+"' > psrcat.csv")
-    dm_values=blist.T[5+1] ##### dm values of candidates
+    #print blist
+    dm_values=blist.T[6] ##### dm values of candidates
+    if len(foflines)==1:
+        dm_values=[dm_values]
+        print 'tell'
     #select_ra=np.intersect1d(np.where(psrra>ra-1),np.where(psrra<ra+1))
     #select_dec=np.intersect1d(np.where(psrdec>dec-1),np.where(psrdec<dec+
     ##### query from psrcat array
     ### select pulsars within position
-    select_pos=np.intersect1d(np.intersect1d(np.where(psrra>ra-5),np.where(psrra<ra+5)),np.intersect1d(np.where(psrdec>dec-5),np.where(psrdec<dec+5)))
+    select_pos=np.intersect1d(np.intersect1d(np.where(psrra>ra-1),np.where(psrra<ra+1)),np.intersect1d(np.where(psrdec>dec-1),np.where(psrdec<dec+1)))
     ##### extract DM information of selected pulsars
     posxdm=psrdm[select_pos]
 
     all_pos= np.where(psrra)[0]
     clen=len(posxdm)
     print(clen,'pulsars within beam')
+    print dm_values
     if clen>0:
         for i,match in enumerate(dm_values):
-            print 'number',i
-            writeline=foflines[i]
-            print('dm',match)
+            print 'number',i,match ### print line number
+            writeline=foflines[i] #### transfer candidate details
+            #print('dm',match) ### print dm of candidate
             select_dm=np.intersect1d(np.where(posxdm>match-5),np.where(posxdm<match+5))
             if len(select_dm)>0:
                 print 'Found Candidate'
                 for j in select_dm:
                     real_pos=select_pos[j]
-                    writename=psrname[real_pos]
-                    print(writename,psrdm[real_pos])
-                    idio.write_psr(writename+' '+writeline)
+                    if psrdm[real_pos] != 0:
+                        writename=psrname[real_pos]
+                        print('dm',match)
+                        print(writename,psrdm[real_pos])
+                        idio.write_psr(writename+' '+writeline)
             else:
                 idio.write_frb(writeline)
 
@@ -195,7 +209,7 @@ for i,xy in enumerate(pos,0):
     bm_list,fline_list=fredda_read(fredda,i)
     ra=xy[0]
     dec=xy[1]
-    print("Searching "+str(len(bm_list))+" Candidates in Beam"+str(i))
+    print("Searching "+str(len(fline_list))+" Candidates in Beam"+str(i))
     if len(bm_list) > 0:
         searcher(i,ra,dec,bm_list,foflines[fline_list],idio,cat_name,cat_dm,cat_ra,cat_dec)
 
