@@ -58,6 +58,7 @@ namespace NCodec
         m_bBuffersInitialised = false;
 
         m_iInputBlockSize = -1;
+	m_bPreload = false;
     }
 
     //////////
@@ -66,6 +67,7 @@ namespace NCodec
     CCodecVCRAFT::~CCodecVCRAFT( void )
     {
         m_bBuffersInitialised = false;
+	m_bPreload = false;
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -165,7 +167,7 @@ namespace NCodec
 
     //////////
     //
-
+  
     bool CCodecVCRAFT::ReadNextBlock( void )
     {
         // For a decoder, we read the input voltage data in blocks.
@@ -194,6 +196,12 @@ namespace NCodec
 
             WordDeque_t &rDeque = m_SampleData.GetSamples();
 
+	    if (m_bPreload) {
+	      printf("DEBUG: preloading\n");
+	      m_pFile->Read( rDeque, m_iNumberOfChannels, 0, SEEK_CUR );
+	      m_bPreload = false;
+	    }
+	    
             bDataToProcess = ( m_pFile->Read( rDeque, m_iInputBlockWords, 0, SEEK_CUR ) > 0 );
         }
         catch ( ... )
@@ -210,9 +218,18 @@ namespace NCodec
     bool CCodecVCRAFT::SeekForward( int iSkipBytes )
     {
         // Skip SkipBytes forward through the file
+      printf("CCodecVCRAFT::SeekForward( %d)\n", iSkipBytes);
         return m_pFile->SeekForward( iSkipBytes );
     }
 
+    //////////
+    //
+
+    void CCodecVCRAFT::setPreload( bool preload )
+    {
+      m_bPreload = preload;
+    }
+  
     //////////
     //
 

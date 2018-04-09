@@ -60,6 +60,7 @@ namespace NCodec
             bool EncodeHeader( void );
             bool EncodeAndWriteChannelData( void );
             bool ReadNextBlock( void );
+	    void setPreloadSamples(int skipBytes);
 
             // Optional overrides (non-pure virutals).
 
@@ -67,6 +68,7 @@ namespace NCodec
             bool operator ()( void );
             bool SetBlockSize( int iBlockSize );
             bool SeekForward( int iSkipBytes );
+            void setPreload( bool preload );
 
         private:
 
@@ -80,6 +82,8 @@ namespace NCodec
             bool            m_bBuffersInitialised;  // Buffering configured flag.
             int             m_iInputBlockSize;      // Size of read chunk (bytes)
             int             m_iInputBlockWords;     // Size of read chunk (32bit words)
+	    bool            m_bPreload;             // Read in a "blocks" worth of data to allow for
+	                                            // skipping of samples to sync with CODIF frame
 
             //////////
             // Private methods.
