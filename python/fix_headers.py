@@ -114,7 +114,7 @@ def guess_intent(hdr):
     sbtemplate = hdr.get_value('SB_TEMPLATE')
     field_name = hdr.get_value('FIELD_NAME')
     scan_intent = 'UNKNOWN'
-    if sbtemplate.lower() == 'flyseye':
+    if 'flyseye' in sbtemplate.lower():
         if field_name.startswith('PSR'):
             scan_intent = 'PSR_CHECK'
         else:
@@ -123,8 +123,8 @@ def guess_intent(hdr):
         if field_name.startswith('PSR') and 'beam' in field_name:
             scan_intent = 'PSR_CAL'
     else:
-        logging.error('Unknown sbtemplate %s for file %s', sbtemplate, hdr_file)
-
+        logging.error('Unknown sbtemplate %s for ', sbtemplate)
+                      
     hdr += ('SCAN_INTENT', scan_intent, 'Scan intent')
 
 name_map = {'16:44:49.281,-45:59:09.5':'J1644-4559'}
@@ -137,6 +137,7 @@ def _main():
     parser.add_argument('-p', '--parset', help='Parset to get field names from')
     parser.add_argument('-l','--sblist', help='Sschedblock list to get data from')
     parser.add_argument('-d','--parset-dir', help='Directory containing parset', default='sbpars')
+    parser.add_argument('-t','--tolerance', help='search tolerance when associating a header RA/DEC with a parset RA/Dec (degrees)', type=float, default=0.1)
     parser.add_argument('--fix', action='store_true', help='Actually fix the header - otherwise dont change anything')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
@@ -202,7 +203,7 @@ def fix_header(hdr_file, sbdata, pset, values):
     if sbtemplate.lower() != 'beamform':
         ra, dec = map(float, (hdr['RA'][0], hdr['DEC'][0]))
         ant_pos = SkyCoord(ra, dec, unit='deg')
-        src = pset.get_nearest_source(ant_pos)
+        src = pset.get_nearest_source(ant_pos, values.tolerance)
         field_direction = src['field_direction']
 
         field_ra, field_dec, field_epoch = field_direction.replace("'",'').replace('[','').replace(']','').replace(' ','').split(',')

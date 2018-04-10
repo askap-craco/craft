@@ -11,6 +11,7 @@ import os
 import sys
 import logging
 from crafthdr import DadaHeader
+log = logging.getLogger(__name__)
 
 bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
 frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
@@ -179,7 +180,7 @@ class VcraftFile(object):
                 dwords >>= 1
                 d[samp::16, :, 1] = 1 - 2*(dwords & 0x1) # imag
                 dwords >>= 1
-            print 'MODE3', startsamp, sampoff, wordidx, nwordsamps, nwords, seek_bytes, nsamps, dwords.shape, d.shape
+            log.debug('MODE3 %s', ' '.join([startsamp, sampoff, wordidx, nwordsamps, nwords, seek_bytes, nsamps, dwords.shape, d.shape]))
             d = d[sampoff:sampoff+nsamp, :, :]
             assert d.shape[0] == nsamp, 'Incorrect output shape {} expected {}'.format(d.shape, nsamp)
         else:

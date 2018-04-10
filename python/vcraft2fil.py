@@ -38,15 +38,14 @@ bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
 frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 
 def detect(f, values):
-    vfile = vcraft.VcraftFile(values.files[0])
+    vfile = vcraft.VcraftFile(f)
 
     hdr = vfile.hdr
     infsamp = float(hdr['SAMP_RATE'][0])
-    tsamp = float(values.nsamps)/infsamp
     # TODO: Calculate frequencies a bit better - tricky because individual
     # files have freqs with gaps, which makes life a little wierd in sigprocland
     freqs = map(float, hdr['FREQS'][0].split(','))
-    fch1 = min(freqs)
+    fch1 = freqs[0]
     foff = freqs[1] - freqs[0]
     # TODO: Get tstart from BATs. This is the easy way
     tstart = float(hdr['ANT_MJD'][0])
@@ -58,8 +57,9 @@ def detect(f, values):
     nchan = len(freqs)
     nfft = 64
     nguard = 5
-    nint = 64
+    nint = values.nsamps
     nchanout = nfft - 2*nguard
+    tsamp = nint*nfft/infsamp
 
     print 'BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6
     # lowest 32 bits of bat from the time the file was written
@@ -89,23 +89,26 @@ def detect(f, values):
     for s in xrange(nsampout):
         sampno = s*nint*nfft
         df = vfile.read(sampno, nint*nfft)
-        df.shape = (nint, nfft, nchan)
+        #df.shape = (nint, nfft, nchan)
 
         for c in xrange(nchan):
-            dc = df[:, :, c]
+            #dc = df[:, :, c]
+            dc = df[:, c]
+            dc.shape = (-1, nfft)
             dfft = np.fft.fftshift(np.fft.fft(dc, axis=1), axes=1)
             dfft = dfft[:, nguard:nchanout+nguard]
-            dabs = (dfft * np.conj(dfft)).real.mean(axis=0)
-            print dabs.shape
+            dabs = abs((dfft * np.conj(dfft))).mean(axis=0)
             dabs -= dabs.mean()
             dabs /= dabs.std()
             dabs *= 18
             dabs += 128
             dabs = dabs[::-1]
             dabs= dabs.astype(np.uint8)
-            pylab.plot(dabs)
-            pylab.show()
             dabs.tofile(fout.fin)
+            if values.show:
+                pylab.plot(dabs)
+                pylab.show()
+
 
 
 
