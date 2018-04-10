@@ -31,64 +31,56 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    for f in values.files:
-        detect(f, values)
+    detect(values.files, values)
 
 bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
 frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 
-def detect(f, values):
-    vfile = vcraft.VcraftFile(f)
-
-    hdr = vfile.hdr
-    infsamp = float(hdr['SAMP_RATE'][0])
+def detect(files, values):
+    vfiles = [vcraft.VcraftFile(f) for f in files]
+    mux = vcraft.VcraftMux(vfiles)
+    infsamp = mux.samp_rate
     # TODO: Calculate frequencies a bit better - tricky because individual
     # files have freqs with gaps, which makes life a little wierd in sigprocland
-    freqs = map(float, hdr['FREQS'][0].split(','))
-    fch1 = freqs[0]
-    foff = freqs[1] - freqs[0]
+    fch1 = mux.freqconfig.freq
+    foff = mux.freqconfig.bw
     # TODO: Get tstart from BATs. This is the easy way
-    tstart = float(hdr['ANT_MJD'][0])
-    bats = np.array([int(hdr[c][0], base=16) for c in bat_cards])
-    frames = np.array([int(hdr[c][0]) for c in frame_cards])
-    bat0 = int(hdr['NOW_BAT'][0], base=16)
-    bat0_40 = bat0 & 0xffffffffff
-    nbits = 8
-    nchan = len(freqs)
+    tstart = mux.start_mjd
+    
+    nbits = 32
+    nchan = mux.freqconfig.nchan
     nfft = 64
     nguard = 5
     nint = values.nsamps
     nchanout = nfft - 2*nguard
     tsamp = nint*nfft/infsamp
 
-    print 'BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6
-    # lowest 32 bits of bat from the time the file was written
-    print 'FRAMES duration', (frames[0] - frames[1])/infsamp,'offset', (frames[2] - frames[0])/infsamp
-
-
     hdr = {'data_type': 1,
            'tsamp': tsamp,
            'tstart': tstart,
            'fch1':fch1,
-           'foff':foff/float(nfft),
+           'foff':foff/float(nchanout),
            'nbits':nbits,
            'nifs':1,
-           'nchans':8*nchanout,
-           'src_raj':0.0,
+           'nchans':nchan*nchanout,
+           'src_raj':0.0, # todo: add sigprog.deg2sex(mux.beam_pos[0])
            'src_dej':0.0
 
     }
     foutname = f.replace('.vcraft','.fil')
     fout = SigprocFile(foutname, 'w', hdr)
 
-    nsamps = vfile.nsamps
+    nsamps = mux.nsamps
     nsampout = nsamps/(nint*nfft)
     nsampin = nsampout*nint*nfft
+
+    logging.debug('Writing sigproc header %s', hdr)
+    logging.debug(' nsamps=%s nsampin=%s nsapout=%s samp rate=%s',nsamps, nsampin, nsampout, infsamp)
 
     # reshape to integral number of integrations
     for s in xrange(nsampout):
         sampno = s*nint*nfft
-        df = vfile.read(sampno, nint*nfft)
+        df = mux.read(sampno, nint*nfft)
         #df.shape = (nint, nfft, nchan)
 
         for c in xrange(nchan):
@@ -97,13 +89,15 @@ def detect(f, values):
             dc.shape = (-1, nfft)
             dfft = np.fft.fftshift(np.fft.fft(dc, axis=1), axes=1)
             dfft = dfft[:, nguard:nchanout+nguard]
+            assert dfft.shape == (nint, nchanout)
             dabs = abs((dfft * np.conj(dfft))).mean(axis=0)
-            dabs -= dabs.mean()
-            dabs /= dabs.std()
-            dabs *= 18
-            dabs += 128
+            assert len(dabs) == nchanout
+            #dabs -= dabs.mean()
+            #dabs /= dabs.std()
+            #dabs *= 18*2
+            #dabs += 128
             dabs = dabs[::-1]
-            dabs= dabs.astype(np.uint8)
+            dabs= dabs.astype(np.float32)
             dabs.tofile(fout.fin)
             if values.show:
                 pylab.plot(dabs)
