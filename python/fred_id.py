@@ -111,15 +111,16 @@ def searcher(beamno,ra,dec,blist,foflines,idio,psrname,psrdm,psrra,psrdec,rad):
 
     all_pos= np.where(psrra)[0]
     clen=len(posxdm)
-    print(clen,'pulsars within beam')
+    #print(clen,'pulsars within beam')
     #print dm_values
     if clen>0:
+        print(str(clen)+' pulsars near beam radius of '+str(rad))
         for i,match in enumerate(dm_values):
             #print 'number',i,match ### print line number
             writeline=foflines[i] #### transfer candidate details
             #print('candidate DM %f'%(match)) ### print dm of candidate
             select_dm=np.intersect1d(np.where(posxdm>match-5),np.where(posxdm<match+5))
-            if len(select_dm)>0:
+            if len(select_dm)==1:
                 print 'Found Candidate'
                 for j in select_dm:
                     real_pos=select_pos[j]
@@ -129,6 +130,25 @@ def searcher(beamno,ra,dec,blist,foflines,idio,psrname,psrdm,psrra,psrdec,rad):
                         dec1=psrdec[real_pos]
                         print(writename,psrdm[real_pos],"location ",ra1,dec1)
                         idio.write_psr(writename+' '+writeline)
+            elif len(select_dm)>1:
+                r2=rad
+                while len(select_dm)>1:
+                    r2=r2*0.75
+                    select_pos=np.intersect1d(np.intersect1d(np.where(psrra>ra-r2),np.where(psrra<ra+r2)),np.intersect1d(np.where(psrdec>dec-r2),np.where(psrdec<dec+r2)))
+                    posxdm=psrdm[select_pos]
+                    select_dm=np.intersect1d(np.where(posxdm>match-5),np.where(posxdm<match+5))
+                if len(select_dm)==1:
+                    print 'Found Candidate'
+                    for j in select_dm:
+                        real_pos=select_pos[j]
+                        if psrdm[real_pos] != 0:
+                            writename=psrname[real_pos]
+                            ra1=psrra[real_pos]
+                            dec1=psrdec[real_pos]
+                            print(writename,psrdm[real_pos],"location ",ra1,dec1)
+                            idio.write_psr(writename+' '+writeline)
+                else:
+                    idio.write_frb(writeline)
             else:
                 idio.write_frb(writeline)
 
@@ -157,7 +177,7 @@ parser.add_argument('--noname', action='store_true', help='Show')
 parser.add_argument('-f','--candlist',type=str,default='') #### fredda candidate file input here
 parser.add_argument('--cat',type=str,default='',help='psrcat.csv address leave empty if you have set FRED_CAT to $CRAFT/craft/python/psrcat.csv')
 #parser.add_argument('-c','--column',type=str,default='name p0 dm raj decj',help='')
-parser.add_argument('-r','--radius',type=float,default=1,help='search radius')
+parser.add_argument('-r','--radius',type=float,default=2,help='search radius')
 parser.add_argument('-x','--sncut',type=float,default=10,help='fredda.frb file threshold for sn')
 parser.add_argument('--dmcut',type=float,default=0,help='fredda.frb file threshold for dm')
 parser.add_argument(dest='files', nargs='+') ####hdr file name here
