@@ -76,7 +76,7 @@ namespace NCodec
             bool Flush( void );
             int  DataArraySize( void );
             bool Initialise( void );
-            int  SkipBytes( void );
+            int  SkipBytes( bool* );
 
         private:
 
@@ -99,7 +99,11 @@ namespace NCodec
             unsigned long long m_ullBAT0;
             unsigned long long m_ullFrame0;
             int      m_iSkipSamples;
+            int      m_iSampleOffset;
+	    int      m_iSamplesPerWord;
             Buffer_t m_DataFrameBuffer;
+	    char     *buf;
+	    int      mask;  
 
             //////////
             // Private methods.
@@ -113,6 +117,9 @@ namespace NCodec
             bool WritePreambleFrames( const int &riPreambleSamples );
             int  BytesPerTimeSampleForChannels( void ) const;
             bool SetPartialFrameParams( const int &riFrames );
+	    void decodeVCRAFTBlock(WordDeque_t & rInput, std::vector<uint32_t>& vcraftData, std::vector<uint32_t>& codifData,
+				   int wordstoUnpack, int samplePerOutword, int samlpesPerWord, int *iWordCount);
+
 
     };
 

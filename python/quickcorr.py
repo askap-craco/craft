@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """
 Correlate vcraft files
 
@@ -114,15 +114,17 @@ def _main():
     xx22 = xf2 * np.conj(xf2)
 
     print 'PRODUCT SIZE', xx12.shape, xx12.shape[0]*Nf, nsamp, 'shortsamp', shortsamp, 'offset', offset
-    punwrap = np.unwrap(np.angle(xx12.mean(axis=0)))
+    xx12m = xx12.mean(axis=0)
+    punwrap = np.unwrap(np.angle(xx12m))
     xx = np.arange(len(punwrap))
     gradient, phase = np.polyfit(xx, punwrap, 1)
     delay = 32./27.*gradient/2./np.pi*len(punwrap)
-    print 'Unwrapped phase = {} rad, graidnet={} rad per channel, delay={} us'.format(phase, gradient, delay)
+    corramp =  abs(xx12m[5:-5]).mean()
+    print 'Unwrapped phase = {} deg, delay={} us cross amplitude={}'.format(np.degrees(phase), delay, corramp)
 
     lagax.plot(abs(xx11.mean(axis=0)), label='auto0')
     lagax.plot(abs(xx22.mean(axis=0)), label='auto1')
-    lagax.plot(abs(xx12.mean(axis=0)), label='crossamp')
+    lagax.plot(abs(xx12m), label='crossamp')
     lagax.legend(frameon=False)
     pax.plot(np.degrees(np.angle(xx12.mean(axis=0))), 'o')
     pax.set_ylabel('Cross phase (deg)')

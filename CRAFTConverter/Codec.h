@@ -274,9 +274,9 @@ namespace NCodec
             virtual bool operator () ( void )          { return true; }
             virtual bool Flush( void )                 { return true; }
             virtual int  DataArraySize( void )	       { return -1;   }
-            virtual bool Initialise( void )	           { return true; }
-            virtual int  SkipBytes( void )             { return 0;    }
-
+            virtual bool Initialise( void )            { return true; }
+            virtual int  SkipBytes( bool *preload )    { UNREFERENCED_PARAMETER( preload ); return 0; }
+            virtual void setPreload( bool preload )    { UNREFERENCED_PARAMETER( preload ); }
             virtual bool SetBlockSize( int iBlockSize )
             {
                 UNREFERENCED_PARAMETER( iBlockSize );
