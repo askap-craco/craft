@@ -228,6 +228,8 @@ class VcraftMux(object):
         assert freqs.shape == (len(self._files), nchan_per_file)
         
         self.freqconfig = freqconfig.FreqConfig(freqs, reverse=True)
+        self.freqs = self.freqconfig.freqs.flatten()
+
         self.all_samps = [f.nsamps for f in self._files]
         self.nsamps = min(self.all_samps)
         self.trigger_frameids = np.array(map(int, self.allhdr('TRIGGER_FRAMEID')))
@@ -307,6 +309,7 @@ def _main():
     print mux.freqconfig.freqs
     print mux.freqconfig.chanmaps
     print mux.freqconfig.freqmaps
+    print mux.freqs
 
         
 

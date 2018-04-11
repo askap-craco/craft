@@ -21,8 +21,10 @@ def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-n','--nsamps', help='Number of samples per integration', type=int, default=1500)
+    parser.add_argument('-i','--nsamps', help='Number of samples per integration', type=int, default=1500)
     parser.add_argument('-s','--show', help='Show plots', action='store_true', default=False)
+    parser.add_argument('-d','--dm', help='Coherently dedisperse each channel to DM', type=float, default=None)
+    parser.add_argument('-n','--nfft', help='FFT size / 64. I.e. for 128 point FFT specify 2', type=int, default=1)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -39,27 +41,29 @@ frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 def detect(files, values):
     vfiles = [vcraft.VcraftFile(f) for f in files]
     mux = vcraft.VcraftMux(vfiles)
-    infsamp = mux.samp_rate
-    # TODO: Calculate frequencies a bit better - tricky because individual
-    # files have freqs with gaps, which makes life a little wierd in sigprocland
+    infsamp = mux.samp_rate # samples/sec for a coarse channel
     fch1 = mux.freqconfig.freq
     foff = mux.freqconfig.bw
-    # TODO: Get tstart from BATs. This is the easy way
     tstart = mux.start_mjd
-    
     nbits = 32
     nchan = mux.freqconfig.nchan
-    nfft = 64
-    nguard = 5
+    nfft = 64*values.nfft
+    nguard = 5*values.nfft
     nint = values.nsamps
     nchanout = nfft - 2*nguard
+    finebw = foff/float(nchanout)
+    if values.dm is None:
+        bwout = finebw
+    else:
+        bwout = foff
+        
     tsamp = nint*nfft/infsamp
 
     hdr = {'data_type': 1,
            'tsamp': tsamp,
            'tstart': tstart,
            'fch1':fch1,
-           'foff':foff/float(nchanout),
+           'foff':bwout,
            'nbits':nbits,
            'nifs':1,
            'nchans':nchan*nchanout,
@@ -76,6 +80,24 @@ def detect(files, values):
 
     logging.debug('Writing sigproc header %s', hdr)
     logging.debug(' nsamps=%s nsampin=%s nsapout=%s samp rate=%s',nsamps, nsampin, nsampout, infsamp)
+
+    if values.dm is not None:
+        phaseramp = np.empty((nchan, nchanout), dtype=np.complex64)
+        foffset = (np.arange(nchanout) - float(nchanout)/2)*finebw # MHz
+        print 'FOFFSET', foffset
+        
+        for ichan, chanfreq in enumerate(mux.freqs):
+            freqs = (chanfreq + foffset)*1e-3 # GHz
+            delay_ms = 4.15*values.dm*(freqs[0]**-2 - freqs[-1]**-2)
+            delay_ns = delay_ms*1e6
+            delay_samp = delay_ms *1e-3 * infsamp
+            print values.dm, chanfreq, freqs[0], freqs[-1], delay_ms, delay_ns, delay_samp
+
+            phaseramp[ichan, :] = np.exp(np.pi*2j*delay_ns*foffset)
+
+        pylab.plot(np.degrees(np.angle(phaseramp.T)))
+        pylab.show()
+
 
     # reshape to integral number of integrations
     for s in xrange(nsampout):
