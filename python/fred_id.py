@@ -93,31 +93,31 @@ def fredda_read(fredda,beamno):
     #dec = coords.dec.deg
     return bm_values,fof_array
 
-def searcher(beamno,ra,dec,blist,foflines,idio,psrname,psrdm,psrra,psrdec):
+def searcher(beamno,ra,dec,blist,foflines,idio,psrname,psrdm,psrra,psrdec,rad):
     #searcher(i,ra,dec,dm_list,f1,f2,cat_name,cat_dm,cat_ra,cat_dec)
     #os.system("psrcat -c '"+format+"' > psrcat.csv")
     #print blist
     dm_values=blist.T[6] ##### dm values of candidates
     if len(foflines)==1:
         dm_values=[dm_values]
-        print 'tell'
+        #print 'tell'
     #select_ra=np.intersect1d(np.where(psrra>ra-1),np.where(psrra<ra+1))
     #select_dec=np.intersect1d(np.where(psrdec>dec-1),np.where(psrdec<dec+
     ##### query from psrcat array
     ### select pulsars within position
-    select_pos=np.intersect1d(np.intersect1d(np.where(psrra>ra-1),np.where(psrra<ra+1)),np.intersect1d(np.where(psrdec>dec-1),np.where(psrdec<dec+1)))
+    select_pos=np.intersect1d(np.intersect1d(np.where(psrra>ra-rad),np.where(psrra<ra+rad)),np.intersect1d(np.where(psrdec>dec-rad),np.where(psrdec<dec+rad)))
     ##### extract DM information of selected pulsars
     posxdm=psrdm[select_pos]
 
     all_pos= np.where(psrra)[0]
     clen=len(posxdm)
     print(clen,'pulsars within beam')
-    print dm_values
+    #print dm_values
     if clen>0:
         for i,match in enumerate(dm_values):
-            print 'number',i,match ### print line number
+            #print 'number',i,match ### print line number
             writeline=foflines[i] #### transfer candidate details
-            #print('dm',match) ### print dm of candidate
+            #print('candidate DM %f'%(match)) ### print dm of candidate
             select_dm=np.intersect1d(np.where(posxdm>match-5),np.where(posxdm<match+5))
             if len(select_dm)>0:
                 print 'Found Candidate'
@@ -125,8 +125,9 @@ def searcher(beamno,ra,dec,blist,foflines,idio,psrname,psrdm,psrra,psrdec):
                     real_pos=select_pos[j]
                     if psrdm[real_pos] != 0:
                         writename=psrname[real_pos]
-                        print('dm',match)
-                        print(writename,psrdm[real_pos])
+                        ra1=psrra[real_pos]
+                        dec1=psrdec[real_pos]
+                        print(writename,psrdm[real_pos],"location ",ra1,dec1)
                         idio.write_psr(writename+' '+writeline)
             else:
                 idio.write_frb(writeline)
@@ -153,9 +154,12 @@ parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help
 parser.add_argument('--probe', action='store_true', help='Show')
 parser.add_argument('--noname', action='store_true', help='Show')
 #parser.add_argument('-o','--output',type=str,default='short_csv')
-parser.add_argument('-f','--fof',type=str,default='') #### fredda candidate file input here
-parser.add_argument('-c','--column',type=str,default='name p0 dm raj decj',help='')
-parser.add_argument('-x','--threshold',type=float,default=10,help='fredda threshold')
+parser.add_argument('-f','--candlist',type=str,default='') #### fredda candidate file input here
+parser.add_argument('--cat',type=str,default='',help='psrcat.csv address leave empty if you have set FRED_CAT to $CRAFT/craft/python/psrcat.csv')
+#parser.add_argument('-c','--column',type=str,default='name p0 dm raj decj',help='')
+parser.add_argument('-r','--radius',type=float,default=1,help='search radius')
+parser.add_argument('-x','--sncut',type=float,default=10,help='fredda.frb file threshold for sn')
+parser.add_argument('--dmcut',type=float,default=0,help='fredda.frb file threshold for dm')
 parser.add_argument(dest='files', nargs='+') ####hdr file name here
 parser.set_defaults(verbose=False)
 values = parser.parse_args()
@@ -164,9 +168,16 @@ if values.verbose:
     logging.basicConfig(level=logging.DEBUG)
 else:
     logging.basicConfig(level=logging.INFO)
+radius=values.radius
+psrcat=values.cat
+if len(psrcat)==0:
+    psrcat=os.environ['FRED_CAT']
+hdr_loc=''
+fof_loc=''
 ############ Generating psrcat database
-if os.path.exists("psrcat.csv"):
+if os.path.exists(psrcat):
     print("reading data from psrcat")
+    print(psrcat)
 else:
     os.system("psrcat -c 'name p0 dm raj decj' -o short_csv -nohead -nonumber > psrcat_.csv ")
     print("generating psrcat.csv file")
@@ -180,8 +191,9 @@ else:
     for i in range(len(ra)):
          c = SkyCoord(ra[i]+' '+dec[i], unit=(u.hourangle, u.deg))
          newcat.write(name[i]+";"+p0[i]+";"+dm[i]+';'+str(c.ra.deg)+';'+str(c.dec.deg)+";\n")
+    psrcat='psrcat.csv'
 
-cat=np.genfromtxt("psrcat.csv",delimiter=';',dtype=str)
+cat=np.genfromtxt(psrcat,delimiter=';',dtype=str)
 cat_name=cat.T[0]
 cat_p0=cat.T[1]
 cat_dm=cat.T[2]
@@ -190,10 +202,10 @@ cat_dec=cat.T[4].astype(float)
 changedm=np.where(cat_dm=='*')
 cat_dm[changedm]=0
 cat_dm=cat_dm.astype(float)
-########################
-fname=values.fof
-pos=read_fredda_hdr(values.files[0],46,47)
-psrcat_format=values.column
+######################## t load header filelist and fof files
+fname=fof_loc+values.candlist
+pos=read_fredda_hdr(hdr_loc+values.files[0],46,47)
+#psrcat_format=values.column
 f=open(fname,'r')
 fof=f.readlines()
 f.close()
@@ -209,9 +221,9 @@ for i,xy in enumerate(pos,0):
     bm_list,fline_list=fredda_read(fredda,i)
     ra=xy[0]
     dec=xy[1]
-    print("Searching "+str(len(fline_list))+" Candidates in Beam"+str(i))
+    print("\n ------------------- \nSearching "+str(len(fline_list))+" Candidates in Beam"+str(i))
     if len(bm_list) > 0:
-        searcher(i,ra,dec,bm_list,foflines[fline_list],idio,cat_name,cat_dm,cat_ra,cat_dec)
+        searcher(i,ra,dec,bm_list,foflines[fline_list],idio,cat_name,cat_dm,cat_ra,cat_dec,radius)
 
 #f1.close()
 #f2.close()
