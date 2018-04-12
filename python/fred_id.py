@@ -90,7 +90,7 @@ def fredda_read(fredda,beamno):
     #ra = coords.ra.deg
     #dec = coords.dec.deg
     return bm_values,fof_array
-
+'''
 def xmatch_astropy(i,ra,dec,blist,foflines,idio,psrname,cat1,radius,rdm):
     dm_values=blist.T[6]
     #print blist
@@ -98,20 +98,15 @@ def xmatch_astropy(i,ra,dec,blist,foflines,idio,psrname,cat1,radius,rdm):
     if len(foflines)==1:
         single_tracer=True
         dm_values=dm_values
-        ra1=ra
-        dec1=dec
-    else:
-        ra1=np.ones(len(dm_values))*ra
-        dec1=np.ones(len(dm_values))*dec
-    c = SkyCoord(ra=ra1*u.degree, dec=dec1*u.degree,distance=dm_values*u.dm)
+
+    sep=c.separation
     #print c, dm_values
     errorbar=rdm
     if single_tracer:
         print 'single_tracer'
-        idxcatalog, d2d, d3d = c.match_to_catalog_3d(catalog)
-        idxc=np.array([0])
+
         #print d2d.deg
-        if d2d.deg < radius:
+        if < radius:
             writename=psrname[idxcatalog]
             print (i,psrname[idxcatalog],d2d.deg)
             idio.write_psr("%s %s"%(writename,foflines))
@@ -132,11 +127,38 @@ def xmatch_astropy(i,ra,dec,blist,foflines,idio,psrname,cat1,radius,rdm):
         for i in tofrb:
             writeline=foflines[i]
             idio.write_frb(writeline)
+'''
+##i,ra,dec,bm_list,foflines[fline_list],idio,cat_name,cat_dm,psr_select,dmlim
+def xmatch(i,blist,foflines,idio,psrname,psrdm,poslimits,rdm):
+    dm_values=blist.T[6]
+    #print blist
+
+    #single_tracer=False
+    if len(foflines)==1:
+        #single_tracer=True
+        dm_values=np.array([dm_values])
+
+    #print c, dm_values
+    namelist=psrname[poslimits]
+    dmlist=psrdm[poslimits]
+    errorbar=rdm*dmlist
+    for n,i in enumerate(dm_values):
+        #foflines[i]
+        dmlimit=np.intersect1d(np.where(dmlist+errorbar>i),np.where(dmlist-errorbar<i))
+        if len(dmlimit) > 0:
+            print dmlimit,namelist[dmlimit]
+            for j in dmlimit:
+                writename=namelist[j]
+                idio.write_psr(writename+' '+foflines[n])
+                print(writename+' '+foflines[n])
+        else:
+            idio.write_frb(foflines[n])
 
 
 
 
 
+'''
 def searcher(ra,dec,blist,foflines,idio,psrname,psrdm,psrra,psrdec,rad,rdm):
     #searcher(i,ra,dec,dm_list,f1,f2,cat_name,cat_dm,cat_ra,cat_dec)
     #os.system("psrcat -c '"+format+"' > psrcat.csv")
@@ -208,13 +230,14 @@ def searcher(ra,dec,blist,foflines,idio,psrname,psrdm,psrra,psrdec,rad,rdm):
 
 
     ####query from psrcat
-    '''
-    for i,dm in enumerate(dm_values):
-        logic="RAJ > "+str(ra-1)+" && "+" RAJ < "+str(ra+1)+ "&& DECJ > "+str(dec-1)+" && "+" DECJ < "+str(dec+1) +" && DM > "+str(dm-5)+" && DM < "+str(dm+5)
-        os.system("psrcat -c ' "+format+" ' -l '"+str(logic)+"' -o short_csv > fredda_temp_psrcat"+str(i))
-    os.system("cat fredda_temp_psrcat* > psrcat_query")
-    os.system("rm fredda_temp_psrcat*")
-    '''
+
+    #for i,dm in enumerate(dm_values):
+    #    logic="RAJ > "+str(ra-1)+" && "+" RAJ < "+str(ra+1)+ "&& DECJ > "+str(dec-1)+" && "+" DECJ < "+str(dec+1) +" && DM > "+str(dm-5)+" && DM < "+str(dm+5)
+    #    os.system("psrcat -c ' "+format+" ' -l '"+str(logic)+"' -o short_csv > fredda_temp_psrcat"+str(i))
+    #os.system("cat fredda_temp_psrcat* > psrcat_query")
+    #os.system("rm fredda_temp_psrcat*")
+'''
+
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -229,7 +252,7 @@ def _main():
     #parser.add_argument('-c','--column',type=str,default='name p0 dm raj decj',help='')
     parser.add_argument('-r','--radius',type=float,default=2,help='search radius')
     parser.add_argument('-x','--sncut',type=float,default=10,help='fredda.frb file threshold for sn')
-    parser.add_argument('-d','--dmlim',type=float,default=5,help='dm')
+    parser.add_argument('-d','--dmlim',type=float,default=0.05,help='dm errorbar')
     parser.add_argument(dest='files', nargs='+') ####hdr file name here
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -245,6 +268,7 @@ def _main():
     hdr_loc=''
     fof_loc=''
     dmlim=values.dmlim
+    print("Search Radius: %f DM error range: %f"%(radius,dmlim))
     ############ Generating psrcat database
     if os.path.exists(psrcat):
         print("reading data from psrcat")
@@ -297,8 +321,12 @@ def _main():
         #bpos=SkyCoord(ra*u.deg,dec*u.deg)
         #idx, d2d, d3d = bpos.match_to_catalog_sky(catalog)
         #print cat_name[idx]
+        c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
+        sep=c.separation(catalog)
+        psr_select=np.where(sep.deg<radius)
         if len(bm_list) > 0:
-            xmatch_astropy(i,ra,dec,bm_list,foflines[fline_list],idio,cat_name,catalog,radius,dmlim)
+            xmatch(i,bm_list,foflines[fline_list],idio,cat_name,cat_dm,psr_select,dmlim)
+            #searcher(ra,dec,bm_list,foflines[fline_list],idio,cat_name,cat_dm,cat_ra,cat_dec,radius,dmlim)
 
 
     #f1.close()
