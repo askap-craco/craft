@@ -91,24 +91,49 @@ def fredda_read(fredda,beamno):
     #dec = coords.dec.deg
     return bm_values,fof_array
 
-def xmatch_astropy(i,ra,dec,blist,foflines,idio,psrname,cat,rdm):
+def xmatch_astropy(i,ra,dec,blist,foflines,idio,psrname,cat1,radius,rdm):
     dm_values=blist.T[6]
+    #print blist
+    single_tracer=False
     if len(foflines)==1:
-        dm_values=[dm_values]
-    ra1=np.ones(len(dm_values))*ra
-    dec1=np.ones(len(dm_values))*dec
+        single_tracer=True
+        dm_values=dm_values
+        ra1=ra
+        dec1=dec
+    else:
+        ra1=np.ones(len(dm_values))*ra
+        dec1=np.ones(len(dm_values))*dec
     c = SkyCoord(ra=ra1*u.degree, dec=dec1*u.degree,distance=dm_values*u.dm)
+    #print c, dm_values
     errorbar=rdm
-    idxc, idxcatalog, d2d, d3d = catalog.search_around_3d(c, errorbar*u.dm)
-    tofrb =np.setdiff1d(np.where(c.distance.dm),idxc)
-    print (i,psrname[np.unique(idxcatalog)],len(idxcatalog))
-    for n,i in enumerate(idxc):
-        writeline=foflines[i]
-        writename=psrname[idxcatalog[n]]
-        idio.write_psr(writename+' '+writeline)
-    for i in tofrb:
-        writeline=foflines[i]
-        idio.write_frb(writeline)
+    if single_tracer:
+        print 'single_tracer'
+        idxcatalog, d2d, d3d = c.match_to_catalog_3d(catalog)
+        idxc=np.array([0])
+        #print d2d.deg
+        if d2d.deg < radius:
+            writename=psrname[idxcatalog]
+            print (i,psrname[idxcatalog],d2d.deg)
+            idio.write_psr("%s %s"%(writename,foflines))
+        else:
+            idio.write_frb(foflines)
+
+    else:
+        idxc,idxcatalog, d2d, d3d = catalog.search_around_3d(c, errorbar*u.dm)
+        radcut=(d2d.deg < radius)
+        print radcut
+        tofrb =np.setdiff1d(np.where(c.distance.dm),idxc[radcut])
+        if len(np.unique(idxcatalog)) > 0:
+            print (i,psrname[np.unique(idxcatalog[radcut])],len(idxcatalog[radcut]),d2d.deg[radcut])
+        for n,i in enumerate(idxc[radcut]):
+            writeline=foflines[i]
+            writename=psrname[idxcatalog[radcut][n]]
+            idio.write_psr(writename+' '+writeline)
+        for i in tofrb:
+            writeline=foflines[i]
+            idio.write_frb(writeline)
+
+
 
 
 
@@ -273,7 +298,7 @@ for i,xy in enumerate(pos,0):
     #idx, d2d, d3d = bpos.match_to_catalog_sky(catalog)
     #print cat_name[idx]
     if len(bm_list) > 0:
-        xmatch_astropy(i,ra,dec,bm_list,foflines[fline_list],idio,cat_name,catalog,dmlim)
+        xmatch_astropy(i,ra,dec,bm_list,foflines[fline_list],idio,cat_name,catalog,radius,dmlim)
 
 
 #f1.close()
