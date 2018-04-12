@@ -321,8 +321,8 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
-        #beams -= 128
-        #beams /= 18
+        beams -= 128
+        beams /= 18
         f0 = files[0]
         self.beams = beams
         print 'Loaded beams', beams.shape
@@ -394,8 +394,8 @@ class Plotter(object):
         #fax2.plot(bi.std(axis=1),freqs, 'r', label='std')
         fax.set_ylim(freqs.min(), freqs.max())
         tax.plot(times, bi.mean(axis=0), label='mean')
-        tax.plot(times, bi.max(axis=0), label='max')
-        tax.plot(times, bi.min(axis=0), label='min')
+        #tax.plot(times, bi.max(axis=0), label='max')
+        #tax.plot(times, bi.min(axis=0), label='min')
         tax.set_xlim(times.min(), times.max())
         #tax2 = tax.twinx()
         #tax2.plot(times, bi.std(axis=0), 'r', label='std')

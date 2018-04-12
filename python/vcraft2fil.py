@@ -21,8 +21,10 @@ def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-n','--nsamps', help='Number of samples per integration', type=int, default=1500)
+    parser.add_argument('-i','--nsamps', help='Number of samples per integration', type=int, default=1500)
     parser.add_argument('-s','--show', help='Show plots', action='store_true', default=False)
+    parser.add_argument('-d','--dm', help='Coherently dedisperse each channel to DM', type=float, default=None)
+    parser.add_argument('-n','--nfft', help='FFT size / 64. I.e. for 128 point FFT specify 2', type=int, default=1)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -31,64 +33,76 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    for f in values.files:
-        detect(f, values)
+    detect(values.files, values)
 
 bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
 frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 
-def detect(f, values):
-    vfile = vcraft.VcraftFile(f)
-
-    hdr = vfile.hdr
-    infsamp = float(hdr['SAMP_RATE'][0])
-    # TODO: Calculate frequencies a bit better - tricky because individual
-    # files have freqs with gaps, which makes life a little wierd in sigprocland
-    freqs = map(float, hdr['FREQS'][0].split(','))
-    fch1 = freqs[0]
-    foff = freqs[1] - freqs[0]
-    # TODO: Get tstart from BATs. This is the easy way
-    tstart = float(hdr['ANT_MJD'][0])
-    bats = np.array([int(hdr[c][0], base=16) for c in bat_cards])
-    frames = np.array([int(hdr[c][0]) for c in frame_cards])
-    bat0 = int(hdr['NOW_BAT'][0], base=16)
-    bat0_40 = bat0 & 0xffffffffff
-    nbits = 8
-    nchan = len(freqs)
-    nfft = 64
-    nguard = 5
+def detect(files, values):
+    vfiles = [vcraft.VcraftFile(f) for f in files]
+    mux = vcraft.VcraftMux(vfiles)
+    infsamp = mux.samp_rate # samples/sec for a coarse channel
+    fch1 = mux.freqconfig.freq
+    foff = mux.freqconfig.bw
+    tstart = mux.start_mjd
+    nbits = 32
+    nchan = mux.freqconfig.nchan
+    nfft = 64*values.nfft
+    nguard = 5*values.nfft
     nint = values.nsamps
     nchanout = nfft - 2*nguard
+    finebw = foff/float(nchanout)
+    if values.dm is None:
+        bwout = finebw
+    else:
+        bwout = foff
+        
     tsamp = nint*nfft/infsamp
-
-    print 'BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6
-    # lowest 32 bits of bat from the time the file was written
-    print 'FRAMES duration', (frames[0] - frames[1])/infsamp,'offset', (frames[2] - frames[0])/infsamp
-
 
     hdr = {'data_type': 1,
            'tsamp': tsamp,
            'tstart': tstart,
            'fch1':fch1,
-           'foff':foff/float(nfft),
+           'foff':bwout,
            'nbits':nbits,
            'nifs':1,
-           'nchans':8*nchanout,
-           'src_raj':0.0,
+           'nchans':nchan*nchanout,
+           'src_raj':0.0, # todo: add sigprog.deg2sex(mux.beam_pos[0])
            'src_dej':0.0
 
     }
     foutname = f.replace('.vcraft','.fil')
     fout = SigprocFile(foutname, 'w', hdr)
 
-    nsamps = vfile.nsamps
+    nsamps = mux.nsamps
     nsampout = nsamps/(nint*nfft)
     nsampin = nsampout*nint*nfft
+
+    logging.debug('Writing sigproc header %s', hdr)
+    logging.debug(' nsamps=%s nsampin=%s nsapout=%s samp rate=%s',nsamps, nsampin, nsampout, infsamp)
+
+    if values.dm is not None:
+        phaseramp = np.empty((nchan, nchanout), dtype=np.complex64)
+        foffset = (np.arange(nchanout) - float(nchanout)/2)*finebw # MHz
+        print 'FOFFSET', foffset
+        
+        for ichan, chanfreq in enumerate(mux.freqs):
+            freqs = (chanfreq + foffset)*1e-3 # GHz
+            delay_ms = 4.15*values.dm*(freqs[0]**-2 - freqs[-1]**-2)
+            delay_ns = delay_ms*1e6
+            delay_samp = delay_ms *1e-3 * infsamp
+            print values.dm, chanfreq, freqs[0], freqs[-1], delay_ms, delay_ns, delay_samp
+
+            phaseramp[ichan, :] = np.exp(np.pi*2j*delay_ns*foffset)
+
+        pylab.plot(np.degrees(np.angle(phaseramp.T)))
+        pylab.show()
+
 
     # reshape to integral number of integrations
     for s in xrange(nsampout):
         sampno = s*nint*nfft
-        df = vfile.read(sampno, nint*nfft)
+        df = mux.read(sampno, nint*nfft)
         #df.shape = (nint, nfft, nchan)
 
         for c in xrange(nchan):
@@ -97,13 +111,15 @@ def detect(f, values):
             dc.shape = (-1, nfft)
             dfft = np.fft.fftshift(np.fft.fft(dc, axis=1), axes=1)
             dfft = dfft[:, nguard:nchanout+nguard]
+            assert dfft.shape == (nint, nchanout)
             dabs = abs((dfft * np.conj(dfft))).mean(axis=0)
-            dabs -= dabs.mean()
-            dabs /= dabs.std()
-            dabs *= 18
-            dabs += 128
+            assert len(dabs) == nchanout
+            #dabs -= dabs.mean()
+            #dabs /= dabs.std()
+            #dabs *= 18*2
+            #dabs += 128
             dabs = dabs[::-1]
-            dabs= dabs.astype(np.uint8)
+            dabs= dabs.astype(np.float32)
             dabs.tofile(fout.fin)
             if values.show:
                 pylab.plot(dabs)
