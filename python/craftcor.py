@@ -14,6 +14,7 @@ import logging
 import vcraft
 from calc11 import ResultsFile
 from corruvfits import CorrUvFitsFile
+from astropy.coordinates import SkyCoord
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -223,7 +224,7 @@ class Correlator(object):
         self.dutc = -37.0
         self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
         self.frame0 = self.refant.trigger_frame
-        self.nint = 2048*2
+        self.nint = values.nint
         self.nfft = 64
         self.nguard_chan = 5
         self.oversamp = 32./27.
@@ -362,6 +363,7 @@ def _main():
     parser.add_argument('--calcfile', help='Calc file for fringe rotation')
     parser.add_argument('-p','--parset', help='Parset for delays')
     parser.add_argument('--show', help='Show plot', action='store_true', default=False)
+    parser.add_argument('-i','--nint', help='Number of fine spectra to average', type=int, default=128)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -371,8 +373,10 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     calcresults = ResultsFile(values.calcfile)
-    sources = [{'name':'M87','ra':180.,'dec':15.}]
-
+    m87pos = SkyCoord(3.276089, 0.21626172, unit=('rad','rad'), frame='icrs')
+    sources = [{'name':'M87','ra':m87pos.ra.deg,'dec':m87pos.dec.deg}]
+    print sources
+    
     antennas = [AntennaSource(a) for a in values.files]
     corr = Correlator(antennas, sources, values)
     try:
