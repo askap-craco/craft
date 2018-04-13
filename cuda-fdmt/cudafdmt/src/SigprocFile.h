@@ -30,6 +30,7 @@ public:
 	int header_int(const char* hname) const;
 	double header_double(const char* hname) const;
 	size_t read_samples_uint8(size_t nt, uint8_t* output);
+	size_t read_samples(void** output);
 	double last_sample_elapsed_seconds();
 	double last_sample_mjd();
 

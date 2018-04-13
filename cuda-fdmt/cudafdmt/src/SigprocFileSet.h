@@ -16,7 +16,7 @@
 class SigprocFileSet : public DataSource {
 
 public:
-	SigprocFileSet(int argc, char* filenames[]);
+	SigprocFileSet(int nt, int argc, char* filenames[]);
 	virtual ~SigprocFileSet();
 
 	float dm_of_idt(int idt) {
@@ -67,12 +67,15 @@ public:
 		return boff;
 	}
 
-	size_t read_samples_uint8(size_t nt, uint8_t* output);
+	size_t read_samples(void** output);
 
 private:
 	std::vector<SigprocFile*> m_files;
 	int m_nbeams;
+	int m_nt;
+	uint8_t* read_buf;
 	SigprocFile* first_file;
+
 
 };
 

@@ -15,7 +15,7 @@
 
 class DadaSource: public DataSource {
 public:
-	DadaSource(int key, bool lock);
+	DadaSource(int nt, int key, bool lock);
 	virtual ~DadaSource();
 
 	int get_header_int(const char* name);
@@ -48,9 +48,11 @@ public:
 	double foff() {
 		return m_foff;
 	}
-	size_t read_samples_uint8(size_t nt, uint8_t* output);
+	size_t read_samples(void** output);
 	size_t seek_sample(size_t t);
 	size_t samples_read();
+	void release_buffer();
+
 	char* name();
 
 private:
@@ -64,6 +66,9 @@ private:
     double m_fch1;
     double m_foff;
     double m_tstart;
+    bool m_got_buffer;
+    uint64_t m_bytes_per_block;
+    uint64_t m_blkid;
 
 };
 

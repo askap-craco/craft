@@ -153,6 +153,14 @@ size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
 	return ont;
 }
 
+
+size_t SigprocFile::read_samples(void** output)
+{
+	// Usually we use the buffer in the FileSet, so we'll just ignore this for now.
+	assert(0);
+	return 0;
+}
+
 double SigprocFile::last_sample_elapsed_seconds()
 {
 	double toff_sec = ((double) m_samples_read) * m_tsamp;

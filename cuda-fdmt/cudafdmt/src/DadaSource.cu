@@ -12,7 +12,8 @@
 #include <assert.h>
 #include "InvalidSourceFormat.h"
 
-DadaSource::DadaSource(int key, bool lock) {
+DadaSource::DadaSource(int nt, int key, bool lock) {
+	m_got_buffer = false;
 	m_hdu = dada_hdu_create(NULL); // create hdu without logger
 	assert(m_hdu != NULL);
 	dada_hdu_set_key(m_hdu, (key_t)key);
@@ -80,11 +81,12 @@ DadaSource::DadaSource(int key, bool lock) {
 	m_npols = get_header_int("NPOL");
 	m_nbeams = get_header_int("NBEAM");
 	m_nchans = get_header_int("NCHAN");
-	m_nbits = get_header_int("NBITS");
+	m_nbits = get_header_int("NBIT");
 	m_tsamp = get_header_double("TSAMP");
 	m_fch1 = get_header_double("FREQ");
 	m_foff = get_header_double("BW");
 	m_tstart = get_header_double("MJD_START");
+	m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
 
 }
 
@@ -116,9 +118,34 @@ double DadaSource::get_header_double(const char* name) {
 	}
 	return d;
 }
-size_t DadaSource::read_samples_uint8(size_t nt, uint8_t* output)
+size_t DadaSource::read_samples(void** output)
 {
-	return size_t(0);
+	m_read_timer.start();
+	// TODO: get main loop to release as soon as it's finished, rather than on next read, but it's too too much typing.
+	if (m_got_buffer) {
+		release_buffer();
+	}
+	uint64_t nbytes;
+	char* ptr = ipcio_open_block_read(m_hdu->data_block, &nbytes, &m_blkid);
+	m_got_buffer = true;
+	// TODO check expected nbytes
+	//m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
+	size_t nt = nbytes/(npols()*nbeams()*nchans()*nbits()/8);
+	//assert(nbytes == m_bytes_per_block);
+	*output = (void*)ptr;
+	m_read_timer.stop();
+	return nt;
+}
+
+void DadaSource::release_buffer() {
+	if(m_got_buffer) {
+		if (ipcio_close_block_read(m_hdu->data_block, m_bytes_per_block)) {
+			printf("Could not mark cleared");
+			exit(1);
+		}
+
+		m_got_buffer = false;
+	}
 }
 size_t DadaSource::seek_sample(size_t t)
 {
@@ -130,5 +157,5 @@ size_t DadaSource::samples_read()
 }
 char* DadaSource::name()
 {
-	return "Hello";
+	return (char*)"Hello";
 }

@@ -9,7 +9,7 @@
 
 Rescaler::Rescaler(RescaleOptions& _options) : options(_options)
 {
-	bool alloc_host = true;
+	bool alloc_host = true; // Need host memory allocated for rescale because we copy back to count flags
 	int nbeams = options.nbeams;
 	int nf = options.nf;
 	int nt = options.nt;

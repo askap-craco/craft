@@ -212,13 +212,13 @@ int main(int argc, char* argv[])
 	DataSource* source = NULL;
 	try {
 		// load sigproc file
-		SigprocFileSet* fs_source = new SigprocFileSet(argc, argv);
+		SigprocFileSet* fs_source = new SigprocFileSet(nt, argc, argv);
 		source = fs_source;
 	} catch (InvalidSourceFormat& e) {
 		try {
 			int key;
 			sscanf(argv[0], "%x",&key);
-			DadaSource* dada_source = new DadaSource(key, true);
+			DadaSource* dada_source = new DadaSource(nt, key, true);
 			source = dada_source;
 		} catch (InvalidSourceFormat& e) {
 			printf("No valid inputs\n");
@@ -247,10 +247,6 @@ int main(int argc, char* argv[])
 		// rescaling will invert the channels now that we've changed the sign of foff
 		foff = -foff;
 	}
-
-	// Create read buffer
-	uint8_t* read_buf = (uint8_t*) malloc(sizeof(uint8_t) * in_chunk_size);
-	assert(read_buf);
 
 	array4d_t rescale_buf;
 	rescale_buf.nw = nbeams;
@@ -291,8 +287,6 @@ int main(int argc, char* argv[])
 			rescale.mean_thresh, rescale.std_thresh, rescale.kurt_thresh,
 			rescale.dm0_thresh, rescale.cell_thresh,
 			rescale.flag_grow);
-	//rescale_allocate(&rescale, nbeams*nf);
-	//rescale_allocate_gpu(&rescale, nbeams, nf, nt, true); // Need host memory allocated for rescale because we copy back to count flags
 	Rescaler* rescaler = new Rescaler(rescale);
 	if (num_rescale_blocks == 0) {
 		rescaler->set_scaleoffset(1.0f, -128.0f); // Just pass it straight through without rescaling
@@ -300,6 +294,7 @@ int main(int argc, char* argv[])
 		rescaler->set_scaleoffset(rescale.target_stdev/18.0, -128.0f); // uint8 stdev is 18 and mean +128.
 	}
 
+	// Create fdmt
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams, dump_data);
@@ -352,7 +347,9 @@ int main(int argc, char* argv[])
 	int num_flagged_beam_chans = 0;
 	int num_flagged_times = 0;
 
-	while (source->read_samples_uint8(nt, read_buf) == nt) {
+	void* read_buf;
+
+	while (source->read_samples(&read_buf) == nt) {
 		if (stopped) {
 			printf("Stopped due to signal received\n");
 			break;
