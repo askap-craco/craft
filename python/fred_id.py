@@ -247,11 +247,11 @@ def _main():
     parser.add_argument('--probe', action='store_true', help='Show')
     parser.add_argument('--noname', action='store_true', help='Show')
     #parser.add_argument('-o','--output',type=str,default='short_csv')
-    parser.add_argument('-f','--candlist',type=str,default='') #### fredda candidate file input here
+    parser.add_argument('-f','--candlist',type=str,default='fredda.cand.fof') #### fredda candidate file input here
     parser.add_argument('--cat',type=str,default='',help='psrcat.csv address leave empty if you have set FRED_CAT to $CRAFT/craft/python/psrcat.csv')
     #parser.add_argument('-c','--column',type=str,default='name p0 dm raj decj',help='')
     parser.add_argument('-r','--radius',type=float,default=2,help='search radius')
-    parser.add_argument('-x','--sncut',type=float,default=10,help='fredda.frb file threshold for sn')
+    #parser.add_argument('-x','--sncut',type=float,default=10,help='fredda.frb file threshold for sn')
     parser.add_argument('-d','--dmlim',type=float,default=0.05,help='dm errorbar')
     parser.add_argument(dest='files', nargs='+') ####hdr file name here
     parser.set_defaults(verbose=False)
