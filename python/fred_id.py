@@ -38,7 +38,7 @@ class FileOperations:
 #def func(a1,idio):
 #    idio.write_psr(a1)
     ##### search psrcat
-def read_fredda_hdr(file,x=39,y=40):
+def read_fredda_hdr(file,x=47,y=48):
     infile=open(file,'r')
     hdr=infile.readlines()
     infile.close()
@@ -250,8 +250,7 @@ def _main():
     parser.add_argument('-f','--candlist',type=str,default='fredda.cand.fof') #### fredda candidate file input here
     parser.add_argument('--cat',type=str,default='',help='psrcat.csv address leave empty if you have set FRED_CAT to $CRAFT/craft/python/psrcat.csv')
     #parser.add_argument('-c','--column',type=str,default='name p0 dm raj decj',help='')
-    parser.add_argument('-r','--radius',type=float,default=2,help='search radius')
-    #parser.add_argument('-x','--sncut',type=float,default=10,help='fredda.frb file threshold for sn')
+    parser.add_argument('-r','--radius',type=float,default=2,help='search radiu#parser.add_argument('-x','--sncut',type=float,default=10,help='fredda.frb file threshold for sn')
     parser.add_argument('-d','--dmlim',type=float,default=0.05,help='dm errorbar')
     parser.add_argument(dest='files', nargs='+') ####hdr file name here
     parser.set_defaults(verbose=False)
