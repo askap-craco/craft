@@ -59,7 +59,7 @@ def read_fredda_hdr(f):
     ######/data/TETHYS_1/craftop/auto_cands//SB01231_20180329103213_co18_tethys4.cand.fof.mbeam.2.good
     ####this isn't finished need fof file name format generation "SB{0:05}_".format(int(sbid))+" _co18_"+".cand.fof.mbeam.2.good"
     return pos
-def fredda_read(fredda,beamno):
+def fredda_read(fredda,beamno,cs=1):
     '''
     ##### read in filterbank sigproc format
     readin=sgp.SigprocFile(filterbank)
@@ -85,15 +85,15 @@ def fredda_read(fredda,beamno):
     '''
     #open fredda
     #dm_values=fredda.T[5+1][np.where(fredda.T[6+1]==beamno)] ###+1 for good mode
-    if fredda.shape==(13,):
-        if fredda.T[7].astype(int)==beamno:
+    if fredda.shape==(12+cs,):
+        if fredda.T[6+cs].astype(int)==beamno:
             bm_values=fredda
             fof_array=np.array([0])
         else:
-            fof_array=np.where(fredda.T[7].astype(int)==beamno)[0]
+            fof_array=np.where(fredda.T[6+cs].astype(int)==beamno)[0]
             bm_values=np.array([])
     else:
-        fof_array=np.where(fredda.T[7].astype(int)==beamno)[0]
+        fof_array=np.where(fredda.T[6+cs].astype(int)==beamno)[0]
         bm_values=fredda[fof_array]
     #ra = coords.ra.deg
     #dec = coords.dec.deg
@@ -163,8 +163,10 @@ def xmatch(i,blist,foflines,idio,psrname,psrdm,poslimits,rdm):
                     writename+=namelist[j]
             main=str(namelist[np.where(np.min(dmlist[dmlimit]-i))[0]][0])
             idio.write_psr(main+' '+foflines[n][:-1]+' '+writename+'\n')
-            print(main+' '+foflines[n][:-1]+' '+writename+'\n')
+            #print 'write psr'
+            #print(main+' '+foflines[n][:-1]+' '+writename+'\n')
         else:
+            #print 'write frb'
             idio.write_frb(foflines[n])
 
 
@@ -266,6 +268,7 @@ def _main():
     parser.add_argument('-r','--radius',type=float,default=2,help='search radius')
     #parser.add_argument('-x','--sncut',type=float,default=10,help='fredda.frb file threshold for sn')
     parser.add_argument('-d','--dmlim',type=float,default=0.05,help='dm errorbar')
+    parser.add_argument('--shift',type=int,default=1,help='column shift, default 1 for .good files, 0 for .fof files')
     parser.add_argument(dest='files', nargs='+',help=' hdr file here') ####hdr file name here
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -281,6 +284,7 @@ def _main():
     hdr_loc=''
     fof_loc=''
     dmlim=values.dmlim
+    cs=values.shift
     print("Search Radius: %f DM error range: %f"%(radius,dmlim))
     ############ Generating psrcat database
     if os.path.exists(psrcat):
@@ -328,9 +332,10 @@ def _main():
     #f2=open(fname+".frb",'w')
     for i,xy in enumerate(pos,0):
         #print(i,xy)
-        bm_list,fline_list=fredda_read(fredda,i)
+        bm_list,fline_list=fredda_read(fredda,i,cs)
         ra=xy[0]
         dec=xy[1]
+        #print(bm_list)
         #print("\n ------------------- \nSearching "+str(len(fline_list))+" Candidates in Beam"+str(i))
         #bpos=SkyCoord(ra*u.deg,dec*u.deg)
         #idx, d2d, d3d = bpos.match_to_catalog_sky(catalog)
@@ -341,6 +346,8 @@ def _main():
         if len(bm_list) > 0:
             xmatch(i,bm_list,foflines[fline_list],idio,cat_name,cat_dm,psr_select,dmlim)
             #searcher(ra,dec,bm_list,foflines[fline_list],idio,cat_name,cat_dm,cat_ra,cat_dec,radius,dmlim)
+        #else:
+            #idio.write_frb(foflines[fline_list])
 
 
     #f1.close()
