@@ -46,6 +46,7 @@ void runtest_usage() {
 			"   -o FILE - Candidate filename\n"
 			"   -x SN - threshold S/N\n"
 			"   -D dump intermediate data to disk\n"
+			"   -B b - Process b beams simultaneously to save memory"
 			"   -r R - Blocks per rescale update (0 for no rescaling)\n"
 			"   -S S - Seek to this number of seconds before starting\n"
 			"   -M M - Channel Mean flagging threshold (3 is OK)\n"
@@ -117,6 +118,7 @@ int main(int argc, char* argv[])
 	int mindm = 0;
 	int maxbc = 32;
 	int max_nblocks = INT_MAX;
+	int nbeams_alloc = -1;
 	bool subtract_dm0 = false;
 	bool polsum = false;
 
@@ -126,7 +128,7 @@ int main(int argc, char* argv[])
 	}
 	printf("\n");
 
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:C:n:m:b:z:N:uhp")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:Dg:M:T:K:G:C:n:m:b:z:N:uhp")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -190,6 +192,9 @@ int main(int argc, char* argv[])
 			break;
 		case 'p':
 			polsum = true;
+			break;
+		case 'B':
+			nbeams_alloc = atoi(optarg);
 			break;
 		case '?':
 		case 'h':
@@ -313,7 +318,7 @@ int main(int argc, char* argv[])
 	// Create fdmt
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams_out);
-	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams_out, dump_data);
+	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams_out, nbeams_alloc, dump_data);
 	assert(seek_seconds >= 0);
 	int num_skip_blocks = seek_seconds / source->tsamp() / nt;
 	printf("Seeking to start of data: block %d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source->tsamp());

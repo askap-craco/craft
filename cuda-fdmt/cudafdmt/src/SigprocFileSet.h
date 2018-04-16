@@ -11,6 +11,7 @@
 #include <vector>
 #include "DataSource.h"
 #include "SigprocFile.h"
+#include "DataOrder.h"
 
 
 class SigprocFileSet : public DataSource {
@@ -52,6 +53,10 @@ public:
 	double tstart() {
 		return first_file->tstart();
 	}
+	DataOrder data_order() {
+		return DataOrder::BPTF;
+	}
+
 	size_t samples_read() {
 		return first_file->samples_read();
 	}

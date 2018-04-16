@@ -81,6 +81,7 @@ typedef struct _fdmt_t
 	int nt; // Number of integrations per block
 	int delta_t; // Initial delta_t for the initialisation
 	int nbeams; // Number of beams
+	int nbeams_alloc; // Number of beams to allocate memory for, and process simultaneously
 	int verbose; // 1 for verbose
 	int curr_state_idx; // index of the current state in the states[] array
 	array4d_t states[2]; // iteration states
@@ -114,7 +115,7 @@ __host__ __device__ float cff(float f1_start, float f1_end, float f2_start, floa
 
 __host__ __device__ int calc_delta_t(const fdmt_t* fdmt, float f_start, float f_end);
 
-int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt,  int nbeams, bool dump_data);
+int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt,  int nbeams, int nbeams_alloc, bool dump_data);
 
 int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata);
 

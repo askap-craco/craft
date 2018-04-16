@@ -70,6 +70,9 @@ public:
 	double tsamp() {
 		return m_tsamp;
 	}
+	DataOrder data_order() {
+		return DataOrder::TFBP;
+	}
 
 	char* name() {
 		return m_filename;

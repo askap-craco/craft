@@ -27,6 +27,7 @@ public:
 	virtual int npols() = 0;
 	virtual int nchans() = 0;
 	virtual int nbits() = 0;
+	virtual DataOrder data_order() = 0;
 
 	virtual size_t read_samples(void** output) = 0;
 	virtual size_t seek_sample(size_t t) = 0;
