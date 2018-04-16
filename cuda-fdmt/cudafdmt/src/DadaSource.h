@@ -20,6 +20,8 @@ public:
 
 	int get_header_int(const char* name);
 	double get_header_double(const char* name);
+	int get_header_string(const char* name, char* out);
+
 
 	int npols() {
 		return m_npols;
@@ -48,6 +50,9 @@ public:
 	double foff() {
 		return m_foff;
 	}
+	DataOrder data_order() {
+		return m_out_data_order;
+	}
 	size_t read_samples(void** output);
 	size_t seek_sample(size_t t);
 	size_t samples_read();
@@ -67,8 +72,11 @@ private:
     double m_foff;
     double m_tstart;
     bool m_got_buffer;
+    DataOrder m_in_data_order;
+    DataOrder m_out_data_order;
     uint64_t m_bytes_per_block;
     uint64_t m_blkid;
+    void* m_reorder_buffer;
 
 };
 

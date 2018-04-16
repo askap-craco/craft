@@ -152,7 +152,8 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		float cell_thresh,
 		int nt,
 		bool invert_freq,
-		bool subtract_dm0)
+		bool subtract_dm0,
+		bool polsum)
 {
 	int ibeam = blockIdx.x;
 	int s = threadIdx.x; // sample index within a word
@@ -161,6 +162,15 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 	const int nf = nwords * nsamps_per_word;
 	const int c = w*nsamps_per_word + s; // channel number
 	const rescale_dtype k = decay_constant;
+
+	int outbeam;
+	if (polsum) {
+		// TODO: Maybe always polsum and do npol=1 and beams*2 or whatever
+		outbeam = ibeam/2; // ASSUMES BP  order and npol = 2
+	} else {
+		outbeam = ibeam;
+	}
+
 
 	// on input F axis is broken further into words and samples. all X threads load the same word
 	// input = BTF order
@@ -228,7 +238,7 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && fabs(dm0sum) < block_dm0thresh;
 		bool this_sample_ok = fabs(dm0z) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh;
-		int outidx = t + nt*(outc + nf*ibeam);
+		int outidx = t + nt*(outc + nf*outbeam);
 
 		if (this_sample_ok && last_sample_ok) {
 			sum += vin;

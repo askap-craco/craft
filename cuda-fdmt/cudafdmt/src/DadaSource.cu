@@ -60,9 +60,9 @@ DadaSource::DadaSource(int nt, int key, bool lock) {
 	header_size = ipcbuf_get_bufsz (m_hdu->header_block);
 
 	/* Check that header is of advertised size */
-	if (ascii_header_get (header, "HDR_SIZE", "%"PRIu64, &hdr_size) != 1) {
+	if (ascii_header_get (header, "HDR_SIZE", "%" PRIu64, &hdr_size) != 1) {
 		hdr_size = header_size;
-		if (ascii_header_set (header, "HDR_SIZE", "%"PRIu64, hdr_size) < 0) {
+		if (ascii_header_set (header, "HDR_SIZE", "%" PRIu64, hdr_size) < 0) {
 			printf("Couldn't set header size");
 			exit(EXIT_FAILURE);
 		}
@@ -88,6 +88,21 @@ DadaSource::DadaSource(int nt, int key, bool lock) {
 	m_tstart = get_header_double("MJD_START");
 	m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
 
+	char order_str[256];
+	get_header_string("DORDER",order_str);
+	m_reorder_buffer = NULL;
+	DataOrder m_in_data_order = data_order_from_string(order_str);
+	if (m_in_data_order == DataOrder::TFBP) {
+		m_reorder_buffer = malloc(m_bytes_per_block);
+		assert(m_reorder_buffer);
+	} else {
+		printf("Unknown order: %s\b");
+		exit(EXIT_FAILURE);
+	}
+
+	// output data order
+	m_out_data_order = DataOrder::BPTF;
+
 }
 
 DadaSource::~DadaSource() {
@@ -96,6 +111,9 @@ DadaSource::~DadaSource() {
 	}
 	if (m_hdu) {
 		dada_hdu_destroy(m_hdu);
+	}
+	if (m_reorder_buffer) {
+		free(m_reorder_buffer);
 	}
 }
 
@@ -118,6 +136,17 @@ double DadaSource::get_header_double(const char* name) {
 	}
 	return d;
 }
+
+int DadaSource::get_header_string(const char* name, char* out) {
+	assert(m_hdr);
+	if (ascii_header_get(m_hdr, name, "%s", out) < 0) {
+		printf("Could not get header %s\n",name);
+		exit(EXIT_FAILURE);
+	}
+
+	return 0;
+}
+
 size_t DadaSource::read_samples(void** output)
 {
 	m_read_timer.start();
@@ -131,8 +160,32 @@ size_t DadaSource::read_samples(void** output)
 	// TODO check expected nbytes
 	//m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
 	size_t nt = nbytes/(npols()*nbeams()*nchans()*nbits()/8);
-	//assert(nbytes == m_bytes_per_block);
-	*output = (void*)ptr;
+	if (m_in_data_order == m_out_data_order) {
+		*output = (void*)ptr;
+	} else if (m_in_data_order == DataOrder::TFBP && m_out_data_order == DataOrder::BPTF) {
+		*output = m_reorder_buffer;
+		assert(nbits() == 32);
+		float *inp, *outp;
+		inp = (float*) ptr;
+		outp = (float*) *output;
+		for(int t = 0; t < nt; ++t) {
+			for (int f = 0; f < nchans(); ++f) {
+				for (int b = 0; b < nbeams(); ++b) {
+					for(int p = 0; p < npols(); ++p) {
+						int outidx = f + nchans()*(t + nt*(p + npols()*b));
+						assert(outidx >= 0);
+						assert(outidx < nchans()*npols()*nbeams()*nt);
+						outp[outidx] = *inp;
+						++inp;
+					}
+				}
+			}
+		}
+	} else {
+		printf("Invalid ordering\n");
+		assert(1==0);
+		exit(EXIT_FAILURE);
+	}
 	m_read_timer.stop();
 	return nt;
 }

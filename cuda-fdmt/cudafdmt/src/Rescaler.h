@@ -28,7 +28,9 @@ public:
 	int nf;
 	int nt;
 	int nbeams;
+	int npols;
 	int nbits;
+	bool polsum;
 };
 
 class Rescaler {
@@ -93,7 +95,7 @@ Rescaler<nsamps_per_word, wordT>::Rescaler(int _nbeams, int _nf, int _nt,
 template <int nsamps_per_word, typename wordT>
 void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device)
 {
-	int nbeams = rescale_buf.nw;
+	int nbeams_in = rescale_buf.nw;
 	int nf = rescale_buf.nx;
 	int nt = rescale_buf.nz;
 	int nwords = nf / nsamps_per_word;
@@ -102,7 +104,7 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 	// clear output
 	array4d_cuda_memset(&rescale_buf, 0);
 
-	rescale_calc_dm0_kernel< nsamps_per_word, wordT > <<<nbeams, 256>>>(
+	rescale_calc_dm0_kernel< nsamps_per_word, wordT > <<<nbeams_in, 256>>>(
 			read_buf_device,
 			offset.d_device,
 			scale.d_device,
@@ -115,7 +117,7 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 	// short dropouts see ACES-209
 	// probably could do this in rescale_calc_dm0_kernel after yu've done it
 	// But i Haven't got htere yet.
-	rescale_calc_dm0stats_kernel<<<1, nbeams>>>(
+	rescale_calc_dm0stats_kernel<<<1, nbeams_in>>>(
 			dm0.d_device,
 			dm0count.d_device,
 			dm0stats.d_device,
@@ -123,7 +125,7 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 
 	dim3 blockdim(nsamps_per_word, nwords);
 
-	rescale_update_and_transpose_float_kernel< nsamps_per_word, wordT ><<<nbeams, blockdim>>>(
+	rescale_update_and_transpose_float_kernel< nsamps_per_word, wordT ><<<nbeams_in, blockdim>>>(
 			read_buf_device,
 			sum.d_device,
 			sum2.d_device,
@@ -142,7 +144,8 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 			options.cell_thresh*options.target_stdev,
 			nt,
 			options.invert_freq,
-			options.subtract_dm0);
+			options.subtract_dm0,
+			options.polsum);
 
 
 	sampnum += nt;

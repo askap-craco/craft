@@ -10,7 +10,7 @@ DADA_PATH=$(HOME)/psrdada-install
 # See http://stackoverflow.com/questions/1704907/how-can-i-get-my-c-code-to-automatically-print-out-its-git-version-hash
 GIT_VERSION := $(shell git describe --dirty --always --tags)
 
-NVCCFLAGS=-g -O3 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_60,code=sm_60  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH) -I$(DADA_PATH)/include
+NVCCFLAGS=-g -O3 -Xcompiler -fPIC -Xcompiler -fopenmp --compile --relocatable-device-code=true -gencode arch=compute_60,code=sm_60  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH) -I$(DADA_PATH)/include -std=c++11
 
 NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=compute_60,code=compute_60 -gencode arch=compute_60,code=sm_60 -link -Xcompiler -fopenmp -L$(DADA_PATH)/lib -lpsrdada
 

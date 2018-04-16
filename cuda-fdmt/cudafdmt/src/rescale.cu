@@ -270,9 +270,9 @@ void rescale_arraymalloc(array4d_t* arr, uint64_t nbeams, uint64_t nf, bool allo
 	arr->nx = 1;
 	arr->ny = nbeams;
 	arr->nz = nf;
-	printf("Allocating array ");
-	array4d_print_shape(arr);
-	printf("for rescaling\n");
+	//printf("Allocating array ");
+	//array4d_print_shape(arr);
+	//printf("for rescaling\n");
 	array4d_malloc(arr, alloc_host, true);
 	array4d_zero(arr);
 }

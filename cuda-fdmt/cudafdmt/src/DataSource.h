@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "CpuTimer.h"
+#include "DataOrder.h"
 
 
 class DataSource {

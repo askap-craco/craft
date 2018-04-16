@@ -55,6 +55,7 @@ void runtest_usage() {
 			"   -z Z - Zap times with 0 DM above threshold Z\n"
 			"   -C C - Zap time/frequency cells with S/N above threshold C\n"
 			"   -u   - Subtract DM0 time series from spectrum\n"
+			"   -p   - Sum polarisations\n"
 			"   -n ncand - Maximum mumber of candidates to write per block\n"
 			"   -m mindm - Minimum DM to report candidates for (to ignore 0 DM junk)\n"
 			"   -b maxbc - Maximum boxcar to create a candidate. Candidates with peaks above this boxcar are ignored\n"
@@ -117,6 +118,7 @@ int main(int argc, char* argv[])
 	int maxbc = 32;
 	int max_nblocks = INT_MAX;
 	bool subtract_dm0 = false;
+	bool polsum = false;
 
 	printf("Fredda version %s starting. Cmdline: ", VERSION);
 	for (int c = 0; c < argc; ++c) {
@@ -124,7 +126,7 @@ int main(int argc, char* argv[])
 	}
 	printf("\n");
 
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:C:n:m:b:z:N:uh")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:Dg:M:T:K:G:C:n:m:b:z:N:uhp")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -186,6 +188,9 @@ int main(int argc, char* argv[])
 		case 'N':
 			max_nblocks = atoi(optarg);
 			break;
+		case 'p':
+			polsum = true;
+			break;
 		case '?':
 		case 'h':
 		default:
@@ -229,11 +234,20 @@ int main(int argc, char* argv[])
 
 	bool negdm = (nd < 0);
 	CandidateSink sink(source, out_filename, negdm);
-	cout << "spf tsamp " << source->tsamp()<< " nbeams " << source->nbeams() << " fch1 " << source->fch1() << " nchans "
+	cout << "spf tsamp " << source->tsamp()<< " nbeams " << source->nbeams()
+			<< " npols "<< source->npols() << " fch1 " << source->fch1() << " nchans "
 			<< source->nchans() << " foff " << source->foff() << endl;
-	int nbeams = source->nbeams();
+	int nbeams_in = source->nbeams()*source->npols();
+	int npols_in = source->npols();
+	int nbeams_out;
+	if (polsum) {
+		nbeams_out = source->nbeams();
+	} else {
+		nbeams_out = nbeams_in;
+	}
 	int nf = source->nchans();
-	size_t in_chunk_size = nbeams*nf*nt;
+	int nbits = source->nbits();
+	size_t in_buffer_bytes = nbeams_in*nf*nt*nbits/8;
 
 	float foff =  (float) source->foff();
 	assert(foff < 0);
@@ -249,14 +263,14 @@ int main(int argc, char* argv[])
 	}
 
 	array4d_t rescale_buf;
-	rescale_buf.nw = nbeams;
+	rescale_buf.nw = nbeams_in;
 	rescale_buf.nx = nf;
 	rescale_buf.ny = 1;
 	rescale_buf.nz = nt;
 	array4d_malloc(&rescale_buf, dump_data, true);
 
 	array4d_t out_buf;
-	out_buf.nw = nbeams;
+	out_buf.nw = nbeams_out;
 	out_buf.nx = 1;
 	out_buf.ny = nd;
 	out_buf.nz = nt;
@@ -278,7 +292,9 @@ int main(int argc, char* argv[])
 	rescale.subtract_dm0 = subtract_dm0;
 	rescale.nt = nt;
 	rescale.nf = nf;
-	rescale.nbeams = nbeams;
+	rescale.nbeams = nbeams_in;
+	rescale.npols = npols_in;
+	rescale.polsum = polsum;
 	rescale.nbits = source->nbits();
 	// set guess of initial scale and offset to dm0 thresholding works
 	printf("Rescaling to mean=%f stdev=%f decay constant=%f mean/std/kurtosis/dm0/Cell thresholds: %0.1f/%0.1f/%0.1f/%0.1f/%0.1f grow flags by %d channels\n",
@@ -296,8 +312,8 @@ int main(int argc, char* argv[])
 
 	// Create fdmt
 	fdmt_t fdmt;
-	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams);
-	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams, dump_data);
+	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams_out);
+	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams_out, dump_data);
 	assert(seek_seconds >= 0);
 	int num_skip_blocks = seek_seconds / source->tsamp() / nt;
 	printf("Seeking to start of data: block %d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source->tsamp());
@@ -310,7 +326,7 @@ int main(int argc, char* argv[])
 	// make boxcar history
 	array4d_t boxcar_history;
 	boxcar_history.nw = 1;
-	boxcar_history.nx = nbeams;
+	boxcar_history.nx = nbeams_out;
 	boxcar_history.ny = nd;
 	boxcar_history.nz = NBOX;
 	array4d_malloc(&boxcar_history, dump_data, true);
@@ -319,7 +335,7 @@ int main(int argc, char* argv[])
 	array4d_t boxcar_discards;
 	boxcar_discards.nw = 1;
 	boxcar_discards.nx = 1;
-	boxcar_discards.ny = nbeams;
+	boxcar_discards.ny = nbeams_out;
 	boxcar_discards.nz = nd;
 	array4d_malloc(&boxcar_discards, true, true);
 	array4d_cuda_memset(&boxcar_discards, 0);
@@ -328,7 +344,7 @@ int main(int argc, char* argv[])
 	// TODO: Only allocate on GPU if we'll be dumping it to dis.
 	// Otherwise, we'll just use candidate lists and save on a bucketload of memory
 	array4d_t boxcar_data;
-	boxcar_data.nw = nbeams;
+	boxcar_data.nw = nbeams_out;
 	boxcar_data.nx = nd;
 	boxcar_data.ny = nt;
 	boxcar_data.nz = NBOX;
@@ -361,11 +377,11 @@ int main(int argc, char* argv[])
 		// File is in TBF order
 		// Output needs to be BFT order
 		// Do transpose and cast to float on the way through using GPU
-		// copy raw data to state. Here we're a little dodgey
+		// copy raw data to FDMT state. Here we're a little dodgey, but why allocate memory anyway?
 
 		uint8_t* read_buf_device = (uint8_t*) fdmt.states[0].d_device;
 		fdmt.t_copy_in.start();
-		gpuErrchk(cudaMemcpy(read_buf_device, read_buf, in_chunk_size*sizeof(uint8_t), cudaMemcpyHostToDevice));
+		gpuErrchk(cudaMemcpy(read_buf_device, read_buf, in_buffer_bytes*sizeof(uint8_t), cudaMemcpyHostToDevice));
 		fdmt.t_copy_in.stop();
 		trescale.start();
 		rescaler->update_and_transpose(rescale_buf, read_buf_device);
@@ -379,7 +395,7 @@ int main(int argc, char* argv[])
 		assert(num_rescale_blocks >= 0);
 		array4d_copy_to_host(&rescaler->nsamps); // must do this before updaing scaleoffset, which resets nsamps to zero
 
-		for(int i = 0; i < nf*nbeams; ++i) {
+		for(int i = 0; i < nf*nbeams_in; ++i) {
 			int nsamps = (int)rescaler->nsamps.d[i]; // nsamps is the number of unflagged samples from this block
 			int nflagged = rescaler->sampnum - nsamps;
 			// rescale.sampnum is the total number of samples that has gone into the rescaler
@@ -396,7 +412,7 @@ int main(int argc, char* argv[])
 			// Count how many  channels have been flagged for this whole block
 			// by looking at how many channels have scale==0
 			array4d_copy_to_host(&rescaler->scale);
-			for(int i = 0; i < nf*nbeams; ++i) {
+			for(int i = 0; i < nf*nbeams_in; ++i) {
 				if (rescaler->scale.d[i] == 0) {
 					// that channel will stay flagged for num_rescale_blocks
 					num_flagged_beam_chans += num_rescale_blocks;
@@ -462,17 +478,17 @@ int main(int argc, char* argv[])
 	}
 
 
-	double boxcar_ngops = (double)nbeams*(double)nt*(double)nd*2.0*(double)NBOX/1e9;
+	double boxcar_ngops = (double)nbeams_out*(double)nt*(double)nd*2.0*(double)NBOX/1e9;
 	double data_nsecs = blocknum*nt*source->tsamp();
 
-	double flagged_percent = ((double) num_flagged_beam_chans) / ((double) nf*nbeams*blocknum) * 100.0;
-	double dm0_flagged_percent = ((double) num_flagged_times) / ((double) blocknum*nbeams*nt*nf) * 100.0;
+	double flagged_percent = ((double) num_flagged_beam_chans) / ((double) nf*nbeams_in*blocknum) * 100.0;
+	double dm0_flagged_percent = ((double) num_flagged_times) / ((double) blocknum*nbeams_in*nt*nf) * 100.0;
 	cout << " FREDDA Finished" << endl;
 	cout << "Found " << total_candidates << " candidates" << endl;
 	cout << "Discarded " << total_discards << " candidates for being too wide" << endl;
 	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << data_nsecs << " seconds" << " at " << data_nsecs/tall.wall_total()<< "x real time"<< endl;
-	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams*blocknum) << " channels = " << flagged_percent << "%" << endl;
-	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;
+	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams_in*blocknum) << " channels = " << flagged_percent << "%" << endl;
+	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams_in*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;
 	cout << "FREDDA CPU "<< endl << tall << endl;
 	cout << "Rescale "<< endl << trescale << endl;
 	cout << "Boxcar "<< endl << tboxcar << endl;
