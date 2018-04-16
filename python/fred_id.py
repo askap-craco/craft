@@ -38,13 +38,21 @@ class FileOperations:
 #def func(a1,idio):
 #    idio.write_psr(a1)
     ##### search psrcat
-def read_fredda_hdr(file,x=47,y=48):
-    infile=open(file,'r')
+def read_fredda_hdr(f):
+    #x=47
+    #y=48
+    infile=open(f,'r')
     hdr=infile.readlines()
     infile.close()
-    sbid=hdr[9].split()[1]
-    obsid=hdr[8].split()[1]
-    ant=hdr[22].split()[1]
+    for i in range(len(hdr)):
+        if hdr[i][0:7]=='BEAM_RA':
+            x=i
+        if hdr[i][0:7]=='BEAM_DE':
+            y=i
+    #print x,y
+    #sbid=hdr[9].split()[1]
+    #obsid=hdr[8].split()[1]
+    #ant=hdr[22].split()[1]
     ra=np.fromstring(hdr[x].split()[1],sep=',')[0:36]
     dec=np.fromstring(hdr[y].split()[1],sep=',')[0:36]
     pos=np.array([ra,dec]).T
@@ -146,11 +154,16 @@ def xmatch(i,blist,foflines,idio,psrname,psrdm,poslimits,rdm):
         #foflines[i]
         dmlimit=np.intersect1d(np.where(dmlist+errorbar>i),np.where(dmlist-errorbar<i))
         if len(dmlimit) > 0:
-            print dmlimit,namelist[dmlimit]
+            #print dmlimit,namelist[dmlimit]
+            writename=''
             for j in dmlimit:
-                writename=namelist[j]
-                idio.write_psr(writename+' '+foflines[n])
-                print(writename+' '+foflines[n])
+                if j != dmlimit[-1]:
+                    writename+=namelist[j]+','
+                else:
+                    writename+=namelist[j]
+            main=str(namelist[np.where(np.min(dmlist[dmlimit]-i))[0]][0])
+            idio.write_psr(main+' '+foflines[n][:-1]+' '+writename+'\n')
+            print(main+' '+foflines[n][:-1]+' '+writename+'\n')
         else:
             idio.write_frb(foflines[n])
 
@@ -272,7 +285,7 @@ def _main():
     ############ Generating psrcat database
     if os.path.exists(psrcat):
         print("reading data from psrcat")
-        print(psrcat)
+        #print(psrcat)
     else:
         os.system("psrcat -c 'name p0 dm raj decj' -o short_csv -nohead -nonumber > psrcat_.csv ")
         print("generating psrcat.csv file")
@@ -300,7 +313,8 @@ def _main():
     catalog=SkyCoord(ra=cat_ra*u.degree, dec=cat_dec*u.degree, distance=cat_dm*u.dm)
     ######################## t load header filelist and fof files
     fname=fof_loc+values.candlist
-    pos=read_fredda_hdr(hdr_loc+values.files[0],46,47)
+    pos=read_fredda_hdr(hdr_loc+values.files[0])
+    #print(pos)
     #psrcat_format=values.column
     f=open(fname,'r')
     fof=f.readlines()
