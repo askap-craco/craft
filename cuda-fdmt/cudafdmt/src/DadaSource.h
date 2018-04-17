@@ -57,6 +57,9 @@ public:
 	size_t seek_sample(size_t t);
 	size_t samples_read();
 	void release_buffer();
+	DataOrder m_in_data_order;
+	DataOrder m_out_data_order;
+
 
 	char* name();
 
@@ -72,8 +75,6 @@ private:
     double m_foff;
     double m_tstart;
     bool m_got_buffer;
-    DataOrder m_in_data_order;
-    DataOrder m_out_data_order;
     uint64_t m_bytes_per_block;
     uint64_t m_blkid;
     void* m_reorder_buffer;

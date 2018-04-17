@@ -92,6 +92,7 @@ DadaSource::DadaSource(int nt, int key, bool lock) {
 	get_header_string("DORDER",order_str);
 	m_reorder_buffer = NULL;
 	DataOrder m_in_data_order = data_order_from_string(order_str);
+	printf("Data order is %s %d\n", order_str, m_in_data_order);
 	if (m_in_data_order == DataOrder::TFBP) {
 		m_reorder_buffer = malloc(m_bytes_per_block);
 		assert(m_reorder_buffer);
@@ -102,7 +103,7 @@ DadaSource::DadaSource(int nt, int key, bool lock) {
 
 	// output data order
 	m_out_data_order = DataOrder::BPTF;
-
+	assert(m_in_data_order == DataOrder::TFBP);
 }
 
 DadaSource::~DadaSource() {
@@ -160,6 +161,8 @@ size_t DadaSource::read_samples(void** output)
 	// TODO check expected nbytes
 	//m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
 	size_t nt = nbytes/(npols()*nbeams()*nchans()*nbits()/8);
+	assert(m_in_data_order == DataOrder::TFBP);
+
 	if (m_in_data_order == m_out_data_order) {
 		*output = (void*)ptr;
 	} else if (m_in_data_order == DataOrder::TFBP && m_out_data_order == DataOrder::BPTF) {

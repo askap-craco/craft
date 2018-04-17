@@ -590,6 +590,7 @@ int boxcar_do_gpu(const array4d_t* indata,
 	assert(boxcar_history->d_device != NULL);
 	sink->clear();
 	assert(sink->ncand() == 0);
+
 	boxcar_do_kernel3<<<grid_shape, block_shape>>>(
 			indata->d_device,
 			boxcar_data->d_device,

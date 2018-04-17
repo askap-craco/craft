@@ -516,13 +516,13 @@ int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* 
 
 	// zero off the state
 	array4d_cuda_memset(state, 0);
-	//gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaDeviceSynchronize());
 
 	dim3 grid_shape(nbeams, fdmt->nf);
 	//fdmt_initialise_kernel<<<fdmt->nbeams, fdmt->nf>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt, fdmt->nt);
 	int nthreads = 256;
 	fdmt_initialise_kernel2<<<grid_shape, nthreads>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt, fdmt->nt, count);
-	//gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaDeviceSynchronize());
 
 	return 0;
 
@@ -1152,7 +1152,7 @@ int fdmt_execute_iterations(fdmt_t* fdmt, int nbeams)
 		array4d_t* newstate = &fdmt->states[s];
 		cuda_fdmt_iteration4(fdmt, iter, currstate, newstate, nbeams);
 		gpuErrchk(cudaPeekAtLastError());
-		//gpuErrchk(cudaDeviceSynchronize());
+		gpuErrchk(cudaDeviceSynchronize());
 #ifdef DUMP_STATE
 		char buf[128];
 		array4d_copy_to_host(newstate);
@@ -1281,7 +1281,7 @@ int fdmt_calculate_weights(fdmt_t* fdmt)
 	int blocksize = 256;
 	int nblocks = (fdmt->max_dt + blocksize - 1) / fdmt->max_dt;
 	fdmt_set_weights_kernel<<<nblocks, blocksize>>>(fdmt->ostate.d_device, fdmt->weights.d_device, fdmt->max_dt, fdmt->max_dt + fdmt->nt);
-	//gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaDeviceSynchronize());
 	if (fdmt->dump_data) {
 		array4d_copy_to_host(&fdmt->weights);
 		array4d_dump(&fdmt->weights, "fdmtweights.dat");
@@ -1294,7 +1294,7 @@ int fdmt_calculate_weights(fdmt_t* fdmt)
 
 	// clear ostate
 	array4d_zero(&fdmt->ostate);
-	//gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaDeviceSynchronize());
 
 }
 
