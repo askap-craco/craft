@@ -1,7 +1,7 @@
 #CUDA_PATH?=/Developer/NVIDIA/CUDA-7.5
 #CUDA_PATH=/usr/local/cuda-5.5/
 CUDA_PATH=$(CUDA)
-objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_test.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o CandidateList.o DadaSource.o  InvalidSourceFormat.o Rescaler.o
+objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_test.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o CandidateList.o DadaSource.o  InvalidSourceFormat.o Rescaler.o DataOrder.o
 NVCC=$(CUDA_PATH)/bin/nvcc
 CUB_PATH=$(HOME)/build/cub/cub-1.6.4/cub/
 DADA_PATH=$(HOME)/psrdada-install
