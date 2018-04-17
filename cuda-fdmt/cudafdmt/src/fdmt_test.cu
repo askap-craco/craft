@@ -236,6 +236,7 @@ int main(int argc, char* argv[])
 	tall.start();
 
 	DataSource* source = NULL;
+	DadaSource* dada_source = NULL; // for debugging
 	try {
 		// load sigproc file
 		SigprocFileSet* fs_source = new SigprocFileSet(nt, argc, argv);
@@ -244,7 +245,7 @@ int main(int argc, char* argv[])
 		try {
 			int key;
 			sscanf(argv[0], "%x",&key);
-			DadaSource* dada_source = new DadaSource(nt, key, true);
+			dada_source = new DadaSource(nt, key, true);
 			source = dada_source;
 		} catch (InvalidSourceFormat& e) {
 			printf("No valid inputs\n");

@@ -57,6 +57,9 @@ public:
 	size_t seek_sample(size_t t);
 	size_t samples_read();
 	void release_buffer();
+
+	// I need to put these here otherwise they get changed
+	// At the end of of the constructor, and I have no idea why.
 	char* name();
 
 private:

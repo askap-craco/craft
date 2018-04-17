@@ -91,8 +91,7 @@ DadaSource::DadaSource(int nt, int key, bool lock) {
 	char order_str[256];
 	get_header_string("DORDER",order_str);
 	m_reorder_buffer = NULL;
-	DataOrder m_in_data_order = data_order_from_string(order_str);
-	printf("Data order is %s %d\n", order_str, m_in_data_order);
+	m_in_data_order = data_order_from_string(order_str);
 	if (m_in_data_order == DataOrder::TFBP) {
 		m_reorder_buffer = malloc(m_bytes_per_block);
 		assert(m_reorder_buffer);
