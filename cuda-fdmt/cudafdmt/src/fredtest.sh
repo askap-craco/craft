@@ -27,9 +27,10 @@ $DADA/bin/dada_db -d  -k $DADA_KEY > /dev/null 2>&1
 $DADA/bin/dada_db -a 32768 -b $block_size -n 16 -k $DADA_KEY 
 #$DADA/bin/dada_install_header -k $DADA_KEY -H $hdr
 #echo Header installed $hdr $DADA_KEY
-$cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1 -D -r 1 -K 30 -s 0  &
 echo dada_diskdb -k $DADA_KEY -f $infile -z
 dada_diskdb -k $DADA_KEY -f $infile -z &
-dada_dbmonitor -k $DADA_KEY
+$cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1 -D -r 1 -K 30 -s 0
+#cuda-gdb --args $cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1 -D -r 1 -K 30 -s 0
+#dada_dbmonitor -k $DADA_KEY
 wait
 
