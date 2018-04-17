@@ -31,7 +31,21 @@ def _main():
         sock.bind((host, port))
         while True:
             data, addr = sock.recvfrom(1500)
-            print data, addr
+            npdata = np.fromstring(data, sep=' ')
+            npdata.shape = (-1, 7)
+            sn = npdata[:, 0]
+            sampnum = npdata[:, 1]
+            tsec = npdata[:, 2]
+            width = npdata[:, 3]
+            idt = npdata[:, 4]
+            dm = npdata[:, 5]
+            beamno = npdata[:, 6]
+            mask = (sn > 10) & (width < 10) & (dm > 30) & (beamno != 35)
+            if np.any(mask):
+                goodat = npdata[mask, :]
+                print 'FOUND CANDIDATE'
+                print goodat
+                break
 
 
 
