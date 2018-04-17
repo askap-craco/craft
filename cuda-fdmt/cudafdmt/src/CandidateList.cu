@@ -52,6 +52,7 @@ __host__ unsigned int CandidateList::copy_to_sink(CandidateSink& sink, size_t sa
 		candidate_t* c = &m_candidates[i];
 		sink.add_candidate(c->ibeam, c->idt, sampno+ c->t, c->ibc, c->sn);
 	}
+	sink.flush();
 
 	return ncand;
 }

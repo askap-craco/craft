@@ -44,6 +44,7 @@ void runtest_usage() {
 			"   -t T - Samples per block\n"
 			"   -s S - Decay timescale\n"
 			"   -o FILE - Candidate filename\n"
+			"   -U host:port - UDP host:port to send candidates to\n"
 			"   -x SN - threshold S/N\n"
 			"   -D dump intermediate data to disk\n"
 			"   -B b - Process b beams simultaneously to save memory"
@@ -121,6 +122,9 @@ int main(int argc, char* argv[])
 	int nbeams_alloc = -1;
 	bool subtract_dm0 = false;
 	bool polsum = false;
+	char udp_host[128];
+	bzero(udp_host, 128);
+	short udp_port = -1;
 
 	printf("Fredda version %s starting. Cmdline: ", VERSION);
 	for (int c = 0; c < argc; ++c) {
@@ -128,7 +132,7 @@ int main(int argc, char* argv[])
 	}
 	printf("\n");
 
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:Dg:M:T:K:G:C:n:m:b:z:N:uhp")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:Dg:M:T:U:K:G:C:n:m:b:z:N:uhp")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -196,6 +200,18 @@ int main(int argc, char* argv[])
 		case 'B':
 			nbeams_alloc = atoi(optarg);
 			break;
+		case 'U':
+		{
+			char* colon = strchr(optarg, ':');
+			if (colon == NULL) {
+				printf("Invalid hostport\n");
+				exit(EXIT_FAILURE);
+			}
+			memcpy(udp_host, optarg, colon-optarg);
+			udp_port = atoi(colon+1);
+		}
+		break;
+
 		case '?':
 		case 'h':
 		default:
@@ -238,7 +254,7 @@ int main(int argc, char* argv[])
 	assert(source != NULL);
 
 	bool negdm = (nd < 0);
-	CandidateSink sink(source, out_filename, negdm);
+	CandidateSink sink(source, out_filename, negdm, udp_host, udp_port);
 	cout << "spf tsamp " << source->tsamp()<< " nbeams " << source->nbeams()
 			<< " npols "<< source->npols() << " fch1 " << source->fch1() << " nchans "
 			<< source->nchans() << " foff " << source->foff() << endl;
