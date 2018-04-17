@@ -499,8 +499,6 @@ int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* 
 	// State is a 4D array: (nbeams, nf, deltat, max_dt) ( for the moment)
 
 	int nbeams = indata->nw; // number of beams in this batch
-	array4d_print_shape(indata);
-	printf("Initialise nbeams %d alloc=%d\n", nbeams, fdmt->nbeams_alloc);
 	assert(nbeams > 0);
 	assert(nbeams <= fdmt->nbeams_alloc);
 
@@ -969,6 +967,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 	int src_beam_stride = array4d_idx(indata, 1, 0, 0, 0);
 	int dst_beam_stride = array4d_idx(outdata, 1, 0, 0, 0);
 
+	// Not sure this memset is necessary.
 	array4d_cuda_memset(outdata, 0);
 
 	// For each output sub-band

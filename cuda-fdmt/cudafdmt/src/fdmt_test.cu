@@ -253,6 +253,8 @@ int main(int argc, char* argv[])
 	int nf = source->nchans();
 	int nbits = source->nbits();
 	size_t in_buffer_bytes = nbeams_in*nf*nt*nbits/8;
+	void* in_buffer_device;
+	gpuErrchk( cudaMalloc((void**) &in_buffer_device, in_buffer_bytes ));
 
 	float foff =  (float) source->foff();
 	assert(foff < 0);
@@ -317,7 +319,8 @@ int main(int argc, char* argv[])
 
 	// Create fdmt
 	fdmt_t fdmt;
-	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d\n", fmin, fmax, nf, nd, nt, nbeams_out);
+	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d nbeams_alloc=%d\n",
+			fmin, fmax, nf, nd, nt, nbeams_out, nbeams_alloc);
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams_out, nbeams_alloc, dump_data);
 	assert(seek_seconds >= 0);
 	int num_skip_blocks = seek_seconds / source->tsamp() / nt;
@@ -383,13 +386,12 @@ int main(int argc, char* argv[])
 		// Output needs to be BFT order
 		// Do transpose and cast to float on the way through using GPU
 		// copy raw data to FDMT state. Here we're a little dodgey, but why allocate memory anyway?
-
-		uint8_t* read_buf_device = (uint8_t*) fdmt.states[0].d_device;
+		//uint8_t* read_buf_device = (uint8_t*) fdmt.states[0].d_device;
 		fdmt.t_copy_in.start();
-		gpuErrchk(cudaMemcpy(read_buf_device, read_buf, in_buffer_bytes*sizeof(uint8_t), cudaMemcpyHostToDevice));
+		gpuErrchk(cudaMemcpy(in_buffer_device, read_buf, in_buffer_bytes*sizeof(uint8_t), cudaMemcpyHostToDevice));
 		fdmt.t_copy_in.stop();
 		trescale.start();
-		rescaler->update_and_transpose(rescale_buf, read_buf_device);
+		rescaler->update_and_transpose(rescale_buf, in_buffer_device);
 		trescale.stop();
 
 		if (dump_data) {
