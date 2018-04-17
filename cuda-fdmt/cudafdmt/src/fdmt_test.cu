@@ -47,7 +47,7 @@ void runtest_usage() {
 			"   -U host:port - UDP host:port to send candidates to\n"
 			"   -x SN - threshold S/N\n"
 			"   -D dump intermediate data to disk\n"
-			"   -B b - Process b beams simultaneously to save memory"
+			"   -B b - Process b beams simultaneously to save memory\n"
 			"   -r R - Blocks per rescale update (0 for no rescaling)\n"
 			"   -S S - Seek to this number of seconds before starting\n"
 			"   -M M - Channel Mean flagging threshold (3 is OK)\n"
