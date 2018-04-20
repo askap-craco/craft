@@ -18,7 +18,7 @@ dev:python3
 
 python2 may have int/float bugs in this code, plz see comments below
 '''
-__author__ = "CRAFT Harry Qiu <hqiu0129@physics.usyd.edu.au>"
+__author__ = "CRAFT Harry Qiu <hqiu0129@uni.sydney.edu.au>"
 
 
 #### define psr/frb i/o operations
@@ -154,15 +154,16 @@ def xmatch(i,blist,foflines,idio,psrname,psrdm,poslimits,rdm):
         #foflines[i]
         dmlimit=np.intersect1d(np.where(dmlist+errorbar>i),np.where(dmlist-errorbar<i))
         if len(dmlimit) > 0:
-            #print dmlimit,namelist[dmlimit]
+            print namelist[dmlimit],dmlist[dmlimit]
             writename=''
             for j in dmlimit:
                 if j != dmlimit[-1]:
-                    writename+=namelist[j]+','
+                    writename+=(namelist[j]+',')
                 else:
                     writename+=namelist[j]
-            main=str(namelist[np.where(np.min(dmlist[dmlimit]-i))[0]][0])
-            idio.write_psr(main+' '+foflines[n][:-1]+' '+writename+'\n')
+            mainpsr=str(namelist[dmlimit][np.where(np.min(dmlist[dmlimit]-i))[0]][0])
+            print(mainpsr)
+            idio.write_psr(mainpsr+' '+foflines[n][:-1]+' '+writename+'\n')
             #print 'write psr'
             #print(main+' '+foflines[n][:-1]+' '+writename+'\n')
         else:
