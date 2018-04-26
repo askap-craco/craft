@@ -139,7 +139,7 @@ def xmatch_astropy(i,ra,dec,blist,foflines,idio,psrname,cat1,radius,rdm):
 ##i,ra,dec,bm_list,foflines[fline_list],idio,cat_name,cat_dm,psr_select,dmlim
 def xmatch(beamno,blist,foflines,idio,psrname,psrdm,poslimits,rdm,rec):
     dm_values=blist.T[6]
-    #print blist
+    print beamno
 
     #single_tracer=False
     if len(foflines)==1:
@@ -149,7 +149,9 @@ def xmatch(beamno,blist,foflines,idio,psrname,psrdm,poslimits,rdm,rec):
     #print c, dm_values
     namelist=psrname[poslimits]
     dmlist=psrdm[poslimits]
-    errorbar=rdm*dmlist
+    errorbar=rdm
+    print namelist
+    print dmlist+errorbar,dmlist-errorbar
     for n,i in enumerate(dm_values):
         #foflines[i]
         dmlimit=np.intersect1d(np.where(dmlist+errorbar>i),np.where(dmlist-errorbar<i))
@@ -174,7 +176,7 @@ def xmatch(beamno,blist,foflines,idio,psrname,psrdm,poslimits,rdm,rec):
             #print(mainpsr)
             idio.write_psr(mainpsr+' '+foflines[n][:-1]+' '+writename+'\n')
             #print 'write psr'
-            #print(main+' '+foflines[n][:-1]+' '+writename+'\n')
+            print(mainpsr+' '+foflines[n][:-1]+' '+writename+'\n')
             #print i,dmlist2[np.argmin(rec2)],dmlist2[np.argmin(dmlist2delta)]
         else:
             #print 'write frb'
@@ -265,105 +267,105 @@ def searcher(ra,dec,blist,foflines,idio,psrname,psrdm,psrra,psrdec,rad,rdm):
 '''
 
 
-def _main():
-    from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-    parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    #parser.add_argument('-s','--show', action='store_true', help='Show')
-    parser.add_argument('--probe', action='store_true', help='Show')
-    parser.add_argument('--noname', action='store_true', help='Show')
-    #parser.add_argument('-o','--output',type=str,default='short_csv')
-    parser.add_argument('-f','--candlist',type=str,default='fredda.cand.fof',help='fof file here') #### fredda candidate file input here
-    parser.add_argument('--cat',type=str,default='',help='psrcat.csv address leave empty if you have set FRED_CAT to $CRAFT/craft/python/psrcat.csv')
-    #parser.add_argument('-c','--column',type=str,default='name p0 dm raj decj',help='')
-    parser.add_argument('-r','--radius',type=float,default=2,help='search radius')
-    #parser.add_argument('-x','--sncut',type=float,default=10,help='fredda.frb file threshold for sn')
-    parser.add_argument('-d','--dmlim',type=float,default=0.02,help='dm errorbar')
-    parser.add_argument('--shift',type=int,default=1,help='column shift, default 1 for .good files, 0 for .fof files')
-    parser.add_argument(dest='files', nargs='+',help=' hdr file here') ####hdr file name here
-    parser.set_defaults(verbose=False)
-    values = parser.parse_args()
-    print values.files
-    if values.verbose:
-        logging.basicConfig(level=logging.DEBUG)
-    else:
-        logging.basicConfig(level=logging.INFO)
-    radius=values.radius
-    psrcat=values.cat
-    if len(psrcat)==0:
-        psrcat=os.environ['FRED_CAT']
-    hdr_loc=''
-    fof_loc=''
-    dmlim=values.dmlim
-    cs=values.shift
-    print("Search Radius: %f DM error range: %f"%(radius,dmlim))
-    ############ Generating psrcat database
-    if os.path.exists(psrcat):
-        print("reading data from psrcat")
-        #print(psrcat)
-    else:
-        os.system("psrcat -c 'name p0 dm raj decj' -o short_csv -nohead -nonumber > psrcat_.csv ")
-        print("generating psrcat.csv file")
-        cat=np.genfromtxt("psrcat_.csv",skip_header=2,delimiter=';',dtype=str)
-        name=cat.T[0]
-        p0=cat.T[1]
-        dm=cat.T[2]
-        ra=cat.T[3]
-        dec=cat.T[4]
-        newcat=open("psrcat.csv",'w')
-        for i in range(len(ra)):
-             c = SkyCoord(ra[i]+' '+dec[i], unit=(u.hourangle, u.deg))
-             newcat.write(name[i]+";"+p0[i]+";"+dm[i]+';'+str(c.ra.deg)+';'+str(c.dec.deg)+";\n")
-        psrcat='psrcat.csv'
+#def _main():
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
+parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
+#parser.add_argument('-s','--show', action='store_true', help='Show')
+parser.add_argument('--probe', action='store_true', help='Show')
+parser.add_argument('--noname', action='store_true', help='Show')
+#parser.add_argument('-o','--output',type=str,default='short_csv')
+parser.add_argument('-f','--candlist',type=str,default='fredda.cand.fof',help='fof file here') #### fredda candidate file input here
+parser.add_argument('--cat',type=str,default='',help='psrcat.csv address leave empty if you have set FRED_CAT to $CRAFT/craft/python/psrcat.csv')
+#parser.add_argument('-c','--column',type=str,default='name p0 dm raj decj',help='')
+parser.add_argument('-r','--radius',type=float,default=2,help='search radius')
+#parser.add_argument('-x','--sncut',type=float,default=10,help='fredda.frb file threshold for sn')
+parser.add_argument('-d','--dmlim',type=float,default=5,help='dm errorbar')
+parser.add_argument('--shift',type=int,default=1,help='column shift, default 1 for .good files, 0 for .fof files')
+parser.add_argument(dest='files', nargs='+',help=' hdr file here') ####hdr file name here
+parser.set_defaults(verbose=False)
+values = parser.parse_args()
+print values.files
+if values.verbose:
+    logging.basicConfig(level=logging.DEBUG)
+else:
+    logging.basicConfig(level=logging.INFO)
+radius=values.radius
+psrcat=values.cat
+if len(psrcat)==0:
+    psrcat=os.environ['FRED_CAT']
+hdr_loc=''
+fof_loc=''
+dmlim=values.dmlim
+cs=values.shift
+print("Search Radius: %f DM error range: %f"%(radius,dmlim))
+############ Generating psrcat database
+if os.path.exists(psrcat):
+    print("reading data from psrcat")
+    #print(psrcat)
+else:
+    os.system("psrcat -c 'name p0 dm raj decj' -o short_csv -nohead -nonumber > psrcat_.csv ")
+    print("generating psrcat.csv file")
+    cat=np.genfromtxt("psrcat_.csv",skip_header=2,delimiter=';',dtype=str)
+    name=cat.T[0]
+    p0=cat.T[1]
+    dm=cat.T[2]
+    ra=cat.T[3]
+    dec=cat.T[4]
+    newcat=open("psrcat.csv",'w')
+    for i in range(len(ra)):
+         c = SkyCoord(ra[i]+' '+dec[i], unit=(u.hourangle, u.deg))
+         newcat.write(name[i]+";"+p0[i]+";"+dm[i]+';'+str(c.ra.deg)+';'+str(c.dec.deg)+";\n")
+    psrcat='psrcat.csv'
 
-    cat=np.genfromtxt(psrcat,delimiter=';',dtype=str)
-    cat_name=cat.T[0]
-    cat_p0=cat.T[1]
-    cat_dm=cat.T[2]
-    cat_ra=cat.T[3].astype(float)
-    cat_dec=cat.T[4].astype(float)
-    changedm=np.where(cat_dm=='*')
-    cat_dm[changedm]=0
-    cat_dm=cat_dm.astype(float)
-    catalog=SkyCoord(ra=cat_ra*u.degree, dec=cat_dec*u.degree, distance=cat_dm*u.dm)
-    ######################## t load header filelist and fof files
-    fname=fof_loc+values.candlist
-    pos=read_fredda_hdr(hdr_loc+values.files[0])
-    #print(pos)
-    #psrcat_format=values.column
-    f=open(fname,'r')
-    fof=f.readlines()
-    f.close()
-    foflines=np.array(fof,dtype=str)
-    fredda=np.loadtxt(fname)
+cat=np.genfromtxt(psrcat,delimiter=';',dtype=str)
+cat_name=cat.T[0]
+cat_p0=cat.T[1]
+cat_dm=cat.T[2]
+cat_ra=cat.T[3].astype(float)
+cat_dec=cat.T[4].astype(float)
+changedm=np.where(cat_dm=='*')
+cat_dm[changedm]=0
+cat_dm=cat_dm.astype(float)
+catalog=SkyCoord(ra=cat_ra*u.degree, dec=cat_dec*u.degree, distance=cat_dm*u.dm)
+######################## t load header filelist and fof files
+fname=fof_loc+values.candlist
+pos=read_fredda_hdr(hdr_loc+values.files[0])
+#print(pos)
+#psrcat_format=values.column
+f=open(fname,'r')
+fof=f.readlines()
+f.close()
+foflines=np.array(fof,dtype=str)
+fredda=np.loadtxt(fname)
 
-    idio=FileOperations()
-    idio.open_files(fname,fname)
-    #f1=open(fname+".psr",'w')
-    #f2=open(fname+".frb",'w')
-    for i,xy in enumerate(pos,0):
-        #print(i,xy)
-        bm_list,fline_list=fredda_read(fredda,i,cs)
-        ra=xy[0]
-        dec=xy[1]
-        #print(bm_list)
-        print("\n ------------------- \nSearching "+str(len(fline_list))+" Candidates in Beam"+str(i))
-        #bpos=SkyCoord(ra*u.deg,dec*u.deg)
-        #idx, d2d, d3d = bpos.match_to_catalog_sky(catalog)
-        #print cat_name[idx]
-        c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
-        sep=c.separation(catalog)
-        psr_select=np.where(sep.deg<radius)
-        if len(bm_list) > 0:
-            xmatch(i,bm_list,foflines[fline_list],idio,cat_name,cat_dm,psr_select,dmlim,sep[psr_select])
-            #searcher(ra,dec,bm_list,foflines[fline_list],idio,cat_name,cat_dm,cat_ra,cat_dec,radius,dmlim)
-        #else:
-            #idio.write_frb(foflines[fline_list])
+idio=FileOperations()
+idio.open_files(fname,fname)
+#f1=open(fname+".psr",'w')
+#f2=open(fname+".frb",'w')
+for i,xy in enumerate(pos,0):
+    #print(i,xy)
+    bm_list,fline_list=fredda_read(fredda,i,cs)
+    ra=xy[0]
+    dec=xy[1]
+    #print(bm_list)
+    #print("\n ------------------- \nSearching "+str(len(fline_list))+" Candidates in Beam"+str(i))
+    #bpos=SkyCoord(ra*u.deg,dec*u.deg)
+    #idx, d2d, d3d = bpos.match_to_catalog_sky(catalog)
+    #print cat_name[idx]
+    c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree)
+    sep=c.separation(catalog)
+    psr_select=np.where(sep.deg<radius)
+    if len(bm_list) > 0:
+        xmatch(i,bm_list,foflines[fline_list],idio,cat_name,cat_dm,psr_select,dmlim,sep[psr_select])
+        #searcher(ra,dec,bm_list,foflines[fline_list],idio,cat_name,cat_dm,cat_ra,cat_dec,radius,dmlim)
+    #else:
+        #idio.write_frb(foflines[fline_list])
 
 
-    #f1.close()
-    #f2.close()
-    idio.close_files()
+#f1.close()
+#f2.close()
+idio.close_files()
 
-if __name__ == '__main__':
-    _main()
+#if __name__ == '__main__':
+    #_main()
