@@ -11,6 +11,8 @@
 #include "rescale.h"
 #include "array.h"
 
+//const rescale_dtype RESINFINITY = 1.0f/0.0f;
+
 struct RescaleOptions {
 public:
 	float target_mean;
@@ -54,6 +56,7 @@ public:
 	uint64_t sampnum;
 	int num_elements;
 	RescaleOptions options;
+	RescaleOptions noflag_options;
 
 
 	// Parameters
@@ -68,34 +71,20 @@ public:
 
 	virtual ~Rescaler();
 
-	void update_scaleoffset();
+	void update_scaleoffset(RescaleOptions& options);
 	void set_scaleoffset(float s_scale, float s_offset);
-	void update_and_transpose(array4d_t& rescale_buf, void* read_buf_device);
+	void update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options);
+
+private:
 
 	template <int nsamps_per_word, typename wordT>
-	void do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device);
+	void do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options);
 };
 
-/*
-template <int nsamps_per_word, class wordT>
-Rescaler<nsamps_per_word, wordT>::Rescaler(int _nbeams, int _nf, int _nt,
-		float _target_mean, float _target_stdev, float _decay_constant,
-		float _mean_thresh, float _std_thresh, float _kurt_thresh,
-		float _dm0_thresh, float _cell_thresh,
-		int _flag_grow, bool _invert_freq, bool _subtract_dm0) : nbeams(_nbeams), nf(_nf), nt(_nt),
-		target_mean(_target_mean),
-		target_stdev(_target_stdev), decay_constant(_decay_constant),
-		mean_thresh(_mean_thresh), std_thresh(_std_thresh), kurt_thresh(_kurt_thresh),
-		dm0_thresh(_dm0_thresh), cell_thresh(_cell_thresh),
-		flag_grow(_flag_grow), invert_freq(_invert_freq), subtract_dm0(_subtract_dm0) {
-		*/
-
-
-
 template <int nsamps_per_word, typename wordT>
-void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device)
+void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options)
 {
-	int nbeams_in = rescale_buf.nw;
+	int nbeams_in = options.nbeams;
 	int nf = rescale_buf.nx;
 	int nt = rescale_buf.nz;
 	int nwords = nf / nsamps_per_word;

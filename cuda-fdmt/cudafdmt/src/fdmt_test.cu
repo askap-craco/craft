@@ -12,6 +12,7 @@
 #include <iostream>
 #include <signal.h>
 #include <limits.h>
+#include <float.h>
 #if defined (ENABLE_OPENMP)
 #include <omp.h>
 #endif
@@ -109,11 +110,11 @@ int main(int argc, char* argv[])
 	const char* out_filename = "fredda.cand";
 	bool dump_data = false;
 	int cuda_device = 0;
-	float kurt_thresh = 1e9;
-	float std_thresh = 1e9;
-	float mean_thresh = 1e9;
-	float dm0_thresh = 1e9;
-	float cell_thresh = 1e9;
+	float kurt_thresh = INFINITY;
+	float std_thresh = INFINITY;
+	float mean_thresh = INFINITY;
+	float dm0_thresh = INFINITY;
+	float cell_thresh = INFINITY;
 	int flag_grow = 3;
 	int max_ncand_per_block = 4096;
 	int mindm = 0;
@@ -287,7 +288,7 @@ int main(int argc, char* argv[])
 	}
 
 	array4d_t rescale_buf;
-	rescale_buf.nw = nbeams_in;
+	rescale_buf.nw = nbeams_out;
 	rescale_buf.nx = nf;
 	rescale_buf.ny = 1;
 	rescale_buf.nz = nt;
@@ -329,9 +330,7 @@ int main(int argc, char* argv[])
 			rescale.flag_grow);
 	Rescaler* rescaler = new Rescaler(rescale);
 	if (num_rescale_blocks == 0) {
-		rescaler->set_scaleoffset(1.0f, -128.0f); // Just pass it straight through without rescaling
-	} else {
-		rescaler->set_scaleoffset(rescale.target_stdev/18.0, -128.0f); // uint8 stdev is 18 and mean +128.
+		rescaler->set_scaleoffset(1.0f, 0.0f); // Just pass it straight through without rescaling
 	}
 
 	// Create fdmt
@@ -408,7 +407,16 @@ int main(int argc, char* argv[])
 		gpuErrchk(cudaMemcpy(in_buffer_device, read_buf, in_buffer_bytes*sizeof(uint8_t), cudaMemcpyHostToDevice));
 		fdmt.t_copy_in.stop();
 		trescale.start();
-		rescaler->update_and_transpose(rescale_buf, in_buffer_device);
+		if (blocknum == 0) { // if first block rescale and update with no
+			// flagging so we can work out roughly what the scales are
+			rescaler->update_and_transpose(rescale_buf, in_buffer_device, rescaler->noflag_options);
+
+			// update scale and offset
+			rescaler->update_scaleoffset(rescaler->noflag_options);
+		}
+
+		// this time we rescale with the flagging turned on
+		rescaler->update_and_transpose(rescale_buf, in_buffer_device, rescaler->options);
 		trescale.stop();
 
 		if (dump_data) {
@@ -427,11 +435,9 @@ int main(int argc, char* argv[])
 			num_flagged_times += nflagged;
 		}
 
-
-
 		// do rescaling if required
 		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
-			rescaler->update_scaleoffset();
+			rescaler->update_scaleoffset(rescaler->options);
 
 			// Count how many  channels have been flagged for this whole block
 			// by looking at how many channels have scale==0

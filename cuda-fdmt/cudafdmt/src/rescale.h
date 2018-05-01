@@ -215,12 +215,14 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		rescale_dtype vin = extract_sample<nsamps_per_word, wordT>(word, s);
 
 		rescale_dtype vout = (vin + offset) * scale;
+		rescale_dtype sout = vout;
 		if (k == 0) { // If we set the timescale to zero, we just don't do any decaying
 			decay_offset = 0;
+			sout = vout;
 		} else {
 			decay_offset = (vout + decay_offset*k)/(1.0 + k);
+			sout = vout - decay_offset;
 		}
-		rescale_dtype sout = vout - decay_offset;
 		int dm0idx = t + nt*ibeam; // DM0 idx: BT order
 		rescale_dtype dm0count = dm0countarr[dm0idx];
 		rescale_dtype dm0sum = dm0arr[dm0idx] ; // sum accros dm0 - not normalised

@@ -32,13 +32,22 @@ Rescaler::Rescaler(RescaleOptions& _options) : options(_options)
 	rescale_arraymalloc(&decay_offset, nbeams, nf, alloc_host);
 	array4d_set(&scale, 1.0);
 
+	// set up the options to use if we don't want to do flagging
+	noflag_options = options; // make a copy
+	// For not flagging, we set the thresholds to max value
+	noflag_options.mean_thresh = INFINITY;
+	noflag_options.std_thresh = INFINITY;
+	noflag_options.kurt_thresh = INFINITY;
+	noflag_options.dm0_thresh = INFINITY;
+	noflag_options.cell_thresh = INFINITY;
+	noflag_options.flag_grow = 1;
 }
 
 Rescaler::~Rescaler() {
 
 }
 
-void Rescaler::update_scaleoffset() {
+void Rescaler::update_scaleoffset(RescaleOptions& options) {
 	assert(options.interval_samps > 0);
 	int nf = options.nf;
 	int nthreads = nf;
@@ -70,31 +79,31 @@ void Rescaler::set_scaleoffset(float s_scale, float s_offset) {
 	array4d_set(&offset, s_offset);
 }
 
-void Rescaler::update_and_transpose(array4d_t& rescale_buf, void* read_buf_device) {
+void Rescaler::update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions &options) {
 	int nbits = options.nbits;
 	switch (nbits) {
 	case 1:
-		do_update_and_transpose<32, uint32_t>(rescale_buf, (uint32_t*)read_buf_device);
+		do_update_and_transpose<32, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options);
 		break;
 
 	case 2:
-		do_update_and_transpose<16, uint32_t>(rescale_buf, (uint32_t*)read_buf_device);
+		do_update_and_transpose<16, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options);
 		break;
 
 	case 4:
-		do_update_and_transpose<8, uint32_t>(rescale_buf, (uint32_t*)read_buf_device);
+		do_update_and_transpose<8, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options);
 		break;
 
 	case 8:
-		do_update_and_transpose<4, uint32_t>(rescale_buf, (uint32_t*)read_buf_device);
+		do_update_and_transpose<4, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options);
 		break;
 
 	case 16:
-		do_update_and_transpose<2, uint32_t>(rescale_buf, (uint32_t*)read_buf_device);
+		do_update_and_transpose<2, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options);
 		break;
 
 	case 32:
-		do_update_and_transpose<1, float>(rescale_buf, (float*)read_buf_device);
+		do_update_and_transpose<1, float>(rescale_buf, (float*)read_buf_device, options);
 		break;
 
 	default:

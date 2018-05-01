@@ -436,6 +436,9 @@ __global__ void rescale_update_scaleoffset_kernel (
 	// numerator = E[X**4] - 4E[X][E[X**3] + 6 E[X**2]E[X]**2 - 3E[X]**4
 	rescale_dtype kurt = (mean4 - 4*mean*mean3 + 6*mean2*mean*mean - 3*mean*mean*mean*mean)/(variance*variance) -3 ;
 	// save flag inputs
+
+	rescale_dtype prev_mean = meanarr[i];
+	rescale_dtype prev_std = stdarr[i];
 	meanarr[i] = mean;
 	stdarr[i] = sqrtf(variance);
 	kurtarr[i] = kurt;
@@ -445,19 +448,29 @@ __global__ void rescale_update_scaleoffset_kernel (
 	int icstart = max(0, c - flag_grow) + nf*ibeam;
 	int icend = min(nf, c + flag_grow) + nf*ibeam;
 	int flag = 0;
-	rescale_dtype expected_mean = 128.;
-	rescale_dtype expected_std = 18.;
 	for (int ic = icstart; ic < icend; ++ic) {
-		rescale_dtype meanoff = fabs(meanarr[ic] - expected_mean);
-		rescale_dtype stdoff = fabs(stdarr[ic] - expected_std);
+		rescale_dtype meanoff = fabs(meanarr[ic] - prev_mean)/prev_mean;
+		rescale_dtype stdoff = fabs(stdarr[ic] - prev_std)/prev_std;
 		rescale_dtype kurtoff = fabs(kurtarr[ic]);
+		// some of these divisions can be by 0, and the thresholds can be inf - this handles all that.
 
-		if (nsamp > 0 && (meanoff > mean_thresh ||
-				stdoff > std_thresh ||
-				kurtoff > kurt_thresh)) {
+		int thresh_ok = (meanoff <= mean_thresh) &&
+				(stdoff <= std_thresh) &&
+				(kurtoff <= kurt_thresh);
+//		printf("Rescale ibeam %d ic=%d meanoff=%f prev_mean=%f meanarr=%f mean_thresh=%f mean OK? %d thresh OK? %d\n",
+//				ibeam, ic, meanoff, prev_mean, meanarr[ic], mean_thresh, mean_ok, thresh_ok);
+		if (! thresh_ok) {
 			flag = 1;
 			break;
 		}
+
+		//if (nsamp > 0 && (meanoff > mean_thresh ||
+		//		stdoff > std_thresh ||
+	//		kurtoff > kurt_thresh)) {
+	//		flag = 1;
+	//		break;
+	//	}
+
 	}
 
 	if (flag) {

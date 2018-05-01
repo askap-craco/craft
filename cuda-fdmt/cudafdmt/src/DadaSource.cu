@@ -96,7 +96,7 @@ DadaSource::DadaSource(int nt, int key, bool lock) {
 		m_reorder_buffer = malloc(m_bytes_per_block);
 		assert(m_reorder_buffer);
 	} else {
-		printf("Unknown order: %s\b");
+		printf("Unknown order: %s\b", order_str);
 		exit(EXIT_FAILURE);
 	}
 
