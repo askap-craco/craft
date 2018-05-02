@@ -968,7 +968,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 	int dst_beam_stride = array4d_idx(outdata, 1, 0, 0, 0);
 
 	// Not sure this memset is necessary.
-	array4d_cuda_memset(outdata, 0);
+	//array4d_cuda_memset(outdata, 0);
 
 	// For each output sub-band
 	for (int iif = 0; iif < outdata->nx; iif++) {
@@ -1001,7 +1001,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 					dst_beam_stride,
 					tmax,tend,
 					ts_data);
-			gpuErrchk(cudaPeekAtLastError());
+			//gpuErrchk(cudaPeekAtLastError());
 		} else { // Do copy if there's no channel to add
 
 
@@ -1010,7 +1010,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 								dst_beam_stride,
 								tmax, ts_data);
 
-			gpuErrchk(cudaPeekAtLastError());
+			//gpuErrchk(cudaPeekAtLastError());
 		}
 
 	}
@@ -1151,7 +1151,7 @@ int fdmt_execute_iterations(fdmt_t* fdmt, int nbeams)
 		s = (s + 1) % 2;
 		array4d_t* newstate = &fdmt->states[s];
 		cuda_fdmt_iteration4(fdmt, iter, currstate, newstate, nbeams);
-		gpuErrchk(cudaPeekAtLastError());
+		//gpuErrchk(cudaPeekAtLastError());
 		//gpuErrchk(cudaDeviceSynchronize());
 #ifdef DUMP_STATE
 		char buf[128];

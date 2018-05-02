@@ -536,5 +536,6 @@ int main(int argc, char* argv[])
 	cout << "Resources User: " << usage.ru_utime.tv_sec <<
 			"s System:" << usage.ru_stime.tv_sec << "s MaxRSS:" << usage.ru_maxrss/1024/1024 << "MB" << endl;
 	cout << "GPU Memory used " << (gpu_total_bytes - gpu_free_bytes)/1024/1024 << " of " << gpu_total_bytes /1024/124 << " MiB" << endl;
+	delete source;
 }
 

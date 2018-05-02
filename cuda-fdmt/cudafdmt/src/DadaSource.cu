@@ -115,6 +115,7 @@ DadaSource::~DadaSource() {
 	if (m_reorder_buffer) {
 		free(m_reorder_buffer);
 	}
+	cout << "DADA Transpose timing " << m_transpose_timer << endl;
 }
 
 int DadaSource::get_header_int(const char* name) {
@@ -156,12 +157,16 @@ size_t DadaSource::read_samples(void** output)
 	}
 	uint64_t nbytes;
 	char* ptr = ipcio_open_block_read(m_hdu->data_block, &nbytes, &m_blkid);
+	m_read_timer.stop();
+
 	m_got_buffer = true;
 	// TODO check expected nbytes
 	//m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
 	size_t nt = nbytes/(npols()*nbeams()*nchans()*nbits()/8);
 	assert(m_in_data_order == DataOrder::TFBP);
 
+
+	m_transpose_timer.start();
 	if (m_in_data_order == m_out_data_order) {
 		*output = (void*)ptr;
 	} else if (m_in_data_order == DataOrder::TFBP && m_out_data_order == DataOrder::BPTF) {
@@ -188,7 +193,7 @@ size_t DadaSource::read_samples(void** output)
 		assert(1==0);
 		exit(EXIT_FAILURE);
 	}
-	m_read_timer.stop();
+	m_transpose_timer.stop();
 	return nt;
 }
 

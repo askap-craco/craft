@@ -99,32 +99,40 @@ def show_inbuf_series(prefix, theslice, start=0, maxn=10):
             print 'Quitting as maxn exceeded'
             break
 
-def statplot(ax, fname, name):
+def statplot(ax, fname, name, beam=None):
     d = None
+    if beam is None:
+        beamslice = slice(None)
+    else:
+        beamslice = beam
+
     try :
         d = load4d(fname.replace('fdmt',name))
-        sl = [0,0,slice(None),slice(None)]
-        ax.plot(d[sl].T)
+        sl = [0,0,beamslice,slice(None)]
+        dsl = d[sl]
+        print dsl.shape, fname, name, beam
+        ax.plot(dsl.T, label=name)
     except IOError:
         print 'No data for ', fname, name
 
     ax.set_ylabel(name)
 
-    return d
+    return dsl
 
 def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
     fig = pylab.figure()
     
     for ifname, fname in enumerate(file_series(prefix, start)):
         ostate = load4d(fname)
-        gs = gridspec.GridSpec(2,10)
+        gs = gridspec.GridSpec(2,12)
         p = plt.subplot
         rawax = p(gs[0, 0:2])
-
         rawname = fname.replace('fdmt','inbuf')
         rawdat = load4d(rawname)
         rawd = rawdat[ibeam, :, 0, :]
+        nbeams_out= rawd.shape[0]
         print 'Raw inbuf', rawdat.shape
+        rawd = np.ma.masked_equal(rawd, 0.0)
         nchans, ntimes = rawd.shape
         myimshow(rawax, rawd, aspect='auto', origin='lower')
 
@@ -150,9 +158,12 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
 
         specax = p(gs[0,2])
         chans = np.arange(nchans)
-        specax.plot(rawd.std(axis=1), chans)
-        specax.plot(rawd.mean(axis=1), chans)
+        stdline, = specax.plot(rawd.std(axis=1), chans)
+        meanline, = specax.plot(rawd.mean(axis=1), chans)
         specax.set_ylim(min(chans), max(chans))
+        specax.axvline(0, c=meanline.get_color(), ls=':')
+        specax.axvline(1, c=stdline.get_color(), ls=':')
+
 
         dmax2 = p(gs[1,2])
         ndt, _ = v.shape
@@ -180,13 +191,31 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         stdax = p(gs[0, 8:10])
         kurtax = p(gs[1, 6:8])
         dm0ax = p(gs[1, 8:10])
+        scaleax = p(gs[0,10:12])
+        offsetax = p(gs[1,10:12])
+        scaled = load4d(fname.replace('fdmt','scale'))
+        offsetd = load4d(fname.replace('fdmt','offset'))
+        nbeams_in = scaled.shape[2]
+        if nbeams_in == 2*nbeams_out:
+            bslice = slice(2*ibeam,2*ibeam+1)
+        else:
+            bslice = slice(ibeam,ibeam+2)
 
-        statplot(meanax, fname, 'mean')
-        statplot(stdax, fname, 'std')
-        statplot(kurtax, fname, 'kurt')
-        statplot(dm0ax, fname, 'dm0')
+        smean = statplot(meanax, fname, 'mean', bslice)
+        sstd = statplot(stdax, fname, 'std', bslice)
+        statplot(kurtax, fname, 'kurt', bslice)
+        statplot(dm0ax, fname, 'dm0', bslice)
+        statplot(scaleax, fname, 'scale', bslice)
+        statplot(offsetax, fname, 'offset', bslice)
+        
         rawdm0 = rawd.sum(axis=1).T
         dm0ax.plot(rawd.sum(axis=0).T)
+        svar = sstd**2
+        nsamp = 1500
+        #chi2metric = svar/smean**2/2*nsamp
+        #kurtax.plot(chi2metric, label='chi2')
+        kurtax.legend(frameon=False)
+
         try:
             dm0count = load4d(fname.replace('fdmt','dm0count'))
             dm0countax = dm0ax.twinx()

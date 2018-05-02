@@ -65,7 +65,7 @@ def plot(f, dtype, nint, nbeam, nchan, npol, order, values):
 
     print 'Got dtypes', dtype, 'ORDER', order, 'shape', v.shape
 
-    fig, axes = pylab.subplots(*map(int, values.nxy.split(',')))
+    fig, axes = pylab.subplots(*map(int, values.nxy.split(',')), sharex=True, sharey=True)
     if values.imrange:
         vmin, vmax = map(float, values.imrange.split(','))
     else:

@@ -9,6 +9,7 @@
 #define DADASOURCE_H_
 
 #include "DataSource.h"
+#include "CpuTimer.h"
 #include "dada_hdu.h"
 #include "dada_def.h"
 #include "ipcio.h"
@@ -79,6 +80,7 @@ private:
     uint64_t m_bytes_per_block;
     uint64_t m_blkid;
     void* m_reorder_buffer;
+    CpuTimer m_transpose_timer;
 
 };
 
