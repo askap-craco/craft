@@ -1301,8 +1301,8 @@ int fdmt_calculate_weights(fdmt_t* fdmt)
 void fdmt_print_timing(fdmt_t* fdmt)
 {
 	cout << "FDMT Timings:" << endl;
-	cout << "Initialisation: " << endl <<  fdmt->t_init << endl;
 	cout << "Copy in:" << endl << fdmt->t_copy_in << endl;
+	cout << "Initialisation: " << endl <<  fdmt->t_init << endl;
 	cout << "Execute: " << endl << fdmt->t_iterations << endl;
 	cout << "Update Ostate: " << endl << fdmt->t_update_ostate << endl;
 	cout << "Copy back: " << endl << fdmt->t_copy_back << endl;
