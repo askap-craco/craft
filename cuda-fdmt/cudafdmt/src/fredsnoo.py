@@ -45,8 +45,8 @@ def _main():
                 goodat = npdata[mask, :]
                 good_sn = goodat[0, :]
                 best_cand_idx = np.argmax(good_sn)
-                best_cand = goodat[best_cand_idx, :]
-                print 'FOUND CANDIDATE', best_cand
+                best_cand = goodat[:, best_cand_idx]
+                print 'FOUND CANDIDATE', np.array2string(best_cand, precision=1)
                 best_beam = int(best_cand[6])
                 sys.exit(best_beam+100)
 
