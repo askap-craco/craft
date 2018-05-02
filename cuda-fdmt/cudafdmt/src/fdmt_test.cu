@@ -268,6 +268,7 @@ int main(int argc, char* argv[])
 	} else {
 		nbeams_out = nbeams_in;
 	}
+	float nbeams_summed = (float(nbeams_in)/float(nbeams_out));
 	int nf = source->nchans();
 	int nbits = source->nbits();
 	size_t in_buffer_bytes = nbeams_in*nf*nt*nbits/8;
@@ -305,7 +306,7 @@ int main(int argc, char* argv[])
 	RescaleOptions rescale = {};
 	rescale.interval_samps = nt;
 	rescale.target_mean = 0.0;
-	rescale.target_stdev = 1.0;
+	rescale.target_stdev = 1.0/sqrt(nbeams_summed);
 	rescale.decay_constant = 0.35 * decay_timescale / source->tsamp(); // This is how the_decimator.C does it, I think.
 	rescale.mean_thresh = mean_thresh;
 	rescale.std_thresh = std_thresh;
