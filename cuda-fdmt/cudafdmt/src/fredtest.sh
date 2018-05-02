@@ -2,7 +2,7 @@
 
 trap 'kill $(jobs -p)' EXIT
 
-let DADA_KEY="2000 + 2*${1}"
+let DADA_KEY="1000 + 100*${1}"
 infile=`ls *.dada`
 hdr=`ls co*.hdr`
 echo Infile $infile hdr=$hdr
@@ -29,11 +29,11 @@ $DADA/bin/dada_db -a 32768 -b $block_size -n 8 -k $DADA_KEY
 echo dada_diskdb -k $DADA_KEY -f $infile -z
 dada_diskdb -k $DADA_KEY -f $infile -z &
 rm -f *.dat
-$cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1  -s 0  -N 10 -M 0.2 -T 0.2 -C 6.0  -B 4 | tee fredda.log  &
+$cudafdmt -t 512 -d 512 -p -r 1  -s 0  -N 10 -M 0.2 -T 0.2 -C 6.0  -B 1 -o fredda.$1.cand *00.fil  
 cudapid=$!
 #cuda-gdb --args $cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1 -D -r 1 -K 30 -s 0
 dada_dbmonitor -k $DADA_KEY &
 wait $cudapid
-
+#dada_db -d -k $DADA_KEY
 kill $(jobs -p)
 
