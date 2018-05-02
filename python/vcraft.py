@@ -228,7 +228,7 @@ class VcraftMux(object):
         assert freqs.shape == (len(self._files), nchan_per_file)
         
         self.freqconfig = freqconfig.FreqConfig(freqs, reverse=True)
-        self.freqs = self.freqconfig.freqs.flatten()
+        self.freqs = np.arange(self.freqconfig.nchan_span)*self.freqconfig.bw + self.freqconfig.freq
 
         self.all_samps = [f.nsamps for f in self._files]
         self.nsamps = min(self.all_samps)
@@ -274,7 +274,7 @@ class VcraftMux(object):
         assert samp_start + nsamp <= self.nsamps, 'Invalid read request. nsamp={} samp_start ={} differnce{}'.format(nsamp, samp_start, nsamp-samp_start)
 
         # allocate giant buffer
-        d = np.empty((nsamp, self.freqconfig.nchan), dtype=np.complex64)
+        d = np.empty((nsamp, len(self.freqs)), dtype=np.complex64)
         for ifile, f in enumerate(self._files):
             out_chans = self.freqconfig.chanmaps[ifile, :]
             fsamp_start = samp_start + self.sample_offsets[ifile]

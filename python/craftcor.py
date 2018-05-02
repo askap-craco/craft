@@ -62,7 +62,7 @@ class PlotOut(object):
     def plot_stuff(self):
 
         (a1, a2, xx) = self.last_xx
-        fig, (ax1, ax2, ax3, ax4, ax5) = pylab.subplots(5,1)
+        fig, (ax1, ax2, ax3, ax4, ax5,ax6) = pylab.subplots(6,1)
         xxang = np.angle(xx)
         print_delay(xx)
         ax1.plot(abs(xx))
@@ -80,6 +80,7 @@ class PlotOut(object):
         rate, offset = np.polyfit(t, phase_vt, 1)
         fit_std = (np.polyval((rate, offset), t) - phase_vt).std()
         ax5.plot(phase_vt)
+        ax6.imshow(abs(np.array(self.stuff)), aspect='auto')
         print 'Phase rate={} offset={} std={} deg'.format(rate, offset, fit_std)
         pylab.show()
 

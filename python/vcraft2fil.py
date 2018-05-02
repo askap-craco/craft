@@ -46,27 +46,39 @@ def detect(files, values):
     foff = mux.freqconfig.bw
     tstart = mux.start_mjd
     nbits = 32
-    nchan = mux.freqconfig.nchan
+    nchan = len(mux.freqs)
     nfft = 64*values.nfft
     nguard = 5*values.nfft
     nint = values.nsamps
     nchanout = nfft - 2*nguard
     finebw = foff/float(nchanout)
-    if values.dm is None:
-        bwout = finebw
-    else:
-        bwout = foff
+    nsamps = mux.nsamps
+
+    if values.dm is None: # just FFT, square and average over nint
+        bw_file = finebw
+        nchan_file = nchan*nchanout
+        sample_block = nint*nfft
+        tsamp = nint*nfft/infsamp
         
-    tsamp = nint*nfft/infsamp
+    else: # coherently dedisperse - FFT, phaseramp, IFFT, then average over nint
+        bw_file = foff
+        nchan_file = nchan
+        sample_block = nfft
+        tsamp = nint/infsamp
+        assert nfft % nint == 0
+
+    nsampout = nsamps/sample_block
+    nsampin = nsampout*sample_block
+
 
     hdr = {'data_type': 1,
            'tsamp': tsamp,
            'tstart': tstart,
            'fch1':fch1,
-           'foff':bwout,
+           'foff':bw_file,
            'nbits':nbits,
            'nifs':1,
-           'nchans':nchan*nchanout,
+           'nchans':nchan_file,
            'src_raj':0.0, # todo: add sigprog.deg2sex(mux.beam_pos[0])
            'src_dej':0.0
 
@@ -74,56 +86,75 @@ def detect(files, values):
     foutname = f.replace('.vcraft','.fil')
     fout = SigprocFile(foutname, 'w', hdr)
 
-    nsamps = mux.nsamps
-    nsampout = nsamps/(nint*nfft)
-    nsampin = nsampout*nint*nfft
-
     logging.debug('Writing sigproc header %s', hdr)
     logging.debug(' nsamps=%s nsampin=%s nsapout=%s samp rate=%s',nsamps, nsampin, nsampout, infsamp)
 
+    # prepare phase ramp, if dm is specified
     if values.dm is not None:
-        phaseramp = np.empty((nchan, nchanout), dtype=np.complex64)
-        foffset = (np.arange(nchanout) - float(nchanout)/2)*finebw # MHz
+        phaseramp = np.empty((nchan, nfft), dtype=np.complex64)
+        foffset = (np.arange(nfft) - float(nfft)/2)*finebw # MHz
         print 'FOFFSET', foffset
         
         for ichan, chanfreq in enumerate(mux.freqs):
             freqs = (chanfreq + foffset)*1e-3 # GHz
-            delay_ms = 4.15*values.dm*(freqs[0]**-2 - freqs[-1]**-2)
-            delay_ns = delay_ms*1e6
+            delay_ms = 4.15*values.dm*(freqs[0]**-2 - freqs[-1]**-2) # dispersion delay
+            delay_us = delay_ms*1e3
             delay_samp = delay_ms *1e-3 * infsamp
-            print values.dm, chanfreq, freqs[0], freqs[-1], delay_ms, delay_ns, delay_samp
+            print values.dm, chanfreq, freqs[0], freqs[-1], delay_ms, delay_us,delay_samp
+            phaseramp[ichan, :] = np.exp(np.pi*2j*delay_us*foffset)
 
-            phaseramp[ichan, :] = np.exp(np.pi*2j*delay_ns*foffset)
-
-        pylab.plot(np.degrees(np.angle(phaseramp.T)))
-        pylab.show()
+        if values.show:
+            pramps = np.degrees(np.angle(phaseramp.T))
+            pylab.plot(pramps, 'o-')
+            pylab.show()
 
 
     # reshape to integral number of integrations
     for s in xrange(nsampout):
-        sampno = s*nint*nfft
-        df = mux.read(sampno, nint*nfft)
-        #df.shape = (nint, nfft, nchan)
+        sampno = s*sample_block
+        df = mux.read(sampno, sample_block)
+        sampout = np.zeros((sample_block/nint, nchan), dtype=np.float32)
 
         for c in xrange(nchan):
-            #dc = df[:, :, c]
             dc = df[:, c]
-            dc.shape = (-1, nfft)
-            dfft = np.fft.fftshift(np.fft.fft(dc, axis=1), axes=1)
-            dfft = dfft[:, nguard:nchanout+nguard]
-            assert dfft.shape == (nint, nchanout)
-            dabs = abs((dfft * np.conj(dfft))).mean(axis=0)
-            assert len(dabs) == nchanout
-            #dabs -= dabs.mean()
-            #dabs /= dabs.std()
-            #dabs *= 18*2
-            #dabs += 128
-            dabs = dabs[::-1]
-            dabs= dabs.astype(np.float32)
-            dabs.tofile(fout.fin)
+            if values.dm is None:
+                dc.shape = (-1, nfft)
+                dfft = np.fft.fftshift(np.fft.fft(dc, axis=1), axes=1)
+
+                # discard guard channels
+                dfft = dfft[:, nguard:nchanout+nguard]
+                assert dfft.shape == (nint, nchanout)
+
+                # just take the absolute values, average over time and be done with it
+                dabs = abs((dfft * np.conj(dfft))).mean(axis=0)
+                assert len(dabs) == nchanout
+                dabs = dabs[::-1] # invert spectra
+                dabs= dabs.astype(np.float32) # convert to float32
+                dabs.tofile(fout.fin)
+
+            else:
+                # do FFT
+                assert len(dc) == nfft
+                dfft = np.fft.fftshift(np.fft.fft(dc))
+
+                # apply phaseramp
+                drotated = (dfft * phaseramp[c, :])
+                assert drotated.shape == (nfft,)
+                ddelayed = np.fft.fftshift(np.fft.ifft(drotated)) # should be roughly dedispersed
+                if values.show:
+                    pylab.plot(abs(ddelayed))
+                    pylab.show()
+                ddelayed.shape = (-1, nint)
+                dabs = (abs(ddelayed)**2).mean(axis=1)**2
+                sampout[:, c] = dabs
+
+
             if values.show:
                 pylab.plot(dabs)
                 pylab.show()
+
+        if values.dm is not None:
+            sampout.tofile(fout.fin)
 
 
 

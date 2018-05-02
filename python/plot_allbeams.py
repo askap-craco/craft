@@ -321,8 +321,8 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
-        beams -= 128
-        beams /= 18
+        #beams -= 128
+        #beams /= 18
         f0 = files[0]
         self.beams = beams
         print 'Loaded beams', beams.shape
