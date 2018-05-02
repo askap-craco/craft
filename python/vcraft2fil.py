@@ -23,6 +23,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-n','--nsamps', help='Number of samples per integration', type=int, default=1500)
     parser.add_argument('-s','--show', help='Show plots', action='store_true', default=False)
+    parser.add_argument('-o','--outfile', help='Output file name', default=None)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -76,7 +77,11 @@ def detect(f, values):
            'src_dej':0.0
            
     }
-    foutname = f.replace('.vcraft','.fil')
+    if values.outfile is None:
+        foutname = f.replace('.vcraft','.fil')
+    else:
+        foutname = values.outfile
+        
     fout = SigprocFile(foutname, 'w', hdr)
     nchan = len(freqs)
            

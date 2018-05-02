@@ -43,11 +43,12 @@ def _main():
             mask = (sn > 10) & (width < 10) & (dm > 30) & (beamno != 35)
             if np.any(mask):
                 goodat = npdata[mask, :]
-                good_sn = goodat[0, :]
+                good_sn = goodat[:, 0]
                 best_cand_idx = np.argmax(good_sn)
-                best_cand = goodat[:, best_cand_idx]
-                print 'FOUND CANDIDATE', np.array2string(best_cand, precision=1)
+                best_cand = goodat[best_cand_idx, :]
+                print 'FOUND CANDIDATE', np.array2string(best_cand, precision=1), best_cand.shape
                 best_beam = int(best_cand[6])
+
                 sys.exit(best_beam+100)
 
 if __name__ == '__main__':
