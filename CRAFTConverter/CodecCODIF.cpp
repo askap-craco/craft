@@ -244,13 +244,12 @@ namespace NCodec        // Part of the Codec namespace.
 	    // There *will* be an up to  +-1/2 sample time rounding with this approach
 
             unsigned long long startBAT = m_ullTriggerWriteBAT - (m_ullTriggerFrameId * (27.0/32.0));
-            m_ullBAT0 = ((startBAT +5e5)/ 1e6); // Round up to full second
+            m_ullBAT0 = ((startBAT +5e5)/ 1e6); // Round to full second
             m_ullBAT0 *= 1e6;  // Need to do in two lines as compiler is too clever it seems (optimises it away)
-	    m_ullFrame0 = (m_ullBAT0-startBAT)*(32.0/27.0); // Number of frames(samples) from startBAT till first 1sec boundary
+	    //m_ullFrame0 = (m_ullBAT0-startBAT)*(32.0/27.0); // Number of frames(samples) from startBAT till first 1sec boundary
 
 	    printf("DEBUG: startBAT=0x%llX\n", startBAT);
 	    printf("DEBUG: BAT0=0x%llX\n", m_ullBAT0);
-	    printf("DEBUG: Frame0=%llu\n", m_ullFrame0);
 	      
             if ( ! ConfigureDFH() )
             {
@@ -364,15 +363,11 @@ namespace NCodec        // Part of the Codec namespace.
 
     int CCodecCODIF::SkipBytes( bool *preload )
     {
-      printf("CCodecCODIF::SkipBytes: Skipping %d blocks of %d bytes\n", m_iSkipSamples, m_iSampleBlockSize);
       int bytestoskip = m_iSkipSamples * m_iSampleBlockSize;
-      printf("Skipping %d->", bytestoskip);
       int vcraftBlock = 4*m_iNumberOfChannels*m_iNumberofPol;
       *preload = (bytestoskip % vcraftBlock) != 0;
       bytestoskip /= vcraftBlock;
       bytestoskip *= vcraftBlock;
-      printf("%d\n", bytestoskip);
-      if (*preload) printf("Need to preload\n");
       return bytestoskip;
     }
 
@@ -486,11 +481,9 @@ namespace NCodec        // Part of the Codec namespace.
 
             unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
             unsigned long long BAT0MJDSec = m_ullBAT0/1e6;
-            unsigned long long PeriodsSinceBAT0 = (m_ullTriggerFrameId-m_ullFrame0) / uiSampleIntervalsPerPeriod; // Will round down
+            unsigned long long PeriodsSinceBAT0 = m_ullTriggerFrameId / uiSampleIntervalsPerPeriod; // Will round down
             int frameseconds = (BAT0MJDSec - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
-            unsigned long framenumber = ((m_ullTriggerFrameId-m_ullFrame0) % uiSampleIntervalsPerPeriod) / samplesPerFrame;
-
-
+            unsigned long framenumber = (m_ullTriggerFrameId % uiSampleIntervalsPerPeriod) / samplesPerFrame;
 
 	    mask = (1<<(m_iBitsPerSample*2))-1;
 
@@ -501,7 +494,7 @@ namespace NCodec        // Part of the Codec namespace.
             // There will be samples that don't fit in a frame (ie first sample may start between frames)
             // These will need to be calculated and eventually discarded
 
-            int initialSamples = (m_ullTriggerFrameId-m_ullFrame0) % samplesPerFrame;
+            int initialSamples = m_ullTriggerFrameId % samplesPerFrame;
 
             if ( initialSamples!=0 )
             {
