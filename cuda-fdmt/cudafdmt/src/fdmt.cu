@@ -847,6 +847,9 @@ __global__ void cuda_fdmt_iteration_kernel5_sum (
 		const fdmt_dtype* __restrict__ indata,
 		int src_beam_stride,
 		int dst_beam_stride,
+		int delta_t_local,
+		int iif,
+		int nchanout,
 		int tmax,
 		int tend,
 		const int* __restrict__ ts_data)
@@ -857,44 +860,53 @@ __global__ void cuda_fdmt_iteration_kernel5_sum (
 	int ndt = gridDim.y;
 	int t = threadIdx.x;
 	int nt = blockDim.x;
-	const int* ts_ptr = ts_data + 4*idt;
 
-	int src1_offset = ts_ptr[0];
-	int src2_offset = ts_ptr[1];
-	int out_offset = ts_ptr[2];
-	int mint = ts_ptr[3];
+	if (idt < delta_t_local) { // do all the fun computation
+		fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
+		const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
+		const int* ts_ptr = ts_data + 4*idt;
 
-	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
-	const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
+		int src1_offset = ts_ptr[0];
+		int src2_offset = ts_ptr[1];
+		int out_offset = ts_ptr[2];
+		int mint = ts_ptr[3];
+		while(t < mint) {
+			outp[out_offset] = inp[src1_offset];
+			t += nt;
+			outp += nt;
+			inp += nt;
+		}
 
-	while(t < mint) {
-		outp[out_offset] = inp[src1_offset];
-		t += nt;
-		outp += nt;
-		inp += nt;
-	}
+		while(t < tmax) {
+			outp[out_offset] = inp[src1_offset] + inp[src2_offset];
+			t += nt;
+			outp += nt;
+			inp += nt;
+		}
 
-	while(t < tmax) {
-		outp[out_offset] = inp[src1_offset] + inp[src2_offset];
-		t += nt;
-		outp += nt;
-		inp += nt;
-	}
+		int tend1 = min(tend, tmax + mint);
 
-	int tend1 = min(tend, tmax + mint);
+		while(t < tend1) {
+			outp[out_offset] = inp[src2_offset];
+			t += nt;
+			outp += nt;
+			inp += nt;
+		}
 
-	while(t < tend1) {
-		outp[out_offset] = inp[src2_offset];
-		t += nt;
-		outp += nt;
-		inp += nt;
-	}
-
-	while(t < tend) {
-		outp[out_offset] = 0;
-		t += nt;
-		outp += nt;
-		inp += nt;
+		while(t < tend) {
+			outp[out_offset] = 0.0f;
+			t += nt;
+			outp += nt;
+			inp += nt;
+		}
+	} else { // set output all to zero
+		int offset = t + tend*(idt + ndt*(iif + nchanout*beamno));
+		fdmt_dtype* outp = outdata + offset;
+		while(t < tend) {
+			*outp = 0.0f;
+			outp += nt;
+			t += nt;
+		}
 	}
 }
 
@@ -905,25 +917,41 @@ __global__ void cuda_fdmt_iteration_kernel5_copy (
 		const fdmt_dtype* __restrict__ indata,
 		int src_beam_stride,
 		int dst_beam_stride,
+		int delta_t_local,
+		int iif,
+		int nchanout,
 		int tend,
 		const int* __restrict__ ts_data)
 
 {
 	int beamno = blockIdx.x;
 	int idt = blockIdx.y;
+	int ndt = gridDim.y;
 	int t = threadIdx.x;
 	int nt = blockDim.x;
 	fdmt_dtype* outp = outdata + beamno*dst_beam_stride + t;
 	const fdmt_dtype* inp = indata + beamno*src_beam_stride + t;
-	const int* ts_ptr = ts_data + 4*idt;
-	int src1_offset = ts_ptr[0];
-	int out_offset = ts_ptr[2];
 
-	while(t < tend) {
-		outp[out_offset] = inp[src1_offset];
-		t += nt;
-		outp += nt;
-		inp += nt;
+	if (idt < delta_t_local) {
+		const int* ts_ptr = ts_data + 4*idt;
+		int src1_offset = ts_ptr[0];
+		int out_offset = ts_ptr[2];
+
+		while(t < tend) {
+			outp[out_offset] = inp[src1_offset];
+			t += nt;
+			outp += nt;
+			inp += nt;
+		}
+	} else {
+		int offset = t + tend*(idt + ndt*(iif + nchanout*beamno));
+		outp = outdata + offset;
+
+		while(t < tend) {
+			*outp = 0.0f;
+			outp += nt;
+			t += nt;
+		}
 	}
 
 
@@ -961,6 +989,8 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 
 	assert(indata->nw == outdata->nw); // Check nbeams same for both input and output
 	int nbeams = indata->nw;
+	int nchanout = outdata->nx;
+	int ndtout = outdata->ny;
 
 	int nt = fdmt->nt;
 	assert(array4d_size(outdata) <= fdmt->state_size);
@@ -969,7 +999,9 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 	int src_beam_stride = array4d_idx(indata, 1, 0, 0, 0);
 	int dst_beam_stride = array4d_idx(outdata, 1, 0, 0, 0);
 
-	// Not sure this memset is necessary.
+	// THIS MEMSET IS NECESSARY OTHERWISE PREVIOUS DATA
+	// PAST
+	// IT HURTS PERFORMANCE BUT I DON'T HAVE TIME TO WORK AROUND IT NOW
 	//array4d_cuda_memset(outdata, 0);
 
 	// For each output sub-band
@@ -988,8 +1020,11 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		// Can exceed teh maximum thread limit of the GPU , and use the threads sub-optimally.
 		// More thought required to do this right.
 		// kernel4 requires nthreads = tax
+		// We run enough kernels to cover nbeams x ndt
+		// The kernels will only do fun computation if idt < ndt
+		// If idt >= ndt, then they just set the output to zero
 		int nthreads = tmax;
-		dim3 grid_size(nbeams, delta_t_local);
+		dim3 grid_size(nbeams, ndtout);
 
 		//printf("Iteration %d iif %d indata->nz %d outdata->nz %d nt=%d delta_t_local %d tmax %d tend %d\n", iteration_num, iif,
 				//indata->nz, outdata->nz, nt, delta_t_local, tmax, tend);
@@ -997,10 +1032,12 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 
 		int nthread = 128;
 		if(2*iif + 1 < indata->nx) { // do sum if there's a channel to sum
-
-			cuda_fdmt_iteration_kernel5_sum<<<grid_size, nthread>>>(dst_start, src_start,
+			cuda_fdmt_iteration_kernel5_sum<<<grid_size, nthread>>>
+					(dst_start, src_start,
 					src_beam_stride,
 					dst_beam_stride,
+					delta_t_local,
+					iif, nchanout,
 					tmax,tend,
 					ts_data);
 			//gpuErrchk(cudaPeekAtLastError());
@@ -1010,6 +1047,8 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 			cuda_fdmt_iteration_kernel5_copy<<<grid_size, nthread>>>(dst_start, src_start,
 								src_beam_stride,
 								dst_beam_stride,
+								delta_t_local,
+								iif, nchanout,
 								tmax, ts_data);
 
 			//gpuErrchk(cudaPeekAtLastError());
@@ -1146,7 +1185,7 @@ __host__ void fdmt_copy_valid_ostate2(const fdmt_t* fdmt, array4d_t* out)
 	}
 }
 
-int fdmt_execute_iterations(fdmt_t* fdmt, int nbeams)
+int fdmt_execute_iterations(fdmt_t* fdmt)
 {
 	// Assumes data have been initialised into state[0]
 
@@ -1202,7 +1241,7 @@ int fdmt_execute_batch(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata, in
 #endif
 
 	// actually execute the iterations on the GPU
-	fdmt_execute_iterations(fdmt, nbeams);
+	fdmt_execute_iterations(fdmt);
 	fdmt->t_update_ostate.start();
 	fdmt_update_ostate(fdmt, ibeam, nbeams);
 	fdmt->t_update_ostate.stop();
@@ -1280,7 +1319,7 @@ int fdmt_calculate_weights(fdmt_t* fdmt)
 	for (int ii = 0; ii < nruns; ++ii) {
 		int s = 0;
 		fdmt_initialise_gpu(fdmt, &inarr_dummy, &fdmt->states[s], true); // Initialise state with ones
-		fdmt_execute_iterations(fdmt, 1); //  actually execute the iterations on the GPU
+		fdmt_execute_iterations(fdmt); //  actually execute the iterations on the GPU
 		fdmt_update_ostate(fdmt, 0, 1); // update the output state
 	}
 
