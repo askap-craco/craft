@@ -349,7 +349,7 @@ int main(int argc, char* argv[])
 	int blocknum = 0;
 	int iblock = num_skip_blocks;
 	unsigned long long total_candidates = 0;
-
+	unsigned long long num_candidate_overflow_blocks = 0;
 	// make boxcar history
 	array4d_t boxcar_history;
 	boxcar_history.nw = 1;
@@ -492,8 +492,11 @@ int main(int argc, char* argv[])
 					&boxcar_discards,
 					thresh, max_ncand_per_block, mindm, maxbc, &candidate_list);
 			tboxcar.stop();
-			total_candidates += candidate_list.copy_to_sink(sink, sampno);
-
+			int ncand = candidate_list.copy_to_sink(sink, sampno);
+			if (ncand >= max_ncand_per_block - 1) {
+				num_candidate_overflow_blocks++;
+			}
+			total_candidates += ncand;
 			if (dump_data) {
 				dumparr("boxcar", iblock, &boxcar_data, true);
 			}
@@ -521,7 +524,8 @@ int main(int argc, char* argv[])
 	double dm0_flagged_percent = ((double) num_flagged_times) / ((double) blocknum*nbeams_in*nt*nf) * 100.0;
 	cout << " FREDDA Finished" << endl;
 	cout << "Found " << total_candidates << " candidates" << endl;
-	cout << "Discarded " << total_discards << " candidates for being too wide" << endl;
+	cout << "Discarded " << total_discards << " candidates for being too wide."<< endl;
+	cout << num_candidate_overflow_blocks << " blocks overflowed the candidate buffer"<<endl;
 	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << data_nsecs << " seconds" << " at " << data_nsecs/tall.wall_total()<< "x real time"<< endl;
 	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams_in*blocknum) << " channels = " << flagged_percent << "%" << endl;
 	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams_in*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;

@@ -44,16 +44,22 @@ fdmt_dtype warpAllReduceMax(fdmt_dtype val) {
 }
 
 // Total hack because I"m too scared to do copy constructors:
-//__device__ unsigned int add_candidate(candidate_*t c, candidate_t* m_candidates,  unsigned int* m_ncand,  unsigned int* m_max_cand) {
-__device__ unsigned int add_candidate(candidate_t* c, candidate_t* m_candidates, unsigned int* m_ncand, unsigned int* m_max_cand) {
+__device__ unsigned int add_candidate(candidate_t* c, candidate_t* m_candidates, unsigned int* m_ncand, unsigned int m_max_cand) {
 
+	// atomicInc will wrap once you go past m_max_cand.
+	// This is dangerous
 	// Increment the count by 1
-	unsigned int old_ncand = atomicInc(m_ncand, *m_max_cand);
+	unsigned int old_ncand = atomicInc(m_ncand, m_max_cand);
+	// set to max_ncand if it's wrapped
+	if (old_ncand >= *m_ncand) {
+		*m_ncand = m_max_cand; // Doesn't need to be synchronised
+	}
 
 	candidate_t* cnext = m_candidates + old_ncand;
 	*cnext = *c;
-	//	printf("Added candidate ibeam=%d idt=%d ibc=%d t=%d sn=%f. Current ncand: %d old ncand %d max_cand %d\n", cnext->ibeam, cnext->idt,
-	//			cnext->ibc, cnext->t, cnext->sn, *m_ncand, old_ncand, *m_max_cand);
+//		printf("Added candidate ibeam=%d idt=%d ibc=%d t=%d sn=%f. Current ncand: %d old ncand %d max_cand %d\n",
+//				 cnext->ibeam, cnext->idt,
+//				cnext->ibc, cnext->t, cnext->sn, *m_ncand, old_ncand, *m_max_cand);
 
 	return old_ncand;
 }
@@ -74,7 +80,7 @@ __global__ void boxcar_do_kernel (
 		int ndt,
 		fdmt_dtype threshold,
 		candidate_t* m_candidates,
-		unsigned int* m_max_cand,
+		unsigned int m_max_cand,
 		unsigned int* m_ncand)
 {
 	// gridDim.x = nbeams
@@ -229,7 +235,7 @@ __global__ void boxcar_do_kernel2 (
 		int ndt,
 		fdmt_dtype threshold,
 		candidate_t* m_candidates,
-		unsigned int* m_max_cand,
+		unsigned int m_max_cand,
 		unsigned int* m_ncand)
 {
 	// gridDim.x = nbeams
@@ -372,7 +378,7 @@ __global__ void boxcar_do_kernel3 (
 		int ndt,
 		fdmt_dtype threshold,
 		candidate_t* m_candidates,
-		unsigned int* m_max_cand,
+		unsigned int m_max_cand,
 		unsigned int* m_ncand,
 		int maxbc)
 {
@@ -599,7 +605,7 @@ int boxcar_do_gpu(const array4d_t* indata,
 			boxcar_discards->d_device,
 			nt, ndt, thresh,
 			sink->m_candidates,
-			sink->m_max_cand,
+			*sink->m_max_cand,
 			sink->m_ncand,
 			maxbc);
 
