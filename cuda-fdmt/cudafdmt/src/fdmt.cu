@@ -509,7 +509,7 @@ int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* 
 	}
 
 	//state->nw = fdmt->nbeams;
-	state->nw = nbeams; // nbeams in this batch
+	//state->nw = nbeams; // nbeams in this batch
 	state->nx = fdmt->nf;
 	state->ny = fdmt->delta_t;
 	state->nz = fdmt->nt + fdmt->delta_t;
@@ -950,15 +950,17 @@ __global__ void cuda_fdmt_iteration_kernel4_copy (
 	}
 }
 
-__host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, const array4d_t* indata, array4d_t* outdata, int nbeams)
+__host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, const array4d_t* indata, array4d_t* outdata)
 {
 	FdmtIteration* iter = fdmt->iterations.at(iteration_num-1);
 	//outdata->nw = iter->state_shape.w;
-	outdata->nw = nbeams;
 	outdata->nx = iter->state_shape.x;
 	outdata->ny = iter->state_shape.y;
 	outdata->nz = iter->state_shape.z;
 	//assert(indata->nz == outdata->nz); // This almost certainly isn't the case - it grows with iteration
+
+	assert(indata->nw == outdata->nw); // Check nbeams same for both input and output
+	int nbeams = indata->nw;
 
 	int nt = fdmt->nt;
 	assert(array4d_size(outdata) <= fdmt->state_size);
@@ -1043,7 +1045,8 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 	int in_off = array4d_idx(1, in_nbeams, max_dt, max_dt+nt, 0, in_ibeam, idt, 0);
 	const fdmt_dtype* iptr = indata + in_off;
 
-	int ostate_off = array4d_idx(1, ostate_nbeams, max_dt, max_dt+nt, 0, ostate_ibeam, idt, 0);
+	int ostate_off = array4d_idx(1, ostate_nbeams, max_dt, max_dt+nt,
+			0, ostate_ibeam+in_ibeam, idt, 0);
 	fdmt_dtype* optr = ostate + ostate_off;
 	// Add the new state for all but the last block
 	for (int t = threadIdx.x; t < max_dt + nt; t += blockt) {
@@ -1154,7 +1157,7 @@ int fdmt_execute_iterations(fdmt_t* fdmt, int nbeams)
 		array4d_t* currstate = &fdmt->states[s];
 		s = (s + 1) % 2;
 		array4d_t* newstate = &fdmt->states[s];
-		cuda_fdmt_iteration4(fdmt, iter, currstate, newstate, nbeams);
+		cuda_fdmt_iteration4(fdmt, iter, currstate, newstate);
 		//gpuErrchk(cudaPeekAtLastError());
 		//gpuErrchk(cudaDeviceSynchronize());
 #ifdef DUMP_STATE
@@ -1182,6 +1185,8 @@ int fdmt_execute_batch(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata, in
 	inarr.nz = fdmt->nt;
 	inarr.d_device = indata + ibeam*(fdmt->nt*fdmt->nf);
 
+	fdmt->states[0].nw = nbeams;
+	fdmt->states[1].nw = nbeams;
 	// Initialise state
 	fdmt->t_init.start();
 	int s = 0;
@@ -1193,8 +1198,6 @@ int fdmt_execute_batch(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata, in
 	char buf[128];
 	array4d_copy_to_host(&fdmt->states[s]);
 	sprintf(buf, "state_s%d.dat", 0);
-	array4d_dump(&fdmt->states[s], buf);
-	sprintf(buf, "initstate_e%d.dat", fdmt->execute_count);
 	array4d_dump(&fdmt->states[s], buf);
 #endif
 
