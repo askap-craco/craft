@@ -446,6 +446,7 @@ __global__ void boxcar_do_kernel3 (
 
 		// store in shared memory - should be coalesced
 		thread_indata[thread_dt][ibc] = vin;
+		__syncthreads(); // actually should do a __syncwarp here - cuda9 required
 
 		// loop through shared memory
 		for (int t = 0 ; t < NBOX; ++t) {

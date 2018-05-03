@@ -266,6 +266,7 @@ int main(int argc, char* argv[])
 	int nbeams_out;
 	if (polsum) {
 		nbeams_out = source->nbeams();
+		assert(nbeams_in %2 == 0);
 	} else {
 		nbeams_out = nbeams_in;
 	}
@@ -478,6 +479,7 @@ int main(int argc, char* argv[])
 			fdmt_execute(&fdmt, rescale_buf.d_device, out_buf.d);
 			if (dump_data) {
 				dumparr("fdmt", iblock, &out_buf, false);
+				dumparr("ostate", iblock, & fdmt.ostate, true);
 			}
 			size_t sampno = iblock*nt;
 

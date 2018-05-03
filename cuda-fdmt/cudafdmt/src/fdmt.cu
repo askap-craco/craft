@@ -1021,25 +1021,30 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 										const fdmt_dtype* __restrict__ indata,
 										const fdmt_dtype weight,
-										int nt)
+										int nt,
+										int ostate_ibeam,
+										int ostate_nbeams)
 {
 	// Adds the indata into the ostate and shifts the ostate where the's some to add
 	// shape of both arrays is [nbeams, max_dt, max_dt + nt]
 	// The time axis is the last one (it just has a big shape)
-	// Where nbeams = gridDim.x
+	// For the indata, nbeams = gridDim.x
+	// For the ostate, nbeams = ostate_nbeams
 	// max_dt = gridDim.y
 	// nt = blockDim.x = number of threads
 	// Elsewhere we check that max_dt is a multiple of nt
 
-	int ibeam = blockIdx.x;
-	int nbeams = gridDim.x;
+	int in_ibeam = blockIdx.x;
+	int in_nbeams = gridDim.x;
 	int blockt = blockDim.x;
 	int max_dt = gridDim.y;
 	int idt = blockIdx.y;
 
-	int off = array4d_idx(1, nbeams, max_dt, max_dt+nt, 0, ibeam, idt, 0);
-	fdmt_dtype* optr = ostate + off;
-	const fdmt_dtype* iptr = indata + off;
+	int in_off = array4d_idx(1, in_nbeams, max_dt, max_dt+nt, 0, in_ibeam, idt, 0);
+	const fdmt_dtype* iptr = indata + in_off;
+
+	int ostate_off = array4d_idx(1, ostate_nbeams, max_dt, max_dt+nt, 0, ostate_ibeam, idt, 0);
+	fdmt_dtype* optr = ostate + ostate_off;
 	// Add the new state for all but the last block
 	for (int t = threadIdx.x; t < max_dt + nt; t += blockt) {
 		// makign this optr[t] = iptr[t+-1] + optr[t + nt] makes the DC RMS worse
@@ -1073,11 +1078,10 @@ __host__ void fdmt_update_ostate(fdmt_t* fdmt, int ibeam, int nbeams)
 	assert(currstate->nx == fdmt->ostate.nx);
 	assert(currstate->ny == fdmt->ostate.ny);
 	assert(currstate->nz == fdmt->ostate.nz);
-	fdmt_dtype* optr = fdmt->ostate.d_device + array4d_idx(&fdmt->ostate, ibeam, 0, 0, 0);
 
 	dim3 grid_shape(nbeams, fdmt->max_dt);
-	cuda_fdmt_update_ostate<<<grid_shape, 256>>>(optr,
-			currstate->d_device, rsqrtf(fdmt->nf), fdmt->nt);
+	cuda_fdmt_update_ostate<<<grid_shape, 256>>>(fdmt->ostate.d_device,
+			currstate->d_device, rsqrtf(fdmt->nf), fdmt->nt, ibeam, fdmt->nbeams);
 
 	//gpuErrchk(cudaDeviceSynchronize());
 }
