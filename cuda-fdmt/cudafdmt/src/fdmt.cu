@@ -1049,7 +1049,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 								dst_beam_stride,
 								delta_t_local,
 								iif, nchanout,
-								tmax, ts_data);
+								tend, ts_data);
 
 			//gpuErrchk(cudaPeekAtLastError());
 		}
