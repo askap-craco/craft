@@ -232,6 +232,7 @@ int main(int argc, char* argv[])
 	gpuErrchk( cudaSetDevice(cuda_device));
 
 	CpuTimer tall;
+	CpuTimer tproc;
 	CudaTimer trescale;
 	CudaTimer tboxcar;
 	tall.start();
@@ -265,6 +266,7 @@ int main(int argc, char* argv[])
 	int nbeams_out;
 	if (polsum) {
 		nbeams_out = source->nbeams();
+		assert(nbeams_in %2 == 0);
 	} else {
 		nbeams_out = nbeams_in;
 	}
@@ -347,7 +349,7 @@ int main(int argc, char* argv[])
 	int blocknum = 0;
 	int iblock = num_skip_blocks;
 	unsigned long long total_candidates = 0;
-
+	unsigned long long num_candidate_overflow_blocks = 0;
 	// make boxcar history
 	array4d_t boxcar_history;
 	boxcar_history.nw = 1;
@@ -407,6 +409,7 @@ int main(int argc, char* argv[])
 		fdmt.t_copy_in.start();
 		gpuErrchk(cudaMemcpy(in_buffer_device, read_buf, in_buffer_bytes*sizeof(uint8_t), cudaMemcpyHostToDevice));
 		fdmt.t_copy_in.stop();
+		tproc.start();
 		trescale.start();
 		if (blocknum == 0) { // if first block rescale and update with no
 			// flagging so we can work out roughly what the scales are
@@ -476,6 +479,7 @@ int main(int argc, char* argv[])
 			fdmt_execute(&fdmt, rescale_buf.d_device, out_buf.d);
 			if (dump_data) {
 				dumparr("fdmt", iblock, &out_buf, false);
+				dumparr("ostate", iblock, & fdmt.ostate, true);
 			}
 			size_t sampno = iblock*nt;
 
@@ -488,12 +492,16 @@ int main(int argc, char* argv[])
 					&boxcar_discards,
 					thresh, max_ncand_per_block, mindm, maxbc, &candidate_list);
 			tboxcar.stop();
-			total_candidates += candidate_list.copy_to_sink(sink, sampno);
-
+			int ncand = candidate_list.copy_to_sink(sink, sampno);
+			if (ncand >= max_ncand_per_block - 1) {
+				num_candidate_overflow_blocks++;
+			}
+			total_candidates += ncand;
 			if (dump_data) {
 				dumparr("boxcar", iblock, &boxcar_data, true);
 			}
 		}
+		tproc.stop();
 
 		blocknum++;
 		iblock++;
@@ -516,15 +524,17 @@ int main(int argc, char* argv[])
 	double dm0_flagged_percent = ((double) num_flagged_times) / ((double) blocknum*nbeams_in*nt*nf) * 100.0;
 	cout << " FREDDA Finished" << endl;
 	cout << "Found " << total_candidates << " candidates" << endl;
-	cout << "Discarded " << total_discards << " candidates for being too wide" << endl;
+	cout << "Discarded " << total_discards << " candidates for being too wide."<< endl;
+	cout << num_candidate_overflow_blocks << " blocks overflowed the candidate buffer"<<endl;
 	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << data_nsecs << " seconds" << " at " << data_nsecs/tall.wall_total()<< "x real time"<< endl;
 	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams_in*blocknum) << " channels = " << flagged_percent << "%" << endl;
 	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams_in*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;
-	cout << "FREDDA CPU "<< endl << tall << endl;
-	cout << "Rescale "<< endl << trescale << endl;
-	cout << "Boxcar "<< endl << tboxcar << endl;
 	cout << "File reading " << endl << source->m_read_timer << endl;
+	cout << "FREDDA Total "<< endl << tall << endl;
+	cout << "FREDDA Procesing "<< endl << tproc << endl;
+	cout << "Rescale "<< endl << trescale << endl;
 	fdmt_print_timing(&fdmt);
+	cout << "Boxcar "<< endl << tboxcar << endl;
 	cout << "FDMT " << ((double)fdmt.nops)/1e9
 			<< " Gops/iteration ran at: " << ((double)fdmt.nops) / (fdmt.t_iterations.get_average_time()/1e3)/1e9
 			<< " GFLOPS" << endl;

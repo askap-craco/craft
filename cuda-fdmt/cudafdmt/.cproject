@@ -37,8 +37,8 @@
 								<option defaultValue="nvcc.compiler.optimization.level.none" id="nvcc.compiler.optimization.level.764705403" name="Optimization Level" superClass="nvcc.compiler.optimization.level" valueType="enumerated"/>
 								<option id="nvcc.compiler.pic.605569362" name="Position Independent Code (-fPIC)" superClass="nvcc.compiler.pic"/>
 								<option id="nvcc.compiler.cpp11option.1342720167" name="Enable C++11 support (-std=c++11)" superClass="nvcc.compiler.cpp11option" value="true" valueType="boolean"/>
-								<option id="nvcc.compiler.option.lineinfo.1475337217" superClass="nvcc.compiler.option.lineinfo" value="true" valueType="boolean"/>
-								<option id="nvcc.compiler.option.gprof.2020786729" superClass="nvcc.compiler.option.gprof" value="true" valueType="boolean"/>
+								<option id="nvcc.compiler.option.lineinfo.1475337217" name="Generate line-number information for device code (-lineinfo)" superClass="nvcc.compiler.option.lineinfo" value="true" valueType="boolean"/>
+								<option id="nvcc.compiler.option.gprof.2020786729" name="Generate gprof information (-pg)" superClass="nvcc.compiler.option.gprof" value="true" valueType="boolean"/>
 								<inputType id="nvcc.compiler.input.cu.1474638552" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.1793809156" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.2115444139" superClass="nvcc.compiler.input.c"/>
