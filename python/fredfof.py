@@ -66,7 +66,7 @@ def load(fin, values):
         else: # ignore it
             pass
 
-    return np.array(d)
+    return np.array(d, dtype=np.float32)
 
 def fof_file(fin, values):
     d = load(fin, values)

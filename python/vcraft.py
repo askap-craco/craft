@@ -112,9 +112,6 @@ class VcraftFile(object):
             d.shape = (nsamp, nchan, 2)
             nsamps = nsamp
         elif mode == 1: # 8b + 8b:
-            if startsamp != 0:
-                raise NotImplementedError('Give me a sec!')
-
             # This works perfectly, but we need some practice at the other method with non-native types
             #d = np.fromfile(fin, dtype=np.int8)
             #print 'mode1 = 8+8', d[0:6]
@@ -126,7 +123,8 @@ class VcraftFile(object):
             #d = d.transpose(0,2,1,3)
             # and reshape it to the orrect shape
             #d = d.reshape(nsamps, nchan, 2)
-            dwords = np.fromfile(fin, dtype=np.uint32)
+            self.fin.seek(self.hdrsize + startsamp*2*nchan)
+            dwords = np.fromfile(fin, dtype=np.uint32, count=nsamp*nchan/2)
             # each word contains 4 8 bit numbers, (imag/real)*2
             nwords = len(dwords)/nchan
             assert len(dwords) == nchan*nwords
