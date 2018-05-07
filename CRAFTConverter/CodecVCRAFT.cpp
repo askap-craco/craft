@@ -197,7 +197,6 @@ namespace NCodec
             WordDeque_t &rDeque = m_SampleData.GetSamples();
 
 	    if (m_bPreload) {
-	      printf("DEBUG: preloading\n");
 	      m_pFile->Read( rDeque, m_iNumberOfChannels, 0, SEEK_CUR );
 	      m_bPreload = false;
 	    }
@@ -217,9 +216,8 @@ namespace NCodec
 
     bool CCodecVCRAFT::SeekForward( int iSkipBytes )
     {
-        // Skip SkipBytes forward through the file
-      printf("CCodecVCRAFT::SeekForward( %d)\n", iSkipBytes);
-        return m_pFile->SeekForward( iSkipBytes );
+      // Skip SkipBytes forward through the file
+      return m_pFile->SeekForward( iSkipBytes );
     }
 
     //////////
