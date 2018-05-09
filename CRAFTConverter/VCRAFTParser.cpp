@@ -168,7 +168,7 @@ namespace NCodec
                 { "CRAFT_MODE",           eParamTypeInt,     "", ""  },
                 { "NBITS",                eParamTypeInt,     "", ""  },
                 { "NPOL",                 eParamTypeInt,     "", ""  },
-                { "BEAMID",               eParamTypeInt,     "", ""  },
+                { "BEAM",                 eParamTypeInt,     "", ""  },
                 { "FPGA_ID",              eParamTypeInt,     "", ""  },
                 { "CARD_NO",              eParamTypeInt,     "", ""  },
                 { "ANTENNA_NO",           eParamTypeInt,     "", ""  },
