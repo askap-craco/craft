@@ -12,8 +12,9 @@ export DADA=$HOME/psrdada-install
 #export DADA=/home/craftop/askap/trunk/3rdParty/psrdada/psrdada-537159/install/
 export PATH=$DADA/bin:$PATH
 export LD_LIBRARY_PATH=$DADA/lib:$LD_LIBRARY_PATH
-#cudafdmt=$HOME/git/craft/cuda-fdmt/cudafdmt/Debugtest_cuda/cudafdmt
 #cudafdmt=$HOME/craftdev/craft/cuda-fdmt/cudafdmt/src/cudafdmt
+
+#cudafdmt=$HOME/git/craft/cuda-fdmt/cudafdmt/Debugtest_cuda/cudafdmt
 cudafdmt=$HOME/git/craft/cuda-fdmt/cudafdmt/src/cudafdmt
 
 ls -l $cudafdmt
@@ -29,6 +30,7 @@ $DADA/bin/dada_db -a 32768 -b $block_size -n 8 -k $DADA_KEY
 echo dada_diskdb -k $DADA_KEY -f $infile -z
 dada_diskdb -k $DADA_KEY -f $infile -z &
 rm -f *.dat
+#$cudafdmt -t 512 -d 512 -r 1  -s 0  -M 0.2 -T 0.2 -C 6.0  -o fredda.$1.cand $DADA_KEY   &
 $cudafdmt -t 512 -d 512 -r 1  -s 0  -M 0.2 -T 0.2 -C 6.0  -o fredda.$1.cand *.fil
 cudapid=$!
 #cuda-gdb --args $cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1 -D -r 1 -K 30 -s 0

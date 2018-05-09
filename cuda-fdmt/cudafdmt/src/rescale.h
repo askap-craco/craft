@@ -2,6 +2,7 @@
 #define _RESCALE_H
 
 #include <stdint.h>
+#include "DataOrder.h"
 #include "array.h"
 
 typedef float rescale_dtype;
@@ -153,9 +154,12 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		int nt,
 		bool invert_freq,
 		bool subtract_dm0,
-		bool polsum)
+		bool polsum,
+		DataOrder in_order)
 {
+
 	int ibeam = blockIdx.x;
+	int nbeams = gridDim.x;
 	int s = threadIdx.x; // sample index within a word
 	int w = threadIdx.y; // word index
 	int nwords = blockDim.y;
@@ -199,7 +203,6 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		outc = c;
 	}
 
-
 	// Easy way of expanding the time flagging by 1. Useful for killing dropouts. ACES-209
 	bool last_sample_ok = true;
 	float block_dm0thresh = dm0_thresh/sqrtf((float) nt);
@@ -208,7 +211,14 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 	rescale_dtype dm0stat_mean = dm0statarr[stati + 2]; // broadcast read.
 
 	for (int t = 0; t < nt; ++t) {
-		int wordidx = w + nwords*(t + nt*ibeam);
+		int wordidx;
+		if (in_order == DataOrder::TFBP) {
+			 // TFB order - only works for nsamps_per_word==1!
+			wordidx = ibeam + nbeams*(c + nf*t);
+		} else { // BTF order
+			wordidx = w + nwords*(t + nt*ibeam);
+		}
+
 
 		// coalesced read from global for all x threads.
 		wordT word = inarr[wordidx];
@@ -285,13 +295,15 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_calc_dm0_
 		rescale_dtype* __restrict__ dm0count,
 		int nf,
 		int nt,
-		rescale_dtype cell_thresh)
+		rescale_dtype cell_thresh,
+		DataOrder in_order)
 {
 	// input = BTF order
 	// dm0 order: BT
 	// Rescale: BF order
 
 	int ibeam = blockIdx.x;
+	int nbeams = gridDim.x;
 
 	// to take advantage of having a word in a register, we have to have two loops to loop
 	// over channels - one loop over the words, and the next over the samples in the word
@@ -301,7 +313,14 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_calc_dm0_
 		rescale_dtype dm0sum = 0.0;
 		int nsamp = 0;
 		for (int w = 0; w < nwords; w++) {
-			int inidx = w + nwords*(t + nt*ibeam); // input index : BTF order
+			int inidx;
+			if (in_order == DataOrder::TFBP) {
+				int thischan = w*nwords; // s must be 0!
+				inidx = ibeam + nbeams*(thischan + nf*t); // TFB order
+			} else {
+				inidx = w + nwords*(t + nt*ibeam); // input index : BTF order
+			}
+
 			// coalesced read from global
 			wordT word = inarr[inidx];
 
@@ -348,6 +367,10 @@ template <int nsamps_per_word, typename wordT> void
 
 	// clear output
 	array4d_cuda_memset(&rescale_buf, 0);
+	bool tfb_order = false;
+	if (tfb_order) {
+		assert(nsamps_per_word == 1); // Kernel's don't support anything else
+	}
 
 	rescale_calc_dm0_kernel< nsamps_per_word, wordT > <<<nbeams, 256>>>(
 			read_buf,
@@ -356,7 +379,8 @@ template <int nsamps_per_word, typename wordT> void
 			rescale.dm0.d_device,
 			rescale.dm0count.d_device,
 			nf, nt,
-			rescale.cell_thresh);
+			rescale.cell_thresh,
+			tfb_order);
 
 	// Take the mean all the dm0 times into one big number per beam - this is the how we flag
 	// short dropouts see ACES-209
@@ -389,7 +413,8 @@ template <int nsamps_per_word, typename wordT> void
 			rescale.cell_thresh*rescale.target_stdev,
 			nt,
 			invert_freq,
-			subtract_dm0);
+			subtract_dm0,
+			tfb_order);
 
 
 	rescale.sampnum += nt;

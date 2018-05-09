@@ -101,7 +101,8 @@ DadaSource::DadaSource(int nt, int key, bool lock) {
 	}
 
 	// output data order
-	m_out_data_order = DataOrder::BPTF;
+	//m_out_data_order = DataOrder::BPTF;
+	m_out_data_order = DataOrder::TFBP;
 	assert(m_in_data_order == DataOrder::TFBP);
 }
 

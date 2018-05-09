@@ -324,6 +324,7 @@ int main(int argc, char* argv[])
 	rescale.npols = npols_in;
 	rescale.polsum = polsum;
 	rescale.nbits = source->nbits();
+	rescale.in_order = source->data_order();
 	// set guess of initial scale and offset to dm0 thresholding works
 	printf("Rescaling to mean=%f stdev=%f decay constant=%f mean/std/kurtosis/dm0/Cell thresholds: %0.1f/%0.1f/%0.1f/%0.1f/%0.1f grow flags by %d channels\n",
 			rescale.target_mean,rescale.target_stdev,

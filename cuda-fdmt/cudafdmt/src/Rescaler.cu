@@ -41,6 +41,18 @@ Rescaler::Rescaler(RescaleOptions& _options) : options(_options)
 	noflag_options.dm0_thresh = INFINITY;
 	noflag_options.cell_thresh = INFINITY;
 	noflag_options.flag_grow = 1;
+	switch(options.in_order) {
+	case DataOrder::BPTF:
+		break; // supported for all values of NBITS
+
+	case DataOrder::TFBP:
+		assert(options.nbits == 32); // only supported for nbits=32
+		break;
+
+	default:
+		printf("Invalid rescaling input order\n");
+		exit(EXIT_FAILURE);
+	}
 }
 
 Rescaler::~Rescaler() {
