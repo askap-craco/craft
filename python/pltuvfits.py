@@ -34,12 +34,10 @@ def _main():
     info = []
     for irow in xrange(len(uvdata)):
         row = uvdata[irow]
-        print row
         u,v,w,jd,jdfrac,baseline,inttim,freqsel,source,datareal = row
         u,v,w = np.array([u,v,w,])*1e9
         delay = np.sqrt(u**2 + v**2 + w**2)
         jd += jdfrac
-        print datareal.shape
         nchan = datareal.shape[3]
         data = np.zeros(nchan, dtype=np.complex)
         data.real = datareal[0,0,0,:,0,0]

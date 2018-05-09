@@ -33,8 +33,9 @@ def print_delay(xx):
     pylab.show()
     '''
     delay = gradient/2./np.pi*len(punwrap)
-    print 'Unwrapped phase = {} rad = {} deg, gradient={} rad per channel, delay={} samples nsamp={}' \
-        .format(phase, np.degrees(phase), gradient, delay, len(punwrap))
+    delayns = delay*27./32.*1e3*(54./len(punwrap))
+    print 'Unwrapped phase = {} rad = {} deg, gradient={} rad per channel, delay={}samples ={} ns nsamp={}' \
+        .format(phase, np.degrees(phase), gradient, delay, delay*27./32.*1e3, len(punwrap))
 
     return (delay, np.degrees(phase))
 
@@ -49,6 +50,7 @@ class PlotOut(object):
     def __init__(self, corr):
         self.stuff = []
         self.corr = corr
+        self.delayout = open('/tmp/delays.parset', 'w')
 
 
     def put_product(self, a1, a2, xxp):
@@ -57,22 +59,28 @@ class PlotOut(object):
             self.stuff.append(xx)
             self.last_xx = (a1, a2, xx)
             if len(self.stuff) >0:
-                self.plot_stuff()
+                self.plot_stuff(a1, a2)
 
-    def plot_stuff(self):
+    def plot_stuff(self, a1, a2):
 
         (a1, a2, xx) = self.last_xx
         fig, (ax1, ax2, ax3, ax4, ax5,ax6) = pylab.subplots(6,1)
         xxang = np.angle(xx)
         print_delay(xx)
         ax1.plot(abs(xx))
-        ax2.plot(np.degrees(xxang))
+        ax2.plot(np.degrees(xxang), 'o')
         nf = self.corr.nfine_per_coarse
-        for i in xrange(8):
-            ax2.axvline(nf*i)
+        for i in xrange(self.corr.ncoarse_chan):
+            ax2.axvline(nf*i, c='r')
+            ax1.axvline(nf*i, c='r')
             print_delay(xx[nf*i:nf*(i+1)])
 
-        ax3.plot(np.fft.fftshift(abs(np.fft.fft(xx))), label='lag')
+        lag = np.fft.fftshift(abs(np.fft.fft(xx)))
+        lagidx = np.argmax(lag)
+        lagoff = lagidx - len(xx)/2.0
+        lagns= lagoff/self.corr.full_bw*1e3
+        lagsn = lag[lagidx]/np.std(lag[0:lagidx-100])
+        ax3.plot(lag,label='lag')
         angxx = np.angle(np.array(self.stuff))
         ax4.imshow(angxx, aspect='auto')
         phase_vt = np.degrees(angxx[:, 10:50].mean(axis=1))
@@ -81,7 +89,12 @@ class PlotOut(object):
         fit_std = (np.polyval((rate, offset), t) - phase_vt).std()
         ax5.plot(phase_vt)
         ax6.imshow(abs(np.array(self.stuff)), aspect='auto')
-        print 'Phase rate={} offset={} std={} deg'.format(rate, offset, fit_std)
+        print 'Phase rate={} offset={} std={} deg lagoff={}samples = {}ns lag S/N={}'.format(rate, offset, fit_std, lagoff, lagns, lagsn)
+        fig.suptitle('a1 {} a2 {}'.format(a1.antname, a2.antname))
+        curr_delay = self.corr.get_fixed_delay_usec(a2.antno)*1e3
+        self.delayout.write('{}={} S/N={} delay={}ns\n'.format(a1.antname, a2.antname, lagsn, lagns))
+        self.delayout.write('common.antenna.ant{}.delay={}ns\n'.format(a2.antno, curr_delay+lagns))
+
         pylab.show()
 
     def finish(self):
@@ -92,7 +105,7 @@ class PlotOut(object):
 
 class AntennaSource(object):
     def __init__(self, vfile):
-        self.vfile = vcraft.VcraftFile(vfile)
+        self.vfile = vfile
         self.antname = self.vfile.hdr['ANT'][0].lower()
         self.antno = int(self.vfile.hdr['ANTENNA_NO'][0])
         self.mjdstart = float(self.vfile.hdr['TRIGGER_MJD'][0])
@@ -130,7 +143,7 @@ class AntennaSource(object):
 
         sampoff = corr.curr_samp*corr.nfft + whole_delay
         rawd = self.vfile.read(sampoff, nsamp)
-        assert rawd.shape == (nsamp, corr.ncoarse_chan)
+        assert rawd.shape == (nsamp, corr.ncoarse_chan), 'Unexpected shape from vfile: {}'.format(rawd.shape)
         self.data = np.zeros((corr.nint, corr.nfine_chan, corr.npol_in), dtype=np.complex64)
         d1 = self.data
         nfine = corr.nfft - 2*corr.nguard_chan
@@ -141,29 +154,17 @@ class AntennaSource(object):
             foff = corr.drxfs - cfreq
             cbw = corr.coarse_chanbw/2.
             coarse_off = cfreq - corr.f0
-            freqs = -(np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw
+            freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw
+            if corr.sideband == -1:
+                freqs = -freqs
+                
             x1 = rawd[:, c].reshape(-1, corr.nfft)
             xf1 = np.fft.fftshift(np.fft.fft(x1, axis=1), axes=1)
-            xfguard = xf1[:, corr.nguard_chan:corr.nguard_chan+nfine:]
-            phases = np.zeros((corr.nint, nfine))
-
-            for i in xrange(corr.nint):
-                #delta_t = (frac_delay_us - i*geom_delay_rate_us/float(corr.nint))*0
-                delta_t = -fixed_delay_us + geom_delay_us
-                dt2 = fixed_delay_us/corr.fs - geom_delay_us
-                #phases[i, :] = cfreq*geom_delay_us + freqs*delta_t + coarse_off*dt2 # this works
-
-                #theta_fixed = -fixed_delay_us*(freqs +  c/corr.fs)
-                #theta_geom = (foff + freqs)*geom_delay_us
-                #phases[i, :] = theta_fixed + theta_geom
-
-                phases[i, :] = delta_t * (freqs + cfreq)
-
-                if i == 0:
-                    #logging.debug('Fixed offset %sdeg. Geometric offset=%sdeg', (c*fixed_delay_us/corr.fs*360.0) % 360.0,
-                    # (cfreq*geom_delay_us*360.0)%360.0))
-                    logging.debug('PHASOR %s[%s] fixed=%f us geom=%f us delta_t %s us dt2=%s us coff*fixed = %f deg coff*geom = %f deg',
-                        self.antname, self.ia, fixed_delay_us, geom_delay_us, delta_t, dt2, cfreq*fixed_delay_us*360., cfreq*geom_delay_us*360.)
+            xfguard = xf1[:, corr.nguard_chan:corr.nguard_chan+nfine:] # scale because oterhwise it overflows
+            delta_t = -fixed_delay_us + geom_delay_us
+            phases = delta_t * (freqs + cfreq)
+            logging.debug('PHASOR %s[%s] chan=%s freq=%sfixed=%f us geom=%f us delta_t %s us coff*fixed = %f deg coff*geom = %f deg',
+                          self.antname, self.ia, c, cfreq, fixed_delay_us, geom_delay_us, delta_t, cfreq*fixed_delay_us*360., cfreq*geom_delay_us*360.)
 
 
             # If you plot the phases you're about to correct, after adding a artificial
@@ -230,12 +231,14 @@ class Correlator(object):
         self.nguard_chan = 5
         self.oversamp = 32./27.
         self.fs = self.oversamp # samples per microsecnd
-        self.ncoarse_chan = 8
+        self.ncoarse_chan = len(self.refant.vfile.freqs)
+        self.sideband = -1
         self.coarse_chanbw = 1.0
-        self.drxfs = 1280.
+        self.drxfs = 1536.0
         self.nfine_per_coarse = self.nfft - 2*self.nguard_chan
         self.nfine_chan = self.ncoarse_chan*self.nfine_per_coarse
         self.fine_chanbw = self.coarse_chanbw / float(self.nfine_per_coarse)
+        self.full_bw = self.fine_chanbw * self.nfine_chan
         self.npol_in = 1
         self.npol_out = 1
         #self.f0 = self.ants[0].vfile.freqs.mean() # centre frequency for fringe rotation
@@ -243,12 +246,12 @@ class Correlator(object):
         self.freqs = self.ants[0].vfile.freqs
         self.inttime_secs = self.nint*self.nfft/(self.fs*1e6)
         self.inttime_days = self.inttime_secs/86400.
-        self.curr_intno = 10
-        self.curr_samp = self.curr_intno*self.nint
+        self.curr_intno = 0
+        self.curr_samp = self.curr_intno*self.nint + 10000
         self.prodout = PlotOut(self)
         self.calcmjd()
         self.get_fr_data()
-        self.fileout = CorrUvFitsFile('test.fits', self.f0, self.fine_chanbw, \
+        self.fileout = CorrUvFitsFile(values.outfile, self.f0, self.fine_chanbw, \
             self.nfine_chan, self.npol_out, sources, ants)
 
         logging.debug('F0 %f FINE CHANNEL %f kHz num=%d freqs=%s', self.f0, self.fine_chanbw*1e3, self.nfine_chan, self.freqs)
@@ -339,13 +342,20 @@ class Correlator(object):
     def do_x_corr(self, a1, a2):
         npolout = self.npol_out
         xx = np.empty([self.nfine_chan, npolout], dtype=np.complex64)
+        #np.seterr(all='raise')
         for p1 in xrange(self.npol_in):
             for p2 in xrange(self.npol_in):
                 d1 = a1.data[:, :, p1]
                 d2 = a2.data[:, :, p2]
                 pout = p2 + p1*self.npol_in
 
-                xx[:,pout] = (d1 * np.conj(d2)).mean(axis=0)
+                try:
+                    xx[:,pout] = (d1 * np.conj(d2)).mean(axis=0)
+                except Exception, e:
+                    print 'Error', e
+                    import ipdb
+                    ipdb.set_trace()
+                    
         self.put_product(a1, a2, xx)
 
     def put_product(self, a1, a2, xx):
@@ -358,9 +368,9 @@ def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-o','--offset', type=int, help='Offset samples')
+    parser.add_argument('-o','--outfile', help='Output fits file', default='corr.fits')
     parser.add_argument('-c','--channel', type=int, help='Channel to plot', default=0)
-    parser.add_argument('-n','--fft-size', type=int, help='FFT size per coarse channel', default=128)
+    parser.add_argument('-n','--fft-size', type=int, help='FFT size per coarse channel', default=64)
     parser.add_argument('--calcfile', help='Calc file for fringe rotation')
     parser.add_argument('-p','--parset', help='Parset for delays')
     parser.add_argument('--show', help='Show plot', action='store_true', default=False)
@@ -377,8 +387,8 @@ def _main():
     m87pos = SkyCoord(3.276089, 0.21626172, unit=('rad','rad'), frame='icrs')
     sources = [{'name':'M87','ra':m87pos.ra.deg,'dec':m87pos.dec.deg}]
     print sources
-    
-    antennas = [AntennaSource(a) for a in values.files]
+    antennas = [AntennaSource(mux) for mux in vcraft.mux_by_antenna(values.files)]
+    #antennas = [AntennaSource(vcraft.VcraftFile(f)) for f in values.files]
     corr = Correlator(antennas, sources, values)
     try:
         while(True):

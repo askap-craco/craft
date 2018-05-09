@@ -12,7 +12,7 @@ import os
 import sys
 import logging
 import vcraft
-
+from cmdline import strrange
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -21,7 +21,7 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-o','--offset', type=int, help='Offset samples')
-    parser.add_argument('-c','--channel', type=int, help='Channel to plot', default=0)
+    parser.add_argument('-c','--channel', type=strrange, help='Channel to plot', default=0)
     parser.add_argument('-n','--fft-size', type=int, help='FFT size per coarse channel', default=128)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
@@ -59,14 +59,13 @@ def _main():
 
     fig, axes = pylab.subplots(5,1)
     d1ax, d2ax,lagax,pax,lax = axes.flatten()
-    N = 4096
+    N = 4096 
     Nc = N*512
     if values.offset is None:
         h = 'TRIGGER_FRAMEID'
         offset = int(f2.hdr[h][0]) - int(f1.hdr[h][0])
     else:
         offset = values.offset
-
 
     print 'OFFSET IS', offset
     d1 = f1.read(offset)
@@ -131,7 +130,7 @@ def _main():
     pax.set_xlabel('Channel')
     lax.plot(np.fft.fftshift(abs(np.fft.fft(xx12.mean(axis=0)))), label='lag')
 
-    Navg = 128
+    Navg = 32
     Nout = xx12.shape[0]/Navg
     xx12 = xx12[:Nout*Navg, :]
     xx12.shape = [Nout, Navg, -1 ]

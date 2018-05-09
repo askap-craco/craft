@@ -69,13 +69,16 @@ class Poly(object):
         self.mjd = None
         self.sec = None
 
+    @property
+    def mjdfull(self):
+        return self.mjd + self.sec/86400.
+
     def update(self, name, value):
         if 'MJD' in name:
             self.mjd = int(value)
         if 'SEC' in name:
             self.sec = int(value)
         if name.startswith('SRC 0'):
-            self.mjdfull = float(self.mjd) + float(self.sec)/86400.
             namebits = name.split()
             antid = int(namebits[3])
             polyname = ' '.join(namebits[4:])
@@ -100,6 +103,14 @@ class Scan(object):
         self.sources = []
         self.curr_poly = None
         self.polys = []
+
+    @property
+    def first_mjd(self):
+        return min(self.polys, key=lambda p:p.mjdfull).mjdfull
+
+    @property
+    def last_mjd(self):
+        return max(self.polys, key=lambda p:p.mjdfull).mjdfull # COuld add interval but don't care right at the moment
 
     def update(self, name, value):
         namebits = name.split()
@@ -240,7 +251,7 @@ def plot_polys_range(rfile, mjdstart, tmax):
 
         
     polynames = ('DELAY (us)','U (m)', 'V (m)', 'W (m)')
-    fig, (ax1, ax2, ax3, ax4, ax5) = pylab.subplots(5,1, sharex=True)
+    fig, (ax1, ax2, ax3, ax4, ax5, ax6) = pylab.subplots(6,1, sharex=True)
     
     for ia1, a1 in enumerate(rfile.telnames):
         for ia2, a2 in enumerate(rfile.telnames[ia1:]):
@@ -249,7 +260,8 @@ def plot_polys_range(rfile, mjdstart, tmax):
             w = [val[a1]['W (m)'] - val[a2]['W (m)'] for val in values]
             el = [val[a1]['EL GEOM'] for val in values]
             secoffs = [val['secoff'] for val in values]
-            u,v,w,secoffs = map(np.array, (u,v,w, secoffs))
+            delays = [val[a1]['DELAY (us)'] - val[a2]['DELAY (us)']for val in values]
+            u,v,w,secoffs, delays = map(np.array, (u,v,w, secoffs, delays))
             if np.any(abs(u) > 1e5):
                 bad_times = np.where(abs(u) > 1e5)[0]
                 print 'BAD TIMES',bad_times, mjds[bad_times]
@@ -264,6 +276,7 @@ def plot_polys_range(rfile, mjdstart, tmax):
             ax3.plot(toff, w)
             ax4.plot(toff, secoffs)
             ax5.plot(toff, el)
+            ax6.plot(toff, delays)
 
 
 
@@ -286,6 +299,8 @@ def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
+    parser.add_argument('--mjdstart', type=float, help='MJD start to plot')
+    parser.add_argument('--nhrs', type=float, help='Number of hours to plot', default=1.0)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -298,10 +313,21 @@ def _main():
     #mjd = 58154 + 39360./86400.
     #results = f.scans[0].eval_src0_poly(mjd)
     #plot_polys(f,10)
-    mjd = 58196 + 47640./86400.
-    #mjd = 58196.9
+    mjdstart = f.scans[0].first_mjd
+    mjdend = f.scans[0].last_mjd
+    print 'File {} starts at mjd {} and ends at {}'.format(values.files[0], mjdstart, mjdend)
+    if values.mjdstart is None:
+        mjd = mjdstart
+    else:
+        mjd = values.mjdstart
+
+    if values.nhrs is None:
+        nhrs = (mjdend - mjdstart)*24.
+    else:
+        nhrs = values.nhrs
+
     print 'PLotting mjds starting from', mjd
-    plot_polys_range(f, mjd, 3600*8)
+    plot_polys_range(f, mjd, 3600*values.nhrs)
     
 
 
