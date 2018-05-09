@@ -10,6 +10,7 @@
 
 #include "rescale.h"
 #include "array.h"
+#include "DataOrder.h"
 
 //const rescale_dtype RESINFINITY = 1.0f/0.0f;
 
@@ -33,6 +34,7 @@ public:
 	int npols;
 	int nbits;
 	bool polsum;
+	DataOrder in_order;
 };
 
 class Rescaler {
@@ -100,7 +102,8 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 			dm0.d_device,
 			dm0count.d_device,
 			nf, nt,
-			options.cell_thresh);
+			options.cell_thresh,
+			options.in_order);
 
 	// Take the mean all the dm0 times into one big number per beam - this is the how we flag
 	// short dropouts see ACES-209
@@ -134,7 +137,8 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 			nt,
 			options.invert_freq,
 			options.subtract_dm0,
-			options.polsum);
+			options.polsum,
+			options.in_order);
 
 
 	sampnum += nt;
