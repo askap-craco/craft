@@ -10,6 +10,7 @@ import numpy as np
 import os
 import sys
 import logging
+import itertools
 from crafthdr import DadaHeader
 import freqconfig
 log = logging.getLogger(__name__)
@@ -65,6 +66,11 @@ class VcraftFile(object):
         self.bat0 = int(hdr['NOW_BAT'][0], base=16)
         self.bat0_40 = self.bat0 & 0xffffffffff
 
+    def __str__(self):
+        return '{} NBITS={}'.format(self.fname, self.nbits)
+
+    __repr__ = __str__
+
 
     @property
     def nsamps(self):
@@ -104,7 +110,8 @@ class VcraftFile(object):
         assert startsamp + nsamp <= self.nsamps, 'Asked for too many samples. startsamp {} nsamp {} nsamps {}'.format(startsamp, nsamp, self.nsamps)
 
         if mode == 0: # 16b+16b
-            self.fin.seek(self.hdrsize + startsamp*4*nchan)
+            offset_bytes = startsamp*nchan*4 # each sample is 4 bytes
+            self.fin.seek(self.hdrsize + offset_bytes)
             d = np.fromfile(fin, dtype=np.int16, count=nsamp*nchan*2)
             # truncate if required
             #d = d[:2*nchan*nsamps]
@@ -112,9 +119,6 @@ class VcraftFile(object):
             d.shape = (nsamp, nchan, 2)
             nsamps = nsamp
         elif mode == 1: # 8b + 8b:
-            if startsamp != 0:
-                raise NotImplementedError('Give me a sec!')
-
             # This works perfectly, but we need some practice at the other method with non-native types
             #d = np.fromfile(fin, dtype=np.int8)
             #print 'mode1 = 8+8', d[0:6]
@@ -126,7 +130,8 @@ class VcraftFile(object):
             #d = d.transpose(0,2,1,3)
             # and reshape it to the orrect shape
             #d = d.reshape(nsamps, nchan, 2)
-            dwords = np.fromfile(fin, dtype=np.uint32)
+            self.fin.seek(self.hdrsize + startsamp*2*nchan)
+            dwords = np.fromfile(fin, dtype=np.uint32, count=nsamp*nchan/2)
             # each word contains 4 8 bit numbers, (imag/real)*2
             nwords = len(dwords)/nchan
             assert len(dwords) == nchan*nwords
@@ -242,6 +247,7 @@ class VcraftMux(object):
         beam_dec = np.array(map(float, self.allhdr('BEAM_DEC'))).mean()
         #self.beam_pos = SkyCoord(beam_ra, beam_dec, frame='icrs', unit=('deg','deg'))
         self.beam_pos = (beam_ra, beam_dec)
+        self.hdr = self._files[0].hdr
 
 
     def allhdr(self, cardname):
@@ -258,7 +264,7 @@ class VcraftMux(object):
         '''
         hdr_values = set(self.allhdr(cardname))
         if len(hdr_values) != 1:
-            raise ValueError('Exepected the same header value for {} for all files. Got these values {}'.format(cardname, hdr_values))
+            raise ValueError('Exepected the same header value for {} for all files. Got these values {}'.format(cardname, self.allhdr(cardname)))
 
         return hdr_values.pop()
 
@@ -274,14 +280,21 @@ class VcraftMux(object):
         assert samp_start + nsamp <= self.nsamps, 'Invalid read request. nsamp={} samp_start ={} differnce{}'.format(nsamp, samp_start, nsamp-samp_start)
 
         # allocate giant buffer
-        d = np.empty((nsamp, len(self.freqs)), dtype=np.complex64)
+        d = np.zeros((nsamp, len(self.freqs)), dtype=np.complex64)
         for ifile, f in enumerate(self._files):
             out_chans = self.freqconfig.chanmaps[ifile, :]
             fsamp_start = samp_start + self.sample_offsets[ifile]
             d[:, out_chans] = f.read(fsamp_start, nsamp)
 
         return d
-         
+
+def mux_by_antenna(filenames):
+    all_files = [VcraftFile(f) for f in filenames]
+    mux_by_ant = itertools.groupby(all_files, lambda f:f.hdr['ANT'][0])
+    muxes = [VcraftMux(list(files)) for antname, files in mux_by_ant]
+    
+    return muxes
+        
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -304,18 +317,13 @@ def _main():
         vf.print_summary()
         all_files.append(vf)
 
-    mux = VcraftMux(all_files)
-    print mux.freqconfig
-    print mux.freqconfig.freqs
-    print mux.freqconfig.chanmaps
-    print mux.freqconfig.freqmaps
-    print mux.freqs
-
-        
-
-    
-
-
+    muxes = mux_by_antenna(values.files)
+    for mux in muxes:
+        print mux.freqconfig
+        print mux.freqconfig.freqs
+        print mux.freqconfig.chanmaps
+        print mux.freqconfig.freqmaps
+        print mux.freqs
 
 if __name__ == '__main__':
     _main()

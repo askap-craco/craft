@@ -25,6 +25,7 @@ def _main():
     parser.add_argument('-s','--show', help='Show plots', action='store_true', default=False)
     parser.add_argument('-d','--dm', help='Coherently dedisperse each channel to DM', type=float, default=None)
     parser.add_argument('-n','--nfft', help='FFT size / 64. I.e. for 128 point FFT specify 2', type=int, default=1)
+    parser.add_argument('-o','--outfile', help='Outfile', default=None)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -83,7 +84,11 @@ def detect(files, values):
            'src_dej':0.0
 
     }
-    foutname = f.replace('.vcraft','.fil')
+    if values.outfile:
+        foutname = values.outfile
+    else:
+        foutname = f.replace('.vcraft','.fil')
+        
     fout = SigprocFile(foutname, 'w', hdr)
 
     logging.debug('Writing sigproc header %s', hdr)
