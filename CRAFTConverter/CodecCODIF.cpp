@@ -50,10 +50,10 @@ namespace               // Anonymous namespace for internal helpers.
     // Constants.
 
     constexpr int      iMaxPacketSize_c            = 9000;   // Maximum bytes for network transport.
-  //    constexpr int      iSamplesPerFrame_c          = 256;    // Samples per frame (really should be calculated)   //CJP TODO CALCULATE
     constexpr int      iBitsPerByte_c              = 8;      // Number of bits in a byte.
     constexpr int      iTimeForIntegerSamples_c    = 27;     // Period in seconds, for a whole number of samples.
     constexpr double   dTolerance_c                = 0.001;  // Tolerance for floating point calculations.
+    constexpr int     DUTC                        = 37;
 
 }                       // End anonymous namespace.
 
@@ -464,7 +464,7 @@ namespace NCodec        // Part of the Codec namespace.
 
             // Set the epoch based on our BAT0
 
-            if ( setCODIFEpochMJD( pDFH, m_ullBAT0/(24*60*60*1e6)) != CODIF_NOERROR )
+            if ( setCODIFEpochMJD( pDFH, (m_ullBAT0/1e6-DUTC)/(24*60*60)) != CODIF_NOERROR )
             {
                 throw string { "setCODIFEpochMJD() failed" };
             }
@@ -482,7 +482,7 @@ namespace NCodec        // Part of the Codec namespace.
             unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
             unsigned long long BAT0MJDSec = m_ullBAT0/1e6;
             unsigned long long PeriodsSinceBAT0 = m_ullTriggerFrameId / uiSampleIntervalsPerPeriod; // Will round down
-            int frameseconds = (BAT0MJDSec - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
+            int frameseconds = (BAT0MJDSec -DUTC - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
             unsigned long framenumber = (m_ullTriggerFrameId % uiSampleIntervalsPerPeriod) / samplesPerFrame;
 
 	    mask = (1<<(m_iBitsPerSample*2))-1;
