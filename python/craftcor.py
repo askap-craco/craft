@@ -108,8 +108,8 @@ class AntennaSource(object):
         self.vfile = vfile
         self.antname = self.vfile.hdr['ANT'][0].lower()
         self.antno = int(self.vfile.hdr['ANTENNA_NO'][0])
-        self.mjdstart = float(self.vfile.hdr['TRIGGER_MJD'][0])
-        self.trigger_frame = int(self.vfile.hdr['TRIGGER_FRAMEID'][0])
+        self.mjdstart = self.vfile.start_mjd
+        self.trigger_frame = self.vfile.start_frameid
         self.hdr = self.vfile.hdr
 
     def do_f(self, corr):
@@ -151,7 +151,6 @@ class AntennaSource(object):
         for c in xrange(corr.ncoarse_chan):
             #cfreq = self.vfile.freqs[c]
             cfreq = corr.freqs[c]
-            foff = corr.drxfs - cfreq
             cbw = corr.coarse_chanbw/2.
             coarse_off = cfreq - corr.f0
             freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw

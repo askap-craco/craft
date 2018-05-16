@@ -321,6 +321,8 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
+        #beams -= beams.mean(axis=0)
+        #beams /= beams.std(axis=0)
         #beams -= 128
         #beams /= 18
         f0 = files[0]

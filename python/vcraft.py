@@ -130,11 +130,13 @@ class VcraftFile(object):
             #d = d.transpose(0,2,1,3)
             # and reshape it to the orrect shape
             #d = d.reshape(nsamps, nchan, 2)
-            self.fin.seek(self.hdrsize + startsamp*2*nchan)
+            offset_bytes =self.hdrsize + startsamp*nchan*2 # each sample is w bytes
+            self.fin.seek(offset_bytes)
             dwords = np.fromfile(fin, dtype=np.uint32, count=nsamp*nchan/2)
             # each word contains 4 8 bit numbers, (imag/real)*2
             nwords = len(dwords)/nchan
-            assert len(dwords) == nchan*nwords
+            assert len(dwords) == nchan*nwords, 'Got {} dwords = nchan={} nwords={} expected={}'.format(len(dwords), nchan, nwords, nchan*nwords)
+            
             dwords.shape = nwords, nchan
 
             nsamps = nwords*2
@@ -219,7 +221,7 @@ class VcraftMux(object):
         '''
         :vcraft_files: A list of open Vcraft files
         '''
-        self._files = vcraft_files
+        self._files = sorted(vcraft_files, key=lambda f:(f.hdr['CARD_NO'][0], f.hdr['FPGA_ID'][0]))
         self.ant = self.hdr_identical('ANT')
         self.beam = int(self.hdr_identical('BEAM'))
         self.nbits = int(self.hdr_identical('NBITS'))
@@ -239,7 +241,9 @@ class VcraftMux(object):
         self.nsamps = min(self.all_samps)
         self.trigger_frameids = np.array(map(int, self.allhdr('TRIGGER_FRAMEID')))
         self.trigger_mjds = np.array(map(float, self.allhdr('TRIGGER_MJD')))
-        self.sample_offsets = self.trigger_frameids - min(self.trigger_frameids)
+        self.start_mjd = max(self.trigger_mjds)
+        self.start_frameid = max(self.trigger_frameids)
+        self.sample_offsets = self.start_frameid - self.trigger_frameids
         assert np.all(self.sample_offsets >= 0)
         assert np.all(self.sample_offsets < self.nsamps)
         self.start_mjd = self.trigger_mjds[np.argmin(self.sample_offsets)]

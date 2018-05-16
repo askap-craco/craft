@@ -23,6 +23,7 @@ def _main():
     parser.add_argument('-o','--offset', type=int, help='Offset samples')
     parser.add_argument('-c','--channel', type=strrange, help='Channel to plot', default=0)
     parser.add_argument('-n','--fft-size', type=int, help='FFT size per coarse channel', default=128)
+    parser.add_argument('-a','--num-avg', type=int, help='Number of ffts to average for dynamic spectrum', default=32)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -58,6 +59,8 @@ def _main():
             print h, 'd1=',d1t, 'd2=',d2t, 'diff=',d2t - d1t,mul*(d2t-d1t)
 
     fig, axes = pylab.subplots(5,1)
+    fig.suptitle(' '.join(values.files[0:2]))
+
     d1ax, d2ax,lagax,pax,lax = axes.flatten()
     N = 4096 
     Nc = N*512
@@ -130,7 +133,7 @@ def _main():
     pax.set_xlabel('Channel')
     lax.plot(np.fft.fftshift(abs(np.fft.fft(xx12.mean(axis=0)))), label='lag')
 
-    Navg = 32
+    Navg = values.num_avg
     Nout = xx12.shape[0]/Navg
     xx12 = xx12[:Nout*Navg, :]
     xx12.shape = [Nout, Navg, -1 ]
@@ -138,6 +141,7 @@ def _main():
 
     pylab.figure()
     pylab.imshow(np.angle(xx12a), aspect='auto')
+    pylab.suptitle(' '.join(values.files[0:2]))
 
     pylab.show()
 

@@ -42,7 +42,7 @@ def load_beams(path, tstart, ntimes, pattern='*.fil', return_files=False):
             dtype = np.float32
 
         v = np.fromfile(f.fin, dtype=dtype, count=nelements )
-        v.shape = (ntimes, f.nifs, f.nchans)
+        v.shape = (-1, f.nifs, f.nchans)
         
 
         if f.nifs == 1:
@@ -53,7 +53,7 @@ def load_beams(path, tstart, ntimes, pattern='*.fil', return_files=False):
 
             #ifnum = int(fname.split('.')[-2])
             ifnum = ifname
-            data[:, ifnum, :] = v[:, 0, :]
+            data[0:v.shape[0], ifnum, :] = v[:, 0, :]
 
             '''
             print 'load beams', v.shape, data.shape, ifnum, ifname
