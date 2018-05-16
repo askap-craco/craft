@@ -303,7 +303,7 @@ namespace NCodec
             RetrieveParameter( "CRAFT_MODE",            m_iMode );
             RetrieveParameter( "NBITS",                 m_iBitsPerSample );
             RetrieveParameter( "NPOL",                  m_iNumberofPol );
-            RetrieveParameter( "BEAMID",                m_iBeamId );
+            RetrieveParameter( "BEAM",                  m_iBeamId );
             RetrieveParameter( "FPGA_ID",               m_iFPGAId );
             RetrieveParameter( "CARD_NO",               m_iCardNumber );
             RetrieveParameter( "ANTENNA_NO",            m_iAntennaNumber );
