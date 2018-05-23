@@ -78,11 +78,11 @@ void CandidateSink::add_candidate(int ibeam, int idt, int t, int ibc, float sn)
 	}
 	double cand_mjd = m_srcfile->tstart() + time_from_file/86400.0;
 	fprintf(m_candfile, "%f %lu %f %d %d %0.3f %d %0.9f\n", sn, t, time_from_file,
-			ibc, idt, dm, ibeam, cand_mjd);
+		ibc, idt, dm, ibeam, cand_mjd);
 
 	if (m_sockbuf != NULL) {
-		int line_len = snprintf(m_sockbuf+m_sockbuf_size, MAX_PACKET_BYTE, "%f %lu %f %d %d %0.3f %d\n", sn, t, time_from_file,
-				ibc, idt, dm, ibeam);
+		int line_len = snprintf(m_sockbuf+m_sockbuf_size, MAX_PACKET_BYTE, "%f %lu %f %d %d %0.3f %d %0.9f\n", sn, t, time_from_file,
+					ibc, idt, dm, ibeam, cand_mjd);
 		m_sockbuf_size += line_len;
 
 		// flush packet early if it's getting close to being big
