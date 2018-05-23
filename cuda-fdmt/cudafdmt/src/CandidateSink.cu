@@ -27,7 +27,7 @@ CandidateSink::CandidateSink(DataSource* srcfile, const char* filename,
 		perror("Could not open candidate file");
 		exit(EXIT_FAILURE);
 	}
-	fprintf(m_candfile, "# S/N, sampno, secs from file start, boxcar, idt, dm, beamno\n");
+	fprintf(m_candfile, "# S/N, sampno, secs from file start, boxcar, idt, dm, beamno, mjd\n");
 
 	if (sockaddr != NULL && strlen(sockaddr) > 0 && sockprt > 0) {
 		if ((m_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {

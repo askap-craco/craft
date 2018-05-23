@@ -87,6 +87,7 @@ DadaSource::DadaSource(int nt, int key, bool lock) {
 	m_foff = get_header_double("BW");
 	m_tstart = get_header_double("MJD_START");
 	m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
+	m_nt = nt;
 
 	char order_str[256];
 	get_header_string("DORDER",order_str);
@@ -149,27 +150,34 @@ int DadaSource::get_header_string(const char* name, char* out) {
 	return 0;
 }
 
-size_t DadaSource::read_samples(void** output)
+void* DadaSource::get_next_buffer(size_t& nt)
 {
-	m_read_timer.start();
+        m_read_timer.start();
 	// TODO: get main loop to release as soon as it's finished, rather than on next read, but it's too too much typing.
 	if (m_got_buffer) {
 		release_buffer();
 	}
-	uint64_t nbytes;
+
+  	uint64_t nbytes;
 	char* ptr = ipcio_open_block_read(m_hdu->data_block, &nbytes, &m_blkid);
 	m_read_timer.stop();
 
 	m_got_buffer = true;
 	// TODO check expected nbytes
 	//m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
-	size_t nt = nbytes/(npols()*nbeams()*nchans()*nbits()/8);
+	nt = nbytes/(npols()*nbeams()*nchans()*nbits()/8);
+	
+	return (void*) ptr;
+}
+
+size_t DadaSource::read_samples(void** output)
+{
+        size_t nt;
+        void* ptr = get_next_buffer(nt);
 	assert(m_in_data_order == DataOrder::TFBP);
-
-
 	m_transpose_timer.start();
 	if (m_in_data_order == m_out_data_order) {
-		*output = (void*)ptr;
+		*output = ptr;
 	} else if (m_in_data_order == DataOrder::TFBP && m_out_data_order == DataOrder::BPTF) {
 		*output = m_reorder_buffer;
 		assert(nbits() == 32);
@@ -210,7 +218,17 @@ void DadaSource::release_buffer() {
 }
 size_t DadaSource::seek_sample(size_t t)
 {
-	return size_t(0);
+  size_t nread = 0, nt=0;
+  while(true) {
+    get_next_buffer(nt);
+    nread += nt;
+    if (nread >= t || nt != m_nt) {
+      break;
+    }
+  }
+
+  return nread;
+  
 }
 size_t DadaSource::samples_read()
 {

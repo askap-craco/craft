@@ -64,12 +64,15 @@ public:
 	char* name();
 
 private:
+	void* get_next_buffer(size_t& nt);
+
 	dada_hdu_t* m_hdu;
 	char* m_hdr;
     int m_npols;
     int m_nbeams;
     int m_nchans;
     int m_nbits;
+    int m_nt;
     double m_tsamp;
     double m_fch1;
     double m_foff;
