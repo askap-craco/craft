@@ -87,6 +87,7 @@ DadaSource::DadaSource(int nt, int key, bool lock) {
 	m_foff = get_header_double("BW");
 	m_tstart = get_header_double("MJD_START");
 	m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
+	m_current_sample = 0;
 	m_nt = nt;
 
 	char order_str[256];
@@ -166,6 +167,7 @@ void* DadaSource::get_next_buffer(size_t& nt)
 	// TODO check expected nbytes
 	//m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
 	nt = nbytes/(npols()*nbeams()*nchans()*nbits()/8);
+	m_current_sample += nt;
 	
 	return (void*) ptr;
 }
@@ -220,8 +222,10 @@ size_t DadaSource::seek_sample(size_t t)
 {
   size_t nread = 0, nt=0;
   while(true) {
+    // read buffers blankly
     get_next_buffer(nt);
     nread += nt;
+    // break if we've read enough, or it's finished reading entirely.
     if (nread >= t || nt != m_nt) {
       break;
     }
@@ -230,10 +234,7 @@ size_t DadaSource::seek_sample(size_t t)
   return nread;
   
 }
-size_t DadaSource::samples_read()
-{
-	return size_t(0);
-}
+
 char* DadaSource::name()
 {
 	return (char*)"Hello";

@@ -55,8 +55,8 @@ public:
 	size_t samples_read() {
 		return m_samples_read;
 	}
-	size_t curr_sample() {
-		return m_curr_sample;
+	size_t current_sample() {
+		return m_current_sample;
 	}
 	double fch1() {
 		return m_fch1;
@@ -93,7 +93,7 @@ private:
 	int m_nbits;
 
 	size_t m_samples_read;
-	size_t m_curr_sample;
+	size_t m_current_sample;
 
 	FILE* m_file;
 	int m_fd;

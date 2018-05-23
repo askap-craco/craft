@@ -16,3 +16,9 @@ DataSource::DataSource() {
 DataSource::~DataSource() {
 	// TODO Auto-generated destructor stub
 }
+
+double DataSource::current_mjd() {
+  double mjd = tstart() + current_sample()*tsamp()/86400.0;
+  
+  return mjd;
+}

@@ -54,9 +54,13 @@ public:
 	DataOrder data_order() {
 		return m_out_data_order;
 	}
+	size_t current_sample()
+	{
+	  return m_current_sample;
+	}
 	size_t read_samples(void** output);
 	size_t seek_sample(size_t t);
-	size_t samples_read();
+
 	void release_buffer();
 
 	// I need to put these here otherwise they get changed
@@ -82,6 +86,7 @@ private:
     DataOrder m_out_data_order;
     uint64_t m_bytes_per_block;
     uint64_t m_blkid;
+    size_t m_current_sample;
     void* m_reorder_buffer;
     CpuTimer m_transpose_timer;
 
