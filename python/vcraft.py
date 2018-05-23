@@ -43,7 +43,7 @@ class VcraftFile(object):
     def __init__(self, fname, mode=None):
         self.fname = fname
         f = fname
-        hdr = DadaHeader.fromfile(f)
+        hdr = DadaHeader.fromfile(f+'.hdr')
         self.hdr = hdr
         self.fin = open(f, 'r')
         self.hdrsize = int(hdr['HDR_SIZE'][0])
@@ -296,6 +296,7 @@ def mux_by_antenna(filenames):
     all_files = [VcraftFile(f) for f in filenames]
     mux_by_ant = itertools.groupby(all_files, lambda f:f.hdr['ANT'][0])
     muxes = [VcraftMux(list(files)) for antname, files in mux_by_ant]
+    muxes.sort(key=lambda mux: mux.ant) # sort by antenna
     
     return muxes
         

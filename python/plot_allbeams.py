@@ -58,6 +58,7 @@ def _main():
     parser.add_argument('--save', help='Save plots as png', action='store_true', default=False)
     parser.add_argument('--raw-units', help='Use raw unts, rather than physical units on axis', action='store_true', default=False)
     parser.add_argument('-d', '--dm', help='Dispersion measure (pc/cm3)', default=0., type=float)
+    parser.add_argument('-f','--fscrunch', help='Fscurnch factor', default=1, type=int)
     parser.set_defaults(verbose=False, nxy="1,1")
     values = parser.parse_args()
     if values.verbose:
@@ -118,7 +119,7 @@ class Plotter(object):
     @staticmethod
 
     def from_values(values, tstart, ntimes):
-        p = Plotter(values.files, values.nxy, fft=values.fft, raw_units=values.raw_units)
+        p = Plotter(values.files, values.nxy, fft=values.fft, raw_units=values.raw_units, fscrunch_factor=values.fscrunch)
         if values.seconds:
             p.set_position_seconds(*values.seconds)
         else:
@@ -130,7 +131,7 @@ class Plotter(object):
 
         return p
     
-    def __init__(self, filenames, nxy, tstart=0, ntimes=1024, fft=False, raw_units=False):
+    def __init__(self, filenames, nxy, tstart=0, ntimes=1024, fft=False, raw_units=False, fscrunch_factor=1):
         self.nrows, self.ncols = nxy
         self.figs = {}
         self.fig_labels = {}
@@ -146,7 +147,10 @@ class Plotter(object):
         tsamp = files[0].tsamp
         self.raw_units = raw_units
         self.tscrunch_factor = 1
-        self.fscrunch_factor = 1
+        fdiv = divisors(self.nfreq)
+        #self.fscrunch_factor = fdiv[fdiv.index(fscrunch_factor) -1]
+        self.fscrunch_factor = fscrunch_factor
+
         self.dm = 0.
         if self.raw_units:
             xunit = 'sample'
@@ -263,10 +267,10 @@ class Plotter(object):
             self.tscrunch_factor += 1
         elif event.key == 'T':
             self.tscrunch_factor = max(1, self.tscrunch_factor - 1)
-        elif event.key == 'f':
+        elif event.key == 'z':
             fdiv = divisors(self.nfreq)
             self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) + 1]
-        elif event.key == 'F':
+        elif event.key == 'Z':
             fdiv = divisors(self.nfreq)
             self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) -1]
         elif event.key == 'd':
@@ -321,8 +325,8 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
-        #beams -= beams.mean(axis=0)
-        #beams /= beams.std(axis=0)
+        beams -= beams.mean(axis=0)
+        beams /= beams.std(axis=0)
         #beams -= 128
         #beams /= 18
         f0 = files[0]

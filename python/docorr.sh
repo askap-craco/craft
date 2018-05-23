@@ -15,7 +15,8 @@ if [[ ! -e $calcfile ]] ; then
     exit 1
 fi
 
-outdir=/data/TETHYS_1/ban115/correlations/virgo/mode0/SB1633/card3.extrapause/
+#outdir=/data/TETHYS_1/ban115/correlations/virgo/mode3/SB1633/card3.extrapause/
+outdir=/data/TETHYS_1/ban115/correlations/virgo/mode3/SB1640/allcards/
 mkdir -p $outdir
 chmod a+w $outdir
 
