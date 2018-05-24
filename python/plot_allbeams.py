@@ -161,6 +161,7 @@ class Plotter(object):
             
         self.mjdstart = mjdstart
         self.tsamp = tsamp
+        self.rescale = False
         self.set_position_sample(tstart, ntimes)
         self.imzrange = None
         if nbeams == 1:
@@ -279,6 +280,8 @@ class Plotter(object):
             self.squeeze_zrange(2.)
         elif event.key == 'C':
             self.squeeze_zrange(0.5)
+        elif event.key == 'r':
+            self.rescale = not self.rescale
         elif event.key == 'ctrl+c':
             sys.exit(0)
         elif event.key == 'h' or event.key == '?':
@@ -314,6 +317,7 @@ class Plotter(object):
         d - Dedisperse (I'll ask for the DM on the cmdline
         c - Increase colormap zoom
         C - Decrease colormap zoom
+        r - Toggle rescaling
         h or ? - Print this help
         Ctrl-C - quit'''
         print s
@@ -325,10 +329,10 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
-        beams -= beams.mean(axis=0)
-        beams /= beams.std(axis=0)
-        #beams -= 128
-        #beams /= 18
+        if self.rescale:
+            beams -= beams.mean(axis=0)
+            beams /= beams.std(axis=0)*np.sqrt(beams.shape[2])
+            
         f0 = files[0]
         self.beams = beams
         print 'Loaded beams', beams.shape

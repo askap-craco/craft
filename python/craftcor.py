@@ -158,7 +158,8 @@ class AntennaSource(object):
                 freqs = -freqs
                 
             x1 = rawd[:, c].reshape(-1, corr.nfft)
-            xf1 = np.fft.fftshift(np.fft.fft(x1, axis=1), axes=1)
+            xf1 = np.fft.fft(x1, axis=1)
+            xf1 = np.fft.fftshift(xf1, axes=1)
             xfguard = xf1[:, corr.nguard_chan:corr.nguard_chan+nfine:] # scale because oterhwise it overflows
             delta_t = -fixed_delay_us + geom_delay_us
             phases = delta_t * (freqs + cfreq)
@@ -169,7 +170,7 @@ class AntennaSource(object):
             # If you plot the phases you're about to correct, after adding a artificial
             # 1 sample delay ad tryig to get rid of it with a phase ramp, it becaomes
             # blatetly clear what you should do
-            phasor = np.exp(np.pi*2j*phases)
+            phasor = np.exp(np.pi*2j*phases, dtype=np.complex64)
             '''
             pylab.figure(10)
             pylab.plot(np.angle(phasor[0, :]))
@@ -347,9 +348,14 @@ class Correlator(object):
                 d1 = a1.data[:, :, p1]
                 d2 = a2.data[:, :, p2]
                 pout = p2 + p1*self.npol_in
+                ntimes = float(d1.shape[0])
 
                 try:
-                    xx[:,pout] = (d1 * np.conj(d2)).mean(axis=0)
+                    for c in xrange(self.nfine_chan):
+                        #xx[:,pout] = (d1 * np.conj(d2)).mean(axis=0)
+                        # vdot conjugates the first argument
+                        # this is equivalent to (d1 * conj(d2)).mean(axis=0)
+                        xx[c, pout] = np.vdot(d2[:, c], d1[:, c])/ntimes 
                 except Exception, e:
                     print 'Error', e
                     import ipdb
