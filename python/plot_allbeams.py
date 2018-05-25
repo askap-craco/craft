@@ -52,13 +52,13 @@ def _main():
     parser.add_argument(dest='files', nargs='+')
     parser.add_argument('-t', '--times', help='Integration range to plot (samples)', type=commasep)
     parser.add_argument('-s', '--seconds', help='Integration range to plot (seconds)', type=commasep)
+    parser.add_argument('-m','--mjd', help='Integration range to plot(mjd,sec)', type=floatcommasep)
     parser.add_argument('--nxy', help='number of rows,columns in plots', type=commasep)
     parser.add_argument('--imzrange', help='Z range for dynamic spectrum', type=floatcommasep)
     parser.add_argument('--fft', help='plot fft', action='store_true',default=False)
     parser.add_argument('--save', help='Save plots as png', action='store_true', default=False)
     parser.add_argument('--raw-units', help='Use raw unts, rather than physical units on axis', action='store_true', default=False)
     parser.add_argument('-d', '--dm', help='Dispersion measure (pc/cm3)', default=0., type=float)
-    parser.add_argument('-f','--fscrunch', help='Fscurnch factor', default=1, type=int)
     parser.set_defaults(verbose=False, nxy="1,1")
     values = parser.parse_args()
     if values.verbose:
@@ -119,9 +119,11 @@ class Plotter(object):
     @staticmethod
 
     def from_values(values, tstart, ntimes):
-        p = Plotter(values.files, values.nxy, fft=values.fft, raw_units=values.raw_units, fscrunch_factor=values.fscrunch)
+        p = Plotter(values.files, values.nxy, fft=values.fft, raw_units=values.raw_units)
         if values.seconds:
             p.set_position_seconds(*values.seconds)
+        elif values.mjd:
+            p.set_position_mjd(*values.mjd)
         else:
             p.set_position_sample(tstart, ntimes)
 
@@ -131,7 +133,7 @@ class Plotter(object):
 
         return p
     
-    def __init__(self, filenames, nxy, tstart=0, ntimes=1024, fft=False, raw_units=False, fscrunch_factor=1):
+    def __init__(self, filenames, nxy, tstart=0, ntimes=1024, fft=False, raw_units=False):
         self.nrows, self.ncols = nxy
         self.figs = {}
         self.fig_labels = {}
@@ -147,10 +149,7 @@ class Plotter(object):
         tsamp = files[0].tsamp
         self.raw_units = raw_units
         self.tscrunch_factor = 1
-        fdiv = divisors(self.nfreq)
-        #self.fscrunch_factor = fdiv[fdiv.index(fscrunch_factor) -1]
-        self.fscrunch_factor = fscrunch_factor
-
+        self.fscrunch_factor = 1
         self.dm = 0.
         if self.raw_units:
             xunit = 'sample'
@@ -189,6 +188,11 @@ class Plotter(object):
     def set_position_seconds(self, sstart, secs):
         self.tstart = int(sstart/self.tsamp)
         self.ntimes = int(secs/self.tsamp)
+
+    def set_position_mjd(self, mjdstart, ntimes):
+        self.ntimes = int(ntimes)
+        self.tstart = int(((mjdstart - self.mjdstart)*86400)/self.tsamp) - self.ntimes # Is my tstart really what I think it is?
+        print 'MJD', mjdstart, ntimes, self.tstart
 
     def mk_single_fig(self, name, title, xlab, ylab):
         p = plt.subplot
@@ -268,10 +272,10 @@ class Plotter(object):
             self.tscrunch_factor += 1
         elif event.key == 'T':
             self.tscrunch_factor = max(1, self.tscrunch_factor - 1)
-        elif event.key == 'z':
+        elif event.key == 'f':
             fdiv = divisors(self.nfreq)
             self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) + 1]
-        elif event.key == 'Z':
+        elif event.key == 'F':
             fdiv = divisors(self.nfreq)
             self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) -1]
         elif event.key == 'd':
