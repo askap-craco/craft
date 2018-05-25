@@ -16,7 +16,7 @@
 
 class DadaSource: public DataSource {
 public:
-	DadaSource(int nt, int key, bool lock);
+	DadaSource(int nt, const char* keyname, bool lock);
 	virtual ~DadaSource();
 
 	int get_header_int(const char* name);
@@ -67,6 +67,10 @@ public:
 	// At the end of of the constructor, and I have no idea why.
 	char* name();
 
+	int dada_key() {
+		return m_key;
+	}
+
 private:
 	void* get_next_buffer(size_t& nt);
 
@@ -89,6 +93,7 @@ private:
     size_t m_current_sample;
     void* m_reorder_buffer;
     CpuTimer m_transpose_timer;
+    int m_key;
 
 };
 

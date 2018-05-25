@@ -8,6 +8,7 @@
 #ifndef DATASOURCE_H_
 #define DATASOURCE_H_
 #include <stdio.h>
+#include <math.h>
 #include <stdint.h>
 #include "CpuTimer.h"
 #include "DataOrder.h"
@@ -32,6 +33,8 @@ public:
 	virtual size_t read_samples(void** output) = 0;
 	virtual size_t seek_sample(size_t t) = 0;
 	virtual size_t current_sample() = 0;
+
+
 	virtual double current_mjd();
 	
 	virtual char* name() = 0;
@@ -44,6 +47,12 @@ public:
 			return dm;
 
 	};
+
+	int64_t current_sample_relative_to(double mjd) {
+		double mjddiff = mjd - current_mjd();
+		int64_t sampdiff = (int64_t)round(mjddiff*86400./tsamp());
+		return sampdiff;
+	}
 
 
 	CpuTimer m_read_timer;

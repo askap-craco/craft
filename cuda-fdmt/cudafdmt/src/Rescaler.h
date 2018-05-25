@@ -30,8 +30,8 @@ public:
 	uint64_t interval_samps;
 	int nf;
 	int nt;
-	int nbeams;
-	int npols;
+	int nbeams; // number of beams*number of polarisations per antenna
+	int nants; // number of antennas
 	int nbits;
 	bool polsum;
 	DataOrder in_order;
@@ -73,27 +73,26 @@ public:
 
 	virtual ~Rescaler();
 
-	void update_scaleoffset(RescaleOptions& options);
+	void reset(array4d_t& rescale_buf); // Set output buffer to zero to start accumulating again
+	void update_scaleoffset(RescaleOptions& options, int iant);
 	void set_scaleoffset(float s_scale, float s_offset);
-	void update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options);
+	void update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options, int iant);
 
 private:
 
 	template <int nsamps_per_word, typename wordT>
-	void do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options);
+	void do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant);
 };
 
 template <int nsamps_per_word, typename wordT>
-void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options)
+void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant)
 {
 	int nbeams_in = options.nbeams;
 	int nf = rescale_buf.nx;
 	int nt = rescale_buf.nz;
 	int nwords = nf / nsamps_per_word;
 	assert(nf % nsamps_per_word == 0);
-
-	// clear output
-	array4d_cuda_memset(&rescale_buf, 0);
+	int boff = iant*options.nbeams;
 
 	rescale_calc_dm0_kernel< nsamps_per_word, wordT > <<<nbeams_in, 256>>>(
 			read_buf_device,
@@ -103,7 +102,8 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 			dm0count.d_device,
 			nf, nt,
 			options.cell_thresh,
-			options.in_order);
+			options.in_order,
+			boff);
 
 	// Take the mean all the dm0 times into one big number per beam - this is the how we flag
 	// short dropouts see ACES-209
@@ -113,7 +113,8 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 			dm0.d_device,
 			dm0count.d_device,
 			dm0stats.d_device,
-			nt);
+			nt,
+			boff);
 
 	dim3 blockdim(nsamps_per_word, nwords);
 
@@ -138,10 +139,13 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 			options.invert_freq,
 			options.subtract_dm0,
 			options.polsum,
-			options.in_order);
+			options.in_order,
+			boff);
 
 
-	sampnum += nt;
+	if (iant == 0) {
+		sampnum += nt;
+	}
 	gpuErrchk(cudaDeviceSynchronize());
 }
 

@@ -355,23 +355,25 @@ __global__ void rescale_calc_dm0stats_kernel (
 		const rescale_dtype* __restrict__ dm0arr,
 		const rescale_dtype* __restrict__ dm0countarr,
 		rescale_dtype* __restrict__ dm0statarr,
-		int nt)
+		int nt,
+		int boff)
 {
 	// dm0 order: BT
 	// dm0stats order: BX
 	// X is max,min,mean,var
 
 	int ibeam = threadIdx.x;
+	int rsbeam = ibeam + boff;
 	rescale_dtype dm0sum = 0.0;
 	rescale_dtype dm0sum2 = 0.0;
-	rescale_dtype nsampinit = dm0countarr[ibeam*nt];
-	rescale_dtype vinit =  dm0arr[ibeam*nt] * rsqrtf(nsampinit); // normalise to sqrt number of additions
+	rescale_dtype nsampinit = dm0countarr[rsbeam*nt];
+	rescale_dtype vinit =  dm0arr[rsbeam*nt] * rsqrtf(nsampinit); // normalise to sqrt number of additions
 	rescale_dtype dm0min = vinit;
 	rescale_dtype dm0max = vinit;
 
 
 	for (int t = 0; t < nt; ++t) {
-		int dmidx = t + nt*ibeam;
+		int dmidx = t + nt*rsbeam;
 		rescale_dtype nsamp = dm0countarr[dmidx];
 		rescale_dtype v = dm0arr[dmidx] * rsqrtf(nsamp); // normalise to sqrt number of additions
 
@@ -391,7 +393,7 @@ __global__ void rescale_calc_dm0stats_kernel (
 	rescale_dtype mean2 = dm0sum2/nsamp;
 	rescale_dtype dm0var = mean2 - dm0mean*dm0mean;
 
-	int stati = ibeam*4;
+	int stati = rsbeam*4;
 	dm0statarr[stati + 0] = dm0max;
 	dm0statarr[stati + 1] = dm0min;
 	dm0statarr[stati + 2] = dm0mean;
@@ -419,12 +421,14 @@ __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype mean_thresh,
 		rescale_dtype std_thresh,
 		rescale_dtype kurt_thresh,
-		int flag_grow)
+		int flag_grow,
+		int boff)
 {
 	int c = threadIdx.x;
 	int nf = blockDim.x;
 	int ibeam = blockIdx.x;
-	int i = c + nf*ibeam;
+	int rsbeam = ibeam + boff;
+	int i = c + nf*rsbeam;
 	rescale_dtype nsamp = nsamparr[i];
 	rescale_dtype mean = sum[i]/nsamp;
 	rescale_dtype mean2 = sum2[i]/nsamp;
@@ -499,12 +503,13 @@ __global__ void rescale_update_scaleoffset_kernel (
 	sum4[i] = 0.0;
 	nsamparr[i] = 0;
 }
-void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale)
+void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale, int iant)
 {
 	assert(rescale.interval_samps > 0);
 	int nthreads = rescale.nf;
 	assert(rescale.num_elements % nthreads == 0);
 	int nblocks = rescale.num_elements / nthreads;
+	int boff = iant*rescale.nbeams;
 	rescale_update_scaleoffset_kernel<<<nblocks, nthreads>>>(
 			rescale.sum.d_device,
 			rescale.sum2.d_device,
@@ -521,7 +526,8 @@ void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale)
 			rescale.mean_thresh,
 			rescale.std_thresh,
 			rescale.kurt_thresh,
-			rescale.flag_grow);
+			rescale.flag_grow,
+			boff);
 	gpuErrchk(cudaDeviceSynchronize());
 	rescale.sampnum = 0;
 }

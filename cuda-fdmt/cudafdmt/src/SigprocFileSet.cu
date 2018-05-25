@@ -5,9 +5,9 @@
  *      Author: ban115
  */
 
-#include <assert.h>
 #include "SigprocFileSet.h"
 #include "SigprocFile.h"
+#include <assert.h>
 
 
 SigprocFileSet::SigprocFileSet(int nt, int argc, char* filenames[]) : m_nt(nt) {

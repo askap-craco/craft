@@ -4,28 +4,26 @@
  *  Created on: 5 Feb 2018
  *      Author: ban115
  */
-
+#include <assert.h>
 #include "DadaSource.h"
 #include "ascii_header.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
 #include "InvalidSourceFormat.h"
 
-DadaSource::DadaSource(int nt, int key, bool lock) {
+DadaSource::DadaSource(int nt, const char* keyname, bool lock) {
+	sscanf(keyname, "%x",&m_key);
 	m_got_buffer = false;
 	m_hdu = dada_hdu_create(NULL); // create hdu without logger
 	assert(m_hdu != NULL);
-	dada_hdu_set_key(m_hdu, (key_t)key);
+	dada_hdu_set_key(m_hdu, (key_t)m_key);
 	// connect to the ringbuffer
 	if (dada_hdu_connect(m_hdu) < 0) {
-		printf("Could not connect to DADA buffer key=0x%x\n", key);
+		printf("Could not connect to DADA buffer key=0x%x\n", m_key);
 		throw InvalidSourceFormat();
 	}
 
 	if (lock) {
 		if (dada_hdu_lock_read(m_hdu) < 0) {
-			printf("Could not lock DADA buffer for read key=0x%x\n", key);
+			printf("Could not lock DADA buffer for read key=0x%x\n", m_key);
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -174,8 +172,8 @@ void* DadaSource::get_next_buffer(size_t& nt)
 
 size_t DadaSource::read_samples(void** output)
 {
-        size_t nt;
-        void* ptr = get_next_buffer(nt);
+    size_t nt;
+    void* ptr = get_next_buffer(nt);
 	assert(m_in_data_order == DataOrder::TFBP);
 	m_transpose_timer.start();
 	if (m_in_data_order == m_out_data_order) {

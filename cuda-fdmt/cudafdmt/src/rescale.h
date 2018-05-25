@@ -75,12 +75,14 @@ float rescale_update_decay_float_single(rescale_t* rescale, uint64_t i, float in
 void rescale_update_decay_uint8(rescale_t* rescale, float* in, uint8_t* out);
 void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale);
 void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& rescale_buf,
-		const uint8_t* read_buf, bool invert_freq, bool subtract_dm0);
+		const uint8_t* read_buf, bool invert_freq, bool subtract_dm0,
+		int iant);
 __global__ void rescale_calc_dm0stats_kernel (
 		const rescale_dtype* __restrict__ dm0arr,
 		const rescale_dtype* __restrict__ dm0countarr,
 		rescale_dtype* __restrict__ dm0statarr,
-		int nt);
+		int nt,
+		int boff);
 
 __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype* __restrict__ sum,
@@ -98,7 +100,8 @@ __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype mean_thresh,
 		rescale_dtype std_thresh,
 		rescale_dtype kurt_thresh,
-		int flag_grow);
+		int flag_grow,
+		int iant);
 
 template <int nsamps_per_word, typename wordT> __device__ __host__ inline rescale_dtype extract_sample(const wordT word, const int samp)
 {
@@ -155,10 +158,12 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		bool invert_freq,
 		bool subtract_dm0,
 		bool polsum,
-		DataOrder in_order)
+		DataOrder in_order,
+		int boff)
 {
 
 	int ibeam = blockIdx.x;
+	int rsbeam = ibeam + boff;
 	int nbeams = gridDim.x;
 	int s = threadIdx.x; // sample index within a word
 	int w = threadIdx.y; // word index
@@ -185,7 +190,7 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 	// nsamps order: BF
 
 
-	int rsidx = c + nf*ibeam; // rescale index: BF order
+	int rsidx = c + nf*rsbeam; // rescale index: BF order
 	// all these reads are nice and coalesced
 	rescale_dtype sum = sumarr[rsidx]; // read from global memory
 	rescale_dtype sum2 = sum2arr[rsidx]; // read from global
@@ -206,7 +211,7 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 	// Easy way of expanding the time flagging by 1. Useful for killing dropouts. ACES-209
 	bool last_sample_ok = true;
 	float block_dm0thresh = dm0_thresh/sqrtf((float) nt);
-	int stati = 4*ibeam;
+	int stati = 4*rsbeam;
 	rescale_dtype dm0min = dm0statarr[stati + 1]; // broadcast read. This is to catch dropouts
 	rescale_dtype dm0stat_mean = dm0statarr[stati + 2]; // broadcast read.
 
@@ -233,7 +238,7 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 			decay_offset = (vout + decay_offset*k)/(1.0 + k);
 			sout = vout - decay_offset;
 		}
-		int dm0idx = t + nt*ibeam; // DM0 idx: BT order
+		int dm0idx = t + nt*rsbeam; // DM0 idx: BT order
 		rescale_dtype dm0count = dm0countarr[dm0idx];
 		rescale_dtype dm0sum = dm0arr[dm0idx] ; // sum accros dm0 - not normalised
 		rescale_dtype dm0z = dm0sum*rsqrtf(dm0count);
@@ -296,13 +301,15 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_calc_dm0_
 		int nf,
 		int nt,
 		rescale_dtype cell_thresh,
-		DataOrder in_order)
+		DataOrder in_order,
+		int boff)
 {
 	// input = BTF order
 	// dm0 order: BT
 	// Rescale: BF order
 
 	int ibeam = blockIdx.x;
+	int rsbeam = ibeam + boff;
 	int nbeams = gridDim.x;
 
 	// to take advantage of having a word in a register, we have to have two loops to loop
@@ -326,7 +333,7 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_calc_dm0_
 
 			for (int s = 0; s < nsamps_per_word; ++s) {
 				int c = w*nwords + s; // channel number
-				int rsidx = c + nf*ibeam; // rescale index BF order
+				int rsidx = c + nf*rsbeam; // rescale index BF order
 				// all these reads are nice and coalesced
 				rescale_dtype offset = offsetarr[rsidx]; // read from global
 				rescale_dtype scale = scalearr[rsidx]; // read from global
@@ -342,7 +349,7 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_calc_dm0_
 			}
 		}
 
-		int dm0idx = t + nt*ibeam;
+		int dm0idx = t + nt*rsbeam;
 		rescale_dtype correction = rsqrtf((float) nsamp);
 		//dm0arr[dm0idx] = dm0sum * correction;
 		dm0arr[dm0idx] = dm0sum;
@@ -386,11 +393,11 @@ template <int nsamps_per_word, typename wordT> void
 	// short dropouts see ACES-209
 	// probably could do this in rescale_calc_dm0_kernel after yu've done it
 	// But i Haven't got htere yet.
-	rescale_calc_dm0stats_kernel<<<1, nbeams>>>(
-			rescale.dm0.d_device,
-			rescale.dm0count.d_device,
-			rescale.dm0stats.d_device,
-			nt);
+//	rescale_calc_dm0stats_kernel<<<1, nbeams>>>(
+//			rescale.dm0.d_device,
+//			rescale.dm0count.d_device,
+//			rescale.dm0stats.d_device,
+//			nt);
 
 	dim3 blockdim(nsamps_per_word, nwords);
 

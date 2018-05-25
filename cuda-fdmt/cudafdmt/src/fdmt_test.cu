@@ -28,6 +28,7 @@
 #include "SigprocFileSet.h"
 #include "DataSource.h"
 #include "DadaSource.h"
+#include "DadaSet.h"
 #include "CandidateList.h"
 #include "InvalidSourceFormat.h"
 #include "Rescaler.h"
@@ -98,8 +99,22 @@ void dumparr(const char* prefix, const int blocknum, array4d_t* arr, bool copy=t
 	array4d_dump(arr, fbuf);
 }
 
+void dump_rescaler(int iblock, Rescaler* rescaler)
+{
+	dumparr("mean", iblock, &rescaler->mean);
+	dumparr("std", iblock, &rescaler->std);
+	dumparr("kurt", iblock, &rescaler->kurt);
+	dumparr("nsamps", iblock, &rescaler->nsamps);
+	dumparr("dm0", iblock, &rescaler->dm0);
+	dumparr("dm0count", iblock, &rescaler->dm0count);
+	dumparr("dm0stats", iblock, &rescaler->dm0stats);
+	dumparr("scale", iblock, &rescaler->scale);
+	dumparr("offset", iblock, &rescaler->offset);
+}
+
 int main(int argc, char* argv[])
 {
+
 	int nd = 1024;
 	int nt = 512;
 	float seek_seconds = 0.0;
@@ -238,16 +253,15 @@ int main(int argc, char* argv[])
 	tall.start();
 
 	DataSource* source = NULL;
-	DadaSource* dada_source = NULL; // for debugging
+	DadaSet* dada_source = NULL; // for debugging
 	try {
 		// load sigproc file
 		SigprocFileSet* fs_source = new SigprocFileSet(nt, argc, argv);
 		source = fs_source;
 	} catch (InvalidSourceFormat& e) {
 		try {
-			int key;
-			sscanf(argv[0], "%x",&key);
-			dada_source = new DadaSource(nt, key, true);
+			dada_source = new DadaSet(nt, argc, argv);
+			//dada_source = new DadaSource(nt, argv[0], true);
 			source = dada_source;
 		} catch (InvalidSourceFormat& e) {
 			printf("No valid inputs\n");
@@ -261,19 +275,22 @@ int main(int argc, char* argv[])
 	cout << "spf tsamp " << source->tsamp()<< " nbeams " << source->nbeams()
 			<< " npols "<< source->npols() << " fch1 " << source->fch1() << " nchans "
 			<< source->nchans() << " foff " << source->foff() << endl;
-	int nbeams_in = source->nbeams()*source->npols();
+	int nbeams_per_antenna = source->nbeams()*source->npols(); // number of beams including polarisations
+	int nbeams_in_total = nbeams_per_antenna*source->nants();
 	int npols_in = source->npols();
 	int nbeams_out;
-	if (polsum) {
+	if (polsum) { // assume polsum and antsum
 		nbeams_out = source->nbeams();
-		assert(nbeams_in %2 == 0);
+		assert(nbeams_per_antenna %2 == 0);
 	} else {
-		nbeams_out = nbeams_in;
+		nbeams_out = nbeams_in_total;
 	}
-	float nbeams_summed = (float(nbeams_in)/float(nbeams_out));
+	float nbeams_summed = (float(nbeams_in_total)/float(nbeams_out));
 	int nf = source->nchans();
 	int nbits = source->nbits();
-	size_t in_buffer_bytes = nbeams_in*nf*nt*nbits/8;
+
+	//rescale input buffer
+	size_t in_buffer_bytes = nbeams_per_antenna*nf*nt*nbits/8;
 	void* in_buffer_device;
 	gpuErrchk( cudaMalloc((void**) &in_buffer_device, in_buffer_bytes ));
 
@@ -290,6 +307,7 @@ int main(int argc, char* argv[])
 		foff = -foff;
 	}
 
+	// rescale output buffer
 	array4d_t rescale_buf;
 	rescale_buf.nw = nbeams_out;
 	rescale_buf.nx = nf;
@@ -297,6 +315,15 @@ int main(int argc, char* argv[])
 	rescale_buf.nz = nt;
 	array4d_malloc(&rescale_buf, dump_data, true);
 
+	// rescale junk buffer for first integration only - bleah
+	array4d_t rescale_junk_buf;
+	rescale_junk_buf.nw = nbeams_out;
+	rescale_junk_buf.nx = nf;
+	rescale_junk_buf.ny = 1;
+	rescale_junk_buf.nz = nt;
+	array4d_malloc(&rescale_junk_buf, false, true);
+
+	// FDMT output buffer
 	array4d_t out_buf;
 	out_buf.nw = nbeams_out;
 	out_buf.nx = 1;
@@ -320,8 +347,8 @@ int main(int argc, char* argv[])
 	rescale.subtract_dm0 = subtract_dm0;
 	rescale.nt = nt;
 	rescale.nf = nf;
-	rescale.nbeams = nbeams_in;
-	rescale.npols = npols_in;
+	rescale.nbeams = nbeams_in_total;
+	rescale.nants = source->nants();
 	rescale.polsum = polsum;
 	rescale.nbits = source->nbits();
 	rescale.in_order = source->data_order();
@@ -393,7 +420,7 @@ int main(int argc, char* argv[])
 
 	void* read_buf;
 
-	while (source->read_samples(&read_buf) == nt) {
+	while (true) {
 		if (stopped) {
 			printf("Stopped due to signal received\n");
 			break;
@@ -402,27 +429,45 @@ int main(int argc, char* argv[])
 			break;
 		}
 
-		// File is in TBF order
-		// Output needs to be BFT order
-		// Do transpose and cast to float on the way through using GPU
-		// copy raw data to FDMT state. Here we're a little dodgey, but why allocate memory anyway?
-		//uint8_t* read_buf_device = (uint8_t*) fdmt.states[0].d_device;
-		fdmt.t_copy_in.start();
-		gpuErrchk(cudaMemcpy(in_buffer_device, read_buf, in_buffer_bytes*sizeof(uint8_t), cudaMemcpyHostToDevice));
-		fdmt.t_copy_in.stop();
-		tproc.start();
-		trescale.start();
-		if (blocknum == 0) { // if first block rescale and update with no
-			// flagging so we can work out roughly what the scales are
-			rescaler->update_and_transpose(rescale_buf, in_buffer_device, rescaler->noflag_options);
+		rescaler->reset(rescale_buf); // set output buffer to zero - each rescale update will add the result into the buffer
+		for(int iant = 0; iant < source->nants(); iant++) {
+			// read samples from input - one antenna at a time.
+			int this_nt = source->read_samples(&read_buf);
+			if (this_nt != nt) { // WE've run out of samples
+				stopped = true;
+				break;
+			}
+			// File is in TBF order
+			// Output needs to be BFT order
+			// Do transpose and cast to float on the way through using GPU
+			fdmt.t_copy_in.start();
+			gpuErrchk(cudaMemcpy(in_buffer_device, read_buf, in_buffer_bytes*sizeof(uint8_t), cudaMemcpyHostToDevice));
+			fdmt.t_copy_in.stop();
+			tproc.start();
+			trescale.start();
+			if (blocknum == 0) { // if first block rescale and update with no
+				// flagging so we can work out roughly what the scales are
+				// Send output to junk buffer - silly but will fix later
+				// TODO: Remove junk buffer to save memory
+				rescaler->update_and_transpose(rescale_junk_buf, in_buffer_device, rescaler->noflag_options, iant);
 
-			// update scale and offset
-			rescaler->update_scaleoffset(rescaler->noflag_options);
+				// update scale and offset
+				rescaler->update_scaleoffset(rescaler->noflag_options, iant);
+				if(dump_data) {
+					dump_rescaler(-1, rescaler);
+				}
+			}
+
+			// this time we rescale with the flagging turned on
+			rescaler->update_and_transpose(rescale_buf, in_buffer_device, rescaler->options, iant);
+			trescale.stop();
+			tproc.stop();
 		}
 
-		// this time we rescale with the flagging turned on
-		rescaler->update_and_transpose(rescale_buf, in_buffer_device, rescaler->options);
-		trescale.stop();
+
+		if (stopped) {// if we've run out of samples
+			break;
+		}
 
 		if (dump_data) {
 			dumparr("inbuf", iblock, &rescale_buf);
@@ -431,23 +476,26 @@ int main(int argc, char* argv[])
 		// Count how many times were flagged
 		assert(num_rescale_blocks >= 0);
 		array4d_copy_to_host(&rescaler->nsamps); // must do this before updaing scaleoffset, which resets nsamps to zero
+		tproc.start();
 
-		for(int i = 0; i < nf*nbeams_in; ++i) {
+		for(int i = 0; i < nf*nbeams_in_total; ++i) {
 			int nsamps = (int)rescaler->nsamps.d[i]; // nsamps is the number of unflagged samples from this block
 			int nflagged = rescaler->sampnum - nsamps;
-			// rescale.sampnum is the total number of samples that has gone into the rescaler
+			// rescale.sampnum is the total number of samples that has gone into the rescaler since resetting
 			assert (nflagged >= 0);
 			num_flagged_times += nflagged;
 		}
 
 		// do rescaling if required
 		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
-			rescaler->update_scaleoffset(rescaler->options);
+			for(int iant = 0; iant < source->nants(); ++iant) {
+				rescaler->update_scaleoffset(rescaler->options, iant);
+			}
 
 			// Count how many  channels have been flagged for this whole block
 			// by looking at how many channels have scale==0
 			array4d_copy_to_host(&rescaler->scale);
-			for(int i = 0; i < nf*nbeams_in; ++i) {
+			for(int i = 0; i < nf*nbeams_in_total; ++i) {
 				if (rescaler->scale.d[i] == 0) {
 					// that channel will stay flagged for num_rescale_blocks
 					num_flagged_beam_chans += num_rescale_blocks;
@@ -463,15 +511,7 @@ int main(int argc, char* argv[])
 			}
 
 			if (dump_data) {
-				dumparr("mean", iblock, &rescaler->mean);
-				dumparr("std", iblock, &rescaler->std);
-				dumparr("kurt", iblock, &rescaler->kurt);
-				dumparr("nsamps", iblock, &rescaler->nsamps);
-				dumparr("dm0", iblock, &rescaler->dm0);
-				dumparr("dm0count", iblock, &rescaler->dm0count);
-				dumparr("dm0stats", iblock, &rescaler->dm0stats);
-				dumparr("scale", iblock, &rescaler->scale);
-				dumparr("offset", iblock, &rescaler->offset);
+				dump_rescaler(iblock, rescaler);
 			}
 		}
 
@@ -521,15 +561,15 @@ int main(int argc, char* argv[])
 	double boxcar_ngops = (double)nbeams_out*(double)nt*(double)nd*2.0*(double)NBOX/1e9;
 	double data_nsecs = blocknum*nt*source->tsamp();
 
-	double flagged_percent = ((double) num_flagged_beam_chans) / ((double) nf*nbeams_in*blocknum) * 100.0;
-	double dm0_flagged_percent = ((double) num_flagged_times) / ((double) blocknum*nbeams_in*nt*nf) * 100.0;
+	double flagged_percent = ((double) num_flagged_beam_chans) / ((double) nf*nbeams_in_total*blocknum) * 100.0;
+	double dm0_flagged_percent = ((double) num_flagged_times) / ((double) blocknum*nbeams_in_total*nt*nf) * 100.0;
 	cout << " FREDDA Finished" << endl;
 	cout << "Found " << total_candidates << " candidates" << endl;
 	cout << "Discarded " << total_discards << " candidates for being too wide."<< endl;
 	cout << num_candidate_overflow_blocks << " blocks overflowed the candidate buffer"<<endl;
 	cout << "Processed " << blocknum << " blocks = "<< blocknum*nt << " samples = " << data_nsecs << " seconds" << " at " << data_nsecs/tall.wall_total()<< "x real time"<< endl;
-	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams_in*blocknum) << " channels = " << flagged_percent << "%" << endl;
-	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams_in*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;
+	cout << "Freq auto-flagged " << num_flagged_beam_chans << "/" << (nf*nbeams_in_total*blocknum) << " channels = " << flagged_percent << "%" << endl;
+	cout << "DM0 auto-flagged " << num_flagged_times << "/" << (blocknum*nbeams_in_total*nt*nf) << " samples = " << dm0_flagged_percent << "%" << endl;
 	cout << "File reading " << endl << source->m_read_timer << endl;
 	cout << "FREDDA Total "<< endl << tall << endl;
 	cout << "FREDDA Procesing "<< endl << tproc << endl;

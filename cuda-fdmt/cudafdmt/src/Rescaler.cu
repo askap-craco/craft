@@ -40,6 +40,7 @@ Rescaler::Rescaler(RescaleOptions& _options) : options(_options)
 	noflag_options.kurt_thresh = INFINITY;
 	noflag_options.dm0_thresh = INFINITY;
 	noflag_options.cell_thresh = INFINITY;
+	noflag_options.decay_constant = 0;
 	noflag_options.flag_grow = 1;
 	switch(options.in_order) {
 	case DataOrder::BPTF:
@@ -59,12 +60,19 @@ Rescaler::~Rescaler() {
 
 }
 
-void Rescaler::update_scaleoffset(RescaleOptions& options) {
+void Rescaler::reset(array4d_t& rescale_buf)
+{
+	// clear output
+	array4d_cuda_memset(&rescale_buf, 0);
+}
+
+void Rescaler::update_scaleoffset(RescaleOptions& options, int iant) {
 	assert(options.interval_samps > 0);
 	int nf = options.nf;
 	int nthreads = nf;
 	assert(num_elements % nthreads == 0);
 	int nblocks = num_elements / nthreads;
+	int boff = iant*options.nbeams;
 	rescale_update_scaleoffset_kernel<<<nblocks, nthreads>>>(
 			sum.d_device,
 			sum2.d_device,
@@ -81,9 +89,12 @@ void Rescaler::update_scaleoffset(RescaleOptions& options) {
 			options.mean_thresh,
 			options.std_thresh,
 			options.kurt_thresh,
-			options.flag_grow);
+			options.flag_grow,
+			boff);
 	gpuErrchk(cudaDeviceSynchronize());
-	sampnum = 0;
+	if (iant == 0) {
+		sampnum = 0;
+	}
 }
 
 void Rescaler::set_scaleoffset(float s_scale, float s_offset) {
@@ -91,31 +102,31 @@ void Rescaler::set_scaleoffset(float s_scale, float s_offset) {
 	array4d_set(&offset, s_offset);
 }
 
-void Rescaler::update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions &options) {
+void Rescaler::update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions &options, int iant) {
 	int nbits = options.nbits;
 	switch (nbits) {
 	case 1:
-		do_update_and_transpose<32, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options);
+		do_update_and_transpose<32, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options, iant);
 		break;
 
 	case 2:
-		do_update_and_transpose<16, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options);
+		do_update_and_transpose<16, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options, iant);
 		break;
 
 	case 4:
-		do_update_and_transpose<8, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options);
+		do_update_and_transpose<8, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options, iant);
 		break;
 
 	case 8:
-		do_update_and_transpose<4, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options);
+		do_update_and_transpose<4, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options, iant);
 		break;
 
 	case 16:
-		do_update_and_transpose<2, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options);
+		do_update_and_transpose<2, uint32_t>(rescale_buf, (uint32_t*)read_buf_device, options, iant);
 		break;
 
 	case 32:
-		do_update_and_transpose<1, float>(rescale_buf, (float*)read_buf_device, options);
+		do_update_and_transpose<1, float>(rescale_buf, (float*)read_buf_device, options, iant);
 		break;
 
 	default:
