@@ -137,7 +137,7 @@ class VcraftFile(object):
             nwords = nwordsamps*nchan # total numberof words including channels
             seek_bytes = self.hdrsize + wordidx*nchan*4  # seek offset in bytes
             fin.seek(seek_bytes)
-            print 'MODE1', 'startsamp', startsamp, 'wordidx', wordidx, 'sampoff', sampoff, 'nwordsamps', nwordsamps, 'nwords', nwords, 'seek bytes', seek_bytes
+            #print 'MODE1', 'startsamp', startsamp, 'wordidx', wordidx, 'sampoff', sampoff, 'nwordsamps', nwordsamps, 'nwords', nwords, 'seek bytes', seek_bytes
             dwords = np.fromfile(fin, dtype='<u4', count=nwords)
 
             # each word contains 4 8 bit numbers, (imag/real)*2
@@ -157,23 +157,29 @@ class VcraftFile(object):
             nsamps = nsamp
 
         elif mode == 2: # 4b+4b
-            if startsamp != 0:
-                raise NotImplementedError('Give me a sec!')
-            # each 32 bit word contais 8 4 bit numbers (imag/real)*4 for the same channel
-            dwords = np.fromfile(fin, dtype=np.uint32)
+            
+            wordidx = startsamp / 4 # which 32 bit word the start sample is in
+            sampoff = startsamp % 4 # how may samples into the first word the start sample is
+            nwordsamps = (nsamp + 3 + sampoff) / 4 # how many times we need to read (in words)
+            nwords = nwordsamps*nchan # total numberof words including channels
+            seek_bytes = self.hdrsize + wordidx*nchan*4  # seek offset in bytes
+            fin.seek(seek_bytes)
+            dwords = np.fromfile(fin, dtype='<u4', count=nwords)
+            # each word contains 4 8 bit numbers, (imag/real)*2
             nwords = len(dwords)/nchan
             nsamps = nwords*4
             assert len(dwords) == nchan*nwords
             dwords.shape = (nwords, nchan)
-
             d = np.empty((nsamps, nchan, 2), dtype=np.int8)
-
+            nsamps = nsamp
             for samp in xrange(4):
                 # convert from 4-bit two's complement to int8
                 d[samp::4, :, 0] = (dwords & 0xf) - (dwords & 0x8)*2 # real
                 dwords >>= 4
                 d[samp::4, :, 1] = (dwords & 0xf) - (dwords & 0x8)*2 # imag
                 dwords >>= 4
+
+            d = d[sampoff:sampoff+nsamp, :, :]
 
         elif mode == 3: # 1b+1b
             # each 32 bit word contais 32 1 bit numbers (imag/real)*16 for the same channel

@@ -120,9 +120,10 @@ def _main():
     punwrap = np.unwrap(np.angle(xx12m))
     xx = np.arange(len(punwrap))
     gradient, phase = np.polyfit(xx, punwrap, 1)
-    delay = 32./27.*gradient/2./np.pi*len(punwrap)
+    delaysamp = gradient/2./np.pi*len(punwrap)
+    delayus = 32./27.*delaysamp
     corramp =  abs(xx12m[5:-5]).mean()
-    print 'Unwrapped phase = {} deg, delay={} us cross amplitude={}'.format(np.degrees(phase), delay, corramp)
+    print 'Unwrapped phase = {} deg, delay={} us = {:0.2f}samples cross amplitude={}'.format(np.degrees(phase), delayus, delaysamp, corramp)
 
     lagax.plot(abs(xx11.mean(axis=0)), label='auto0')
     lagax.plot(abs(xx22.mean(axis=0)), label='auto1')
