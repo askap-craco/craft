@@ -272,10 +272,10 @@ class Plotter(object):
             self.tscrunch_factor += 1
         elif event.key == 'T':
             self.tscrunch_factor = max(1, self.tscrunch_factor - 1)
-        elif event.key == 'f':
+        elif event.key == 'z':
             fdiv = divisors(self.nfreq)
             self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) + 1]
-        elif event.key == 'F':
+        elif event.key == 'Z':
             fdiv = divisors(self.nfreq)
             self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) -1]
         elif event.key == 'd':
