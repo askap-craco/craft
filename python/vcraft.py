@@ -65,6 +65,13 @@ class VcraftFile(object):
         self.frames = np.array([int(hdr[c][0]) for c in frame_cards])
         self.bat0 = int(hdr['NOW_BAT'][0], base=16)
         self.bat0_40 = self.bat0 & 0xffffffffff
+        self.beam = int(hdr['BEAM'][0])
+        self.pol = hdr.get('POL', (None, None))[0]
+        if self.pol is None:
+            if self.beam % 2 == 0:
+                self.pol = 'X'
+            else:
+                self.pol = 'Y'
 
     def __str__(self):
         return '{} NBITS={}'.format(self.fname, self.nbits)
@@ -265,6 +272,9 @@ class VcraftMux(object):
         #self.beam_pos = SkyCoord(beam_ra, beam_dec, frame='icrs', unit=('deg','deg'))
         self.beam_pos = (beam_ra, beam_dec)
         self.hdr = self._files[0].hdr
+        pols = np.array([f.pol for f in self._files])
+        assert np.all(pols == pols[0])
+        self.pol = pols[0]
 
 
     def allhdr(self, cardname):
@@ -304,6 +314,17 @@ class VcraftMux(object):
             d[:, out_chans] = f.read(fsamp_start, nsamp)
 
         return d
+
+def mux_by_pol(filenames):
+    '''
+    :return: Dictionary keyened by 'X' or "Y
+    '''
+    all_files = [VcraftFile(f) for f in filenames]
+    mux_by_pol = itertools.groupby(all_files, lambda f:f.pol)
+    muxes = {pol:VcraftMux(list(files)) for pol, files in mux_by_pol}
+    
+    return muxes
+    
 
 def mux_by_antenna(filenames):
     all_files = [VcraftFile(f) for f in filenames]
