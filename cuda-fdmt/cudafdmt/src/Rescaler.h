@@ -30,7 +30,7 @@ public:
 	uint64_t interval_samps;
 	int nf;
 	int nt;
-	int nbeams; // number of beams*number of polarisations per antenna
+	int nbeams_per_ant; // number of beams*number of polarisations per antenna
 	int nants; // number of antennas
 	int nbits;
 	bool polsum;
@@ -57,6 +57,7 @@ public:
 	array4d_t decay_offset;
 	uint64_t sampnum;
 	int num_elements;
+	int num_elements_per_ant;
 	RescaleOptions options;
 	RescaleOptions noflag_options;
 
@@ -87,12 +88,12 @@ private:
 template <int nsamps_per_word, typename wordT>
 void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant)
 {
-	int nbeams_in = options.nbeams;
+	int nbeams_in = options.nbeams_per_ant;
 	int nf = rescale_buf.nx;
 	int nt = rescale_buf.nz;
 	int nwords = nf / nsamps_per_word;
 	assert(nf % nsamps_per_word == 0);
-	int boff = iant*options.nbeams;
+	int boff = iant*options.nbeams_per_ant;
 
 	rescale_calc_dm0_kernel< nsamps_per_word, wordT > <<<nbeams_in, 256>>>(
 			read_buf_device,

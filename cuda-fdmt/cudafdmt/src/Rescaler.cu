@@ -10,10 +10,11 @@
 Rescaler::Rescaler(RescaleOptions& _options) : options(_options)
 {
 	bool alloc_host = true; // Need host memory allocated for rescale because we copy back to count flags
-	int nbeams = options.nbeams;
+	int nbeams = options.nbeams_per_ant * options.nants;
 	int nf = options.nf;
 	int nt = options.nt;
 	num_elements = nbeams*nf;
+	num_elements_per_ant = options.nbeams_per_ant * nf;
 	sampnum = 0;
 	options.interval_samps = nt;
 	rescale_arraymalloc(&sum, nbeams, nf, alloc_host);
@@ -70,9 +71,9 @@ void Rescaler::update_scaleoffset(RescaleOptions& options, int iant) {
 	assert(options.interval_samps > 0);
 	int nf = options.nf;
 	int nthreads = nf;
-	assert(num_elements % nthreads == 0);
-	int nblocks = num_elements / nthreads;
-	int boff = iant*options.nbeams;
+	assert(num_elements_per_ant % nthreads == 0);
+	int nblocks = num_elements_per_ant / nthreads;
+	int boff = iant*options.nbeams_per_ant;
 	rescale_update_scaleoffset_kernel<<<nblocks, nthreads>>>(
 			sum.d_device,
 			sum2.d_device,

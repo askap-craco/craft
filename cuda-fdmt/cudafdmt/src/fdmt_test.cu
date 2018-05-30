@@ -114,7 +114,6 @@ void dump_rescaler(int iblock, Rescaler* rescaler)
 
 int main(int argc, char* argv[])
 {
-
 	int nd = 1024;
 	int nt = 512;
 	float seek_seconds = 0.0;
@@ -347,7 +346,7 @@ int main(int argc, char* argv[])
 	rescale.subtract_dm0 = subtract_dm0;
 	rescale.nt = nt;
 	rescale.nf = nf;
-	rescale.nbeams = nbeams_in_total;
+	rescale.nbeams_per_ant = nbeams_per_antenna;
 	rescale.nants = source->nants();
 	rescale.polsum = polsum;
 	rescale.nbits = source->nbits();
@@ -360,9 +359,7 @@ int main(int argc, char* argv[])
 			rescale.dm0_thresh, rescale.cell_thresh,
 			rescale.flag_grow);
 	Rescaler* rescaler = new Rescaler(rescale);
-	if (num_rescale_blocks == 0) {
-		rescaler->set_scaleoffset(1.0f, 0.0f); // Just pass it straight through without rescaling
-	}
+	rescaler->set_scaleoffset(1.0f, 0.0f); // Just pass it straight through without rescaling
 
 	// Create fdmt
 	fdmt_t fdmt;

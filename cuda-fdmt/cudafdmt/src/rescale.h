@@ -344,6 +344,8 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_calc_dm0_
 				if (fabs(vout) < cell_thresh && scale != 0.0f) {
 					dm0sum += vout;
 					++nsamp;
+				} else {
+					//printf("Flagged ibeam %d rsbeam %d c %d nsamp %d dm0sum %f\n", ibeam, rsbeam, c, nsamp, dm0sum);
 				}
 
 			}
