@@ -60,21 +60,15 @@ public:
 		return first_source->current_sample();
 	}
 
-	size_t seek_sample(size_t t) {
-		printf("Ignoring seek sample %d\n", t);
-		size_t boff = 0;
-//		for(int i = 0; i < m_sources.size(); i++) {
-//			boff = m_sources.at(i)->seek_sample(t);
-//		}
-		return boff;
-	}
+	size_t seek_sample(size_t t);
+
 	size_t read_samples(void** output);
 
 
 private:
 	std::vector<DadaSource*> m_sources;
 	DadaSource* first_source;
-	void sync();
+	void sync(size_t offset);
 	int m_nt;
 	int m_current_ant;
 };
