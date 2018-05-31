@@ -65,6 +65,13 @@ class VcraftFile(object):
         self.frames = np.array([int(hdr[c][0]) for c in frame_cards])
         self.bat0 = int(hdr['NOW_BAT'][0], base=16)
         self.bat0_40 = self.bat0 & 0xffffffffff
+        self.beam = int(hdr['BEAM'][0])
+        self.pol = hdr.get('POL', (None, None))[0]
+        if self.pol is None:
+            if self.beam % 2 == 0:
+                self.pol = 'X'
+            else:
+                self.pol = 'Y'
 
     def __str__(self):
         return '{} NBITS={}'.format(self.fname, self.nbits)
@@ -120,53 +127,66 @@ class VcraftFile(object):
             nsamps = nsamp
         elif mode == 1: # 8b + 8b:
             # This works perfectly, but we need some practice at the other method with non-native types
-            #d = np.fromfile(fin, dtype=np.int8)
-            #print 'mode1 = 8+8', d[0:6]
-            #nsamps = len(d)/2/nchan
-            #assert 2*nchan*nsamps == len(d), 'Not integral number of samples'
+           # d = np.fromfile(fin, dtype=np.int8, count=nsamp*nchan*2) # 2 for complex
+           # nsamps = len(d)/nchan/2
+           # assert 2*nchan*nsamps == len(d), 'Not integral number of samples'
+           # print 'MODE1', startsamp, 'requested ', nsamp, 'got', nsamps, 'count', nsamp*nchan*2, 'len', len(d)
             # each 32 bit word contains 4x8 bit numbers imag/real/imag/real is two seuential samplesfrom a single channel
-            #d.shape =(nsamps/2, nchan, 2, 2)
+            #d.shape = (nsamps, nchan, 2, 2)
             # let's put those axes next to each other
             #d = d.transpose(0,2,1,3)
             # and reshape it to the orrect shape
             #d = d.reshape(nsamps, nchan, 2)
-            offset_bytes =self.hdrsize + startsamp*nchan*2 # each sample is w bytes
-            self.fin.seek(offset_bytes)
-            dwords = np.fromfile(fin, dtype=np.uint32, count=nsamp*nchan/2)
+            
+            wordidx = startsamp / 2 # which 32 bit word the start sample is in
+            sampoff = startsamp % 2 # how may samples into the first word the start sample is
+            nwordsamps = (nsamp + 1 + sampoff) / 2 # how many times we need to read (in words)
+            nwords = nwordsamps*nchan # total numberof words including channels
+            seek_bytes = self.hdrsize + wordidx*nchan*4  # seek offset in bytes
+            fin.seek(seek_bytes)
+            #print 'MODE1', 'startsamp', startsamp, 'wordidx', wordidx, 'sampoff', sampoff, 'nwordsamps', nwordsamps, 'nwords', nwords, 'seek bytes', seek_bytes
+            dwords = np.fromfile(fin, dtype='<u4', count=nwords)
+
             # each word contains 4 8 bit numbers, (imag/real)*2
             nwords = len(dwords)/nchan
             assert len(dwords) == nchan*nwords, 'Got {} dwords = nchan={} nwords={} expected={}'.format(len(dwords), nchan, nwords, nchan*nwords)
-            
             dwords.shape = nwords, nchan
-
             nsamps = nwords*2
             d = np.empty((nsamps, nchan, 2), dtype=np.int8)
             for samp in xrange(2):
-                # convert from 4-bit two's complement to int8
+                # convert from 8-bit two's complement to int8
                 d[samp::2, :, 0] = (dwords & 0xff) - (dwords & 0x80)*2 # real
-                dwords >> 8
+                dwords >>= 8
                 d[samp::2, :, 1] = (dwords & 0xff) - (dwords & 0x80)*2 # imag
-                dwords >> 8
+                dwords >>= 8
 
+            d = d[sampoff:sampoff+nsamp, :, :]
+            nsamps = nsamp
 
         elif mode == 2: # 4b+4b
-            if startsamp != 0:
-                raise NotImplementedError('Give me a sec!')
-            # each 32 bit word contais 8 4 bit numbers (imag/real)*4 for the same channel
-            dwords = np.fromfile(fin, dtype=np.uint32)
+            
+            wordidx = startsamp / 4 # which 32 bit word the start sample is in
+            sampoff = startsamp % 4 # how may samples into the first word the start sample is
+            nwordsamps = (nsamp + 3 + sampoff) / 4 # how many times we need to read (in words)
+            nwords = nwordsamps*nchan # total numberof words including channels
+            seek_bytes = self.hdrsize + wordidx*nchan*4  # seek offset in bytes
+            fin.seek(seek_bytes)
+            dwords = np.fromfile(fin, dtype='<u4', count=nwords)
+            # each word contains 4 8 bit numbers, (imag/real)*2
             nwords = len(dwords)/nchan
             nsamps = nwords*4
             assert len(dwords) == nchan*nwords
             dwords.shape = (nwords, nchan)
-
             d = np.empty((nsamps, nchan, 2), dtype=np.int8)
-
+            nsamps = nsamp
             for samp in xrange(4):
                 # convert from 4-bit two's complement to int8
                 d[samp::4, :, 0] = (dwords & 0xf) - (dwords & 0x8)*2 # real
-                dwords >> 4
+                dwords >>= 4
                 d[samp::4, :, 1] = (dwords & 0xf) - (dwords & 0x8)*2 # imag
-                dwords >> 4
+                dwords >>= 4
+
+            d = d[sampoff:sampoff+nsamp, :, :]
 
         elif mode == 3: # 1b+1b
             # each 32 bit word contais 32 1 bit numbers (imag/real)*16 for the same channel
@@ -252,6 +272,9 @@ class VcraftMux(object):
         #self.beam_pos = SkyCoord(beam_ra, beam_dec, frame='icrs', unit=('deg','deg'))
         self.beam_pos = (beam_ra, beam_dec)
         self.hdr = self._files[0].hdr
+        pols = np.array([f.pol for f in self._files])
+        assert np.all(pols == pols[0])
+        self.pol = pols[0]
 
 
     def allhdr(self, cardname):
@@ -291,6 +314,17 @@ class VcraftMux(object):
             d[:, out_chans] = f.read(fsamp_start, nsamp)
 
         return d
+
+def mux_by_pol(filenames):
+    '''
+    :return: Dictionary keyened by 'X' or "Y
+    '''
+    all_files = [VcraftFile(f) for f in filenames]
+    mux_by_pol = itertools.groupby(all_files, lambda f:f.pol)
+    muxes = {pol:VcraftMux(list(files)) for pol, files in mux_by_pol}
+    
+    return muxes
+    
 
 def mux_by_antenna(filenames):
     all_files = [VcraftFile(f) for f in filenames]
