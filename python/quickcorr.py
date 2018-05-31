@@ -23,6 +23,7 @@ def _main():
     parser.add_argument('-o','--offset', type=int, help='Offset samples')
     parser.add_argument('-c','--channel', type=strrange, help='Channel to plot', default=0)
     parser.add_argument('-n','--fft-size', type=int, help='FFT size per coarse channel', default=128)
+    parser.add_argument('-a','--num-avg', type=int, help='Number of ffts to average for dynamic spectrum', default=32)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -58,6 +59,8 @@ def _main():
             print h, 'd1=',d1t, 'd2=',d2t, 'diff=',d2t - d1t,mul*(d2t-d1t)
 
     fig, axes = pylab.subplots(5,1)
+    fig.suptitle(' '.join(values.files[0:2]))
+
     d1ax, d2ax,lagax,pax,lax = axes.flatten()
     N = 4096 
     Nc = N*512
@@ -117,9 +120,9 @@ def _main():
     punwrap = np.unwrap(np.angle(xx12m))
     xx = np.arange(len(punwrap))
     gradient, phase = np.polyfit(xx, punwrap, 1)
-    delay = 32./27.*gradient/2./np.pi*len(punwrap)
+    delaysamp = gradient/2./np.pi*len(punwrap)
+    delayus = 32./27.*delaysamp
     corramp =  abs(xx12m[5:-5]).mean()
-    print 'Unwrapped phase = {} deg, delay={} us cross amplitude={}'.format(np.degrees(phase), delay, corramp)
 
     lagax.plot(abs(xx11.mean(axis=0)), label='auto0')
     lagax.plot(abs(xx22.mean(axis=0)), label='auto1')
@@ -128,16 +131,24 @@ def _main():
     pax.plot(np.degrees(np.angle(xx12.mean(axis=0))), 'o')
     pax.set_ylabel('Cross phase (deg)')
     pax.set_xlabel('Channel')
-    lax.plot(np.fft.fftshift(abs(np.fft.fft(xx12.mean(axis=0)))), label='lag')
+    lagspec =np.fft.fftshift(abs(np.fft.fft(xx12.mean(axis=0))))
+    lags = np.arange(len(lagspec)) - float(len(lagspec))/2.
+    lax.plot(lags, lagspec, label='lag')
+    lag_offset = np.argmax(lagspec) - float(len(lagspec))/2.
 
-    Navg = 32
+    Navg = values.num_avg
     Nout = xx12.shape[0]/Navg
     xx12 = xx12[:Nout*Navg, :]
     xx12.shape = [Nout, Navg, -1 ]
     xx12a = xx12.mean(axis=1)
 
+
+    print 'Lagmax {}samples. Unwrapped phase = {} deg, delay={} us = {:0.2f}samples cross amplitude={}'.format(lag_offset, np.degrees(phase), delayus, delaysamp, corramp)
+
+
     pylab.figure()
     pylab.imshow(np.angle(xx12a), aspect='auto')
+    pylab.suptitle(' '.join(values.files[0:2]))
 
     pylab.show()
 

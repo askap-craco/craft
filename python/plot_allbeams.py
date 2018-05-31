@@ -52,6 +52,7 @@ def _main():
     parser.add_argument(dest='files', nargs='+')
     parser.add_argument('-t', '--times', help='Integration range to plot (samples)', type=commasep)
     parser.add_argument('-s', '--seconds', help='Integration range to plot (seconds)', type=commasep)
+    parser.add_argument('-m','--mjd', help='Integration range to plot(mjd,sec)', type=floatcommasep)
     parser.add_argument('--nxy', help='number of rows,columns in plots', type=commasep)
     parser.add_argument('--imzrange', help='Z range for dynamic spectrum', type=floatcommasep)
     parser.add_argument('--fft', help='plot fft', action='store_true',default=False)
@@ -121,6 +122,8 @@ class Plotter(object):
         p = Plotter(values.files, values.nxy, fft=values.fft, raw_units=values.raw_units)
         if values.seconds:
             p.set_position_seconds(*values.seconds)
+        elif values.mjd:
+            p.set_position_mjd(*values.mjd)
         else:
             p.set_position_sample(tstart, ntimes)
 
@@ -157,6 +160,7 @@ class Plotter(object):
             
         self.mjdstart = mjdstart
         self.tsamp = tsamp
+        self.rescale = False
         self.set_position_sample(tstart, ntimes)
         self.imzrange = None
         if nbeams == 1:
@@ -184,6 +188,11 @@ class Plotter(object):
     def set_position_seconds(self, sstart, secs):
         self.tstart = int(sstart/self.tsamp)
         self.ntimes = int(secs/self.tsamp)
+
+    def set_position_mjd(self, mjdstart, ntimes):
+        self.ntimes = int(ntimes)
+        self.tstart = int(((mjdstart - self.mjdstart)*86400)/self.tsamp) - self.ntimes # Is my tstart really what I think it is?
+        print 'MJD', mjdstart, ntimes, self.tstart
 
     def mk_single_fig(self, name, title, xlab, ylab):
         p = plt.subplot
@@ -263,10 +272,10 @@ class Plotter(object):
             self.tscrunch_factor += 1
         elif event.key == 'T':
             self.tscrunch_factor = max(1, self.tscrunch_factor - 1)
-        elif event.key == 'f':
+        elif event.key == 'z':
             fdiv = divisors(self.nfreq)
             self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) + 1]
-        elif event.key == 'F':
+        elif event.key == 'Z':
             fdiv = divisors(self.nfreq)
             self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) -1]
         elif event.key == 'd':
@@ -275,6 +284,8 @@ class Plotter(object):
             self.squeeze_zrange(2.)
         elif event.key == 'C':
             self.squeeze_zrange(0.5)
+        elif event.key == 'r':
+            self.rescale = not self.rescale
         elif event.key == 'ctrl+c':
             sys.exit(0)
         elif event.key == 'h' or event.key == '?':
@@ -310,6 +321,7 @@ class Plotter(object):
         d - Dedisperse (I'll ask for the DM on the cmdline
         c - Increase colormap zoom
         C - Decrease colormap zoom
+        r - Toggle rescaling
         h or ? - Print this help
         Ctrl-C - quit'''
         print s
@@ -321,8 +333,10 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
-        #beams -= 128
-        #beams /= 18
+        if self.rescale:
+            beams -= beams.mean(axis=0)
+            beams /= beams.std(axis=0)*np.sqrt(beams.shape[2])
+            
         f0 = files[0]
         self.beams = beams
         print 'Loaded beams', beams.shape
