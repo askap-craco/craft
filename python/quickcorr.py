@@ -123,7 +123,6 @@ def _main():
     delaysamp = gradient/2./np.pi*len(punwrap)
     delayus = 32./27.*delaysamp
     corramp =  abs(xx12m[5:-5]).mean()
-    print 'Unwrapped phase = {} deg, delay={} us = {:0.2f}samples cross amplitude={}'.format(np.degrees(phase), delayus, delaysamp, corramp)
 
     lagax.plot(abs(xx11.mean(axis=0)), label='auto0')
     lagax.plot(abs(xx22.mean(axis=0)), label='auto1')
@@ -132,13 +131,20 @@ def _main():
     pax.plot(np.degrees(np.angle(xx12.mean(axis=0))), 'o')
     pax.set_ylabel('Cross phase (deg)')
     pax.set_xlabel('Channel')
-    lax.plot(np.fft.fftshift(abs(np.fft.fft(xx12.mean(axis=0)))), label='lag')
+    lagspec =np.fft.fftshift(abs(np.fft.fft(xx12.mean(axis=0))))
+    lags = np.arange(len(lagspec)) - float(len(lagspec))/2.
+    lax.plot(lags, lagspec, label='lag')
+    lag_offset = np.argmax(lagspec) - float(len(lagspec))/2.
 
     Navg = values.num_avg
     Nout = xx12.shape[0]/Navg
     xx12 = xx12[:Nout*Navg, :]
     xx12.shape = [Nout, Navg, -1 ]
     xx12a = xx12.mean(axis=1)
+
+
+    print 'Lagmax {}samples. Unwrapped phase = {} deg, delay={} us = {:0.2f}samples cross amplitude={}'.format(lag_offset, np.degrees(phase), delayus, delaysamp, corramp)
+
 
     pylab.figure()
     pylab.imshow(np.angle(xx12a), aspect='auto')
