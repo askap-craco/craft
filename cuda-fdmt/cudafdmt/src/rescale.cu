@@ -439,6 +439,9 @@ __global__ void rescale_update_scaleoffset_kernel (
 	// Excess Kurtosis is k = E([X-mu]**4)/(Var[X]**2) - 3
 	// numerator = E[X**4] - 4E[X][E[X**3] + 6 E[X**2]E[X]**2 - 3E[X]**4
 	rescale_dtype kurt = (mean4 - 4*mean*mean3 + 6*mean2*mean*mean - 3*mean*mean*mean*mean)/(variance*variance) -3 ;
+	if (!isfinite(kurt)) {
+		kurt = 0;
+	}
 	// save flag inputs
 
 	rescale_dtype prev_mean = meanarr[i];
@@ -453,14 +456,22 @@ __global__ void rescale_update_scaleoffset_kernel (
 	int icend = min(nf, c + flag_grow) + nf*ibeam;
 	int flag = 0;
 	for (int ic = icstart; ic < icend; ++ic) {
+		if (prev_mean == 0) {
+			prev_mean = meanarr[ic];
+		}
+		if (prev_std == 0) {
+			prev_std = stdarr[ic];
+		}
 		rescale_dtype meanoff = fabs(meanarr[ic] - prev_mean)/prev_mean;
 		rescale_dtype stdoff = fabs(stdarr[ic] - prev_std)/prev_std;
 		rescale_dtype kurtoff = fabs(kurtarr[ic]);
+
 		// some of these divisions can be by 0, and the thresholds can be inf - this handles all that.
 
-		int thresh_ok = (meanoff <= mean_thresh) &&
+		 bool thresh_ok = (meanoff <= mean_thresh) &&
 				(stdoff <= std_thresh) &&
 				(kurtoff <= kurt_thresh);
+
 //		printf("Rescale ibeam %d ic=%d meanoff=%f prev_mean=%f meanarr=%f mean_thresh=%f mean OK? %d thresh OK? %d\n",
 //				ibeam, ic, meanoff, prev_mean, meanarr[ic], mean_thresh, mean_ok, thresh_ok);
 		if (! thresh_ok) {

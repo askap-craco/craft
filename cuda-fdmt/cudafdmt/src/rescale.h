@@ -129,7 +129,7 @@ template <int nsamps_per_word, typename wordT> __device__ __host__ inline rescal
 
 template <> __device__ __host__ inline rescale_dtype extract_sample<1, float>(const float word, int sampno)
 {
-	return (rescale_dtype) word;
+	return ((rescale_dtype) word)*1e-8f;// boy do I hate myself for this.
 }
 
 template <> __device__ __host__ inline rescale_dtype extract_sample<1, double>(const double word, int sampno)

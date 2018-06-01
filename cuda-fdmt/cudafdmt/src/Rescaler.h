@@ -35,6 +35,7 @@ public:
 	int nbits;
 	bool polsum;
 	DataOrder in_order;
+	rescale_dtype global_scale;
 };
 
 class Rescaler {

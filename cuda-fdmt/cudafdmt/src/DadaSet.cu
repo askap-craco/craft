@@ -89,7 +89,7 @@ void DadaSet::sync(size_t offset) {
 			 curr_source->dada_key(),
 			 curr_sample, target_sample, first_source_mjd);
 
-		//assert(curr_sample == target_sample);
+		assert(curr_sample == target_sample);
 	}
 
 	// all sources should be synchronised at this point.
