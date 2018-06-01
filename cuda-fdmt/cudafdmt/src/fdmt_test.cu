@@ -370,7 +370,9 @@ int main(int argc, char* argv[])
 	int num_skip_blocks = seek_seconds / source->tsamp() / nt;
 	printf("Seeking to start of data: block %d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source->tsamp());
 	printf("S/N Threshold %f Max ncand per block %d mindm %d \n", thresh, max_ncand_per_block, mindm);
-	source->seek_sample(nt*num_skip_blocks);
+	if (num_skip_blocks > 0) {
+	    source->seek_sample(nt*num_skip_blocks);
+	}
 	int blocknum = 0;
 	int iblock = num_skip_blocks;
 	unsigned long long total_candidates = 0;
