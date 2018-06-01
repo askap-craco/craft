@@ -435,6 +435,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 	rescale_dtype mean3 = sum3[i]/nsamp;
 	rescale_dtype mean4 = sum4[i]/nsamp;
 	rescale_dtype variance = mean2 - mean*mean;
+	rescale_dtype std = sqrtf(variance);
 
 	// Excess Kurtosis is k = E([X-mu]**4)/(Var[X]**2) - 3
 	// numerator = E[X**4] - 4E[X][E[X**3] + 6 E[X**2]E[X]**2 - 3E[X]**4
@@ -447,44 +448,37 @@ __global__ void rescale_update_scaleoffset_kernel (
 	rescale_dtype prev_mean = meanarr[i];
 	rescale_dtype prev_std = stdarr[i];
 	meanarr[i] = mean;
-	stdarr[i] = sqrtf(variance);
+	stdarr[i] = std;
 	kurtarr[i] = kurt;
 
-	__syncthreads();
 	rescale_dtype scale = 0.0, offset = 0.0;
-	int icstart = max(0, c - flag_grow) + nf*ibeam;
-	int icend = min(nf, c + flag_grow) + nf*ibeam;
-	int flag = 0;
-	for (int ic = icstart; ic < icend; ++ic) {
-		if (prev_mean == 0) {
-			prev_mean = meanarr[ic];
-		}
-		if (prev_std == 0) {
-			prev_std = stdarr[ic];
-		}
-		rescale_dtype meanoff = fabs(meanarr[ic] - prev_mean)/prev_mean;
-		rescale_dtype stdoff = fabs(stdarr[ic] - prev_std)/prev_std;
-		rescale_dtype kurtoff = fabs(kurtarr[ic]);
+	//int icstart = max(0, c - flag_grow) + nf*rsbeam;
+	//int icend = min(nf, c + flag_grow) + nf*rsbeam;
+	rescale_dtype meanoff, stdoff, kurtoff;
+	bool flag = false;
+	if (prev_mean == 0) {
+		meanoff = 0;
+	} else {
+		meanoff = fabs(mean - prev_mean)/prev_mean;
+	}
+	if (prev_std == 0) {
+		stdoff = 0;
+	} else {
+		stdoff = fabs(std - prev_std)/prev_std;
+	}
+	kurtoff = fabs(kurt);
 
-		// some of these divisions can be by 0, and the thresholds can be inf - this handles all that.
+	// some of these divisions can be by 0, and the thresholds can be inf - this handles all that.
 
-		 bool thresh_ok = (meanoff <= mean_thresh) &&
-				(stdoff <= std_thresh) &&
-				(kurtoff <= kurt_thresh);
+	 bool thresh_ok = (meanoff <= mean_thresh) &&
+			(stdoff <= std_thresh) &&
+			(kurtoff <= kurt_thresh);
 
-//		printf("Rescale ibeam %d ic=%d meanoff=%f prev_mean=%f meanarr=%f mean_thresh=%f mean OK? %d thresh OK? %d\n",
-//				ibeam, ic, meanoff, prev_mean, meanarr[ic], mean_thresh, mean_ok, thresh_ok);
-		if (! thresh_ok) {
-			flag = 1;
-			break;
-		}
+	if (! thresh_ok) {
+//			printf("Rescale ibeam %d ic=%d meanoff=%f prev_mean=%f meanarr=%f mean_thresh=%f stdoff=%f prev_std=%f stdarr=%f kurtoff=%f thresh OK? %d\n",
+//							ibeam, ic, meanoff, prev_mean, meanarr[ic], mean_thresh, stdoff, prev_std, stdarr[ic], kurtoff, thresh_ok);
 
-		//if (nsamp > 0 && (meanoff > mean_thresh ||
-		//		stdoff > std_thresh ||
-	//		kurtoff > kurt_thresh)) {
-	//		flag = 1;
-	//		break;
-	//	}
+		flag = true;
 
 	}
 

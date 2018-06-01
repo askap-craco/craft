@@ -38,7 +38,9 @@ for indir in $@ ; do
 done
 
 rm -f *.dat
-cudafdmt -N 10 -D -t 512 -d 512 -r 1  -s 0 -o fredda.multi.cand -p -T 0.3 -M 0.3 -B 4 -K 0.8  $all_keys | tee fredda.log &
+
+cudafdmt -N 10 -t 512 -d 512 -r 1  -s 0 -o fredda.multi.cand -p -D -M 0.3 -T 0.3 -K 30 $all_keys &
+
 #$cudafdmt -t 512 -d 512 -r 1  -s 0  -M 0.2 -T 0.2 -C 6.0  -o fredda.$1.cand *.fil
 cudapid=$!
 #cuda-gdb --args $cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1 -D -r 1 -K 30 -s 0
