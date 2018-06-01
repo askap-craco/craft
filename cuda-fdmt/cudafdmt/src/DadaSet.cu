@@ -66,7 +66,7 @@ void DadaSet::sync(size_t offset) {
 		}
 	}
 
-	size_t target_sample = latest_sampnum + offset;
+	int64_t target_sample = latest_sampnum + offset;
 	// max_sampdiff is the sample number we want to get to for all the input sources
 
 	// Loop through inputs again, and read blocks until aligned with latest_sampnum
@@ -85,7 +85,7 @@ void DadaSet::sync(size_t offset) {
 		    break;
 		  }
 		}
-		printf("End of sync 0x%x curr_sample=%d target sample%d targetmjd=%0.10f\n",
+		printf("Sync complete 0x%x curr_sample=%d target sample%d targetmjd=%0.10f\n",
 			 curr_source->dada_key(),
 			 curr_sample, target_sample, first_source_mjd);
 
