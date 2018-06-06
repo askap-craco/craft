@@ -10,7 +10,7 @@ import logging
 import glob
 from subprocess import Popen,PIPE,STDOUT,call
 import datetime
-#from pathlib import Path
+
 
 # for slack
 import requests
@@ -19,32 +19,20 @@ import socket
 import boto3
 
 def _main():
-
-    #python_bin = "/home/craftop/craftenv/bin/activate"
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('--sbid', dest="sbid", type=str)
-    #parser.add_argument('--infile', dest="infile", type=str)
-    parser.add_argument('--scan', dest="scan", type=str)
-    parser.add_argument('--alias',dest="alias",type=str)
-    parser.add_argument('--ant',dest="ant",type=str)
-    parser.add_argument('--cid',dest="cid",type=str)
-    #parser.add_argument('--cid_vol',dest="cid_vol",type=str)
-    parser.add_argument('--text',dest="text",type=str)
-    #parser.add_argument('--mode',dest="mode",type=int)
+    parser.add_argument('--sbid')
+    parser.add_argument('--scan')
+    parser.add_argument('--alias')
+    parser.add_argument('--ant')
+    parser.add_argument('--cid')
+    parser.add_argument('--text')
+    parser.add_argument('--mode', help='CRAFT mode')
+
     parser.set_defaults(verbose=False)
 
     args = parser.parse_args()
-    sb = args.sbid
-    sb_alias = args.alias
-    scan = args.scan
-    ant = args.ant
-    cid = args.cid
-    #capture_id = args.cid_vol
-    #mode = args.mode
-    text = args.text
-    #in_file = args.infile
                     
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -54,8 +42,8 @@ def _main():
     print sb
     print scan
 
-    check_realcand_flyseye(sb,scan,cid)
-    slack (text,sb,scan,cid,ant,sb_alias)
+    check_realcand_flyseye(args)
+    slack (args) #text,sb,scan,cid,ant,sb_alias)
 
     
 def fix_sb(sb):
@@ -84,7 +72,7 @@ def fix_beam(beam):
         beam = '0'+str(beam)
     return str(beam)
     
-def make_vcraft_plots(sb,scan,cid,cid_vol,dm,beam_v,beam,ant,mjd):
+def make_vcraft_plots(sb,scan,cid,cid_vol,dm,beam_v,beam,ant,mjd, plot_time):
 	# Here cid would be the capture id for the particular observation.
 	# Here beam should be vcraft beam for the particular observation.
     print "X polarisation is",beam_v[0]
@@ -94,7 +82,6 @@ def make_vcraft_plots(sb,scan,cid,cid_vol,dm,beam_v,beam,ant,mjd):
     original_sb = sb
     sb = fix_sb(sb)
     plot_dir = '/data/TETHYS_1/bha03n/test/auto_plots/'
-    plot_time = 1.5
     
     #print "Vcraft beam is",beam
     #print "CID to be used is",cid_vol
@@ -114,9 +101,10 @@ def make_vcraft_plots(sb,scan,cid,cid_vol,dm,beam_v,beam,ant,mjd):
             print cmd
             os.popen(cmd)
          
-         
-        print "Filterbank should be made by now"
-        
+        assert os.path.isfile(fil_path), 'Looks like vcraft2fil didnt work'
+        output_file = '{}_{}_{}_{}_{}_{}_on'.format(original_sb, scan, cid, ant, beam_v[i])
+        cmd1v2 = 'dspsr -cepoch=start -D {dm:0.1f} -c {plot_time} -T {plot_time} -k askap -N source -O {plot_file}'.format(dm=dm, plot_time=plot_time, plot_file=output_file)
+                
         cmd1 = 'dspsr -cepoch=start   -D ' + str(dm) + ' -c ' + str(plot_time) + '  -T ' + str(plot_time) + ' -k askap -N source -O '+ plot_dir +original_sb+'_'+scan+'_'+str(cid)+'_'+ant+'_'+str(beam_v[i]) + '_on'+' ' + fil_path
         print cmd1
         os.popen(cmd1)
@@ -132,7 +120,7 @@ def make_vcraft_plots(sb,scan,cid,cid_vol,dm,beam_v,beam,ant,mjd):
     os.popen(cmd3)
     print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     
-def make_plots(sb,scan,cid,dm,beam,ant,mjd):
+def make_plots(sb,scan,cid,dm,beam,ant,mjd,plot_time):
 	# Here CID should be the scan ID and beam should be the actual beam
 
     print "Making plots using offline filterbank"
@@ -159,7 +147,6 @@ def make_plots(sb,scan,cid,dm,beam,ant,mjd):
     #print "despersive delay is",delay*1e-6
     
     #plot_time = delay
-    plot_time = 1.5
     #plot_time =  0.8 # This is for mode3!
     
     if (plot_time > t_left):
@@ -177,8 +164,14 @@ def make_plots(sb,scan,cid,dm,beam,ant,mjd):
     os.popen(cmd1)
     os.popen(cmd2)
 
-def check_realcand_flyseye(sb,scan,cid):
-    
+def check_realcand_flyseye(args):
+    sb = args.sbid
+    sb_alias = args.alias
+    scan = args.scan
+    ant = args.ant
+    cid = args.cid
+    text = args.text
+
     print "Snoopy real-time candidate"
     cmd = 'pwd | sed  "s/\// /g" | awk "{print $10}"'
     capture = os.popen(cmd).read()
@@ -215,9 +208,11 @@ def check_realcand_flyseye(sb,scan,cid):
     #print "I am passing",cid_vol
     #print "Passing the Beam with x polarisation as",beamx
     print "Making plots now"
-    make_vcraft_plots(sb,scan,cid,capture_id,dm,beam_v,beam,ant,fredsnop_mjd)
-    make_plots(sb,scan,cid,dm,beam,ant,fredsnop_mjd)
-        
+    mode_plot_time_map= {"0":0.7, "1":1.4,"2":3,"3":14}
+                        
+    plot_time = mode_plot_time_map[args.mode]
+    make_vcraft_plots(sb,scan,cid,capture_id,dm,beam_v,beam,ant,fredsnop_mjd, plot_time)
+    make_plots(sb,scan,cid,dm,beam,ant,fredsnop_mjd, plot_time)
         
 
 def find_start_time(sb,scan,cid,beam,mjd,ant):
@@ -241,7 +236,13 @@ def find_start_time(sb,scan,cid,beam,mjd,ant):
     print "Start time of the pulse is",start_time
     return start_time,nsamp,tsamp
 
-def slack(text,sb,scan,cid,ant,sb_alias):
+def slack(args): #text,sb,scan,cid,ant,sb_alias):
+    sb = args.sbid
+    sb_alias = args.alias
+    scan = args.scan
+    ant = args.ant
+    cid = args.cid
+    text = args.text
     
     plot_dir = '/data/TETHYS_1/bha03n/test/auto_plots'
 
