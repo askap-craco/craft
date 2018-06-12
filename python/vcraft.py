@@ -19,7 +19,25 @@ bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
 frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 
 # number of samples per 32 bit word indexed by mode
+# see setupCraftDownload
+# https://svn.atnf.csiro.au/askapsoft/Src/trunk/Code/Base/adbe/current/adbe/Redback3.cc
+#
+# Andrew's comment from setupCraftDownload below:
+# // For a DIMM with 28 address bits there are (2^(28-7))/72=29172 sets of 72 beams
+# // The 28-7 comes from the fact that the lower 2 bits are used for address incrementing
+# // and the next 5 bits are for counting samples (up to 32). So the remaining number
+# // of bits left for sets of 72 beams is 28-7 = 21 bits. We divide by 72 because
+# // that's how many beams we have in a set. Each set contains 32 samples for each beam
+# // (assuming 16bit data). Therefore the max number of timeSamples that can be read is
+# // 29172 sets x 32 samples. For single beam mode we have 36 more samples available but
+# // only for the 2 beams selected
+
 SAMPS_PER_WORD32 = [1,2,4,16,1,2,4,16]
+MODE_BEAMS = [72,72,72,72,2,2,2,2]
+MAX_SETS = 29172
+
+#  Number of sample vs mode
+SAMPS_MODE = [29172*32*nsamp_per_word*72/nbeams for (nsamp_per_word, nbeams) in zip(SAMPS_PER_WORD32, MODE_BEAMS)]
 
 def unpack_craft(fin, nsamp_per_word):
     dwords = np.fromfile(fin, dtype=np.uint32)
@@ -54,13 +72,17 @@ class VcraftFile(object):
             self.mode = mode
 
         self.nbits = int(hdr['NBITS'][0])
-        self.infsamp = float(hdr['SAMP_RATE'][0])
+        self.infsamp = float(hdr['SAMP_RATE'][0]) # samples per second
         # TODO: Calculate frequencies a bit better - tricky because individual
         # files have freqs with gaps, which makes life a little wierd in sigprocland
         self.freqs = np.array(map(float, hdr['FREQS'][0].split(',')))
 
         # TODO: Get tstart from BATs. This is the easy way
-        self.tstart = float(hdr['ANT_MJD'][0])
+        #self.tstart = float(hdr['ANT_MJD'][0])
+        # Trigger is at the *end* of the buffer.
+        self.trigger_mjd = float(hdr['TRIGGER_MJD'][0])
+        self.expected_nsamp = SAMPS_MODE[self.mode]
+        self.start_mjd = trigger_mjd - self.expected_nsamp/self.infsamp*86400.
         self.bats = np.array([int(hdr[c][0], base=16) for c in bat_cards])
         self.frames = np.array([int(hdr[c][0]) for c in frame_cards])
         self.bat0 = int(hdr['NOW_BAT'][0], base=16)
@@ -72,6 +94,9 @@ class VcraftFile(object):
                 self.pol = 'X'
             else:
                 self.pol = 'Y'
+
+        if self.nsamps != self.expected_nsamp:
+            warnings.warn('VCRAFT file {} had unexpected size. Mode {} expected {} actual {}'.format(self.fname, self.mode, self.expected_nsamp, self.nsamps))
 
     def __str__(self):
         return '{} NBITS={}'.format(self.fname, self.nbits)
@@ -261,7 +286,8 @@ class VcraftMux(object):
         self.nsamps = min(self.all_samps)
         self.trigger_frameids = np.array(map(int, self.allhdr('TRIGGER_FRAMEID')))
         self.trigger_mjds = np.array(map(float, self.allhdr('TRIGGER_MJD')))
-        self.start_mjd = max(self.trigger_mjds)
+        self.start_mjds = np.array(f.start_mjd for f in vcraft_files)
+        self.start_mjd = max(self.start_mjds)
         self.start_frameid = max(self.trigger_frameids)
         self.sample_offsets = self.start_frameid - self.trigger_frameids
         assert np.all(self.sample_offsets >= 0)

@@ -120,7 +120,6 @@ def detect(files, values):
                 dfft = dfft[:,:,::-1]
                 
             assert dfft.shape == (npolin, nint, nchanout)
-            print 'DFFT shape', dfft.shape, 'c', c, 'dout.shape', dout.shape
             
             # just take the absolute values, average over time and be done with it
             if npolout == 1:

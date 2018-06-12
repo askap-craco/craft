@@ -15,7 +15,7 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 parnames = ('UU','VV','WW','DATE','_DATE','BASELINE','FREQSEL','SOURCE','INTTIM','DATA')
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan, npol, sources, antennas):
+    def __init__(self, fname, fcent, foff, nchan, npol, sources, antennas, sideband):
         self.dshape = [1,1,1,nchan, npol, 3]
         hdr = pyfits.Header()
         self.hdr = hdr
@@ -27,6 +27,8 @@ class CorrUvFitsFile(object):
         self.sources = sources
         self.antennas = antennas
         self.fname = fname
+        self.no_if = 1
+        self.sideband = sideband
 
         hdr['SIMPLE'] = True
         hdr['BITPIX'] = -32
@@ -81,11 +83,12 @@ class CorrUvFitsFile(object):
                 Col('IF FREQ','1D','HZ', array=[0]), #??
                 Col('CH WIDTH','1E','HZ', array=[self.foff*1e6]),
                 Col('TOTAL BANDWIDTH','1E','HZ', array=[self.bandwidth*1e6]),
-                Col('SIDEBAND','1J', array=[1]) #??
+                Col('SIDEBAND','1J', array=[self.sideband]), #??
+                Col('RXCODE','1J',array=[0]) # ?? Not in AIPSMEM117, but AIPS/FRING1 complains if it isn't there
         ]
-
         tbhdu = pyfits.BinTableHDU.from_columns(cols)
         tbhdu.header['EXTNAME'] = 'AIPS FQ'
+        tbhdu.header['NO_IF'] = (self.no_if, 'hard coded')
 
         return tbhdu
 
@@ -125,6 +128,7 @@ class CorrUvFitsFile(object):
         hdr['ARRNAM'] = 'ASKAP'
         hdr['NUMORB'] = 0
         hdr['NOPCAL'] = 0
+        hdr['NO_IF'] = (self.no_if, 'hard coded')
         hdr['POLTYPE'] = ''
         hdr['XYZHAND'] = 'RIGHT'
         hdr['FRAME'] = 'ITRF'
@@ -157,7 +161,7 @@ class CorrUvFitsFile(object):
         ]
         tbhdu = pyfits.BinTableHDU.from_columns(cols)
         tbhdu.header['EXTNAME'] = 'AIPS SU'
-        tbhdu.header['NO_IF'] = 1
+        tbhdu.header['NO_IF'] = self.no_if
         tbhdu.header['FREQID'] = 1
 
         return tbhdu

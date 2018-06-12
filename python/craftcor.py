@@ -54,7 +54,7 @@ class PlotOut(object):
 
 
     def put_product(self, a1, a2, xxp):
-        if a1 != a2 and self.corr.values.show:
+        if self.corr.values.show:
             xx= xxp[:,0]
             self.stuff.append(xx)
             self.last_xx = (a1, a2, xx)
@@ -227,8 +227,8 @@ class Correlator(object):
         self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
         self.frame0 = self.refant.trigger_frame
         self.nint = values.nint
-        self.nfft = 64
-        self.nguard_chan = 5
+        self.nfft = 64*values.fft_size
+        self.nguard_chan = 5*values.fft_size
         self.oversamp = 32./27.
         self.fs = self.oversamp # samples per microsecnd
         self.ncoarse_chan = len(self.refant.vfile.freqs)
@@ -244,6 +244,7 @@ class Correlator(object):
         #self.f0 = self.ants[0].vfile.freqs.mean() # centre frequency for fringe rotation
         self.f0 = self.ants[0].vfile.freqs[0]
         self.freqs = self.ants[0].vfile.freqs
+        self.fmid = self.freqs.mean()
         self.inttime_secs = self.nint*self.nfft/(self.fs*1e6)
         self.inttime_days = self.inttime_secs/86400.
         self.curr_intno = 0
@@ -251,8 +252,8 @@ class Correlator(object):
         self.prodout = PlotOut(self)
         self.calcmjd()
         self.get_fr_data()
-        self.fileout = CorrUvFitsFile(values.outfile, self.f0, self.fine_chanbw, \
-            self.nfine_chan, self.npol_out, sources, ants)
+        self.fileout = CorrUvFitsFile(values.outfile, self.fmid, self.sideband*self.fine_chanbw, \
+                                      self.nfine_chan, self.npol_out, sources, ants, self.sideband)
 
         logging.debug('F0 %f FINE CHANNEL %f kHz num=%d freqs=%s', self.f0, self.fine_chanbw*1e3, self.nfine_chan, self.freqs)
 
@@ -369,13 +370,26 @@ class Correlator(object):
         self.fileout.put_data(uvw, self.curr_mjd_mid, a1.ia, a2.ia,
             self.inttime_secs, xx)
 
+
+def parse_delays(values):
+    delayfile = os.path.join(os.path.basename(values.parset), 'fpga_delays.txt')
+    delays = {}
+    if os.path.exists(delayfile):
+        with open(delayfile, 'rU') as dfile:
+            for line in dfile:
+                bits = line.split()
+                if not line.startswith('#'):
+                    delays[bits[0].strip()] = int(bits[1])
+
+    return delays
+
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-o','--outfile', help='Output fits file', default='corr.fits')
     parser.add_argument('-c','--channel', type=int, help='Channel to plot', default=0)
-    parser.add_argument('-n','--fft-size', type=int, help='FFT size per coarse channel', default=64)
+    parser.add_argument('-n','--fft-size', type=int, help='Multiple of 64 channels to make channels- default=1', default=1)
     parser.add_argument('--calcfile', help='Calc file for fringe rotation')
     parser.add_argument('-p','--parset', help='Parset for delays')
     parser.add_argument('--show', help='Show plot', action='store_true', default=False)
@@ -391,8 +405,10 @@ def _main():
     calcresults = ResultsFile(values.calcfile)
     m87pos = SkyCoord(3.276089, 0.21626172, unit=('rad','rad'), frame='icrs')
     sources = [{'name':'M87','ra':m87pos.ra.deg,'dec':m87pos.dec.deg}]
+    # hacking delays
+    delaymap = parse_delays(values)
     print sources
-    antennas = [AntennaSource(mux) for mux in vcraft.mux_by_antenna(values.files)]
+    antennas = [AntennaSource(mux) for mux in vcraft.mux_by_antenna(values.files, delaymap)]
     #antennas = [AntennaSource(vcraft.VcraftFile(f)) for f in values.files]
     corr = Correlator(antennas, sources, values)
     try:

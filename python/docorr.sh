@@ -16,7 +16,7 @@ if [[ ! -e $calcfile ]] ; then
 fi
 
 #outdir=/data/TETHYS_1/ban115/correlations/virgo/mode3/SB1633/card3.extrapause/
-outdir=/data/TETHYS_1/ban115/correlations/virgo/mode1/SB1679/allcards/
+outdir=/data/TETHYS_1/ban115/correlations/virgo/mode3/SB1679/allcards/nfft4/
 mkdir -p $outdir
 chmod a+w $outdir
 
@@ -29,7 +29,7 @@ for f in $@ ; do
     dlname=`basename $f`
     echo "DL NAME IS $dlname"
     for b in beam40 beam41; do
-	tsp craftcor.py --parset $fcm --calcfile $calcfile  -i 1024 -o $outdir/${dlname}_${b}.fits $dlname/c*/$b/*.vcraft
+	tsp craftcor.py --parset $fcm --calcfile $calcfile  -i 1024 -o $outdir/${dlname}_${b}.fits $dlname/c*/$b/*.vcraft --fft-size=4
     done
 done
 
