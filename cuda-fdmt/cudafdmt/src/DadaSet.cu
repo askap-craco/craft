@@ -74,17 +74,7 @@ void DadaSet::sync(size_t offset) {
 	for (int i = 0; i < m_sources.size(); ++i) {
 		DadaSource* curr_source = m_sources.at(i);
 		int64_t curr_sample;
-		while(true) {
-		  curr_sample = curr_source->current_sample_relative_to(first_source_mjd);
-		  //  printf("Synchronising 0x%x curr_sample=%d target sample%d targetmjd=%0.10f\n",
-		  //	 curr_source->dada_key(),
-		  //	 curr_sample, target_sample, first_source_mjd);
-		  if(curr_sample< target_sample) {
-		    curr_source->read_samples(&dummy_output);
-		  } else {
-		    break;
-		  }
-		}
+		curr_source->seek_sample(target_sample);
 		printf("Sync complete 0x%x curr_sample=%d target sample%d targetmjd=%0.10f\n",
 			 curr_source->dada_key(),
 			 curr_sample, target_sample, first_source_mjd);
@@ -93,6 +83,7 @@ void DadaSet::sync(size_t offset) {
 	}
 
 	// all sources should be synchronised at this point.
+	printf("ALL SOURCES SYNCHRONISED\n");
 }
 
 size_t DadaSet::read_samples(void** output)
