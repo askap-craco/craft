@@ -15,6 +15,7 @@ import vcraft
 from calc11 import ResultsFile
 from corruvfits import CorrUvFitsFile
 from astropy.coordinates import SkyCoord
+import multiprocessing
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -50,16 +51,16 @@ class PlotOut(object):
     def __init__(self, corr):
         self.stuff = []
         self.corr = corr
-        self.delayout = open('/tmp/delays.parset', 'w')
-
+        self.delayout = open(corr.values.outfile.replace('.fits','')+'.delays.parset', 'w')
 
     def put_product(self, a1, a2, xxp):
         if self.corr.values.show:
-            xx= xxp[:,0]
-            self.stuff.append(xx)
-            self.last_xx = (a1, a2, xx)
-            if len(self.stuff) >0:
-                self.plot_stuff(a1, a2)
+            if a1 != a2:
+                xx= xxp[:,0]
+                self.stuff.append(xx)
+                self.last_xx = (a1, a2, xx)
+                if len(self.stuff) >0:
+                    self.plot_stuff(a1, a2)
 
     def plot_stuff(self, a1, a2):
 
@@ -80,7 +81,10 @@ class PlotOut(object):
         lagoff = lagidx - len(xx)/2.0
         lagns= lagoff/self.corr.full_bw*1e3
         lagsn = lag[lagidx]/np.std(lag[0:lagidx-100])
-        ax3.plot(lag,label='lag')
+        lagx = np.arange(len(lag)) - len(lag)/2.0
+        ax3.plot(lagx/self.corr.full_bw*1e3, lag,label='lag')
+        ax3.axvline(0, c='r')
+        ax3.set_xlabel('Delay (ns)')
         angxx = np.angle(np.array(self.stuff))
         ax4.imshow(angxx, aspect='auto')
         phase_vt = np.degrees(angxx[:, 10:50].mean(axis=1))
@@ -92,8 +96,10 @@ class PlotOut(object):
         print 'Phase rate={} offset={} std={} deg lagoff={}samples = {}ns lag S/N={}'.format(rate, offset, fit_std, lagoff, lagns, lagsn)
         fig.suptitle('a1 {} a2 {}'.format(a1.antname, a2.antname))
         curr_delay = self.corr.get_fixed_delay_usec(a2.antno)*1e3
-        self.delayout.write('{}={} S/N={} delay={}ns\n'.format(a1.antname, a2.antname, lagsn, lagns))
-        self.delayout.write('common.antenna.ant{}.delay={}ns\n'.format(a2.antno, curr_delay+lagns))
+        if a1 != a2:
+            self.delayout.write('#{}={} S/N={} delay={}ns\n'.format(a1.antname, a2.antname, lagsn, lagns))
+            self.delayout.write('common.antenna.ant{}.delay={}ns\n'.format(a2.antno, curr_delay+lagns))
+            self.delayout.flush()
 
         pylab.show()
 
@@ -128,7 +134,6 @@ class AntennaSource(object):
 
         frac_delay_samp = (total_delay_samp - whole_delay)
         frac_delay_us = frac_delay_samp *corr.fs
-
 
         # get data
         nsamp = corr.nint*corr.nfft
@@ -211,6 +216,9 @@ class Correlator(object):
     def __init__(self, ants, sources, values):
         self.ants = ants
         self.values = values
+        self.pool = None
+        if self.values.num_threads > 1:
+            self.pool = multiprocessing.Pool(processes=values.num_threads)
 
         self.parse_parset()
 
@@ -248,7 +256,7 @@ class Correlator(object):
         self.inttime_secs = self.nint*self.nfft/(self.fs*1e6)
         self.inttime_days = self.inttime_secs/86400.
         self.curr_intno = 0
-        self.curr_samp = self.curr_intno*self.nint + 10000
+        self.curr_samp = self.curr_intno*self.nint + 1000
         self.prodout = PlotOut(self)
         self.calcmjd()
         self.get_fr_data()
@@ -262,7 +270,7 @@ class Correlator(object):
         self.parset = {}
         with open(self.values.parset, 'rU') as f:
             for line in f:
-                if '=' not in line:
+                if '=' not in line or line.startswith('#'):
                     continue
 
                 name, value = line.strip().split('=')
@@ -372,14 +380,19 @@ class Correlator(object):
 
 
 def parse_delays(values):
-    delayfile = os.path.join(os.path.basename(values.parset), 'fpga_delays.txt')
+    delayfile = os.path.join(os.path.dirname(values.parset), 'fpga_delays.txt')
     delays = {}
     if os.path.exists(delayfile):
         with open(delayfile, 'rU') as dfile:
             for line in dfile:
                 bits = line.split()
-                if not line.startswith('#'):
+                if not line.startswith('#') and len(bits) == 2:
                     delays[bits[0].strip()] = int(bits[1])
+
+        logging.info('Loaded %s delays from %s', len(delays), delayfile)
+    else:
+        logging.info('No delays loaded. %s does not exist', delayfile)
+
 
     return delays
 
@@ -390,6 +403,7 @@ def _main():
     parser.add_argument('-o','--outfile', help='Output fits file', default='corr.fits')
     parser.add_argument('-c','--channel', type=int, help='Channel to plot', default=0)
     parser.add_argument('-n','--fft-size', type=int, help='Multiple of 64 channels to make channels- default=1', default=1)
+    parser.add_argument('-t','--num-threads', type=int, help='Number of threads to run with', default=1)
     parser.add_argument('--calcfile', help='Calc file for fringe rotation')
     parser.add_argument('-p','--parset', help='Parset for delays')
     parser.add_argument('--show', help='Show plot', action='store_true', default=False)

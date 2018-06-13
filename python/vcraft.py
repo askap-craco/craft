@@ -80,9 +80,11 @@ class VcraftFile(object):
         # TODO: Get tstart from BATs. This is the easy way
         #self.tstart = float(hdr['ANT_MJD'][0])
         # Trigger is at the *end* of the buffer.
+        self.trigger_frameid = int(hdr['TRIGGER_FRAMEID'][0])
         self.trigger_mjd = float(hdr['TRIGGER_MJD'][0])
         self.expected_nsamp = SAMPS_MODE[self.mode]
-        self.start_mjd = trigger_mjd - self.expected_nsamp/self.infsamp*86400.
+        self.start_frameid = self.trigger_frameid - self.expected_nsamp
+        self.start_mjd = self.trigger_mjd - self.expected_nsamp/self.infsamp/86400.
         self.bats = np.array([int(hdr[c][0], base=16) for c in bat_cards])
         self.frames = np.array([int(hdr[c][0]) for c in frame_cards])
         self.bat0 = int(hdr['NOW_BAT'][0], base=16)
@@ -262,12 +264,17 @@ class VcraftMux(object):
     frequency axis
     '''
 
-    def __init__(self, vcraft_files):
+    def __init__(self, vcraft_files, delays=None):
         '''
         :vcraft_files: A list of open Vcraft files
         '''
         self._files = sorted(vcraft_files, key=lambda f:(f.hdr['CARD_NO'][0], f.hdr['FPGA_ID'][0]))
+        if delays is None:
+            delays = {}
+
+        self.file_delays = np.array([int(delays.get(os.path.basename(f.fname+'.hdr'), 0)) for f in vcraft_files])
         self.ant = self.hdr_identical('ANT')
+        self.antno = int(self.hdr_identical('ANTENNA_NO'))
         self.beam = int(self.hdr_identical('BEAM'))
         self.nbits = int(self.hdr_identical('NBITS'))
         self.mode = int(self.hdr_identical('MODE'))
@@ -286,13 +293,20 @@ class VcraftMux(object):
         self.nsamps = min(self.all_samps)
         self.trigger_frameids = np.array(map(int, self.allhdr('TRIGGER_FRAMEID')))
         self.trigger_mjds = np.array(map(float, self.allhdr('TRIGGER_MJD')))
-        self.start_mjds = np.array(f.start_mjd for f in vcraft_files)
+        
+        self.start_mjds = np.array([f.start_mjd for f in vcraft_files])
         self.start_mjd = max(self.start_mjds)
-        self.start_frameid = max(self.trigger_frameids)
-        self.sample_offsets = self.start_frameid - self.trigger_frameids
+
+        self.start_frameids = np.array([f.start_frameid for f in vcraft_files]) - self.file_delays
+        self.start_frameid = max(self.start_frameids)
+        # BUG! Start MJDs don't account for sample offsets
+        self.sample_offsets = self.start_frameid - self.start_frameids 
+        print 'SAMPLE OFFSETS', self.sample_offsets, 'FILE DELAYS', self.file_delays
         assert np.all(self.sample_offsets >= 0)
         assert np.all(self.sample_offsets < self.nsamps)
-        self.start_mjd = self.trigger_mjds[np.argmin(self.sample_offsets)]
+        self.start_mjd = self.start_mjds[np.argmin(self.sample_offsets)]
+        assert np.all(abs(self.start_mjds - self.trigger_mjds) < 1), 'MJD adjustment should be << 1 day'
+
         beam_ra = np.array(map(float, self.allhdr('BEAM_RA'))).mean() # TODO: make craft_vdump write same BEAM_RA for all card/fpgas
         beam_dec = np.array(map(float, self.allhdr('BEAM_DEC'))).mean()
         #self.beam_pos = SkyCoord(beam_ra, beam_dec, frame='icrs', unit=('deg','deg'))
@@ -341,22 +355,22 @@ class VcraftMux(object):
 
         return d
 
-def mux_by_pol(filenames):
+def mux_by_pol(filenames, delays=None):
     '''
     :return: Dictionary keyened by 'X' or "Y
     '''
     all_files = [VcraftFile(f) for f in filenames]
     mux_by_pol = itertools.groupby(all_files, lambda f:f.pol)
-    muxes = {pol:VcraftMux(list(files)) for pol, files in mux_by_pol}
+    muxes = {pol:VcraftMux(list(files), delays) for pol, files in mux_by_pol}
     
     return muxes
     
 
-def mux_by_antenna(filenames):
+def mux_by_antenna(filenames, delays=None):
     all_files = [VcraftFile(f) for f in filenames]
     mux_by_ant = itertools.groupby(all_files, lambda f:f.hdr['ANT'][0])
-    muxes = [VcraftMux(list(files)) for antname, files in mux_by_ant]
-    muxes.sort(key=lambda mux: mux.ant) # sort by antenna
+    muxes = [VcraftMux(list(files), delays) for antname, files in mux_by_ant]
+    muxes.sort(key=lambda mux: mux.antno) # sort by antenna number
     
     return muxes
         

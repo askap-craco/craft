@@ -152,6 +152,7 @@ class Scan(object):
         
         if secs < 0.:
             warnings.warn('ERR Dodgey offset. mjd={} polymjd ={} secoffset={}'.format(mjd, poly.mjdfull, secs))
+        assert secs >= 0
             
         ant_results = {}
         for ant, polys in poly.source0antpolys.iteritems():
