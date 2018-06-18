@@ -6,7 +6,8 @@ c& rjs
 c: uv analysis
 c+
 c	BLFIT is a Miriad task which solves for antenna locations (baseline
-c	lengths) visibility data. It works by breaking the data into
+c	lengths) and other parameters that determine the instrumental phase
+c	model. It works by breaking the data into
 c	a collection of sets, each set of which can contain several
 c	scans. A set is a collection of data for which the antenna-based
 c	instrumental phases are assumed constant. Different polarisation
@@ -19,8 +20,7 @@ c@ vis
 c	Name of the input visibility file(s). No default.
 c@ stokes
 c	Normal Stokes/polarisation parameter (e.g. i,q,u,v,ii etc).
-c	Only a single polarisation can be requested. The default is
-c	to select all parallel hand polarizations.
+c	The default is to select all parallel hand polarizations.
 c@ line
 c	Normal line-type processing with normal defaults. 
 c@ select
@@ -60,13 +60,12 @@ c    20nov04 rjs	Original version ?
 c    17mar08 rjs	Compute az/el directly.
 c    11dec08 rjs	Correct dimensioning of b1() and b2() in Solve (thanks
 c			to Randall Wayth).
+c    18jun18 rjs	Minor mods and correct handling of polarization.
 c------------------------------------------------------------------------
-	integer PolXX,PolYY
-	parameter(PolXX=-5,PolYY=-6)
 	include 'mirconst.h'
 	include 'maxdim.h'
 	character version*(*)
-        parameter(version='version 1.0 11-Dec-2008')
+        parameter(version='version 1.0 18-Jun-2018')
 	include 'blfit.h'
 c
 	integer NP
@@ -74,7 +73,7 @@ c
 	real model(NP,NANT),moderr(NP,NANT),omodel(NP,NANT),tol,factor
 	character device*64,xaxis*10,yaxis*10,logf*80,telescop*16
 	integer lIn,vUpd,npol,i,j,nvis,nread,refant,ref2,nselect
-	integer nbadsc,nbadset,npd
+	integer nbadsc,nbadset,npd,pol
 	double precision t0,lat,long,cosl,sinl
 	real interval,gap,flo,fhi,f1,f2,fac,xd,yd,zd,yrange(2)
 	double precision xyz(NANT,3)
@@ -84,7 +83,7 @@ c
 c
 	character typeaz*1,typeel*1
 	integer laz,lel
-	logical uaz,uel,doazel
+	logical uaz,uel,doazel,accept
 	double precision dtemp,ra,dec,lst
 c
 	double precision t,bl,az,daz,el,preamble(4)
@@ -103,6 +102,7 @@ c
         character itoaf*8
 	logical uvDatOpn,uvVarUpd
 	integer scanMake,pgbeg
+	logical polsPara
 c
 c  Get the inputs.
 c
@@ -136,7 +136,6 @@ c
 c  Set the polarisations to ii if nothing was selected.
 c
 	call uvDatGti('npol',npol)
-	if(npol.eq.0)call uvDatSet('stokes',0)
 c
 c  Open up the PGPLOT device for later plotting.
 c
@@ -187,6 +186,12 @@ c
           dowhile(nread.gt.0)
 	    t = preamble(3)
 	    bl = preamble(4)
+	    accept = npol.gt.0
+	    if(.not.accept)then
+	      call uvdatgti('pol',pol)
+	      accept = polsPara(pol)
+	    endif
+	    if(accept)then
 	    if(first)then
 	      t0 = t
 	      tbase = t
@@ -241,7 +246,7 @@ c
 	    call setGet(lIn,nread,set)
 	    call uvDatGtr('variance',sigma2)
 	    if(sigma2.le.0)sigma2 = 1
-c
+c	    
 	    do i=1,nread
 	      if(flags(i))then
 		if(Scan(set(i)).eq.0)then
@@ -262,6 +267,7 @@ c
 		nvis = nvis + 1
 	      endif
 	    enddo
+	    endif
 	    call uvDatRd(preamble,data,flags,MAXCHAN,nread)
 	  enddo
 	  call uvDatCls
