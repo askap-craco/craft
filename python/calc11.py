@@ -32,6 +32,7 @@ class CalcFile(object):
         else:
             value = antdata.get(vkey, default)
 
+        logging.debug('%s %s %s', vkey, self.telno, value)
         assert value is not None, 'Unknown value for ant {} key {} {}'.format(self.telno, cname, vkey)
         if index is not None:
             bits = value.replace('[','').replace(']','').split(',')
@@ -190,6 +191,8 @@ class ResultsFile(OrderedDict):
 
         with open(self.fname, 'rU') as f:
             for line in f:
+                if ':' not in line:
+                    continue
                 name, value = [s.strip() for s in line.split(':')]
                 if name.startswith('SCAN'):
                     namebits = name.split()
