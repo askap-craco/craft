@@ -156,7 +156,6 @@ class AntennaSource(object):
         for c in xrange(corr.ncoarse_chan):
             #cfreq = self.vfile.freqs[c]
             cfreq = corr.freqs[c]
-            cbw = corr.coarse_chanbw/2.
             coarse_off = cfreq - corr.f0
             freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw
             if corr.sideband == -1:
@@ -231,7 +230,7 @@ class Correlator(object):
         #self.refant = filter(lambda a:a.antname == refantname, ants)[0]
         self.refant = ants[0]
         self.calcresults = ResultsFile(values.calcfile)
-        self.dutc = -37.0*0
+        self.dutc = -37.0
         self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
         self.frame0 = self.refant.trigger_frame
         self.nint = values.nint

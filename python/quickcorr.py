@@ -128,7 +128,11 @@ def _main():
     lagax.plot(abs(xx22.mean(axis=0)), label='auto1')
     lagax.plot(abs(xx12m), label='crossamp')
     lagax.legend(frameon=False)
-    pax.plot(np.degrees(np.angle(xx12.mean(axis=0))), 'o')
+    pax.plot(xx, np.degrees(np.angle(xx12m)), 'o')
+    fitdeg = np.degrees(np.polyval((gradient, phase), xx))
+    fitwrapped = ((fitdeg + 180.) % 360) - 180.
+    pax.plot(xx, fitwrapped)
+    #pax.plot(xx, np.degrees(punwrap))
     pax.set_ylabel('Cross phase (deg)')
     pax.set_xlabel('Channel')
     lagspec =np.fft.fftshift(abs(np.fft.fft(xx12.mean(axis=0))))
