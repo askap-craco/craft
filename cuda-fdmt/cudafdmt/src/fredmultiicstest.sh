@@ -5,9 +5,9 @@ infile=`ls *.dada`
 hdr=`ls co*.hdr`
 echo Infile $infile hdr=$hdr
 #cat $hdr
-export DADA=$HOME/psrdada-install
+#export DADA=$HOME/psrdada-install
 #export DADA=/home/craftop/askap/trunk/3rdParty/psrdada/psrdata
-#export DADA=/home/craftop/askap/trunk/3rdParty/psrdada/psrdada-537159/install/
+export DADA=/home/craftop/askap/trunk/3rdParty/psrdada/psrdada-537159/install/
 export PATH=$DADA/bin:$PATH
 export LD_LIBRARY_PATH=$DADA/lib:$LD_LIBRARY_PATH
 #cudafdmt=$HOME/craftdev/craft/cuda-fdmt/cudafdmt/src/cudafdmt
@@ -34,12 +34,12 @@ for indir in $@ ; do
     #echo Header installed $hdr $DADA_KEY
     echo dada_diskdb -k $DADA_KEY  -z -f $indir/*.dada
     dada_diskdb -k $DADA_KEY -z -f $indir/*.dada &
-    dada_dbmonitor -k $DADA_KEY &
+    #dada_dbmonitor -k $DADA_KEY &
 done
 
 rm -f *.dat
 
-cudafdmt -N 70 -t 512 -d 512 -r 1  -s 0 -o fredda.multi.cand -p  -M 0.1 -T 0.1 -K 30 $all_keys &
+cuda-gdb --args cudafdmt -N 70 -t 512 -d 512 -r 1  -s 0 -o fredda.multi.cand -p  -M 0.1 -T 0.1 -K 30 $all_keys 
 
 #$cudafdmt -t 512 -d 512 -r 1  -s 0  -M 0.2 -T 0.2 -C 6.0  -o fredda.$1.cand *.fil
 cudapid=$!
