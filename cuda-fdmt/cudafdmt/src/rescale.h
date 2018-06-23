@@ -320,16 +320,16 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_calc_dm0_
 		rescale_dtype dm0sum = 0.0;
 		int nsamp = 0;
 		for (int w = 0; w < nwords; w++) {
-			int inidx;
-			if (in_order == DataOrder::TFBP) {
-				int thischan = w*nwords; // s must be 0!
-				inidx = ibeam + nbeams*(thischan + nf*t); // TFB order
-			} else {
-				inidx = w + nwords*(t + nt*ibeam); // input index : BTF order
+		        int wordidx;
+		        if (in_order == DataOrder::TFBP) {
+			  // TFB order - only works for nsamps_per_word==1!
+			  wordidx = ibeam + nbeams*(w + nf*t);
+			} else { // BTF order
+			  wordidx = w + nwords*(t + nt*ibeam);
 			}
 
 			// coalesced read from global
-			wordT word = inarr[inidx];
+			wordT word = inarr[wordidx];
 
 			for (int s = 0; s < nsamps_per_word; ++s) {
 				int c = w*nwords + s; // channel number

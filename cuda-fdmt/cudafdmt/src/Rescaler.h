@@ -95,6 +95,7 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 	int nwords = nf / nsamps_per_word;
 	assert(nf % nsamps_per_word == 0);
 	int boff = iant*options.nbeams_per_ant;
+	assert(options.in_order == DataOrder::TFBP || options.in_order == DataOrder::BPTF);
 
 	rescale_calc_dm0_kernel< nsamps_per_word, wordT > <<<nbeams_in, 256>>>(
 			read_buf_device,
