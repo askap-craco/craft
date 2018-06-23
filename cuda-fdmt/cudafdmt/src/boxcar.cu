@@ -7,9 +7,12 @@
 #include "CandidateSink.h"
 #include "CandidateList.h"
 #include "boxcar.h"
+#include <cuda_runtime_api.h>
 #include <cub.cuh>
 
 #define FULL_MASK 0xffffffff
+#define WARP_SZ 32
+
 
 // Modulous of a % b, but handles negative numbers
 __host__ __device__ int mod(int a, int b)
@@ -24,9 +27,68 @@ __host__ __device__ fdmt_dtype mymax(fdmt_dtype a, fdmt_dtype b)
 	return a > b ? a : b;
 }
 
-#define WARP_SZ 32
+__inline__ __device__ int shfl_xor(int val, int mask)
+{
+#if (CUDART_VERSION >= 9000)
+	return __shfl_xor_sync(FULL_MASK, val, mask);
+#else
+	return __shfl_xor(val, mask);
+#endif
+}
+
+
+__inline__ __device__ int shfl(int val, int leader)
+{
+#if (CUDART_VERSION >= 9000)
+	return __shfl_sync(FULL_MASK, val, leader);
+#else
+	return __shfl(val, leader);
+#endif
+
+}
+
+__inline__ __device__ fdmt_dtype shfl_up(fdmt_dtype var, unsigned int delta, int width)
+{
+#if (CUDART_VERSION >= 9000)
+	return __shfl_up_sync(FULL_MASK, var, delta, width);
+#else
+	return __shfl_up(var, delta, width);
+#endif
+}
+
+__inline__ __device__ int ballot(int predicate)
+{
+#if (CUDART_VERSION >= 9000)
+	return __ballot_sync(FULL_MASK, predicate);
+#else
+	return __ballot(predicate);
+#endif
+}
+
+__inline__ __device__ int any(int predicate)
+{
+#if (CUDART_VERSION >= 9000)
+	return __any_sync(FULL_MASK, predicate);
+#else
+	return __any(predicate);
+#endif
+}
+
+__inline__ __device__ int all(int predicate)
+{
+#if (CUDART_VERSION >= 9000)
+	return __all_sync(FULL_MASK, predicate);
+#else
+	return __all(predicate);
+#endif
+}
+
+
+
+
 __device__ inline int lane_id(void) { return threadIdx.x % WARP_SZ; }
-__device__ int warp_bcast(int v, int leader) { return __shfl_sync(FULL_MASK, v, leader); }
+__device__ int warp_bcast(int v, int leader) { return __shfl(FULL_MASK, v, leader); }
+
 
 
 // One of my favourite things ever
@@ -34,14 +96,14 @@ __device__ int warp_bcast(int v, int leader) { return __shfl_sync(FULL_MASK, v, 
 __inline__ __device__
 int warpAllReduceSum(int val) {
 	for (int mask = warpSize/2; mask > 0; mask /= 2)
-	  val += __shfl_xor_sync(FULL_MASK, val, mask);
+	  val += shfl_xor(val, mask);
 	return val;
 }
 
 __inline__ __device__
 fdmt_dtype warpAllReduceMax(fdmt_dtype val) {
 	for (int mask = warpSize/2; mask > 0; mask /= 2)
-	  val = max(val, __shfl_xor_sync(FULL_MASK, val, mask));
+	  val = max(val, (fdmt_dtype)shfl_xor(val, mask));
 	return val;
 }
 
@@ -188,11 +250,11 @@ __global__ void boxcar_do_kernel (
 		// if in a detection:
 		if (cand.t >= 0) {
 			// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
-		  if (::__all_sync(FULL_MASK, vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
+		  if (all(vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
 				// find maximum across all boxcars
 				fdmt_dtype best_sn_for_ibc = warpAllReduceMax(cand.sn);
 				// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
-				int boxcar_mask = __ballot_sync(FULL_MASK, best_sn_for_ibc == cand.sn);
+				int boxcar_mask = ballot(best_sn_for_ibc == cand.sn);
 				int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
 
 				//				printf("End of candidate. t=%d sn=%f idt=%d bestsn %f mask=0x%x ibc=%d best_ibc=%d got best? %d m_ncand %d\n",
@@ -214,7 +276,7 @@ __global__ void boxcar_do_kernel (
 			}
 		} else { // not currently in a detection
 			// do warp vote to see if any boxcars exceed threshold
-		  if (::__any_sync(FULL_MASK, vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
+		  if (any(vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
 				cand.sn = vout;
 				cand.t = t;
 			}
@@ -307,7 +369,7 @@ __global__ void boxcar_do_kernel2 (
 		state += vin - vprev;
 
 		// shift previous values one thread to the right. leaves vprev for ibc=0 unchanged.
-		vprev = __shfl_up_sync(FULL_MASK, vprev, 1, NBOX);
+		vprev = shfl_up(vprev, 1, NBOX);
 
 		// set vprev to vin for ibc=0
 		if (ibc == 0) {
@@ -331,12 +393,12 @@ __global__ void boxcar_do_kernel2 (
 		// if in a detection:
 		if (cand.t >= 0) {
 			// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
-		  if (::__all_sync(FULL_MASK, vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
+		  if (all(vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
 				// find maximum across all boxcars
 				fdmt_dtype scaled_sn = cand.sn/ibc_scale; // scale by boxcar width, so all boxcars have the same variance
 				fdmt_dtype best_sn_for_ibc = warpAllReduceMax(scaled_sn);
 				// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
-				int boxcar_mask = __ballot_sync(FULL_MASK, best_sn_for_ibc == scaled_sn);
+				int boxcar_mask = ballot(best_sn_for_ibc == scaled_sn);
 				int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
 
 				// if you're the winner, you get to write to memory. Lucky you!
@@ -357,7 +419,7 @@ __global__ void boxcar_do_kernel2 (
 			}
 		} else { // not currently in a detection
 			// do warp vote to see if any boxcars exceed threshold
-		  if (::__any_sync(FULL_MASK, vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
+		  if (any(vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
 				cand.sn = vout;
 				cand.t = t;
 			}
@@ -463,7 +525,7 @@ __global__ void boxcar_do_kernel3 (
 			state += vin - vprev;
 
 			// shift previous values one thread to the right. leaves vprev for ibc=0 unchanged.
-			vprev = __shfl_up_sync(FULL_MASK, vprev, 1, NBOX);
+			vprev = shfl_up(vprev, 1, NBOX);
 
 			// set vprev to vin for ibc=0
 			if (ibc == 0) {
@@ -492,12 +554,12 @@ __global__ void boxcar_do_kernel3 (
 					cand.t = fullt;
 				}
 				// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
-				if (::__all_sync(FULL_MASK, vout < threshold) || fullt == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
+				if (all(vout < threshold) || fullt == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
 					// find maximum across all boxcars
 					fdmt_dtype scaled_sn = cand.sn/ibc_scale; // scale by boxcar width, so all boxcars have the same variance
 					fdmt_dtype best_sn_for_ibc = warpAllReduceMax(scaled_sn);
 					// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
-					int boxcar_mask = __ballot_sync(FULL_MASK, best_sn_for_ibc == scaled_sn);
+					int boxcar_mask = ballot(best_sn_for_ibc == scaled_sn);
 					int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
 
 					// if you're the winner, you get to write to memory. Lucky you!
@@ -521,7 +583,7 @@ __global__ void boxcar_do_kernel3 (
 				}
 			} else { // not currently in a detection
 				// do warp vote to see if any boxcars exceed threshold
-			  if (::__any_sync(FULL_MASK, vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
+			  if (any(vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
 					cand.sn = vout;
 					cand.t = fullt;
 				}
