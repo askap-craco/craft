@@ -442,7 +442,7 @@ int main(int argc, char* argv[])
 			fdmt.t_copy_in.stop();
 			tproc.start();
 			trescale.start();
-			if (blocknum == 0) { // if first block rescale and update with no
+			if (blocknum == 0 && num_rescale_blocks > 0) { // if first block rescale and update with no
 				// flagging so we can work out roughly what the scales are
 				// Send output to junk buffer - silly but will fix later
 				// TODO: Remove junk buffer to save memory

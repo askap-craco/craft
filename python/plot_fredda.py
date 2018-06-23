@@ -100,7 +100,7 @@ def show_inbuf_series(prefix, theslice, start=0, maxn=10):
             break
 
 def statplot(ax, fname, name, beam=None):
-    d = None
+    dsl = None
     if beam is None:
         beamslice = slice(None)
     else:
@@ -193,24 +193,28 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         dm0ax = p(gs[1, 8:10])
         scaleax = p(gs[0,10:12])
         offsetax = p(gs[1,10:12])
-        scaled = load4d(fname.replace('fdmt','scale'))
-        offsetd = load4d(fname.replace('fdmt','offset'))
-        nbeams_in = scaled.shape[2]
-        if nbeams_in == 2*nbeams_out:
-            bslice = slice(2*ibeam,2*ibeam+1)
-        else:
-            bslice = slice(ibeam,ibeam+2)
-
+        bslice = slice(ibeam,ibeam+2)
         smean = statplot(meanax, fname, 'mean', bslice)
         sstd = statplot(stdax, fname, 'std', bslice)
         statplot(kurtax, fname, 'kurt', bslice)
         statplot(dm0ax, fname, 'dm0', bslice)
-        statplot(scaleax, fname, 'scale', bslice)
-        statplot(offsetax, fname, 'offset', bslice)
+
+        try:
+            scaled = load4d(fname.replace('fdmt','scale'))
+            offsetd = load4d(fname.replace('fdmt','offset'))
+            nbeams_in = scaled.shape[2]
+            if nbeams_in == 2*nbeams_out:
+                bslice = slice(2*ibeam,2*ibeam+1)
+            else:
+                bslice = slice(ibeam,ibeam+2)
+
+            statplot(scaleax, fname, 'scale', bslice)
+            statplot(offsetax, fname, 'offset', bslice)
+        except:
+            print 'Could not open a file'
         
         rawdm0 = rawd.sum(axis=1).T
         dm0ax.plot(rawd.sum(axis=0).T)
-        svar = sstd**2
         nsamp = 1500
         #chi2metric = svar/smean**2/2*nsamp
         #kurtax.plot(chi2metric, label='chi2')

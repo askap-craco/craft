@@ -321,12 +321,13 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
-        #beams -= 128
-        #beams /= 18
         f0 = files[0]
         self.beams = beams
         print 'Loaded beams', beams.shape
         print 'scrunching t=', self.tscrunch_factor, 'f=', self.fscrunch_factor, 'dm', self.dm
+        beams -= 128
+        beams /= 18
+        beams *= np.sqrt(self.nfreq)
 
         if self.dm != 0:
             beams = dmroll(beams, self.dm, f0.fch1/1e3, f0.foff/1e3, f0.tsamp*1e3)
@@ -393,8 +394,8 @@ class Plotter(object):
         #fax.plot(bi.std(axis=1)*np.sqrt(ntimes),freqs, label='std')
         fax.set_ylim(freqs.min(), freqs.max())
         tax.plot(times, bi.mean(axis=0), label='mean')
-        tax.plot(times, bi.max(axis=0), label='max')
-        tax.plot(times, bi.min(axis=0), label='min')
+        #tax.plot(times, bi.max(axis=0), label='max')
+        #tax.plot(times, bi.min(axis=0), label='min')
         #tax.plot(times, bi.std(axis=0)*np.sqrt(nfreq), label='std')
         tax.set_xlim(times.min(), times.max())
 
