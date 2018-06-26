@@ -84,6 +84,7 @@ namespace NCodec
             {
                 if ( ! ParamsFromHeader( pItem, pbyHeader ) )
                 {
+
                     // It is probable that additional parameters are added which
                     // is not an error, per se, so simply flag this fact.
                     fprintf( stderr, "Unrecognised VCRAFT parameter found.\n" );
@@ -164,8 +165,13 @@ namespace NCodec
                 { "HDR_SIZE",             eParamTypeInt,     "", ""  },
                 { "DATA_TYPE",            eParamTypeString,  "", ""  },
                 { "CMD_ARGS",             eParamTypeString,  "", ""  },
+                { "CMD_NAMESPACE",        eParamTypeString,  "", ""  },
                 { "SAMP_RATE",            eParamTypeDouble,  "", ""  },
                 { "CRAFT_MODE",           eParamTypeInt,     "", ""  },
+                { "ANT_RA",               eParamTypeDouble,  "", ""  },
+                { "ANT_DEC",              eParamTypeDouble,  "", ""  },
+                { "ANT_AZ",               eParamTypeDouble,  "", ""  },
+                { "ANT_EL",               eParamTypeDouble,  "", ""  },
                 { "NBITS",                eParamTypeInt,     "", ""  },
                 { "NPOL",                 eParamTypeInt,     "", ""  },
                 { "BEAM",                 eParamTypeInt,     "", ""  },
