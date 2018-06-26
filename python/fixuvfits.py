@@ -25,6 +25,8 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
+    fix_bzero = False
+
     for f in values.files:
         hdu = pyfits.open(f)
         h = hdu[0]
@@ -39,21 +41,26 @@ def _main():
         twholec = datec.array
         tnew = tall - t0.jd
         print 'Column = {} twhole={} twholec={} tpart={} tall={} t0={} tnew={}'.format(datec, twhole[0], twholec[0], tpart[0], tall[0], t0, tnew[0])
-        if datec.bzero == 0:
+        if datec.bzero == 0 and fix_bzero:
             print 'Fixing DATE bzero'
             t0.format = 'fits'
-            h.header.set('DATE-OBS', t0.value, 'Fixed by fixuvfits.py')
-            h.header.set('DATE_OBS', t0.value, 'Fixed by fixuvfits.py')
+            #h.header.set('DATE-OBS', t0.value, 'Fixed by fixuvfits.py')
+            #h.header.set('DATE_OBS', t0.value, 'Fixed by fixuvfits.py')
             h.data['DATE'] = tnew.astype(np.float32)
             #datec.array = tnew.astype(np.float32)*0
 
             datec.bzero = t0.jd
             if '_DATE' in h.columns.names:
                 h.data['_DATE'] = 0
-            fout = f+'.fixed'
+                
+
             print 'New data', h.data['DATE'].min(), h.data['_DATE'].min(), 'writing to', fout, h.header['DATE_OBS']
             
-            hdu.writeto(fout)
+
+        del hdu[0].header['DATE_OBS']
+        del hdu[2].header['RDATE']
+        fout = f+'.fixed'
+        hdu.writeto(fout)
 
 if __name__ == '__main__':
     _main()
