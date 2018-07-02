@@ -1,6 +1,12 @@
 #!/bin/bash
 
-trap 'kill $(jobs -p)' EXIT
+function remove_db {
+    for key in $all_keys; do
+	dada_db -d -k $key
+    done
+}
+
+trap 'kill $(jobs -p) ; remove_db' EXIT
 infile=`ls *.dada`
 hdr=`ls co*.hdr`
 echo Infile $infile hdr=$hdr
@@ -27,7 +33,7 @@ let block_size=72*336*4*512
 
 all_keys=""
 DADA_KEY="1000"
-ncount=16
+ncount=36
 
 for i in $(seq $ncount) ; do
     echo "COUNT $i"
@@ -35,7 +41,7 @@ for i in $(seq $ncount) ; do
 	let DADA_KEY="$DADA_KEY + 100"
 	all_keys="$all_keys $DADA_KEY"
 	dada_db -d  -k $DADA_KEY > /dev/null 2>&1
-	dada_db -a 32768 -b $block_size -n 8 -k $DADA_KEY  -l -p
+	dada_db -a 32768 -b $block_size -n 4 -k $DADA_KEY  -l -p
 	#$DADA/bin/dada_install_header -k $DADA_KEY -H $hdr
 	#echo Header installed $hdr $DADA_KEY
 	echo dada_diskdb -k $DADA_KEY  -z -f $indir/*.dada
@@ -47,7 +53,7 @@ for i in $(seq $ncount) ; do
 done
 
 rm -f *.dat
-#cuda-gdb --args cudafdmt -N 70 -t 512 -d 512 -r 1  -s 0 -o fredda.multi.cand -p  -M 0.1 -T 0.1 -K 30 $all_keys 
+cudafdmt -N 10 -t 512 -d 2048 -r 1  -s 0 -o fredda.multi.cand -p  -M 0.1 -T 0.1 -K 30 -B 16 -x 999999 $all_keys 
 
 #$cudafdmt -t 512 -d 512 -r 1  -s 0  -M 0.2 -T 0.2 -C 6.0  -o fredda.$1.cand *.fil
 cudapid=$!
@@ -57,7 +63,4 @@ cudapid=$!
 wait
 #dada_db -d -k $DADA_KEY
 kill $(jobs -p)
-for key in all_keys; do
-    dada_db -d $key
-done
-
+remove_db

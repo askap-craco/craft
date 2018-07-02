@@ -91,6 +91,7 @@ private:
     uint64_t m_bytes_per_block;
     uint64_t m_blkid;
     size_t m_current_sample;
+    size_t m_buf_num;
     void* m_reorder_buffer;
     CpuTimer m_transpose_timer;
     int m_key;

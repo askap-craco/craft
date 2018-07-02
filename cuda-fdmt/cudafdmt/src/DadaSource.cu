@@ -8,6 +8,7 @@
 #include "DadaSource.h"
 #include "ascii_header.h"
 #include "InvalidSourceFormat.h"
+#include "cuda_utils.h"
 
 DadaSource::DadaSource(int nt, const char* keyname, bool lock) {
 	sscanf(keyname, "%x",&m_key);
@@ -87,23 +88,28 @@ DadaSource::DadaSource(int nt, const char* keyname, bool lock) {
 	m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
 	m_current_sample = 0;
 	m_nt = nt;
+	m_buf_num = 0;
 
 	char order_str[256];
 	get_header_string("DORDER",order_str);
 	m_reorder_buffer = NULL;
 	m_in_data_order = data_order_from_string(order_str);
-	if (m_in_data_order == DataOrder::TFBP) {
-		m_reorder_buffer = malloc(m_bytes_per_block);
-		assert(m_reorder_buffer);
-	} else {
-		printf("Unknown order: %s\b", order_str);
-		exit(EXIT_FAILURE);
-	}
-
 	// output data order
 	//m_out_data_order = DataOrder::BPTF;
 	m_out_data_order = DataOrder::TFBP;
 	assert(m_in_data_order == DataOrder::TFBP);
+
+	if (m_in_data_order != m_out_data_order) {
+		m_reorder_buffer = malloc(m_bytes_per_block);
+		assert(m_reorder_buffer);
+	}
+
+	size_t nbufs = ipcbuf_get_nbufs(&m_hdu->data_block->buf);
+	size_t blck_size = ipcbuf_get_bufsz(&m_hdu->data_block->buf);
+	for(int b = 0; b < nbufs; b++) {
+		gpuErrchk(cudaHostRegister(m_hdu->data_block->buf.buffer[b], blck_size, cudaHostRegisterDefault));
+	}
+
 }
 
 DadaSource::~DadaSource() {
@@ -161,6 +167,15 @@ void* DadaSource::get_next_buffer(size_t& nt)
 	char* ptr = ipcio_open_block_read(m_hdu->data_block, &nbytes, &m_blkid);
 	assert(ptr != 0);
 	m_read_timer.stop();
+
+	// need to tell cuda to mark this as pinned memory, but only do it  the first time around
+	// This improves throughput from 2.5 GB/sec to 12 GB/sec.
+	size_t nbufs = ipcbuf_get_nbufs(&m_hdu->data_block->buf);
+	if (m_buf_num < nbufs) {
+		size_t blck_size = ipcbuf_get_bufsz(&m_hdu->data_block->buf);
+		//gpuErrchk(cudaHostRegister(ptr, blck_size, cudaHostRegisterDefault));
+	}
+	m_buf_num++;
 
 	m_got_buffer = true;
 	// TODO check expected nbytes

@@ -289,6 +289,7 @@ int main(int argc, char* argv[])
 	//rescale input buffer
 	size_t in_buffer_bytes_per_ant = nbeams_per_antenna*nf*nt*nbits/8;
 	uint8_t* in_buffer_device;
+	printf("Copy in buffer size = %d MB per ant = %d MB TOTAL \n", in_buffer_bytes_per_ant/(1024l*1024l), in_buffer_bytes_per_ant*source->nants()/(1024l*1024l));
 	gpuErrchk( cudaMalloc((void**) &in_buffer_device, in_buffer_bytes_per_ant*source->nants() ));
 
 	float foff =  (float) source->foff();
