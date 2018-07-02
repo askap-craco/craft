@@ -472,9 +472,8 @@ int main(int argc, char* argv[])
 			//trescale.stop();
 			//tproc.stop();
 		}
-		fdmt.t_copy_in.stop();
 		gpuErrchk(cudaDeviceSynchronize()); // Synchonize after doing all those asynchronous, multistream things
-
+		fdmt.t_copy_in.stop();
 
 
 		if (stopped) {// if we've run out of samples
