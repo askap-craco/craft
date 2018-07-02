@@ -35,12 +35,14 @@ for i in $(seq $ncount) ; do
 	let DADA_KEY="$DADA_KEY + 100"
 	all_keys="$all_keys $DADA_KEY"
 	dada_db -d  -k $DADA_KEY > /dev/null 2>&1
-	dada_db -a 32768 -b $block_size -n 8 -k $DADA_KEY 
+	dada_db -a 32768 -b $block_size -n 8 -k $DADA_KEY  -l -p
 	#$DADA/bin/dada_install_header -k $DADA_KEY -H $hdr
 	#echo Header installed $hdr $DADA_KEY
 	echo dada_diskdb -k $DADA_KEY  -z -f $indir/*.dada
-	dada_diskdb -k $DADA_KEY -z -f $indir/*.dada &
-	#dada_dbmonitor -k $DADA_KEY &
+	dada_diskdb -k $DADA_KEY -z -f $indir/*00000.dada &
+	if [[ $DADA_KEY == "1100" ]] ; then
+	    dada_dbmonitor -k $DADA_KEY &
+	fi
     done
 done
 

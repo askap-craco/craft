@@ -13,9 +13,7 @@
 #include <signal.h>
 #include <limits.h>
 #include <float.h>
-#if defined (ENABLE_OPENMP)
 #include <omp.h>
-#endif
 #include <sys/time.h>
 #include <sys/resource.h>
 #include "fdmt.h"
@@ -289,9 +287,9 @@ int main(int argc, char* argv[])
 	int nbits = source->nbits();
 
 	//rescale input buffer
-	size_t in_buffer_bytes = nbeams_per_antenna*nf*nt*nbits/8;
-	void* in_buffer_device;
-	gpuErrchk( cudaMalloc((void**) &in_buffer_device, in_buffer_bytes ));
+	size_t in_buffer_bytes_per_ant = nbeams_per_antenna*nf*nt*nbits/8;
+	uint8_t* in_buffer_device;
+	gpuErrchk( cudaMalloc((void**) &in_buffer_device, in_buffer_bytes_per_ant*source->nants() ));
 
 	float foff =  (float) source->foff();
 	assert(foff < 0);
@@ -417,7 +415,14 @@ int main(int argc, char* argv[])
 	int num_flagged_beam_chans = 0;
 	int num_flagged_times = 0;
 
-	void* read_buf;
+	// Create streams - one for each antenan
+	const int MAX_NANT = 36;
+	cudaStream_t streams[MAX_NANT];
+	assert(source->nants() <= MAX_NANT);
+	for (int i = 0; i < source->nants(); i++) {
+		gpuErrchk(cudaStreamCreate(&streams[i]));
+		//streams[i] = 0;
+	}
 
 	while (true) {
 		if (stopped) {
@@ -429,39 +434,47 @@ int main(int argc, char* argv[])
 		}
 
 		rescaler->reset(rescale_buf); // set output buffer to zero - each rescale update will add the result into the buffer
+
+		fdmt.t_copy_in.start();
+
+//#pragma omp parallel
 		for(int iant = 0; iant < source->nants(); iant++) {
 			// read samples from input - one antenna at a time.
-			int this_nt = source->read_samples(&read_buf);
+			void* read_buf;
+			int this_nt = source->read_samples_ant(&read_buf, iant);
 			if (this_nt != nt) { // WE've run out of samples
 				stopped = true;
-				break;
+				//break;
 			}
 			// File is in TBF order
 			// Output needs to be BFT order
 			// Do transpose and cast to float on the way through using GPU
-			fdmt.t_copy_in.start();
-			gpuErrchk(cudaMemcpy(in_buffer_device, read_buf, in_buffer_bytes*sizeof(uint8_t), cudaMemcpyHostToDevice));
-			fdmt.t_copy_in.stop();
-			tproc.start();
-			trescale.start();
+			uint8_t* this_ant_buffer = in_buffer_device + iant*in_buffer_bytes_per_ant;
+			gpuErrchk(cudaMemcpyAsync(this_ant_buffer,
+					read_buf, in_buffer_bytes_per_ant*sizeof(uint8_t), cudaMemcpyHostToDevice, streams[iant]));
+			//tproc.start();
+			//trescale.start();
 			if (blocknum == 0 && num_rescale_blocks > 0) { // if first block rescale and update with no
 				// flagging so we can work out roughly what the scales are
 				// Send output to junk buffer - silly but will fix later
 				// TODO: Remove junk buffer to save memory
-				rescaler->update_and_transpose(rescale_junk_buf, in_buffer_device, rescaler->noflag_options, iant);
+				rescaler->update_and_transpose(rescale_junk_buf, this_ant_buffer, rescaler->noflag_options, iant, streams[iant]);
 
 				// update scale and offset
-				rescaler->update_scaleoffset(rescaler->noflag_options, iant);
+				rescaler->update_scaleoffset(rescaler->noflag_options, iant, streams[iant]);
 				if(dump_data) {
 					dump_rescaler(-1, rescaler);
 				}
 			}
 
 			// this time we rescale with the flagging turned on
-			rescaler->update_and_transpose(rescale_buf, in_buffer_device, rescaler->options, iant);
-			trescale.stop();
-			tproc.stop();
+			rescaler->update_and_transpose(rescale_buf, this_ant_buffer, rescaler->options, iant, streams[iant]);
+			//trescale.stop();
+			//tproc.stop();
 		}
+		fdmt.t_copy_in.stop();
+		gpuErrchk(cudaDeviceSynchronize()); // Synchonize after doing all those asynchronous, multistream things
+
 
 
 		if (stopped) {// if we've run out of samples

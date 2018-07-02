@@ -159,6 +159,7 @@ void* DadaSource::get_next_buffer(size_t& nt)
 
   	uint64_t nbytes;
 	char* ptr = ipcio_open_block_read(m_hdu->data_block, &nbytes, &m_blkid);
+	assert(ptr != 0);
 	m_read_timer.stop();
 
 	m_got_buffer = true;

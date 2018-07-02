@@ -31,6 +31,10 @@ public:
 	virtual DataOrder data_order() = 0;
 
 	virtual size_t read_samples(void** output) = 0;
+	virtual size_t read_samples_ant(void** output, int iant) {
+		return read_samples(output);
+	}
+
 	virtual size_t seek_sample(size_t t) = 0;
 	virtual size_t current_sample() = 0;
 

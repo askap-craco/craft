@@ -76,18 +76,18 @@ public:
 	virtual ~Rescaler();
 
 	void reset(array4d_t& rescale_buf); // Set output buffer to zero to start accumulating again
-	void update_scaleoffset(RescaleOptions& options, int iant);
+	void update_scaleoffset(RescaleOptions& options, int iant, cudaStream_t stream = 0);
 	void set_scaleoffset(float s_scale, float s_offset);
-	void update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options, int iant);
+	void update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream=0);
 
 private:
 
 	template <int nsamps_per_word, typename wordT>
-	void do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant);
+	void do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream = 0);
 };
 
 template <int nsamps_per_word, typename wordT>
-void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant)
+void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream)
 {
 	int nbeams_in = options.nbeams_per_ant;
 	int nf = rescale_buf.nx;
@@ -97,7 +97,7 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 	int boff = iant*options.nbeams_per_ant;
 	assert(options.in_order == DataOrder::TFBP || options.in_order == DataOrder::BPTF);
 
-	rescale_calc_dm0_kernel< nsamps_per_word, wordT > <<<nbeams_in, 256>>>(
+	rescale_calc_dm0_kernel< nsamps_per_word, wordT > <<<nbeams_in, 256, 0, stream>>>(
 			read_buf_device,
 			offset.d_device,
 			scale.d_device,
@@ -112,7 +112,7 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 	// short dropouts see ACES-209
 	// probably could do this in rescale_calc_dm0_kernel after yu've done it
 	// But i Haven't got htere yet.
-	rescale_calc_dm0stats_kernel<<<1, nbeams_in>>>(
+	rescale_calc_dm0stats_kernel<<<1, nbeams_in, 0, stream>>>(
 			dm0.d_device,
 			dm0count.d_device,
 			dm0stats.d_device,
@@ -121,7 +121,7 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 
 	dim3 blockdim(nsamps_per_word, nwords);
 
-	rescale_update_and_transpose_float_kernel< nsamps_per_word, wordT ><<<nbeams_in, blockdim>>>(
+	rescale_update_and_transpose_float_kernel< nsamps_per_word, wordT ><<<nbeams_in, blockdim, 0, stream>>>(
 			read_buf_device,
 			sum.d_device,
 			sum2.d_device,
@@ -149,7 +149,6 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 	if (iant == 0) {
 		sampnum += nt;
 	}
-	gpuErrchk(cudaDeviceSynchronize());
 }
 
 

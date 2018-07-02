@@ -64,6 +64,8 @@ public:
 
 	size_t read_samples(void** output);
 
+	size_t read_samples_ant(void** output, int iant);
+
 
 private:
 	std::vector<DadaSource*> m_sources;
