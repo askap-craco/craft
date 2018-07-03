@@ -73,5 +73,9 @@ for file in sys.argv[1:]:
             h = f.read(64)
             if not h: break
 
-    shuffleIdx = list(range(7,16))+list(range(8))
-    print(histo[:,shuffleIdx])
+    shuffleIdx = list(range(8,16))+list(range(8))
+    for r in histo[:,shuffleIdx]:
+        sum = r.sum()
+        norm = r.astype(float)/sum*100
+        for n in norm: print(" {:5.2f}".format(n),end="")
+        print()
