@@ -53,7 +53,7 @@ for i in $(seq $ncount) ; do
 done
 
 rm -f *.dat
-cudafdmt -N 10 -t 512 -d 2048 -r 1  -s 0 -o fredda.multi.cand -p  -M 0.1 -T 0.1 -K 30 -B 16 -x 999999 $all_keys 
+cudafdmt -N 30 -t 512 -d 2048 -r 1  -s 0 -o fredda.multi.cand -p  -M 0.1 -T 0.1 -K 30 -B 16 -x 999999 $all_keys 
 
 #$cudafdmt -t 512 -d 512 -r 1  -s 0  -M 0.2 -T 0.2 -C 6.0  -o fredda.$1.cand *.fil
 cudapid=$!
