@@ -8,7 +8,7 @@
 #include "SigprocFileSet.h"
 #include "SigprocFile.h"
 #include <assert.h>
-
+#include "cuda_utils.h"
 
 SigprocFileSet::SigprocFileSet(int nt, int argc, char* filenames[]) : m_nt(nt) {
 	m_nbeams = 0;
@@ -33,7 +33,7 @@ SigprocFileSet::SigprocFileSet(int nt, int argc, char* filenames[]) : m_nt(nt) {
 	int in_num_elements = nt*nchans()*nbeams(); // Number of elements per block read
 	size_t in_num_bytes = sizeof(uint8_t)*8*in_num_elements/nbits(); //
 	printf("Read buffer is %d elements or %d bytes\n", in_num_elements, in_num_bytes);
-	read_buf = (uint8_t*) malloc(in_num_bytes);
+	gpuErrchk(cudaMallocHost(&read_buf, in_num_bytes));
 	assert(read_buf);
 
 }
@@ -43,7 +43,7 @@ SigprocFileSet::~SigprocFileSet() {
 		delete m_files.at(i);
 	}
 	if (read_buf) {
-		free(read_buf);
+		gpuErrchk(cudaFreeHost(read_buf));
 	}
 }
 
