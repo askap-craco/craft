@@ -27,6 +27,7 @@
 #include "DataSource.h"
 #include "DadaSource.h"
 #include "DadaSet.h"
+#include "FilDirSet.h"
 #include "CandidateList.h"
 #include "InvalidSourceFormat.h"
 #include "Rescaler.h"
@@ -258,11 +259,14 @@ int main(int argc, char* argv[])
 	} catch (InvalidSourceFormat& e) {
 		try {
 			dada_source = new DadaSet(nt, argc, argv);
-			//dada_source = new DadaSource(nt, argv[0], true);
 			source = dada_source;
 		} catch (InvalidSourceFormat& e) {
-			printf("No valid inputs\n");
-			exit(EXIT_FAILURE);
+			try {
+				source = new FilDirSet(nt, argc, argv);
+			} catch (InvalidSourceFormat& e) {
+				printf("No valid inputs\n");
+				exit(EXIT_FAILURE);
+			}
 		}
 	}
 	assert(source != NULL);
