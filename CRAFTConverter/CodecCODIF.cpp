@@ -503,8 +503,6 @@ namespace NCodec        // Part of the Codec namespace.
               printf("Warning: Will skip %d samples for frame alignment\n", m_iSkipSamples);
 
 	      m_iSampleOffset = m_iSkipSamples%m_iSamplesPerWord;
-	      printf("DEBUG: m_iSampleOffset = %d\n", m_iSampleOffset);
-	      
 	      m_DFH.NextFrame(); // Allow for the sample skipping which will happen
             }
             else
@@ -619,10 +617,6 @@ namespace NCodec        // Part of the Codec namespace.
 	vector<uint32_t> vcraftData(wordstoUnpack); // +1 in case input words dont align with output words
 	vector<uint32_t> codifData(wordstoUnpack); 
 
-	printf("sampPerWord/words to Unpack: %d  %d\n",  m_iSamplesPerWord,  wordstoUnpack);
-	
-	//int samplePerOutword = m_iSamplesPerWord/  wordstoUnpack;
-	
         try
         {
             WordDeque_t & rInput = SampleData();
