@@ -273,7 +273,7 @@ int main(int argc, char* argv[])
 
 	bool negdm = (nd < 0);
 	CandidateSink sink(source, out_filename, negdm, udp_host, udp_port);
-	cout << "spf tsamp " << source->tsamp()<< " nbeams " << source->nbeams()
+	cout << "spf tsamp " << source->tsamp()<< " ants " << source->nants() << " nbeams " << source->nbeams()
 			<< " npols "<< source->npols() << " fch1 " << source->fch1() << " nchans "
 			<< source->nchans() << " foff " << source->foff() << endl;
 	int nbeams_per_antenna = source->nbeams()*source->npols(); // number of beams including polarisations
@@ -283,8 +283,8 @@ int main(int argc, char* argv[])
 	if (polsum) { // assume polsum and antsum
 		nbeams_out = source->nbeams();
 		assert(nbeams_per_antenna %2 == 0);
-	} else {
-		nbeams_out = nbeams_in_total;
+	} else { // ant sum only
+		nbeams_out = source->nbeams()*source->npols();
 	}
 	float nbeams_summed = (float(nbeams_in_total)/float(nbeams_out));
 	int nf = source->nchans();
