@@ -304,8 +304,6 @@ bool CFileProcessor::EncodeAndWriteOutputFile( ICodec &rEncoder,
 
     bool bSuccess = true;
 
-    printf("Debug: CFileProcessor::EncodeAndWriteOutputFile\n");
-	  
     try
     {
         // Prepare the encoder.
@@ -337,10 +335,6 @@ bool CFileProcessor::EncodeAndWriteOutputFile( ICodec &rEncoder,
         {
 	  rDecoder.SeekForward( rEncoder.SkipBytes(&preload) );
 	  rDecoder.setPreload( preload );
-	  if (preload) {
-	    printf("DEBUG: Need to preload VCRAFT block\n");
-	  }
-
         }
 
         // Next, have the Decoder read the sample data in sucessive blocks and

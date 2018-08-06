@@ -50,7 +50,7 @@ def _main():
                 samp_start = 0
 
         hdr = fin.header.copy()
-        fout_tstart = fin.tstart + fin.tsamp * samp_start
+        fout_tstart = fin.tstart + fin.tsamp * samp_start / 86400.0
         hdr['tstart'] = fout_tstart
         del hdr['nsamples']
         del hdr['refdm']

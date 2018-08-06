@@ -50,10 +50,10 @@ namespace               // Anonymous namespace for internal helpers.
     // Constants.
 
     constexpr int      iMaxPacketSize_c            = 9000;   // Maximum bytes for network transport.
-  //    constexpr int      iSamplesPerFrame_c          = 256;    // Samples per frame (really should be calculated)   //CJP TODO CALCULATE
     constexpr int      iBitsPerByte_c              = 8;      // Number of bits in a byte.
     constexpr int      iTimeForIntegerSamples_c    = 27;     // Period in seconds, for a whole number of samples.
     constexpr double   dTolerance_c                = 0.001;  // Tolerance for floating point calculations.
+    constexpr int     DUTC                        = 37;
 
 }                       // End anonymous namespace.
 
@@ -244,13 +244,12 @@ namespace NCodec        // Part of the Codec namespace.
 	    // There *will* be an up to  +-1/2 sample time rounding with this approach
 
             unsigned long long startBAT = m_ullTriggerWriteBAT - (m_ullTriggerFrameId * (27.0/32.0));
-            m_ullBAT0 = ((startBAT +5e5)/ 1e6); // Round up to full second
+            m_ullBAT0 = ((startBAT +5e5)/ 1e6); // Round to full second
             m_ullBAT0 *= 1e6;  // Need to do in two lines as compiler is too clever it seems (optimises it away)
-	    m_ullFrame0 = (m_ullBAT0-startBAT)*(32.0/27.0); // Number of frames(samples) from startBAT till first 1sec boundary
+	    //m_ullFrame0 = (m_ullBAT0-startBAT)*(32.0/27.0); // Number of frames(samples) from startBAT till first 1sec boundary
 
 	    printf("DEBUG: startBAT=0x%llX\n", startBAT);
 	    printf("DEBUG: BAT0=0x%llX\n", m_ullBAT0);
-	    printf("DEBUG: Frame0=%llu\n", m_ullFrame0);
 	      
             if ( ! ConfigureDFH() )
             {
@@ -364,15 +363,11 @@ namespace NCodec        // Part of the Codec namespace.
 
     int CCodecCODIF::SkipBytes( bool *preload )
     {
-      printf("CCodecCODIF::SkipBytes: Skipping %d blocks of %d bytes\n", m_iSkipSamples, m_iSampleBlockSize);
       int bytestoskip = m_iSkipSamples * m_iSampleBlockSize;
-      printf("Skipping %d->", bytestoskip);
       int vcraftBlock = 4*m_iNumberOfChannels*m_iNumberofPol;
       *preload = (bytestoskip % vcraftBlock) != 0;
       bytestoskip /= vcraftBlock;
       bytestoskip *= vcraftBlock;
-      printf("%d\n", bytestoskip);
-      if (*preload) printf("Need to preload\n");
       return bytestoskip;
     }
 
@@ -469,7 +464,7 @@ namespace NCodec        // Part of the Codec namespace.
 
             // Set the epoch based on our BAT0
 
-            if ( setCODIFEpochMJD( pDFH, m_ullBAT0/(24*60*60*1e6)) != CODIF_NOERROR )
+            if ( setCODIFEpochMJD( pDFH, (m_ullBAT0/1e6-DUTC)/(24*60*60)) != CODIF_NOERROR )
             {
                 throw string { "setCODIFEpochMJD() failed" };
             }
@@ -486,11 +481,9 @@ namespace NCodec        // Part of the Codec namespace.
 
             unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
             unsigned long long BAT0MJDSec = m_ullBAT0/1e6;
-            unsigned long long PeriodsSinceBAT0 = (m_ullTriggerFrameId-m_ullFrame0) / uiSampleIntervalsPerPeriod; // Will round down
-            int frameseconds = (BAT0MJDSec - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
-            unsigned long framenumber = ((m_ullTriggerFrameId-m_ullFrame0) % uiSampleIntervalsPerPeriod) / samplesPerFrame;
-
-
+            unsigned long long PeriodsSinceBAT0 = m_ullTriggerFrameId / uiSampleIntervalsPerPeriod; // Will round down
+            int frameseconds = (BAT0MJDSec -DUTC - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
+            unsigned long framenumber = (m_ullTriggerFrameId % uiSampleIntervalsPerPeriod) / samplesPerFrame;
 
 	    mask = (1<<(m_iBitsPerSample*2))-1;
 
@@ -501,7 +494,7 @@ namespace NCodec        // Part of the Codec namespace.
             // There will be samples that don't fit in a frame (ie first sample may start between frames)
             // These will need to be calculated and eventually discarded
 
-            int initialSamples = (m_ullTriggerFrameId-m_ullFrame0) % samplesPerFrame;
+            int initialSamples = m_ullTriggerFrameId % samplesPerFrame;
 
             if ( initialSamples!=0 )
             {
@@ -510,8 +503,6 @@ namespace NCodec        // Part of the Codec namespace.
               printf("Warning: Will skip %d samples for frame alignment\n", m_iSkipSamples);
 
 	      m_iSampleOffset = m_iSkipSamples%m_iSamplesPerWord;
-	      printf("DEBUG: m_iSampleOffset = %d\n", m_iSampleOffset);
-	      
 	      m_DFH.NextFrame(); // Allow for the sample skipping which will happen
             }
             else
@@ -581,8 +572,9 @@ namespace NCodec        // Part of the Codec namespace.
     //////////
     //
 
-  void CCodecCODIF::decodeVCRAFTBlock(WordDeque_t & rInput, vector<uint32_t>& vcraftData, vector<uint32_t>& codifData,
-				      int wordstoUnpack, int samplePerOutword, int samplesPerWord, int *iWordCount) {
+    // Multiple time samples per output CODIF word
+    void CCodecCODIF::decodeVCRAFTBlock(WordDeque_t & rInput, vector<uint32_t>& vcraftData, vector<uint32_t>& codifData,
+				       int wordstoUnpack, int samplesPerWord, int *iWordCount) {
 
       // Grab next set of original samples
       for (int c=0; c< (wordstoUnpack) && ( ! rInput.empty()); c++) {
@@ -591,16 +583,32 @@ namespace NCodec        // Part of the Codec namespace.
 	(*iWordCount)++;
       }
 
-      for (int i=0; i< samplesPerWord/samplePerOutword; i++) {
-	codifData[i] = 0;
-	for (int j=0; j<samplePerOutword; j++) {
-	  for (int k=0; k<wordstoUnpack; k++) {
-	    codifData[i] |= ((vcraftData[k]>>(j+i*2)*m_iBitsPerSample*2)&mask)<<(k+j*wordstoUnpack)*m_iBitsPerSample*2;
+      if (samplesPerWord>wordstoUnpack) {
+	int samplePerOutword = samplesPerWord/wordstoUnpack;
+	for (int i=0; i< samplesPerWord/samplePerOutword; i++) {
+	  codifData[i] = 0;
+	  for (int j=0; j<samplePerOutword; j++) {
+	    for (int k=0; k<wordstoUnpack; k++) {
+	      codifData[i] |= ((vcraftData[k]>>(j+i*2)*m_iBitsPerSample*2)&mask)<<(k+j*wordstoUnpack)*m_iBitsPerSample*2;
+	    }
+	  }
+	}
+      } else {
+
+	int wordPerGroup = wordstoUnpack/samplesPerWord; //  2          4
+	for (int i=0; i< samplesPerWord; i++) {          // 0..3       0..1
+	  for (int j=0; j<wordPerGroup; j++) {             // 0..1       0..3
+	    int c = i*wordPerGroup + j;
+	    codifData[c] = 0;
+	    for (int k=0; k<samplesPerWord; k++) {
+	      codifData[c] |= ((vcraftData[k+j*samplesPerWord]>>(i*m_iBitsPerSample*2))&mask)<<(k*m_iBitsPerSample*2);
+	    }
 	  }
 	}
       }
     }
 
+  
     bool CCodecCODIF::WriteDataFrames( bool bForceFlush )
     {
         bool bSuccess = false;      // Assume failure for now.
@@ -609,8 +617,6 @@ namespace NCodec        // Part of the Codec namespace.
 	vector<uint32_t> vcraftData(wordstoUnpack); // +1 in case input words dont align with output words
 	vector<uint32_t> codifData(wordstoUnpack); 
 
-	int samplePerOutword = m_iSamplesPerWord/  wordstoUnpack;
-	
         try
         {
             WordDeque_t & rInput = SampleData();
@@ -639,12 +645,6 @@ namespace NCodec        // Part of the Codec namespace.
 		if (iTotalFrames==0)
 		  return(true); // EOF
 
-
-                //if ( ( iWordsToProcess % m_iDataArrayWords ) != 0 ) // Not sure this is correct/wanted
-                //{
-                //    iTotalFrames++;
-                //}
-
                 for ( int iFrame = 0; iFrame < iTotalFrames; iFrame++ )
                 {
                     // Zero the output data frame, which covers the case where there
@@ -666,8 +666,7 @@ namespace NCodec        // Part of the Codec namespace.
 		      if (iFrame==0) {
 			if (buf==NULL) {
 			  // First time through - copy in a block
-			  decodeVCRAFTBlock(rInput, vcraftData, codifData, wordstoUnpack, samplePerOutword,
-					    m_iSamplesPerWord, &iWordCount);
+			  decodeVCRAFTBlock(rInput, vcraftData, codifData, wordstoUnpack, m_iSamplesPerWord, &iWordCount);
 			  bytesptr = (char*)&codifData[0] + m_iSampleOffset*m_iSampleBlockSize;
 
 			  buf = new char[ncopy];
@@ -693,28 +692,18 @@ namespace NCodec        // Part of the Codec namespace.
 			  rInput.pop_front();
 			  iWordCount++;
 			}
-		    } else if (m_iBitsPerSample==1) {
-		      
-		      assert(mask==0x3); // Temp check - remove
-
+		    } else if (m_iBitsPerSample==1 || m_iBitsPerSample==4  || m_iBitsPerSample==8) {
 		      int samplesPerWord = sizeof(uint32_t)*8/(m_iBitsPerSample*2); // 16
-		      assert(samplesPerWord % wordstoUnpack == 0); // Must have an integer number of channels per word
-
 		      int nBlock = m_iDataArrayWords/wordstoUnpack;
 		      for ( int iBlock = 0; ( iBlock < nBlock ) && ( ! rInput.empty() ); iBlock++ ) {
 			// Grab next set of original samples and convert to codif ordering
-
-			decodeVCRAFTBlock(rInput, vcraftData, codifData, wordstoUnpack, samplePerOutword,
-					  samplesPerWord, &iWordCount);
+			decodeVCRAFTBlock(rInput, vcraftData, codifData, wordstoUnpack, samplesPerWord, &iWordCount);
 
 			if (m_iSampleOffset && iBlock==nBlock-1) {
 			  // Just copy the start of this block;
 			  memcpy(frameptr, &codifData[0], m_iSampleOffset*m_iSampleBlockSize);
 			  frameptr += m_iSampleOffset*m_iSampleBlockSize;
 			} else {
-			  //for (int i=0;i<wordstoUnpack;i++) printf(" %08X", codifData[i]);
-			  //printf("\n");
-			  //printf("MEMCPY: %d\n", m_iSamplesPerWord*m_iSampleBlockSize);
 			  memcpy(frameptr, &codifData[0], m_iSamplesPerWord*m_iSampleBlockSize);
 			  frameptr += m_iSamplesPerWord*m_iSampleBlockSize;
 			}

@@ -118,7 +118,7 @@ namespace NCodec
             int  BytesPerTimeSampleForChannels( void ) const;
             bool SetPartialFrameParams( const int &riFrames );
 	    void decodeVCRAFTBlock(WordDeque_t & rInput, std::vector<uint32_t>& vcraftData, std::vector<uint32_t>& codifData,
-				   int wordstoUnpack, int samplePerOutword, int samlpesPerWord, int *iWordCount);
+				    int wordstoUnpack, int samplesPerWord, int *iWordCount);
 
 
     };

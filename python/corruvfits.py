@@ -9,13 +9,14 @@ import logging
 import os
 import pyfits
 from pyfits import Column as Col
+from astropy.time import Time
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 parnames = ('UU','VV','WW','DATE','_DATE','BASELINE','FREQSEL','SOURCE','INTTIM','DATA')
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan, npol, sources, antennas):
+    def __init__(self, fname, fcent, foff, nchan, npol, sources, antennas, sideband, firstmjd):
         self.dshape = [1,1,1,nchan, npol, 3]
         hdr = pyfits.Header()
         self.hdr = hdr
@@ -27,6 +28,9 @@ class CorrUvFitsFile(object):
         self.sources = sources
         self.antennas = antennas
         self.fname = fname
+        self.no_if = 1
+        self.sideband = sideband
+        self.first_time = Time(firstmjd, format='mjd')
 
         hdr['SIMPLE'] = True
         hdr['BITPIX'] = -32
@@ -52,15 +56,16 @@ class CorrUvFitsFile(object):
         self.add_type(1, ptype='UU', pscal=1.0, pzero=0.0)
         self.add_type(2, ptype='VV', pscal=1.0, pzero=0.0)
         self.add_type(3, ptype='WW', pscal=1.0, pzero=0.0)
-        self.add_type(4, ptype='DATE', pscal=1.0, pzero=0.0, comment='Day number')
+        self.add_type(4, ptype='DATE', pscal=1.0, pzero=self.first_time.jd, comment='Day number')
         self.add_type(5, ptype='DATE', pscal=1.0, pzero=0.0, comment='Day fraction')
         self.add_type(6, ptype='BASELINE', pscal=1.0, pzero=0.0)
         self.add_type(7, ptype='FREQSEL', pscal=1.0, pzero=0.0)
         self.add_type(8, ptype='SOURCE', pscal=1.0, pzero=0.0)
         self.add_type(9, ptype='INTTIM', pscal=1.0, pzero=0.0)
 
+        self.first_time.format = 'fits'
         hdr['OBJECT'] = 'MULTI'
-        hdr['DATE_OBS'] = '2018-03-19T11:02:30.909121'
+        hdr['DATE_OBS'] = self.first_time.value
         hdr['TELESCOP'] = 'ASKAP'
         hdr['INSTRUME'] = 'VCRAFT'
         hdr['OBSERVER'] = ''
@@ -81,11 +86,12 @@ class CorrUvFitsFile(object):
                 Col('IF FREQ','1D','HZ', array=[0]), #??
                 Col('CH WIDTH','1E','HZ', array=[self.foff*1e6]),
                 Col('TOTAL BANDWIDTH','1E','HZ', array=[self.bandwidth*1e6]),
-                Col('SIDEBAND','1J', array=[1]) #??
+                Col('SIDEBAND','1J', array=[self.sideband]), #??
+                Col('RXCODE','1J',array=[0]) # ?? Not in AIPSMEM117, but AIPS/FRING1 complains if it isn't there
         ]
-
         tbhdu = pyfits.BinTableHDU.from_columns(cols)
         tbhdu.header['EXTNAME'] = 'AIPS FQ'
+        tbhdu.header['NO_IF'] = (self.no_if, 'hard coded')
 
         return tbhdu
 
@@ -116,7 +122,7 @@ class CorrUvFitsFile(object):
         hdr['GSTIA0'] = (1.764940880935E+02 , 'hard coded. ????')
         hdr['DEGPDY'] = (3.609856473692E+02, 'hard coded. ????')
         hdr['FREQ'] = self.fcent*1e6
-        hdr['RDATE'] = ('2018-03-19T11:02:30.909121', 'hard coded. ????')
+        hdr['RDATE'] = (self.first_time.value, 'hard coded. ????')
         hdr['POLARX'] = 0
         hdr['POLARY'] = 0
         hdr['UT1UTC'] = 0
@@ -125,6 +131,7 @@ class CorrUvFitsFile(object):
         hdr['ARRNAM'] = 'ASKAP'
         hdr['NUMORB'] = 0
         hdr['NOPCAL'] = 0
+        hdr['NO_IF'] = (self.no_if, 'hard coded')
         hdr['POLTYPE'] = ''
         hdr['XYZHAND'] = 'RIGHT'
         hdr['FRAME'] = 'ITRF'
@@ -157,7 +164,7 @@ class CorrUvFitsFile(object):
         ]
         tbhdu = pyfits.BinTableHDU.from_columns(cols)
         tbhdu.header['EXTNAME'] = 'AIPS SU'
-        tbhdu.header['NO_IF'] = 1
+        tbhdu.header['NO_IF'] = self.no_if
         tbhdu.header['FREQID'] = 1
 
         return tbhdu
@@ -204,14 +211,13 @@ class CorrUvFitsFile(object):
         if weights is None:
             weights = 7.71604973e-05 #???
 
-
         jd = mjd + 2400000.5
         day = np.floor(jd)
         dayfrac = jd - day
 
         visdata['UU'], visdata['VV'], visdata['WW'] = uvw
-        visdata['DATE'] = day
-        visdata['_DATE'] = dayfrac
+        visdata['DATE'] = jd
+        visdata['_DATE'] = dayfrac*0
         visdata['BASELINE'] = (ia1 + 1)*256 + ia2 + 1
         visdata['INTTIM'] = inttim
         visdata['FREQSEL'] = 1

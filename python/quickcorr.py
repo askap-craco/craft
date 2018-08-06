@@ -12,7 +12,7 @@ import os
 import sys
 import logging
 import vcraft
-
+from cmdline import strrange
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -21,8 +21,9 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-o','--offset', type=int, help='Offset samples')
-    parser.add_argument('-c','--channel', type=int, help='Channel to plot', default=0)
+    parser.add_argument('-c','--channel', type=strrange, help='Channel to plot', default=0)
     parser.add_argument('-n','--fft-size', type=int, help='FFT size per coarse channel', default=128)
+    parser.add_argument('-a','--num-avg', type=int, help='Number of ffts to average for dynamic spectrum', default=32)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -58,15 +59,16 @@ def _main():
             print h, 'd1=',d1t, 'd2=',d2t, 'diff=',d2t - d1t,mul*(d2t-d1t)
 
     fig, axes = pylab.subplots(5,1)
+    fig.suptitle(' '.join(values.files[0:2]))
+
     d1ax, d2ax,lagax,pax,lax = axes.flatten()
-    N = 4096
+    N = 4096 
     Nc = N*512
     if values.offset is None:
         h = 'TRIGGER_FRAMEID'
         offset = int(f2.hdr[h][0]) - int(f1.hdr[h][0])
     else:
         offset = values.offset
-
 
     print 'OFFSET IS', offset
     d1 = f1.read(offset)
@@ -118,27 +120,39 @@ def _main():
     punwrap = np.unwrap(np.angle(xx12m))
     xx = np.arange(len(punwrap))
     gradient, phase = np.polyfit(xx, punwrap, 1)
-    delay = 32./27.*gradient/2./np.pi*len(punwrap)
+    delaysamp = gradient/2./np.pi*len(punwrap)
+    delayus = 32./27.*delaysamp
     corramp =  abs(xx12m[5:-5]).mean()
-    print 'Unwrapped phase = {} deg, delay={} us cross amplitude={}'.format(np.degrees(phase), delay, corramp)
 
     lagax.plot(abs(xx11.mean(axis=0)), label='auto0')
     lagax.plot(abs(xx22.mean(axis=0)), label='auto1')
     lagax.plot(abs(xx12m), label='crossamp')
     lagax.legend(frameon=False)
-    pax.plot(np.degrees(np.angle(xx12.mean(axis=0))), 'o')
+    pax.plot(xx, np.degrees(np.angle(xx12m)), 'o')
+    fitdeg = np.degrees(np.polyval((gradient, phase), xx))
+    fitwrapped = ((fitdeg + 180.) % 360) - 180.
+    pax.plot(xx, fitwrapped)
+    #pax.plot(xx, np.degrees(punwrap))
     pax.set_ylabel('Cross phase (deg)')
     pax.set_xlabel('Channel')
-    lax.plot(np.fft.fftshift(abs(np.fft.fft(xx12.mean(axis=0)))), label='lag')
+    lagspec =np.fft.fftshift(abs(np.fft.fft(xx12.mean(axis=0))))
+    lags = np.arange(len(lagspec)) - float(len(lagspec))/2.
+    lax.plot(lags, lagspec, label='lag')
+    lag_offset = np.argmax(lagspec) - float(len(lagspec))/2.
 
-    Navg = 128
+    Navg = values.num_avg
     Nout = xx12.shape[0]/Navg
     xx12 = xx12[:Nout*Navg, :]
     xx12.shape = [Nout, Navg, -1 ]
     xx12a = xx12.mean(axis=1)
 
+
+    print 'Lagmax {}samples. Unwrapped phase = {} deg, delay={} us = {:0.2f}samples cross amplitude={}'.format(lag_offset, np.degrees(phase), delayus, delaysamp, corramp)
+
+
     pylab.figure()
     pylab.imshow(np.angle(xx12a), aspect='auto')
+    pylab.suptitle(' '.join(values.files[0:2]))
 
     pylab.show()
 
