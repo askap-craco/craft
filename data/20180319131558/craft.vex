@@ -1,0 +1,339 @@
+VEX_rev = 1.5;
+*    SCHED vers: Release 11.4.  March 14, 2015
+*    VEX/SCHED:  1.5.87
+*    Other versions: Sched:  11.4  Plot: 1.06  JPL-ephem: 1.01
+*------------------------------------------------------------------------------
+$GLOBAL;
+     ref $EXPER = craft;
+*                                                      +------------+
+*                         PI revision number:          |    2.0000  |
+*                                                      +------------+
+*    mode:       CRAFT
+*------------------------------------------------------------------------------
+$EXPER;
+*
+def craft;
+     exper_name = craft;
+     exper_description = "CRAFT FRB Localisation";
+     PI_name = "Team CRAFT";
+     PI_email = Chris.Phillips@csiro.au;
+*    address:   CASS
+*               Marsfield
+*                
+*                
+*    phone:     000
+*    during obs: 
+*    fax:        
+*    notes:     Dummy schedule to setup CRAFT Voltage correlation
+*
+*    year, doy: 2018,  78
+*    date     : Mon 19 Mar 2018
+*    MJD      : 58196
+     exper_nominal_start=2018y078d13h16m30s;
+     exper_nominal_stop=2018y078d13h16m50s;
+*
+     target_correlator = OTHER;
+*
+*    integr_time    :     1.000 s
+*    number_channels:   256
+*    number_antenna :  3
+*    cross_polarize : No
+*    weight_func    : UNIFORM
+*    distrib_medium : NONE
+*    distrib_format : FITS
+*    source_pos_cat : STANDARD
+*    distribute_to  : 
+*                     Chris Phillips
+*
+enddef;
+*------------------------------------------------------------------------------
+$MODE;
+*
+def craft;
+     ref $PROCEDURES = Mode_01;
+     ref $FREQ = 798.00MHz8x1MHz:Aa:Az;
+     ref $FREQ = 798.00MHz8x1MHz#2:Ab;
+     ref $IF = LO@1000MHzLPolNoTone:Aa:Ab:Az;
+     ref $BBC = 8BBCs:Aa:Ab:Az;
+* Track lines replaced my addVDIF.pl Thu Apr  5 15:35:33 2018
+*     ref $TRACKS = LBA_.8Ch2bit1to1:Aa:Ab:Az;
+     ref $TRACKS = VDIF.8Ch2bit:Aa:Ab:Az;
+     ref $HEAD_POS = LBAVoid:Aa:Ab:Az;
+     ref $ROLL = NoRoll:Aa:Ab:Az;
+     ref $PASS_ORDER = LBADummy:Aa:Ab:Az;
+     ref $PHASE_CAL_DETECT = NoDetect:Aa:Ab:Az;
+enddef;
+*------------------------------------------------------------------------------
+$STATION;
+*
+def Aa;
+     ref $SITE = ASKAP01;
+     ref $ANTENNA = ASKAP01;
+* DAS ref replaced my addVDIF.pl Thu Apr  5 15:35:33 2018
+*     ref $DAS = 1LBA+NONE<LBADR;
+     ref $DAS = VDIF;
+enddef;
+*
+def Ab;
+     ref $SITE = ASKAP02;
+     ref $ANTENNA = ASKAP02;
+* DAS ref replaced my addVDIF.pl Thu Apr  5 15:35:33 2018
+*     ref $DAS = 1LBA+NONE<LBADR;
+     ref $DAS = VDIF;
+enddef;
+*
+def Az;
+     ref $SITE = ASKAP30;
+     ref $ANTENNA = ASKAP30;
+* DAS ref replaced my addVDIF.pl Thu Apr  5 15:35:33 2018
+*     ref $DAS = 1LBA+NONE<LBADR;
+     ref $DAS = VDIF;
+enddef;
+*------------------------------------------------------------------------------
+$PROCEDURES;
+*
+def Mode_01;
+     procedure_name_prefix =  "01";
+     tape_change =  420 sec;
+     headstack_motion =    6 sec;
+     new_source_command =    5 sec;
+     new_tape_setup =   20 sec;
+     setup_always = on :  20 sec;
+     parity_check = off : 100 sec;
+     tape_prepass = off : 600 sec;
+     preob_cal  = on :  10 sec : preob;
+     midob_cal  = on :  15 sec : midob;
+     postob_cal = on :   0 sec : postob;
+enddef;
+*------------------------------------------------------------------------------
+$SITE;
+*
+def ASKAP01;
+     site_type = fixed;
+     site_name = ASKAP01;
+     site_ID = Aa;
+*    elev=  370.14 long=-116:37:53. lat=-26:41:49.2
+     site_position =-2556088.33300 m: 5097405.64400 m:-2848428.24400 m;
+     site_velocity =  0.000000   m/yr:  0.000000   m/yr:  0.000000  m/yr;
+*    First line below is VEX standard format.  Use only when readers are ready.
+*    site_position_epoch = 1997y001d;
+     site_position_epoch =   50449;
+enddef;
+*
+def ASKAP02;
+     site_type = fixed;
+     site_name = ASKAP02;
+     site_ID = Ab;
+*    elev=  370.00 long=-116:37:54. lat=-26:41:49.6
+     site_position =-2556109.71700 m: 5097388.20100 m:-2848439.87900 m;
+     site_velocity =  0.000000   m/yr:  0.000000   m/yr:  0.000000  m/yr;
+*    First line below is VEX standard format.  Use only when readers are ready.
+*    site_position_epoch = 1997y001d;
+     site_position_epoch =   50449;
+enddef;
+*
+def ASKAP30;
+     site_type = fixed;
+     site_name = ASKAP30;
+     site_ID = Az;
+*    elev=  370.00 long=-116:38:37. lat=-26:41:23.4
+     site_position =-2557349.57200 m: 5097172.59400 m:-2847717.60000 m;
+     site_velocity =  0.000000   m/yr:  0.000000   m/yr:  0.000000  m/yr;
+*    First line below is VEX standard format.  Use only when readers are ready.
+*    site_position_epoch = 1997y001d;
+     site_position_epoch =   50449;
+enddef;
+*------------------------------------------------------------------------------
+$ANTENNA;
+*
+def ASKAP01;
+     axis_type = az : el;
+     antenna_motion = el :  60.0 deg/min :  2 sec;  *    1.000 deg/sec/sec
+     antenna_motion = az : 180.0 deg/min :  2 sec;  *    3.000 deg/sec/sec
+     axis_offset =    0.00000 m;
+enddef;
+*
+def ASKAP02;
+     axis_type = az : el;
+     antenna_motion = el :  60.0 deg/min :  2 sec;  *    1.000 deg/sec/sec
+     antenna_motion = az : 180.0 deg/min :  2 sec;  *    3.000 deg/sec/sec
+     axis_offset =    0.00000 m;
+enddef;
+*
+def ASKAP30;
+     axis_type = az : el;
+     antenna_motion = el :  60.0 deg/min :  2 sec;  *    1.000 deg/sec/sec
+     antenna_motion = az : 180.0 deg/min :  2 sec;  *    3.000 deg/sec/sec
+     axis_offset =    0.00000 m;
+enddef;
+*------------------------------------------------------------------------------
+$DAS;
+*
+* Extra DAS ref by addVDIF.pl Thu Apr  5 15:35:33 2018
+*
+def VDIF;
+     record_transport_type = VDIF;
+     electronics_rack_type = VDIF;
+     number_drives = 2;
+     headstack = 1 :            : 0 ;
+     headstack = 2 :            : 1 ;
+     tape_motion = adaptive : 0 min: 0 min: 10 sec;
+enddef;
+*
+def 1LBA+NONE<LBADR;
+     record_transport_type = S2;
+     electronics_rack_type = LBA;
+     number_drives = 1;
+     headstack = 1 :            : 0 ;
+     tape_motion = adaptive : 0 min: 0 min: 10 sec;
+enddef;
+*------------------------------------------------------------------------------
+$SOURCE;
+*
+def VIRGO;
+     source_name = VIRGO;
+*    this source had calibrator code:  
+     ra = 12h30m49.4233800s; dec =  12d23'28.043900"; ref_coord_frame = J2000;
+*    ra = 12h28m17.5692777s; dec =  12d40'01.749075"; ref_coord_frame = B1950;
+*    ra = 12h31m45.1125700s; dec =  12d17'23.578422"; ref_coord_frame = Date;
+enddef;
+*------------------------------------------------------------------------------
+$FREQ;
+*
+def 798.00MHz8x1MHz;
+* mode =  1    stations =Aa:Ab:Az
+     sample_rate =   2.37037037037038 Ms/sec;  * (2bits/sample)
+     chan_def = :   798.00 MHz : L :   1.18518518518519 MHz : &CH01 : &BBC01 : &NoCal; *Lcp
+     chan_def = :   799.00 MHz : L :   1.18518518518519 MHz : &CH02 : &BBC02 : &NoCal; *Lcp
+     chan_def = :   800.00 MHz : L :   1.18518518518519 MHz : &CH03 : &BBC03 : &NoCal; *Lcp
+     chan_def = :   801.00 MHz : L :   1.18518518518519 MHz : &CH04 : &BBC04 : &NoCal; *Lcp
+     chan_def = :   806.00 MHz : L :   1.18518518518519 MHz : &CH05 : &BBC05 : &NoCal; *Lcp
+     chan_def = :   807.00 MHz : L :   1.18518518518519 MHz : &CH06 : &BBC06 : &NoCal; *Lcp
+     chan_def = :   808.00 MHz : L :   1.18518518518519 MHz : &CH07 : &BBC07 : &NoCal; *Lcp
+     chan_def = :   809.00 MHz : L :   1.18518518518519 MHz : &CH08 : &BBC08 : &NoCal; *Lcp
+enddef;
+*
+def 798.00MHz8x1MHz#2;
+* mode =  1    stations =Aa:Ab:Az
+     sample_rate =   2.37037037037038 Ms/sec;  * (2bits/sample
+     chan_def = :   801.00 MHz : L :   1.18518518518519 MHz : &CH01 : &BBC01 : &NoCal; *Lcp
+     chan_def = :   806.00 MHz : L :   1.18518518518519 MHz : &CH02 : &BBC02 : &NoCal; *Lcp
+     chan_def = :   807.00 MHz : L :   1.18518518518519 MHz : &CH03 : &BBC03 : &NoCal; *Lcp
+     chan_def = :   808.00 MHz : L :   1.18518518518519 MHz : &CH04 : &BBC04 : &NoCal; *Lcp
+     chan_def = :   809.00 MHz : L :   1.18518518518519 MHz : &CH05 : &BBC05 : &NoCal; *Lcp
+     chan_def = :   798.00 MHz : L :   1.18518518518519 MHz : &CH06 : &BBC06 : &NoCal; *Lcp
+     chan_def = :   799.00 MHz : L :   1.18518518518519 MHz : &CH07 : &BBC07 : &NoCal; *Lcp
+     chan_def = :   800.00 MHz : L :   1.18518518518519 MHz : &CH08 : &BBC08 : &NoCal; *Lcp
+enddef;
+
+*------------------------------------------------------------------------------
+$IF;
+*
+def LO@1000MHzLPolNoTone;
+* mode =  1    stations =Aa:Ab:Az
+     if_def = &IF_1N : 1N : L :  1000.00 MHz : L ; * PCall off!   0.0   0.0  NA     0 NA
+enddef;
+*------------------------------------------------------------------------------
+$BBC;
+*
+def 8BBCs;
+* mode =  1    stations =Aa:Ab:Az
+     BBC_assign = &BBC01 :  1 : &IF_1N;
+     BBC_assign = &BBC02 :  2 : &IF_1N;
+     BBC_assign = &BBC03 :  3 : &IF_1N;
+     BBC_assign = &BBC04 :  4 : &IF_1N;
+     BBC_assign = &BBC05 :  5 : &IF_1N;
+     BBC_assign = &BBC06 :  6 : &IF_1N;
+     BBC_assign = &BBC07 :  7 : &IF_1N;
+     BBC_assign = &BBC08 :  8 : &IF_1N;
+enddef;
+*------------------------------------------------------------------------------
+$PHASE_CAL_DETECT;
+*
+def NoDetect;
+* mode =  1    stations =Aa:Ab:Az
+     phase_cal_detect = &NoCal;
+enddef;
+*------------------------------------------------------------------------------
+$TRACKS;
+*
+* Extra Tracks added by addVDIF.pl Thu Apr  5 15:35:33 2018
+*
+*
+def VDIF.8Ch2bit;
+  track_frame_format = VDIF/8000/2;
+  fanout_def = A : &CH01 : sign : 1 : 00;
+  fanout_def = A : &CH01 : mag  : 1 : 01;
+  fanout_def = A : &CH02 : sign : 1 : 02;
+  fanout_def = A : &CH02 : mag  : 1 : 03;
+  fanout_def = A : &CH03 : sign : 1 : 04;
+  fanout_def = A : &CH03 : mag  : 1 : 05;
+  fanout_def = A : &CH04 : sign : 1 : 06;
+  fanout_def = A : &CH04 : mag  : 1 : 07;
+  fanout_def = A : &CH05 : sign : 1 : 08;
+  fanout_def = A : &CH05 : mag  : 1 : 09;
+  fanout_def = A : &CH06 : sign : 1 : 10;
+  fanout_def = A : &CH06 : mag  : 1 : 11;
+  fanout_def = A : &CH07 : sign : 1 : 12;
+  fanout_def = A : &CH07 : mag  : 1 : 13;
+  fanout_def = A : &CH08 : sign : 1 : 14;
+  fanout_def = A : &CH08 : mag  : 1 : 15;
+enddef;
+*
+*
+def LBA_.8Ch2bit1to1;
+* mode =  1    stations =Aa:Ab:Az
+*    format = LBA, and fan-out = 1
+*    mode requires   2.37Mb/s/tr; stations using disks
+     S2_data_source = VLBA;
+     S2_recording_mode = none;
+     fanout_def =   : &CH01 : sign : 1:  0;
+     fanout_def =   : &CH01 :  mag : 1:  1;
+     fanout_def =   : &CH02 : sign : 1:  2;
+     fanout_def =   : &CH02 :  mag : 1:  3;
+     fanout_def =   : &CH03 : sign : 1:  4;
+     fanout_def =   : &CH03 :  mag : 1:  5;
+     fanout_def =   : &CH04 : sign : 1:  6;
+     fanout_def =   : &CH04 :  mag : 1:  7;
+     fanout_def =   : &CH05 : sign : 1:  8;
+     fanout_def =   : &CH05 :  mag : 1:  9;
+     fanout_def =   : &CH06 : sign : 1: 10;
+     fanout_def =   : &CH06 :  mag : 1: 11;
+     fanout_def =   : &CH07 : sign : 1: 12;
+     fanout_def =   : &CH07 :  mag : 1: 13;
+     fanout_def =   : &CH08 : sign : 1: 14;
+     fanout_def =   : &CH08 :  mag : 1: 15;
+enddef;
+*------------------------------------------------------------------------------
+$HEAD_POS;
+def LBAVoid;
+* mode =  1    stations =Aa:Ab:Az
+*     Head positions irrelevant for Disk: empty def
+enddef;
+*------------------------------------------------------------------------------
+$PASS_ORDER;
+*
+def LBADummy;
+* mode =  1    stations =Aa:Ab:Az
+* LBA masquerading as S2 needs a dummy value
+     S2_group_order = 0;
+enddef;
+*------------------------------------------------------------------------------
+$ROLL;
+*
+def NoRoll;
+* mode =  1    stations =Aa:Ab:Az
+*    barrel-roll set to 'roll_off', so reverse-roll by  0 (1 head)
+     roll = off;
+enddef;
+*------------------------------------------------------------------------------
+$SCHED;
+* schedule section for experiment craft   
+* CRAFT FRB Localisation                                                  
+scan No0001;
+     start=2018y078d13h16m30s; mode=craft; source=VIRGO;
+*              :data_good:data_stop:goto_foot: pass:  wrap :driv:tape at
+     station=Aa:    0 sec:   20 sec:    0.000 GB:   0 :       : 1;
+     station=Ab:    0 sec:   20 sec:    0.000 GB:   0 :       : 1;
+     station=Az:    0 sec:   20 sec:    0.000 GB:   0 :       : 1;
+endscan;

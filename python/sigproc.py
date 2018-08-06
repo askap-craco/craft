@@ -55,7 +55,6 @@ def sigproc_sex2deg(x):
     dout = sign*(dd + mm/60.0 + ss/3600.0)
     
     return dout
-    
 
 def unpack(hdr, param, struct_format):
     idx = hdr.find(param)
@@ -278,7 +277,7 @@ class SigprocFile(object):
 
             data = data2
             
-        data.shape = (self.nchans, self.num_samples)
+        data.shape = (num_samples, self.nchans)
 
         return data
     

@@ -49,9 +49,9 @@ namespace NCodec
             double              m_dSampleRate;
             double              m_dMJDNow;
 
-            unsigned long       m_ulStartWriteFrameId;
-            unsigned long       m_ulFinishWriteFrameId;
-            unsigned long       m_ulTriggerFrameId;
+            unsigned long long  m_ullStartWriteFrameId;
+            unsigned long long  m_ullFinishWriteFrameId;
+            unsigned long long  m_ullTriggerFrameId;
 
             unsigned long long  m_ullStartWriteBAT;
             unsigned long long  m_ullFinishWriteBAT;
@@ -99,9 +99,9 @@ namespace NCodec
                 m_dSampleRate           = 0.0;
                 m_dMJDNow               = 0.0;
 
-                m_ulStartWriteFrameId   = 0;
-                m_ulFinishWriteFrameId  = 0;
-                m_ulTriggerFrameId      = 0;
+                m_ullStartWriteFrameId   = 0;
+                m_ullFinishWriteFrameId  = 0;
+                m_ullTriggerFrameId      = 0;
                 m_ullStartWriteBAT      = 0;
                 m_ullFinishWriteBAT     = 0;
                 m_ullTriggerWriteBAT    = 0;
@@ -274,9 +274,9 @@ namespace NCodec
             virtual bool operator () ( void )          { return true; }
             virtual bool Flush( void )                 { return true; }
             virtual int  DataArraySize( void )	       { return -1;   }
-            virtual bool Initialise( void )	           { return true; }
-            virtual int  SkipBytes( void )             { return 0;    }
-
+            virtual bool Initialise( void )            { return true; }
+            virtual int  SkipBytes( bool *preload )    { UNREFERENCED_PARAMETER( preload ); return 0; }
+            virtual void setPreload( bool preload )    { UNREFERENCED_PARAMETER( preload ); }
             virtual bool SetBlockSize( int iBlockSize )
             {
                 UNREFERENCED_PARAMETER( iBlockSize );

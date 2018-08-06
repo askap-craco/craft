@@ -21,8 +21,10 @@ def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-n','--nsamps', help='Number of samples per integration', type=int, default=1500)
+    parser.add_argument('-i','--nsamps', help='Number of samples per integration', type=int, default=1500)
     parser.add_argument('-s','--show', help='Show plots', action='store_true', default=False)
+    parser.add_argument('-n','--nfft', help='FFT size / 64. I.e. for 128 point FFT specify 2', type=int, default=1)
+    parser.add_argument('-o','--outfile', help='Outfile', default='beam.fil')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -31,69 +33,124 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    for f in values.files:
-        detect(f, values)
+    detect(values.files, values)
 
 bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
 frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 
-def detect(f, values):
-    vfile = vcraft.VcraftFile(values.files[0])
+def detect(files, values):
+    #vfiles = [vcraft.VcraftFile(f) for f in files]
+    #mux = vcraft.VcraftMux(vfiles)
+    all_muxes = vcraft.mux_by_pol(files)
+    npolin = len(all_muxes)
+    if npolin == 1:
+        npolout = 1
+    elif npolin == 2:
+        npolout = 4
+    else:
+        assert 'Unexpected number of input polarisations {}'.format(all_muxes.keys())
 
-    hdr = vfile.hdr
-    df = vfile.read()
-    nsamps, nchan = df.shape
-    infsamp = float(hdr['SAMP_RATE'][0])
-    tsamp = float(values.nsamps)/infsamp
-    # TODO: Calculate frequencies a bit better - tricky because individual
-    # files have freqs with gaps, which makes life a little wierd in sigprocland
-    freqs = map(float, hdr['FREQS'][0].split(','))
-    fch1 = min(freqs)
-    foff = freqs[1] - freqs[0]
-    # TODO: Get tstart from BATs. This is the easy way
-    tstart = float(hdr['ANT_MJD'][0])
-    bats = np.array([int(hdr[c][0], base=16) for c in bat_cards])
-    frames = np.array([int(hdr[c][0]) for c in frame_cards])
-    bat0 = int(hdr['NOW_BAT'][0], base=16)
-    bat0_40 = bat0 & 0xffffffffff
+    pols = sorted(all_muxes.keys())
+    # pick random pol to get metadata - todo - check all muxes the same.
+    mux = all_muxes[pols[0]] 
+    infsamp = mux.samp_rate # samples/sec for a coarse channel
+    fch1 = mux.freqconfig.freq
+    foff = mux.freqconfig.bw
+    tstart = mux.start_mjd
     nbits = 32
-    
+    nchan = len(mux.freqs)
+    nfft = 64*values.nfft
+    nguard = 5*values.nfft
+    nint = values.nsamps
+    nchanout = nfft - 2*nguard
+    finebw = foff/float(nchanout)
+    nsamps = mux.nsamps
 
-    print 'BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6
-    # lowest 32 bits of bat from the time the file was written
-    print 'FRAMES duration', (frames[0] - frames[1])/infsamp,'offset', (frames[2] - frames[0])/infsamp
+    bw_file = finebw
+    nchan_file = nchan*nchanout
+    sample_block = nint*nfft
+    tsamp = nint*nfft/infsamp
+        
+    nsampout = nsamps/sample_block
+    nsampin = nsampout*sample_block
 
 
     hdr = {'data_type': 1,
            'tsamp': tsamp,
            'tstart': tstart,
            'fch1':fch1,
-           'foff':foff,
+           'foff':bw_file,
            'nbits':nbits,
-           'nifs':1,
-           'nchans':8,
-           'src_raj':0.0,
+           'nifs':npolout,
+           'nchans':nchan_file,
+           'src_raj':0.0, # todo: add sigprog.deg2sex(mux.beam_pos[0])
            'src_dej':0.0
-           
+
     }
-    foutname = f.replace('.vcraft','.fil')
+    if values.outfile:
+        foutname = values.outfile
+    else:
+        foutname = f.replace('.vcraft','.fil')
+        
     fout = SigprocFile(foutname, 'w', hdr)
-    nchan = len(freqs)
-           
-    
-    # detect
-    dout = abs(df)**2
-    
-    dfil = np.add.reduceat(dout, np.arange(0, nsamps, values.nsamps), axis=0)
-    # get rid of last sample
-    dfil = dfil[0:-1:, :]
-    # subtract mean over time
-    dfil -= dfil.mean(axis=0)
-    dfil /= dfil.std(axis=0)
-    print 'Input shape', df.shape, 'output shape', dfil.shape
-    
-    
-    dfil.tofile(fout.fin)
+
+    logging.debug('Writing sigproc header %s', hdr)
+    logging.debug(' nsamps=%s nsampin=%s nsapout=%s samp rate=%s',nsamps, nsampin, nsampout, infsamp)
+
+    # reshape to integral number of integrations
+    for s in xrange(nsampout):
+        sampno = s*sample_block
+        din = np.empty((npolin, sample_block, nchan), dtype=np.float32)
+        for ipol, pol in enumerate(pols):
+            din[ipol, :, :]  = all_muxes[pol].read(sampno, sample_block)
+
+        dout = np.empty((npolout, nchan_file), dtype=np.float32)
+            
+
+        for c in xrange(nchan):
+            dc = din[:, :, c]
+            # make blocks of nfft samples
+            dc.shape = (npolin, -1 ,nfft)
+            dfft = np.fft.fftshift(np.fft.fft(dc, axis=2), axes=2)
+            
+            # discard guard channels
+            dfft = dfft[:, :, nguard:nchanout+nguard]
+            invert = True
+            if invert:
+                dfft = dfft[:,:,::-1]
+                
+            assert dfft.shape == (npolin, nint, nchanout)
+            
+            # just take the absolute values, average over time and be done with it
+            if npolout == 1:
+                #dabs = abs((dfft * np.conj(dfft))).mean(axis=0)
+                #assert len(dabs) == nchanout
+                #dabs = dabs[::-1] # invert spectra
+                #dabs= dabs.astype(np.float32) # convert to float32
+                #dout[0, :] = dabs
+                for thechan in xrange(dfft.shape[1]):
+                    p = dfft[0, thechan, :]
+                    dout[0, thechan] = np.vdot(p,p).real
+                
+            elif npolout == 4:
+                for chanout in xrange(nchanout):
+                    p1 = dfft[0, chanout, :]
+                    p2 = dfft[1, chanout, :]
+                    cross = np.vdot(p2, p1)
+                    dout[0, chanout] = np.vdot(p1, p1).real
+                    dout[1, chanout] = cross.real
+                    dout[2, chanout] = cross.imag
+                    dout[3, chanout] = np.vdot(p2, p2).real
+
+            if values.show:
+                pylab.plot(dabs)
+                pylab.show()
+                
+        dout.flatten().tofile(fout.fin)
+
+
+
+
     fout.fin.close()
 
     if values.show:
@@ -135,7 +192,7 @@ def detect(f, values):
         pylab.show()
 
 
-        
-    
+
+
 if __name__ == '__main__':
     _main()

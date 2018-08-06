@@ -76,14 +76,14 @@ namespace NCodec
             bool Flush( void );
             int  DataArraySize( void );
             bool Initialise( void );
-            int  SkipBytes( void );
+            int  SkipBytes( bool* );
 
         private:
 
             //////////
             // Private definitions and attributes.
 
-            using Buffer_t = std::vector<byte_t>;
+            using Buffer_t = std::vector<uint32_t>;
 
             bool     m_bFirstInputBlock;
             bool     m_bSynced;
@@ -91,13 +91,19 @@ namespace NCodec
 
             int      m_iSampleBlockSize;
             int      m_iDataArraySize;
+            int      m_iDataArrayWords;
             int      m_iDataFrameSize;
             int      m_iNumberOfSyncRetries;
 
             CDFH     m_DFH;
-            unsigned long long ull_BAT0;
+            unsigned long long m_ullBAT0;
+            unsigned long long m_ullFrame0;
             int      m_iSkipSamples;
+            int      m_iSampleOffset;
+	    int      m_iSamplesPerWord;
             Buffer_t m_DataFrameBuffer;
+	    char     *buf;
+	    int      mask;  
 
             //////////
             // Private methods.
@@ -106,11 +112,14 @@ namespace NCodec
             bool HandleCODIFFrameData( void );
             bool ConfigureDFH( void );
             bool SetBufferSize( Buffer_t &rBuffer, const int &riLength );
-            ByteDeque_t & SampleData( void ) const;
+            WordDeque_t & SampleData( void ) const;
             bool WriteDataFrames( bool bForceFlush = false );
             bool WritePreambleFrames( const int &riPreambleSamples );
             int  BytesPerTimeSampleForChannels( void ) const;
             bool SetPartialFrameParams( const int &riFrames );
+	    void decodeVCRAFTBlock(WordDeque_t & rInput, std::vector<uint32_t>& vcraftData, std::vector<uint32_t>& codifData,
+				    int wordstoUnpack, int samplesPerWord, int *iWordCount);
+
 
     };
 

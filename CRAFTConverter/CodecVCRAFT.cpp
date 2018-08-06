@@ -27,7 +27,7 @@
 namespace
 {
     constexpr int iNumberOfVCRAFTChannels_c = 8;                    // VCRAFT number of channels.
-    constexpr int iInputBlockSize_c         = 2 * 1042 * 1024;      // Make 2MB for now. NB: VCRAFT
+  //    constexpr int iInputBlockSize_c         = 2 * 1042 * 1024;      // Make 2MB for now. NB: VCRAFT
                                                                     // data is sampled at 32/27 Msps so
                                                                     // we could use a multiple/divisor of this.
 }
@@ -40,8 +40,7 @@ namespace NCodec
     //////////
     // Construction and destruction.
 
-    CCodecVCRAFT::CCodecVCRAFT( CFileDescriptor *pFile, ECodecMode eCodecMode )
-                 :ICodec( pFile, eCodecMode )
+    CCodecVCRAFT::CCodecVCRAFT( CFileDescriptor *pFile, ECodecMode eCodecMode )                 :ICodec( pFile, eCodecMode )
     {
         if ( eCodecMode == eCodecModeDecode )
         {
@@ -58,7 +57,8 @@ namespace NCodec
 
         m_bBuffersInitialised = false;
 
-        m_iInputBlockSize = iInputBlockSize_c;
+        m_iInputBlockSize = -1;
+	m_bPreload = false;
     }
 
     //////////
@@ -67,6 +67,7 @@ namespace NCodec
     CCodecVCRAFT::~CCodecVCRAFT( void )
     {
         m_bBuffersInitialised = false;
+	m_bPreload = false;
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -166,7 +167,7 @@ namespace NCodec
 
     //////////
     //
-
+  
     bool CCodecVCRAFT::ReadNextBlock( void )
     {
         // For a decoder, we read the input voltage data in blocks.
@@ -178,6 +179,7 @@ namespace NCodec
         //         otherwise false.
 
         bool bDataToProcess = false;
+	assert ( m_iInputBlockWords>0 );
 
         try
         {
@@ -192,9 +194,14 @@ namespace NCodec
 
             // Read the next data block from the file directly into the codec's deque.
 
-            ByteDeque_t &rDeque = m_SampleData.GetSamples();
+            WordDeque_t &rDeque = m_SampleData.GetSamples();
 
-            bDataToProcess = ( m_pFile->Read( rDeque, m_iInputBlockSize, 0, SEEK_CUR ) > 0 );
+	    if (m_bPreload) {
+	      m_pFile->Read( rDeque, m_iNumberOfChannels, 0, SEEK_CUR );
+	      m_bPreload = false;
+	    }
+	    
+            bDataToProcess = ( m_pFile->Read( rDeque, m_iInputBlockWords, 0, SEEK_CUR ) > 0 );
         }
         catch ( ... )
         {
@@ -209,16 +216,25 @@ namespace NCodec
 
     bool CCodecVCRAFT::SeekForward( int iSkipBytes )
     {
-        // Skip SkipBytes forward through the file
-        return m_pFile->SeekForward( iSkipBytes );
+      // Skip SkipBytes forward through the file
+      return m_pFile->SeekForward( iSkipBytes );
     }
 
+    //////////
+    //
+
+    void CCodecVCRAFT::setPreload( bool preload )
+    {
+      m_bPreload = preload;
+    }
+  
     //////////
     //
 
     bool CCodecVCRAFT::SetBlockSize( int iBlockSize )
     {
         m_iInputBlockSize = iBlockSize;
+	m_iInputBlockWords = iBlockSize / sizeof(uint32_t);
         return true;
     }
 
@@ -287,22 +303,22 @@ namespace NCodec
             RetrieveParameter( "CRAFT_MODE",            m_iMode );
             RetrieveParameter( "NBITS",                 m_iBitsPerSample );
             RetrieveParameter( "NPOL",                  m_iNumberofPol );
-            RetrieveParameter( "BEAMID",                m_iBeamId );
+            RetrieveParameter( "BEAM",                  m_iBeamId );
             RetrieveParameter( "FPGA_ID",               m_iFPGAId );
             RetrieveParameter( "CARD_NO",               m_iCardNumber );
             RetrieveParameter( "ANTENNA_NO",            m_iAntennaNumber );
             RetrieveParameter( "NCHANS",                m_iNumberOfChannels );
             RetrieveParameter( "NOW_MJD",               m_dMJDNow );
             RetrieveParameter( "NOW_BAT",               m_ullNowBAT );
-            RetrieveParameter( "START_WRITE_FRAMEID",   m_ulStartWriteFrameId );
-            RetrieveParameter( "STOP_WRITE_FRAMEID",    m_ulFinishWriteFrameId );
-            RetrieveParameter( "TRIGGER_FRAMEID",       m_ulTriggerFrameId );
+            RetrieveParameter( "START_WRITE_FRAMEID",   m_ullStartWriteFrameId );
+            RetrieveParameter( "STOP_WRITE_FRAMEID",    m_ullFinishWriteFrameId );
+            RetrieveParameter( "TRIGGER_FRAMEID",       m_ullTriggerFrameId );
             RetrieveParameter( "START_WRITE_BAT",       m_ullStartWriteBAT );
             RetrieveParameter( "STOP_WRITE_BAT",        m_ullFinishWriteBAT );
             RetrieveParameter( "TRIGGER_BAT",           m_ullTriggerWriteBAT );
 
             m_iBitsPerSample /= 2;
-            printf("Warning: Forcing NPOL==1\n");  m_iNumberofPol = 1;
+            //printf("Warning: Forcing NPOL==1\n");  m_iNumberofPol = 1;
 
             // UTC string (ISO formatted) verbatim from the VCRAFT header.
 

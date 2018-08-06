@@ -121,9 +121,10 @@ bool CFileDescriptor::SeekPastFileHeader( const int &riChannelSeekPosition )
 
 bool CFileDescriptor::SeekForward( const int &SeekPosition )
 {
-    if ( IsOpen() )
+  if ( IsOpen() )
     {
-        return ( std::fseek( m_pFile, SeekPosition, SEEK_CUR ) == 0 );
+      int status = std::fseek( m_pFile, SeekPosition, SEEK_CUR );
+      return (status  == 0 );
     }
 
     return false;
@@ -148,31 +149,36 @@ int CFileDescriptor::Read( byte_t *pbyReadArray, const int &riNumberOfBytes,
 //////////
 //
 
-int  CFileDescriptor::Read( ByteDeque_t& rQueue, const int &riNumberOfBytes,
+int  CFileDescriptor::Read( WordDeque_t& rQueue, const int &riNumberOfWords,
                             const int &riOffset,  const int &riOrigin )
 {
-    int iBytesRead = 0;
+    int iWordsRead = 0;
+    uint32_t iWord;
+    size_t nRead;
 
     
     if ( IsOpen() && ( fseek( m_pFile, riOffset, riOrigin ) == 0 ) )
     {
-        for ( int i = 0; i < riNumberOfBytes; i++ )
+        for ( int i = 0; i < riNumberOfWords; i++ )
         {
-            int iChar = std::fgetc( m_pFile );  // int needed to handle EOF.
-
-            if ( iChar == EOF )
-            {
+	  nRead = std::fread(&iWord, sizeof(uint32_t), 1, m_pFile);
+	  if (nRead !=1) {
+            if ( feof(m_pFile ) )
+	      {
                 break;
-            }
-            else
-            {
-                rQueue.push_back( static_cast<byte_t>( iChar ) );
-                iBytesRead++;
-            }
+	      }
+	      else
+		{
+		  iWordsRead = -1;
+		}
+	  } else {
+                rQueue.push_back( iWord );
+                iWordsRead++;
+	  }
         }
     }
 
-    return iBytesRead;
+    return iWordsRead;
 }
 
 //////////
@@ -199,6 +205,33 @@ bool CFileDescriptor::Write( const byte_t * pbyRecord, const int &riNumBytes )
         std::size_t BytesWritten = std::fwrite( pbyRecord, sizeof(byte_t), riNumBytes, m_pFile );
 
         bSuccess = ( BytesWritten == static_cast<size_t>( riNumBytes ) );
+    }
+
+    return bSuccess;
+}
+
+
+bool CFileDescriptor::Write( const uint32_t * pbyRecord, const int &riNumWords )
+{
+    bool bSuccess = true;
+
+    if ( riNumWords <= 0 )
+    {
+        bSuccess = true;
+    }
+    else if ( pbyRecord == nullptr )
+    {
+        bSuccess = false;
+    }
+    else if ( ! IsOpen() )
+    {
+        bSuccess = false;
+    }
+    else
+    {
+        std::size_t WordsWritten = std::fwrite( pbyRecord, sizeof(uint32_t), riNumWords, m_pFile );
+
+        bSuccess = ( WordsWritten == static_cast<size_t>( riNumWords ) );
     }
 
     return bSuccess;

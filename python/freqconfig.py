@@ -7,7 +7,7 @@ Copyright (C) CSIRO 2016
 __author__ = 'Keith Bannister <keith.bannister@csiro.au>'
 
 import numpy as np
-from . crafthdr import DadaHeader
+import warnings
 
 class FreqConfig(object):
     '''Containiner class containing information about the frequency config for each 
@@ -30,18 +30,20 @@ class FreqConfig(object):
         if reverse:
             allfreqs = allfreqs[::-1]
 
-        assert len(np.unique(allfreqs)) == len(allfreqs), 'Duplicate frequencies'
+        assert len(np.unique(allfreqs)) == len(allfreqs), 'Duplicate frequencies = {}'.format(str(allfreqs))
         freq_diffs =allfreqs[1:] -  allfreqs[0:-1] 
         bw = np.median(freq_diffs)
-        if reverse:
-            assert bw < 0, 'Expected negative bw. Got: %s' % bw
-        else: 
-            assert bw > 0, 'Expected positive bw. Got: %s' % bw
-
-        assert bw != 0
-
         startfreq = allfreqs[0]
         nchan = len(allfreqs)
+
+        if reverse:
+            assert bw < 0, 'Expected negative bw. Got: %s' % bw
+            assert startfreq == max(freqs.flat)
+        else: 
+            assert bw > 0, 'Expected positive bw. Got: %s' % bw
+            assert startfreq == min(freqs.flat)
+
+        assert bw != 0
 
         self.nchan = nchan
         self.bw = bw
@@ -84,6 +86,8 @@ class FreqConfig(object):
 
     @staticmethod
     def load_from_dada_header(dada_header, cards=None, freqname='FREQS'):
+        from crafthdr import DadaHeader
+
         h = dada_header
         nbf = int(h.get_value('NUM_BEAMFORMERS'))
         freqs = []
@@ -109,4 +113,53 @@ class FreqConfig(object):
         freqconfig = FreqConfig(freqs)
         return freqconfig
 
+    
+    @staticmethod
+    def load_from_pv(ant, cards):
+        from epics import PV
+
+        all_freqs = []
+
+        for card in cards:
+            chanpv = PV('{}:abf:c{:02d}:F_setChanFreq:chans'.format(ant, card))
+            pvchans = chanpv.get()
         
+            # Poke it to get it to read
+            pvname = '{}:abf:c{:02d}:fpgaSubbands'.format(ant, card)
+            subbandpv_proc = PV(pvname+'.PROC')
+            ret = subbandpv_proc.put(1)
+            assert ret == 1, 'Invalid return value for PV %s' % subbandpv_proc
+            
+            # Now read that puppy
+            subbandpv = PV(pvname)
+            for i in xrange(10):
+                subbands = subbandpv.get()
+                if len(subbands) > 0:
+                    break
+                print 'Retry', pvname
+
+
+            # need to do this because the other bits arent part of the actual subband.
+            subbands = subbands & 0x7f
+
+            # Numberof fpgas
+            assert len(subbands) == 6 , 'Invalid subbands: %s for %s' % (subbands, subbandpv)
+            assert np.all(subbands >= 0), 'Invalid subbands: %s for %s' % (subbands, subbandpv)
+            pvfreqs = []
+            for sbid in subbands:
+                for f in xrange(8):
+                    channo = sbid*8 + f
+                    pvfreqs.append(pvchans[channo])
+
+
+            all_freqs.append(pvfreqs)
+
+
+        all_freqs = np.array(all_freqs)
+
+        warnings.warn('Adding a henious hack found by looking at pulsar data where we appear to be off by 1 MHz')
+        all_freqs += 1
+        freqconfig = FreqConfig(all_freqs)
+
+        return freqconfig
+

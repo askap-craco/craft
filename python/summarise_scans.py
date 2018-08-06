@@ -83,6 +83,7 @@ def _main():
     parser.add_argument('-f','--fname', help='Candidate filename')
     parser.add_argument('-o','--outfile',help='Output json file')
     parser.add_argument('-m','--write-meta-files',help='Write meta files for mediaflux', action='store_true')
+    parser.add_argument('-e','--elasticurl', help='Index to this url')
 
  
     parser.set_defaults(verbose=False)
@@ -104,11 +105,20 @@ def _main():
         fout.write('\n')
         logging.info('Summarised scan %s', f)
 
+        if values.elasticurl is not None:
+            index_summary(id, summary, values.elasticurl)
+
         if values.write_meta_files:
             write_meta_files(f, summary, values)
         
 
     fout.close()
+
+def index_summary(_id, summary, url='akingest01'):
+    from elasticsearch import Elasticsearch
+    es = Elasticsearch(url)
+    es.index(index='craftscans', doc_type='antscan', id=_id, body=summary)
+    
 
 def summarise_scan(f):
     hdr = DadaHeader.fromfile(f)

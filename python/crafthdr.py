@@ -30,7 +30,11 @@ class DadaHeader(OrderedDict):
         return self[item]
 
     def get_comment(self, item):
-        return self[item][1]
+        if item in self.keys():
+            comment = self[item][1]
+        else:
+            comment = ''
+        return comment
         
     def reset_hdr_size(self, block_size=4096):
         s = self.str(check=False)

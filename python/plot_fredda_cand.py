@@ -45,6 +45,7 @@ def _main():
     parser.add_argument('-w','--max-boxcar', help='max width to plot', default=32, type=int)
     parser.add_argument('-d','--min-dm', help='minimum dm to plot', default=0, type=float)
     parser.add_argument('-b','--min-sn', help='minimum S/N to plot', default=0, type=float)
+    
 
     parser.add_argument('--detail', action='store_true', help='Plot detail')
     parser.add_argument(dest='files', nargs='+')
@@ -59,10 +60,23 @@ def _main():
     maxboxcar = 32.
     scalarmap = plt.cm.ScalarMappable(cmap=cmap, norm=mpl.colors.Normalize(1., maxboxcar))
     scalarmap._A = [] # URGH http://stackoverflow.com/questions/8342549/matplotlib-add-colorbar-to-a-sequence-of-line-plots
+    consol = False
 
 
-    for fin in values.files:
+    pylab.figure()
+    ax = pylab.gca()
+    for f in values.files:
+        plot_file(f, values, ax, title=f)
+
+    pylab.show()
+
+    if consol:
+        candlist = find_files_filelist(values.files)
+        
+    for key, c in candlist.iteritems():
+
         pylab.close()
+        '''
         if os.path.isdir(fin):
             fig, axes, ncand = plot_dir(fin, values, scmap=cmap)
         else:
@@ -74,14 +88,19 @@ def _main():
             except:
                 logging.exception('Could not plot file')
                 ncand = 0
-            
+        '''
+
+        fig, axes, ncand = plot_scans(c, values)
+
         # add colorbar
         fig.subplots_adjust(right=0.87)
         cbar_ax = fig.add_axes([0.90, 0.1, 0.02, 0.8])
         cbar = fig.colorbar(scalarmap, cax=cbar_ax)
         cbar.set_label('Width (samples)')
 
-        fout = fin
+        fname, sb, scan = c[0][0:3]
+        fout = '{}_{}.png'.format(sb, scan)
+
         if fout.endswith('/'):
             fout = fout[0:-1]
         
@@ -94,13 +113,18 @@ def _main():
             print 'Saving', fout
             fig.savefig(fout, dpi=200)
         else:
-            print 'Not saving ', fin, 'is empty'
+            print 'Not saving ', fout, 'is empty'
         
         if values.show:
             pylab.show()
 
+
 def plot_dir(din, values, scmap=None):
     candfiles = sorted(find_files(din, values.fname))
+    plot_scans(candfiles)
+
+def plot_scans(candfiles, values, scmap=None):
+
     print 'len candfiles', len(candfiles)
     
     if len(candfiles) == 0:
@@ -115,32 +139,64 @@ def plot_dir(din, values, scmap=None):
 
     assert nrows * ncols >= len(candfiles)
     print 'nxy', nrows, ncols
-    fig, axes = plotutil.subplots(nrows, ncols, sharex=True, sharey=True)
+    fig, axes = plotutil.subplots(nrows, ncols)
     fig.set_size_inches([8,6])
-    #fig.set_dpi(300)
     axes = axes.flatten()
 
     ncands = 0
-    for ic, f in enumerate(candfiles):
+    for ic, (f, sb, scan, antname, run, rest) in enumerate(candfiles):
         ax=axes[ic]
-        antname = f.replace(din, '').replace('C000','').replace(values.fname,'').replace('/','')
         subtitle = antname
         v = plot_file(f, values, ax, labels=False, subtitle=subtitle, scmap=scmap)
         ncands += len(v)
 
-    fig.suptitle(din)
+    title = ' '.join([sb, scan])
+    fig.suptitle(title)
     fig.text(0.5, 0.05, 'Time(s)', ha='center',va='bottom')
     fig.text(0.05, 0.5, 'DM (pc/cm3)', rotation=90, ha='center', va='top')
 
     return fig, axes, ncands
 
+def find_files_filelist(files):
+    'Parse a Ryan Shannon cnadfile list'
+    scans = {}
+    for fname in files:
+        bits = fname.split('_')
+        sb = bits[0]
+        scan = bits[1]
+        ant = bits[2]
+        run = bits[3]
+        rest = bits[4]
+        key = (sb, scan)
+        if key not in scans.keys():
+            scans[key] = []
+
+        data = (fname, sb, scan, ant, run, rest, )
+
+        scans[key].append(data)
+
+    return scans
+        
+
 def onpick(event):
     thisline = event.artist
     print event, dir(event), event.artist
 
+def loadfile(fin):
+    f = open(fin, 'rU')
+    a = []
+    for line in f:
+        if line.startswith('#') or line.strip() == '':
+            continue
+        bits = map(float, line.split())
+        nbits = len(bits)
+        bits.extend([0 for i in xrange(12-nbits)])
+        a.append(bits)
+
+    return np.array(a)
 
 def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=None):
-    vin = np.loadtxt(fin)
+    vin = loadfile(fin)
 
     if subtitle:
         ax.text(0.05, 0.95, subtitle, ha='left', va='top', transform=ax.transAxes)
@@ -157,6 +213,7 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=Non
     if len(vin.shape) == 1:
         vin.shape = (1, len(vin))
 
+    vin[:, 5] = abs(vin[:, 5]) # handle negative DMs
     print fin, vin.shape
     boxcar = vin[:, 3]
     dm = vin[:, 5]
@@ -174,16 +231,17 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=Non
     dm = vin[:, 5]
     beamno = vin[:, 6]
     ubeams = set(beamno)
-
+    
     ax.scatter(badvin[:, 2], 1+badvin[:, 5], marker='.', alpha=0.4, edgecolors='face', c='0.5')
-    print 'MASK has ', sum(mask), 'valid candidates'
+    print 'MASK has ', sum(mask), 'valid candidates', ax
 
     for ib, b in enumerate(sorted(ubeams)):
         bmask = beamno == b
         ax.scatter(time[bmask], 1+dm[bmask], s=sn[bmask]**2, marker=markers[ib % len(markers)], c=boxcar[bmask], cmap=scmap, label='Beam %d' %b, picker=3, edgecolors='face', alpha=0.4, norm=mpl.colors.Normalize(1., 32.))
-        ax.set_yscale('log')
-        ax.set_ylim(1, 5000)
-               
+
+    ax.set_yscale('log')
+    ax.set_ylim(1, 5000)
+
     pylab.gcf().canvas.mpl_connect('pick_event', onpick)
     
     if labels:

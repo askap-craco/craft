@@ -262,7 +262,8 @@ CFileProcessor::ConvertVCRAFTFile( CFileDescriptor &rInFile,
 
                         if ( ! EncodeAndWriteOutputFile( Encoder, Decoder ) )
                         {
-                            throw Encoder.GetLastError();
+			  fprintf(stderr, "Error1\n");
+			  throw Encoder.GetLastError();
                         }
                     }
 
@@ -292,7 +293,7 @@ CFileProcessor::ConvertVCRAFTFile( CFileDescriptor &rInFile,
 
     return eErrorCode;
 }
-
+   
 //////////
 //
 
@@ -329,18 +330,22 @@ bool CFileProcessor::EncodeAndWriteOutputFile( ICodec &rEncoder,
 
         // We may need to skip some blocks from the input file to allow alignment
 
-        if ( rEncoder.SkipBytes() > 0 )
+	bool preload;
+        if ( rEncoder.SkipBytes(&preload) > 0 )
         {
-            rDecoder.SeekForward( rEncoder.SkipBytes() );
+	  rDecoder.SeekForward( rEncoder.SkipBytes(&preload) );
+	  rDecoder.setPreload( preload );
         }
 
         // Next, have the Decoder read the sample data in sucessive blocks and
         // the Encoder take this blocked-data, convert format and write to the
         // output file.
 
+	int count = 1;
         while ( rDecoder.ReadNextBlock() )
         {
-            if ( ! rEncoder.EncodeAndWriteChannelData() )
+	  count++;
+	    if ( ! rEncoder.EncodeAndWriteChannelData() )
             {
                 throw rEncoder.GetLastError();
             }
