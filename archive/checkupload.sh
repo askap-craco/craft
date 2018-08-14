@@ -4,6 +4,7 @@ ldir=/group/askap/ban115/craft/archive-logfiles/
 sbdir=/scratch2/askap/askapops/craft/co/
 pdir=askap-craft/co
 finfile=$ldir/archived_sbs.txt
+cmpfiles=/group/askap/ban115/craft/archive/compares/
 
 dodelete=0
 while getopts "dh" opt  ; do
@@ -29,11 +30,12 @@ shift $((OPTIND-1))
 for f in $@ ; do
     f=`basename $f`
     echo "Checking $f"
-    cmpfile="/tmp/$f.compare"
+    cmpfile="$cmpfiles/$f.compare"
     if [[ ! -d $f ]] ; then
 	echo $f is not an SB
 	continue
     fi
+
     pshellresult=`pshell "cd $pdir && compare $f" | grep -v meta | tee $cmpfile`
     pshellerr=$?
     echo "PSHELL returned code $pshellerr"
@@ -42,8 +44,7 @@ for f in $@ ; do
 	exit 1
     fi
 
-    nmissing=`echo $pshellresult | awk '/=== Missing remote/{flag=1;next}/=== Compare complete/{flag=0}flag' < $cmpfile | wc -l`
-    rm $cmpfile
+    nmissing=`awk '/=== Missing remote/{flag=1;next}/=== Compare complete/{flag=0}flag' < $cmpfile | wc -l`
     echo "Missing $nmissing" files
     if [[ $nmissing == 0 ]] ; then
 	echo "$f No missing files"

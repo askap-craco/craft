@@ -503,8 +503,6 @@ namespace NCodec        // Part of the Codec namespace.
               printf("Warning: Will skip %d samples for frame alignment\n", m_iSkipSamples);
 
 	      m_iSampleOffset = m_iSkipSamples%m_iSamplesPerWord;
-	      printf("DEBUG: m_iSampleOffset = %d\n", m_iSampleOffset);
-	      
 	      m_DFH.NextFrame(); // Allow for the sample skipping which will happen
             }
             else
@@ -574,8 +572,9 @@ namespace NCodec        // Part of the Codec namespace.
     //////////
     //
 
-  void CCodecCODIF::decodeVCRAFTBlock(WordDeque_t & rInput, vector<uint32_t>& vcraftData, vector<uint32_t>& codifData,
-				      int wordstoUnpack, int samplePerOutword, int samplesPerWord, int *iWordCount) {
+    // Multiple time samples per output CODIF word
+    void CCodecCODIF::decodeVCRAFTBlock(WordDeque_t & rInput, vector<uint32_t>& vcraftData, vector<uint32_t>& codifData,
+				       int wordstoUnpack, int samplesPerWord, int *iWordCount) {
 
       // Grab next set of original samples
       for (int c=0; c< (wordstoUnpack) && ( ! rInput.empty()); c++) {
@@ -584,16 +583,32 @@ namespace NCodec        // Part of the Codec namespace.
 	(*iWordCount)++;
       }
 
-      for (int i=0; i< samplesPerWord/samplePerOutword; i++) {
-	codifData[i] = 0;
-	for (int j=0; j<samplePerOutword; j++) {
-	  for (int k=0; k<wordstoUnpack; k++) {
-	    codifData[i] |= ((vcraftData[k]>>(j+i*2)*m_iBitsPerSample*2)&mask)<<(k+j*wordstoUnpack)*m_iBitsPerSample*2;
+      if (samplesPerWord>wordstoUnpack) {
+	int samplePerOutword = samplesPerWord/wordstoUnpack;
+	for (int i=0; i< samplesPerWord/samplePerOutword; i++) {
+	  codifData[i] = 0;
+	  for (int j=0; j<samplePerOutword; j++) {
+	    for (int k=0; k<wordstoUnpack; k++) {
+	      codifData[i] |= ((vcraftData[k]>>(j+i*2)*m_iBitsPerSample*2)&mask)<<(k+j*wordstoUnpack)*m_iBitsPerSample*2;
+	    }
+	  }
+	}
+      } else {
+
+	int wordPerGroup = wordstoUnpack/samplesPerWord; //  2          4
+	for (int i=0; i< samplesPerWord; i++) {          // 0..3       0..1
+	  for (int j=0; j<wordPerGroup; j++) {             // 0..1       0..3
+	    int c = i*wordPerGroup + j;
+	    codifData[c] = 0;
+	    for (int k=0; k<samplesPerWord; k++) {
+	      codifData[c] |= ((vcraftData[k+j*samplesPerWord]>>(i*m_iBitsPerSample*2))&mask)<<(k*m_iBitsPerSample*2);
+	    }
 	  }
 	}
       }
     }
 
+  
     bool CCodecCODIF::WriteDataFrames( bool bForceFlush )
     {
         bool bSuccess = false;      // Assume failure for now.
@@ -602,8 +617,6 @@ namespace NCodec        // Part of the Codec namespace.
 	vector<uint32_t> vcraftData(wordstoUnpack); // +1 in case input words dont align with output words
 	vector<uint32_t> codifData(wordstoUnpack); 
 
-	int samplePerOutword = m_iSamplesPerWord/  wordstoUnpack;
-	
         try
         {
             WordDeque_t & rInput = SampleData();
@@ -632,12 +645,6 @@ namespace NCodec        // Part of the Codec namespace.
 		if (iTotalFrames==0)
 		  return(true); // EOF
 
-
-                //if ( ( iWordsToProcess % m_iDataArrayWords ) != 0 ) // Not sure this is correct/wanted
-                //{
-                //    iTotalFrames++;
-                //}
-
                 for ( int iFrame = 0; iFrame < iTotalFrames; iFrame++ )
                 {
                     // Zero the output data frame, which covers the case where there
@@ -659,8 +666,7 @@ namespace NCodec        // Part of the Codec namespace.
 		      if (iFrame==0) {
 			if (buf==NULL) {
 			  // First time through - copy in a block
-			  decodeVCRAFTBlock(rInput, vcraftData, codifData, wordstoUnpack, samplePerOutword,
-					    m_iSamplesPerWord, &iWordCount);
+			  decodeVCRAFTBlock(rInput, vcraftData, codifData, wordstoUnpack, m_iSamplesPerWord, &iWordCount);
 			  bytesptr = (char*)&codifData[0] + m_iSampleOffset*m_iSampleBlockSize;
 
 			  buf = new char[ncopy];
@@ -686,28 +692,18 @@ namespace NCodec        // Part of the Codec namespace.
 			  rInput.pop_front();
 			  iWordCount++;
 			}
-		    } else if (m_iBitsPerSample==1) {
-		      
-		      assert(mask==0x3); // Temp check - remove
-
+		    } else if (m_iBitsPerSample==1 || m_iBitsPerSample==4  || m_iBitsPerSample==8) {
 		      int samplesPerWord = sizeof(uint32_t)*8/(m_iBitsPerSample*2); // 16
-		      assert(samplesPerWord % wordstoUnpack == 0); // Must have an integer number of channels per word
-
 		      int nBlock = m_iDataArrayWords/wordstoUnpack;
 		      for ( int iBlock = 0; ( iBlock < nBlock ) && ( ! rInput.empty() ); iBlock++ ) {
 			// Grab next set of original samples and convert to codif ordering
-
-			decodeVCRAFTBlock(rInput, vcraftData, codifData, wordstoUnpack, samplePerOutword,
-					  samplesPerWord, &iWordCount);
+			decodeVCRAFTBlock(rInput, vcraftData, codifData, wordstoUnpack, samplesPerWord, &iWordCount);
 
 			if (m_iSampleOffset && iBlock==nBlock-1) {
 			  // Just copy the start of this block;
 			  memcpy(frameptr, &codifData[0], m_iSampleOffset*m_iSampleBlockSize);
 			  frameptr += m_iSampleOffset*m_iSampleBlockSize;
 			} else {
-			  //for (int i=0;i<wordstoUnpack;i++) printf(" %08X", codifData[i]);
-			  //printf("\n");
-			  //printf("MEMCPY: %d\n", m_iSamplesPerWord*m_iSampleBlockSize);
 			  memcpy(frameptr, &codifData[0], m_iSamplesPerWord*m_iSampleBlockSize);
 			  frameptr += m_iSamplesPerWord*m_iSampleBlockSize;
 			}

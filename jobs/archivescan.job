@@ -17,14 +17,16 @@ NTASKS=$SLURM_TASKS_PER_NODE
 #module swap PrgEnv-cray PrgEnv-gnu
 #module load mpibash
 module unload gcc/4.9.0
-module load python/2.7.10 > /dev/null
 
 echo `date` starting archivescan with $@
 
 CRAFTDATA=/scratch2/askap/askapops/craft/co/
 OUTDIR=askap-craft/co
 logfile=/group/askap/ban115/craft/archive/archived_scans.txt
-tempdir=/scratch2/askap/ban115/craft/tartemp
+#tempdir=/scratch2/askap/ban115/craft/tartemp
+tempdir=/group/askap/ban115/craft/archive/tartemp/
+
+
 
 if [[ ! -d $tempdir ]] ; then
     mkdir -p $tempdir
@@ -50,6 +52,10 @@ for f in $@ ; do
     fi
 
     for scandir in 2*/ ; do
+	if [[ ! -d $scandir ]] ;  then
+	    echo $scandir not a directory. Continuing
+	    continue
+	fi
 	pushd $scandir
 	isfinished=`grep $f/$scandir $logfile`
 	echo "FINISHED file contains $isfinished"
@@ -59,6 +65,8 @@ for f in $@ ; do
 	    continue
 	fi
 
+	# run all the tar jobs in the background
+	pids=""
 	for antdir in */*/ ; do
 	    antpath="${f}/${scandir}/${antdir}"
 	    temppath="${tempdir}/${antpath}"
@@ -69,24 +77,49 @@ for f in $@ ; do
 		echo "Copying metafile $metafile"
 		cp $metafile ${tarfile}.meta
 	    fi
+	    if [[ -f $tarfile ]] ; then
+		echo Tarfile $tarfile exists. Continuing
+		continue
+	    fi
+
 	    echo "Taring $antdir to $tarfile"
 	    pushd $antdir
-	    tar -cvf $tarfile .
-	    tarerr=$?
+	    tar -cf $tarfile . &
+	    tarpid=$!
 	    popd
-	    if [[ $tarerr != 0 ]] ; then
-		echo "Tar failed with $tarerr. Exiting"
+	    echo "Taring of $antdir to $tarfile has pid $tarpid"
+	    pids+=" $tarpid"
+	done
+
+	# Wait for tar processes to finish
+	for p in $pids ; do
+	    wait $p
+	    tarerr=$?
+	    if [[ $tarerr == 0 ]] ; then
+		echo "Tar pid $p finished successfully"
+	    else
+		echo "Tar pid $p failed with exit code $tarerr. Quitting"
 		exit $tarerr
 	    fi
 	done
 	popd
-	echo "Importing $scandir to $OUTDIR/$f "
-	pshell "cd $OUTDIR/$f && import $scandir"
-	pshellerr=$?
+
+	for retry in {1..5} ; do
+	    echo "Importing $scandir to $OUTDIR/$f retry $retry"
+	    pshell "cd $OUTDIR/$f && import $tempdir/$f/$scandir"
+	    pshellerr=$?
+	    if [[ $pshellerr == 0 ]] ; then
+		echo "Import successfull on retry $retry"
+		break
+	    else
+		echo "Import failed with error $pshellerr on retry $retry. Trying again"
+	    fi
+	done
+	
 	if [[ $pshellerr == 0 ]] ; then
 	    echo $f/$scandir `date` >> $logfile
 	    echo "Deleting teporary files from $tempdir/$f/$scandir"
-	    find $tempdir/$f/$scandir -name $tarname  -print0 | xargs -0 munlink
+	    find $tempdir/$f/$scandir -name $tarname  -delete
 	    delerr=$?
 	    if [[ $delerr != 0 ]] ; then
 		echo "Could not delete temp files in $scandir. Error code $delerr Continuing"

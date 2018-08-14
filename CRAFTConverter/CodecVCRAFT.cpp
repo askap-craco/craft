@@ -318,7 +318,7 @@ namespace NCodec
             RetrieveParameter( "TRIGGER_BAT",           m_ullTriggerWriteBAT );
 
             m_iBitsPerSample /= 2;
-            printf("Warning: Forcing NPOL==1\n");  m_iNumberofPol = 1;
+            //printf("Warning: Forcing NPOL==1\n");  m_iNumberofPol = 1;
 
             // UTC string (ISO formatted) verbatim from the VCRAFT header.
 
