@@ -3,6 +3,7 @@
 from numpy import sqrt
 import os
 import logging
+import glob
 
 __author__ = "Stefan Oslowski <stefanoslowski@swin.edu.au>"
 
@@ -31,15 +32,13 @@ def _main():
     else:
         from influxdb import InfluxDBClient
         client = InfluxDBClient(host='akingest01', database='craft')
-        # print "not available yet yo"
-        # sys.exit(0)
     body = []
     for filename in values.files:
         try:
             logging.debug("Handling {}".format(filename))
             body.append(get_folded_stats(filename, client, influxout, values))
         except Exception as inst:
-            logging.exception('Blah exception in get_folded_stats: {0}'.format(inst))
+            logging.exception('Exception in get_folded_stats:{0}'.format(inst))
     if influxout is not None:
         logging.debug("Writing data to file %s", str(values.outfile))
         for entry in body:
@@ -52,13 +51,23 @@ def _main():
 
 
 def get_folded_stats(filename_p, client, influxout, values):
-    assert filename_p.endswith('.ar')
     filename = os.path.basename(filename_p)
+    assert filename.endswith('.ar')
     filebits = filename.split('_')
     sbid = filebits[0]
-    # coarse_timestamp = filebits[1]
-    ant = filebits[2]
-    beam = filebits[3].split('.')[0]
+
+    name_extra = ""
+    if filename.endswith('_add.ar'):
+        name_extra = "_ics"
+        beam = filebits[2]
+        coarse_timestamp = filebits[1]
+        ant_count = len(glob.glob(os.path.dirname(filename_p)+"/"+sbid+'_' +
+                                  coarse_timestamp+'_*_'+beam+'.ar'))
+        ant = "ics_"+str(ant_count)
+    else:
+        ant = filebits[2]
+        beam = filebits[3].split('.')[0]
+
     beam = beam[1:] if beam.startswith('0') else beam
 
     name, tstamp, weff, on_count, off_rms, on_max,\
@@ -78,7 +87,8 @@ def get_folded_stats(filename_p, client, influxout, values):
                    'tint': float(tint)}
 
     body = {'measurement': 'psrfold',
-            'tags': {'psr': name, 'sbid': sbid, 'ant': ant, 'beam': int(beam)},
+            'tags': {'psr': name+name_extra, 'sbid': sbid, 'ant': ant,
+                     'beam': int(beam)},
             'time': int(tstamp*1e9),
             'fields': fields_dict}
 
@@ -137,7 +147,6 @@ def extract_stats_from_archive(archive_fn):
             print psrstat_out
 
     weff_tmp = weff_turns.replace('.', '', 1).replace('e', '', 1).replace('-', '', 1)
-
     if not weff_tmp.isdigit():
         weff_turns = -1
 
