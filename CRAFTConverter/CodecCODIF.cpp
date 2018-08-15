@@ -243,8 +243,7 @@ namespace NCodec        // Part of the Codec namespace.
 	    // work out which frame(sample) starts on the next second boundary
 	    // There *will* be an up to  +-1/2 sample time rounding with this approach
 
-            unsigned long long startBAT = m_ullStopWriteBAT - (m_ullStopWriteFrameId * (27.0/32.0));
-            //unsigned long long startBAT = m_ullTriggerWriteBAT - (m_ullTriggerFrameId * (27.0/32.0));
+            unsigned long long startBAT = m_ullTriggerWriteBAT - (m_ullTriggerFrameId * (27.0/32.0));
             m_ullBAT0 = ((startBAT +5e5)/ 1e6); // Round to full second
             m_ullBAT0 *= 1e6;  // Need to do in two lines as compiler is too clever it seems (optimises it away)
 	    //m_ullFrame0 = (m_ullBAT0-startBAT)*(32.0/27.0); // Number of frames(samples) from startBAT till first 1sec boundary
@@ -498,8 +497,8 @@ namespace NCodec        // Part of the Codec namespace.
 	    unsigned long long bufferSamples = voltage_samples(m_iMode);
 	    printf("DEBUG: Assuming %lld samples per voltage dump\n", bufferSamples);
 
-	    unsigned long long startFrameId = m_ullStopWriteFrameId - bufferSamples + m_iSamplesPerWord;
-	    // StopWrite is the time of the last word, so need to allow for the number of samples/32bit word
+	    unsigned long long startFrameId = m_ullTriggerFrameId - bufferSamples + m_iSamplesPerWord;
+	    // TriggerFrameId is the time of the last word, so need to allow for the number of samples/32bit word
 	    
             unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
             unsigned long long BAT0MJDSec = m_ullBAT0/1e6;
