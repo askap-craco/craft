@@ -21,8 +21,11 @@ class DadaHeader(OrderedDict):
         self.add_card(*bits)
         return self
 
-    def get_value(self, item):
-        return self[item][0]
+    def get_value(self, item, default=None):
+        if item in self.keys():
+            return self[item][0]
+        else:
+            return default
 
     def set_value(self, item, value):
         comment = self.get_comment(item)
