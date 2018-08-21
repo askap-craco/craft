@@ -291,6 +291,7 @@ class VcraftMux(object):
 
         self.all_samps = [f.nsamps for f in self._files]
         self.nsamps = min(self.all_samps)
+
         self.trigger_frameids = np.array(map(int, self.allhdr('TRIGGER_FRAMEID')))
         self.trigger_mjds = np.array(map(float, self.allhdr('TRIGGER_MJD')))
         
@@ -301,6 +302,10 @@ class VcraftMux(object):
         self.start_frameid = max(self.start_frameids)
         # BUG! Start MJDs don't account for sample offsets
         self.sample_offsets = self.start_frameid - self.start_frameids 
+
+        self.all_overlap_samps = [f.nsamps - self.sample_offsets[i] for i,f in enumerate(self._files)]
+        self.overlap_nsamps = min(self.all_overlap_samps)
+
         print 'SAMPLE OFFSETS', self.sample_offsets, 'FILE DELAYS', self.file_delays
         assert np.all(self.sample_offsets >= 0)
         assert np.all(self.sample_offsets < self.nsamps)
