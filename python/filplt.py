@@ -20,6 +20,8 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-d','--dm', type=float, default=0)
+    parser.add_argument('-m', '--mjd', type=float, help='MJD to plot')
+    parser.add_argument('-s','--show', action='store_true', help='Show')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -37,11 +39,19 @@ def plot(f, values):
     foff = s.header['foff']
     nchan = s.header['nchans']
     tsamp = s.header['tsamp']
+    tstart = s.header['tstart']
     nsamp = 4096
-    samp_start = 7000
-    #s.seek_sample(samp_start)
-    #d = np.fromfile(s.fin, count=nsamp*nchan, dtype=np.uint8)
-    #d.shape = nsamp,nchan
+    print values.mjd, tstart, tsamp
+
+    if values.mjd is None:
+        samp_start = nsamp/2
+    else:
+        samp_start = int(np.round((values.mjd - tstart)/tsamp))
+        if samp_start < 0:
+            raise ValueError, 'Start sample is before start of filterbank'
+        if samp_start > s.nsamp:
+            raise ValueError, 'End sample is after end of filterbank'
+
     d = s[samp_start:samp_start+nsamp]
     # rescale to roughly 0 mean and 1 variance
     d = d.astype(float)
@@ -63,7 +73,14 @@ def plot(f, values):
     #fig.title(f)
     ax[1].set_ylabel('S/N')
     fig.savefig(f+'.png')
-    pylab.show()
+
+    if values.show:
+        pylab.show()
+
+
+    fig.close()
+
+        
 
     
 

@@ -13,6 +13,7 @@ import logging
 import itertools
 from crafthdr import DadaHeader
 import freqconfig
+import warnings
 log = logging.getLogger(__name__)
 
 bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
@@ -82,7 +83,7 @@ class VcraftFile(object):
         # Trigger is at the *end* of the buffer.
         self.trigger_frameid = int(hdr['TRIGGER_FRAMEID'][0])
         self.trigger_mjd = float(hdr['TRIGGER_MJD'][0])
-        self.expected_nsamp = SAMPS_MODE[self.mode]
+        self.expected_nsamp = int(hdr.get_value('NSAMPS_REQUEST'), SAMPS_MODE[self.mode])
         self.start_frameid = self.trigger_frameid - self.expected_nsamp
         self.start_mjd = self.trigger_mjd - self.expected_nsamp/self.infsamp/86400.
         self.bats = np.array([int(hdr[c][0], base=16) for c in bat_cards])

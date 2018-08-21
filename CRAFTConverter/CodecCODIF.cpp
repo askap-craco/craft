@@ -374,6 +374,23 @@ namespace NCodec        // Part of the Codec namespace.
     ///////////////////////////////////////////////////////////////////////////
     // Private internal helpers.
 
+    // Return expected number of samples in a voltage dump - needed to correct time because VCRAFT file contains time
+    // of LAST sample. Logic taken from vcraft.py
+    unsigned long long voltage_samples(int mode) {
+      int samples_per_word[] = {1,2,4,16,1,2,4,16};
+      int mode_beams[] = {72,72,72,72,2,2,2,2};
+
+      if (mode>7 || mode < 0) {
+	fprintf(stderr, "Error: Mode must be 0..7, not %d\n", mode);
+	exit(1);
+      }
+      int max_sets = 29172;
+
+      //  Number of sample vs mode
+      return (max_sets*32*samples_per_word[mode]*72/mode_beams[mode]);
+    }
+
+  
     bool CCodecCODIF::ConfigureDFH( void )
     {
         bool bSuccess = false;      // Assume failure for now.
@@ -429,8 +446,6 @@ namespace NCodec        // Part of the Codec namespace.
 	    m_iDataArrayWords  = m_iDataArraySize/sizeof(uint32_t);
             assert( m_iDataFrameSize <= iMaxPacketSize_c );
 
-	    //printf("********samplesPerFrame=%d  DataArray=%d\n", samplesPerFrame, m_iDataFrameSize);
-
 	    // Get a pointer to the underlying DFH structure.
 
             CODIFDFH_t *pDFH = static_cast<CODIFDFH_t *>( m_DFH );
@@ -479,11 +494,17 @@ namespace NCodec        // Part of the Codec namespace.
 
             // Figure out the "previous" Period restart
 
+	    unsigned long long bufferSamples = voltage_samples(m_iMode);
+	    printf("DEBUG: Assuming %lld samples per voltage dump\n", bufferSamples);
+
+	    unsigned long long startFrameId = m_ullTriggerFrameId - bufferSamples + m_iSamplesPerWord;
+	    // TriggerFrameId is the time of the last word, so need to allow for the number of samples/32bit word
+	    
             unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
             unsigned long long BAT0MJDSec = m_ullBAT0/1e6;
-            unsigned long long PeriodsSinceBAT0 = m_ullTriggerFrameId / uiSampleIntervalsPerPeriod; // Will round down
+            unsigned long long PeriodsSinceBAT0 = startFrameId / uiSampleIntervalsPerPeriod; // Will round down
             int frameseconds = (BAT0MJDSec -DUTC - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
-            unsigned long framenumber = (m_ullTriggerFrameId % uiSampleIntervalsPerPeriod) / samplesPerFrame;
+            unsigned long framenumber = (startFrameId % uiSampleIntervalsPerPeriod) / samplesPerFrame;
 
 	    mask = (1<<(m_iBitsPerSample*2))-1;
 
@@ -494,7 +515,7 @@ namespace NCodec        // Part of the Codec namespace.
             // There will be samples that don't fit in a frame (ie first sample may start between frames)
             // These will need to be calculated and eventually discarded
 
-            int initialSamples = m_ullTriggerFrameId % samplesPerFrame;
+            int initialSamples = startFrameId % samplesPerFrame;
 
             if ( initialSamples!=0 )
             {

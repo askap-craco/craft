@@ -311,10 +311,10 @@ namespace NCodec
             RetrieveParameter( "NOW_MJD",               m_dMJDNow );
             RetrieveParameter( "NOW_BAT",               m_ullNowBAT );
             RetrieveParameter( "START_WRITE_FRAMEID",   m_ullStartWriteFrameId );
-            RetrieveParameter( "STOP_WRITE_FRAMEID",    m_ullFinishWriteFrameId );
+            RetrieveParameter( "STOP_WRITE_FRAMEID",    m_ullStopWriteFrameId );
             RetrieveParameter( "TRIGGER_FRAMEID",       m_ullTriggerFrameId );
             RetrieveParameter( "START_WRITE_BAT",       m_ullStartWriteBAT );
-            RetrieveParameter( "STOP_WRITE_BAT",        m_ullFinishWriteBAT );
+            RetrieveParameter( "STOP_WRITE_BAT",        m_ullStopWriteBAT );
             RetrieveParameter( "TRIGGER_BAT",           m_ullTriggerWriteBAT );
 
             m_iBitsPerSample /= 2;

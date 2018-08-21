@@ -16,7 +16,7 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 parnames = ('UU','VV','WW','DATE','_DATE','BASELINE','FREQSEL','SOURCE','INTTIM','DATA')
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan, npol, sources, antennas, sideband, firstmjd):
+    def __init__(self, fname, fcent, foff, nchan, npol, sources, antennas, sideband):
         self.dshape = [1,1,1,nchan, npol, 3]
         hdr = pyfits.Header()
         self.hdr = hdr
@@ -30,7 +30,7 @@ class CorrUvFitsFile(object):
         self.fname = fname
         self.no_if = 1
         self.sideband = sideband
-        self.first_time = Time(firstmjd, format='mjd')
+        #self.first_time = Time(firstmjd, format='mjd')
 
         hdr['SIMPLE'] = True
         hdr['BITPIX'] = -32
@@ -56,16 +56,16 @@ class CorrUvFitsFile(object):
         self.add_type(1, ptype='UU', pscal=1.0, pzero=0.0)
         self.add_type(2, ptype='VV', pscal=1.0, pzero=0.0)
         self.add_type(3, ptype='WW', pscal=1.0, pzero=0.0)
-        self.add_type(4, ptype='DATE', pscal=1.0, pzero=self.first_time.jd, comment='Day number')
+        self.add_type(4, ptype='DATE', pscal=1.0, pzero=0.0, comment='Day number')
         self.add_type(5, ptype='DATE', pscal=1.0, pzero=0.0, comment='Day fraction')
         self.add_type(6, ptype='BASELINE', pscal=1.0, pzero=0.0)
         self.add_type(7, ptype='FREQSEL', pscal=1.0, pzero=0.0)
         self.add_type(8, ptype='SOURCE', pscal=1.0, pzero=0.0)
         self.add_type(9, ptype='INTTIM', pscal=1.0, pzero=0.0)
 
-        self.first_time.format = 'fits'
+        #self.first_time.format = 'fits'
         hdr['OBJECT'] = 'MULTI'
-        hdr['DATE_OBS'] = self.first_time.value
+        #hdr['DATE_OBS'] = self.first_time.value Miriad gets confused by this 
         hdr['TELESCOP'] = 'ASKAP'
         hdr['INSTRUME'] = 'VCRAFT'
         hdr['OBSERVER'] = ''
@@ -122,7 +122,7 @@ class CorrUvFitsFile(object):
         hdr['GSTIA0'] = (1.764940880935E+02 , 'hard coded. ????')
         hdr['DEGPDY'] = (3.609856473692E+02, 'hard coded. ????')
         hdr['FREQ'] = self.fcent*1e6
-        hdr['RDATE'] = (self.first_time.value, 'hard coded. ????')
+        #hdr['RDATE'] = (self.first_time.value, 'hard coded. ????') # miriad gets confused by this
         hdr['POLARX'] = 0
         hdr['POLARY'] = 0
         hdr['UT1UTC'] = 0
@@ -217,7 +217,7 @@ class CorrUvFitsFile(object):
 
         visdata['UU'], visdata['VV'], visdata['WW'] = uvw
         visdata['DATE'] = jd
-        visdata['_DATE'] = dayfrac*0
+        visdata['_DATE'] = dayfrac
         visdata['BASELINE'] = (ia1 + 1)*256 + ia2 + 1
         visdata['INTTIM'] = inttim
         visdata['FREQSEL'] = 1
