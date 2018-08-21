@@ -59,7 +59,6 @@ def plot(f, values):
     d -= 128
     d /= 18.
     
-    assert s.header['nbits'] == 8
     assert s.header['nifs'] == 1
     assert d.shape == (nsamp, nchan)
     channels = np.arange(nchan)*foff + fch1
@@ -76,7 +75,13 @@ def plot(f, values):
     ax[0].set_title(f)
     #fig.title(f)
     ax[1].set_ylabel('S/N')
-    ax[1].set_xlabel('Offset (samples) from %0.15f'%values.mjd)
+    
+    if values.mjd is None:
+        lbl = 'Offset (samples)'
+    else:
+        lbl = 'Offset (samples) from %0.9f'%values.mjd
+        
+    ax[1].set_xlabel(lbl)
     #fig.savefig(f+'.png')
 
     if values.show:
