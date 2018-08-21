@@ -33,7 +33,7 @@ public:
 	__host__ void clear();
 	__host__ unsigned int ncand();
 	__host__ unsigned int copy_to_host();
-	__host__ unsigned int copy_to_sink(CandidateSink& sink, size_t sampno);
+	__host__ unsigned int copy_to_sink(CandidateSink& sink);
 	__device__ unsigned int add_candidate( int ibeam,  int idt,  int t,  int ibc, float sn);
 };
 

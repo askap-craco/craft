@@ -46,14 +46,14 @@ unsigned int __host__ CandidateList::ncand() {
 	return *m_ncand;
 }
 
-__host__ unsigned int CandidateList::copy_to_sink(CandidateSink& sink, size_t sampno) {
+__host__ unsigned int CandidateList::copy_to_sink(CandidateSink& sink) {
 	unsigned int ncand = CandidateList::ncand();
 	if (ncand >= *m_max_cand-1) {
 		//printf("FREDDA WARNING: Overflowed candidate buffer in block starting at sampno %d\n", sampno);
 	}
 	for (unsigned int i = 0; i < ncand; ++i) {
 		candidate_t* c = &m_candidates[i];
-		sink.add_candidate(c->ibeam, c->idt, sampno+ c->t, c->ibc, c->sn);
+		sink.add_candidate(c->ibeam, c->idt, c->t, c->ibc, c->sn);
 	}
 	sink.flush();
 

@@ -37,8 +37,6 @@ public:
 
 	virtual size_t seek_sample(size_t t) = 0;
 	virtual size_t current_sample() = 0;
-
-
 	virtual double current_mjd();
 	
 	virtual char* name() = 0;

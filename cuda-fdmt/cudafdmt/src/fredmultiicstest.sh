@@ -20,7 +20,7 @@ export DADA=/home/craftop/askap/trunk/3rdParty/psrdada/psrdada-537159/install/
 export PATH=$DADA/bin:$PATH
 export LD_LIBRARY_PATH=$DADA/lib:$LD_LIBRARY_PATH
 #cudafdmt=$HOME/craftdev/craft/cuda-fdmt/cudafdmt/src/cudafdmt
-
+cudafdmt=$HOME/craftdev/craft/cuda-fdmt/cudafdmt/Debugtest_cuda/cudafdmt
 #cudafdmt=$HOME/git/craft/cuda-fdmt/cudafdmt/Debugtest_cuda/cudafdmt
 #cudafdmt=$HOME/git/craft/cuda-fdmt/cudafdmt/src/cudafdmt
 
@@ -33,7 +33,7 @@ let block_size=72*336*4*512
 
 all_keys=""
 DADA_KEY="1000"
-ncount=36
+ncount=1
 
 for i in $(seq $ncount) ; do
     echo "COUNT $i"
@@ -53,6 +53,7 @@ for i in $(seq $ncount) ; do
 done
 
 rm -f *.dat
+which cudafdmt
 cudafdmt -N 30 -t 512 -d 2048 -r 1  -s 0 -o fredda.multi.cand -p  -M 0.1 -T 0.1 -K 30 -B 16 -x 999999 $all_keys 
 
 #$cudafdmt -t 512 -d 512 -r 1  -s 0  -M 0.2 -T 0.2 -C 6.0  -o fredda.$1.cand *.fil

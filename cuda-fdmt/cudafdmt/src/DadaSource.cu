@@ -181,8 +181,6 @@ void* DadaSource::get_next_buffer(size_t& nt)
 	// TODO check expected nbytes
 	//m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
 	nt = nbytes/(npols()*nbeams()*nchans()*nbits()/8);
-	m_current_sample += nt;
-	
 	return (void*) ptr;
 }
 
@@ -231,6 +229,7 @@ void DadaSource::release_buffer() {
 
 		m_got_buffer = false;
 	}
+	m_current_sample += m_nt;
 }
 size_t DadaSource::seek_sample(size_t t)
 {
