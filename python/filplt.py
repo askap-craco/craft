@@ -77,7 +77,7 @@ def plot(f, values):
     #fig.title(f)
     ax[1].set_ylabel('S/N')
     ax[1].set_xlabel('Offset (samples) from %0.15f'%values.mjd)
-    fig.savefig(f+'.png')
+    #fig.savefig(f+'.png')
 
     if values.show:
         pylab.show()
