@@ -46,7 +46,7 @@ for keyoff in $@ ; do
 done
 
 rm -f *.dat
-$cudafdmt -t 512 -d 512 -r 1 -o fredda.$1.cand -p -x 60 -M 0.05 -T 0.05 -C 20  $all_keys
+$cudafdmt -t 512 -d 512 -r 4 -o fredda.$1.cand -p -x 10 -M 0.1 -T 0.1 -C 20  $all_keys
 #$cudafdmt -t 512 -d 512 -r 1  -s 0  -M 0.2 -T 0.2 -C 6.0  -o fredda.$1.cand *.fil
 cudapid=$!
 #cuda-gdb --args $cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1 -D -r 1 -K 30 -s 0
