@@ -94,9 +94,11 @@ def get_meas(filename, client, influxout, values):
         field_dict = {}
         for sname, v in s.iteritems():
             field_dict[sname] = v
+
+        field_dict.update({'sbid':sbid,'scanid':scanid})
             
         body = {'measurement':'craftstat',
-                'tags':{'sbid':sbid,'scanid':scanid,'ant':ant,'beam':b},
+                'tags':{'ant':ant,'beam':b},
                 'time':unix_nanosec,
                 'fields':field_dict
                 }
