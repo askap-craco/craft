@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """
-Template for making scripts to run from the command line
+Checks vcraft files to see whether they have delays or not.
 
 Copyright (C) CSIRO 2017
 """
@@ -12,14 +12,17 @@ import os
 import sys
 import logging
 import vcraft
-from craftcor import print_delay
+import scipy.signal
+
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-    parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
+    parser = ArgumentParser(description='Check for sample delays in vcraft files', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
+    parser.add_argument('-s','--show', action='store_true', help="plot where it's all gone wrong")
+    parser.add_argument('-n','--nsamp', type=int, help='Number of samples to compare', default=4096)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -28,49 +31,50 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    f = vcraft.VcraftFile(values.files[0])
-    ndelay = 32
-    nint = 1024*32
-    nfft = 64
-    nchan = len(f.freqs)
-    nchan = 2
-    #data = np.zeros((ntimes, f.nchans, ndelay), dtype=np.complex)
+    N = values.nsamp
+    files = [vcraft.VcraftFile(f) for f in values.files]
+    trigger_frameids = [f.trigger_frameid for f in files]
+    fstart = max(trigger_frameids)
+    f0 = fstart - trigger_frameids[0]
+    d0 = files[0].read(f0, N)
+    chan = 4
+    ncrap = 1440
+    for f in files:
+        foff = fstart - f.trigger_frameid
+        d = f.read(foff, N)
+        is_equal = np.all(d[:, :] == d0[:, :])
 
-    rdata = np.random.randn((nint+ndelay)*nfft) + 1j*np.random.randn((nint+ndelay)*nfft)
-    fig, (ax1, ax2) = pylab.subplots(2,1)
-    delays = np.zeros((ndelay, nchan))
-    phases = np.zeros((ndelay, nchan))
-    df0 = np.zeros((nint, nfft, nchan), dtype=np.complex)
+        print '{} TRIGGER_FRAMEID={} FRAME_OFF={} equal ? {}'.format(f.fname, f.trigger_frameid, foff, is_equal)
+        if not is_equal and values.show:
+            wrap_frameid = int(f.hdr['START_WRITE_FRAMEID'][0])
+            ngood = 96
+            print 'WRAP FRAME', wrap_frameid, fstart, f.trigger_frameid, f.trigger_frameid - wrap_frameid, d0.shape, 'ngood', ngood
+            d0c = d0[:, chan]
+            dc = d[:, chan]
 
+            #extra = d0c[0:ncrap]
+            extra = dc[0:ngood]
+            extra = np.conj(extra[::-1])
+            c1 = scipy.signal.fftconvolve(extra, d0c)
+            c2 = scipy.signal.fftconvolve(extra, dc)
+            
+            fig, ax = pylab.subplots(4,1)
+            fig.suptitle(files[0].fname + '-' +f.fname)
+            ax[0].plot(d0c.real)
+            ax[0].plot(dc.real)
+            ax[1].plot(d0c.imag)
+            ax[1].plot(dc.imag)
+            ax[2].plot((dc-d0c).real)
+            ax[2].plot((dc-d0c).imag)
+            ax[0].set_ylabel('Real part')
+            ax[1].set_ylabel('Imag part')
+            ax[2].set_ylabel('Difference (real/imag)')
+            ax[3].plot(abs(c1), label=files[0].fname)
+            ax[3].plot(abs(c2), label=f.fname)
+            ax[3].set_ylabel('Correlation')
+            ax[3].legend()
 
-    for delay in xrange(ndelay):
-        d = f.read(delay, nfft*nint)
-        print d.shape
-        for c in xrange(nchan):
-            dc = d[:, c] # chanel 0
-            #dc = rdata[delay:delay+nint*nfft]
-            dc.shape = (-1, nfft)
-            df = np.fft.fftshift(np.fft.fft(dc, axis=1), axes=1)
-            if delay == 0:
-                df0[:,:,c] = df
-
-            dfx = (df*np.conj(df0[:,:,c])).mean(axis=0)
-            ax1.plot(np.abs(dfx))
-            ax2.plot(np.angle(dfx))
-            print 'DELAY = {} sample'.format(delay)
-            delays[delay, c], phases[delay, c] = print_delay(dfx)
-
-    fig, (ax1, ax2) = pylab.subplots(2,1, sharex=True)
-    ax1.plot(delays)
-    ax1.set_ylabel('Delays')
-    ax2.plot(phases)
-    ax2.set_ylabel('Phase (deg)')
-    ax2.set_xlabel('Delay (samp)')
-
-    pylab.show()
-
-
-
+            pylab.show()
 
 
 

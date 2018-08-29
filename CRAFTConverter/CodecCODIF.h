@@ -103,7 +103,9 @@ namespace NCodec
 	    int      m_iSamplesPerWord;
             Buffer_t m_DataFrameBuffer;
 	    char     *buf;
-	    int      mask;  
+	    int      mask;
+	    bool     convert;
+	    uint8_t  *lookup;
 
             //////////
             // Private methods.

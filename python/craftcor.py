@@ -230,7 +230,7 @@ class Correlator(object):
         #self.refant = filter(lambda a:a.antname == refantname, ants)[0]
         self.refant = ants[0]
         self.calcresults = ResultsFile(values.calcfile)
-        self.dutc = -37.0
+        self.dutc = 0
         self.mjd0 = self.refant.mjdstart + self.dutc/86400.0
         self.frame0 = self.refant.trigger_frame
         self.nint = values.nint

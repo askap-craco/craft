@@ -13,6 +13,7 @@ import logging
 import itertools
 from crafthdr import DadaHeader
 import freqconfig
+import warnings
 log = logging.getLogger(__name__)
 
 bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
@@ -82,7 +83,7 @@ class VcraftFile(object):
         # Trigger is at the *end* of the buffer.
         self.trigger_frameid = int(hdr['TRIGGER_FRAMEID'][0])
         self.trigger_mjd = float(hdr['TRIGGER_MJD'][0])
-        self.expected_nsamp = SAMPS_MODE[self.mode]
+        self.expected_nsamp = int(hdr.get_value('NSAMPS_REQUEST'), SAMPS_MODE[self.mode])
         self.start_frameid = self.trigger_frameid - self.expected_nsamp
         self.start_mjd = self.trigger_mjd - self.expected_nsamp/self.infsamp/86400.
         self.bats = np.array([int(hdr[c][0], base=16) for c in bat_cards])
@@ -291,6 +292,7 @@ class VcraftMux(object):
 
         self.all_samps = [f.nsamps for f in self._files]
         self.nsamps = min(self.all_samps)
+
         self.trigger_frameids = np.array(map(int, self.allhdr('TRIGGER_FRAMEID')))
         self.trigger_mjds = np.array(map(float, self.allhdr('TRIGGER_MJD')))
         
@@ -301,6 +303,10 @@ class VcraftMux(object):
         self.start_frameid = max(self.start_frameids)
         # BUG! Start MJDs don't account for sample offsets
         self.sample_offsets = self.start_frameid - self.start_frameids 
+
+        self.all_overlap_samps = [f.nsamps - self.sample_offsets[i] for i,f in enumerate(self._files)]
+        self.overlap_nsamps = min(self.all_overlap_samps)
+
         print 'SAMPLE OFFSETS', self.sample_offsets, 'FILE DELAYS', self.file_delays
         assert np.all(self.sample_offsets >= 0)
         assert np.all(self.sample_offsets < self.nsamps)
