@@ -498,7 +498,7 @@ namespace NCodec        // Part of the Codec namespace.
 	    printf("DEBUG: Assuming %lld samples per voltage dump\n", bufferSamples);
 
 	    unsigned long long startFrameId = m_ullTriggerFrameId - bufferSamples + m_iSamplesPerWord;
-	    // TriggerFrameId is the time of the last word, so need to allow for the number of samples/32bit word
+	    // StopFrameId is the time of the last word, so need to allow for the number of samples/32bit word
 	    
             unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
             unsigned long long BAT0MJDSec = m_ullBAT0/1e6;
@@ -596,7 +596,7 @@ namespace NCodec        // Part of the Codec namespace.
     // Multiple time samples per output CODIF word
     void CCodecCODIF::decodeVCRAFTBlock(WordDeque_t & rInput, vector<uint32_t>& vcraftData, vector<uint32_t>& codifData,
 				       int wordstoUnpack, int samplesPerWord, int *iWordCount) {
-
+      //printf("DEBUG: decodeVCRAFTBlock: %d %d\n", wordstoUnpack, samplesPerWord);
       // Grab next set of original samples
       for (int c=0; c< (wordstoUnpack) && ( ! rInput.empty()); c++) {
 	vcraftData[c] = rInput.front();
@@ -614,11 +614,10 @@ namespace NCodec        // Part of the Codec namespace.
 	    }
 	  }
 	}
-      } else {
-
-	int wordPerGroup = wordstoUnpack/samplesPerWord; //  2          4
+      } else {                                           // 4bit
+	int wordPerGroup = wordstoUnpack/samplesPerWord; // 2          4
 	for (int i=0; i< samplesPerWord; i++) {          // 0..3       0..1
-	  for (int j=0; j<wordPerGroup; j++) {             // 0..1       0..3
+	  for (int j=0; j<wordPerGroup; j++) {           // 0..1       0..3
 	    int c = i*wordPerGroup + j;
 	    codifData[c] = 0;
 	    for (int k=0; k<samplesPerWord; k++) {
