@@ -55,7 +55,7 @@ def _main():
         influxout = open(values.outfile, 'w')
     else:
         from influxdb import InfluxDBClient
-        client = InfluxDBClient(host='akingest01', database='craft')
+        client = InfluxDBClient(host='akingest01', database='craft', username='craftwriter', password='craft')
 
     for filename in values.files:
         try:
@@ -188,8 +188,9 @@ class CraftStatMaker(object):
 
         idxs = np.rint(self.fft_freqs * float(ntimes) * self.tsamp).astype(int)
         for n, i in zip(self.fft_freqs, idxs):
-            freq = '{:0.1f}'.format(n).replace('.','d')
-            stat['fft.{}Hz'.format(freq)] = dm0f[i]
+            if i < len(dm0f): # Sample rate might not be high enough to measure all freqs
+                freq = '{:0.1f}'.format(n).replace('.','d')
+                stat['fft.{}Hz'.format(freq)] = dm0f[i]
 
         stat['fft.max'] = dm0f[1:].max()
         stat['fft.mean'] = dm0f[1:].mean()
