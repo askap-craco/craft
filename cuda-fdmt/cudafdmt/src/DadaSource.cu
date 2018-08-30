@@ -104,6 +104,7 @@ DadaSource::DadaSource(int nt, const char* keyname, bool lock) {
 		assert(m_reorder_buffer);
 	}
 
+	// make memory as pinned so cuda will transfer it more efficiently.
 	size_t nbufs = ipcbuf_get_nbufs(&m_hdu->data_block->buf);
 	size_t blck_size = ipcbuf_get_bufsz(&m_hdu->data_block->buf);
 	for(int b = 0; b < nbufs; b++) {

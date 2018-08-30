@@ -66,6 +66,10 @@ public:
 
 	size_t read_samples_ant(void** output, int iant);
 
+	DadaSource* get_source_at(int idx) {
+		return m_sources.at(idx);
+	}
+
 
 private:
 	std::vector<DadaSource*> m_sources;

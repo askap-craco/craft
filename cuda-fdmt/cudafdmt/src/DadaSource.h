@@ -71,6 +71,10 @@ public:
 		return m_key;
 	}
 
+	inline char* get_header() {
+		return m_hdr;
+	}
+
 private:
 	void* get_next_buffer(size_t& nt);
 

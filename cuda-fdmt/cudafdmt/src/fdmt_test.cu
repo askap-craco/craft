@@ -31,9 +31,8 @@
 #include "CandidateList.h"
 #include "InvalidSourceFormat.h"
 #include "Rescaler.h"
-
-
 #include "rescale.h"
+#include "DadaSink.h"
 
 
 using namespace std;
@@ -64,6 +63,7 @@ void runtest_usage() {
 			"   -b maxbc - Maximum boxcar to create a candidate. Candidates with peaks above this boxcar are ignored\n"
 			"   -g G - CUDA device\n"
 			"   -N N - Maximum number of blocks to process before quitting\n"
+			"   -X x - Export incoherent sum data to this DADA key\n"
 			"   -h Print this message\n"
 			"    Version: %s\n"
 			, VERSION);
@@ -139,6 +139,7 @@ int main(int argc, char* argv[])
 	char udp_host[128];
 	bzero(udp_host, 128);
 	short udp_port = -1;
+	int export_dada_key = -1;
 
 	printf("Fredda version %s starting. Cmdline: ", VERSION);
 	for (int c = 0; c < argc; ++c) {
@@ -146,7 +147,7 @@ int main(int argc, char* argv[])
 	}
 	printf("\n");
 
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:Dg:M:T:U:K:G:C:n:m:b:z:N:uhp")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:Dg:M:T:U:K:G:C:n:m:b:z:N:X:uhp")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -214,6 +215,9 @@ int main(int argc, char* argv[])
 		case 'B':
 			nbeams_alloc = atoi(optarg);
 			break;
+		case 'X':
+			sscanf(optarg, "%x",&export_dada_key);
+			break;
 		case 'U':
 		{
 			char* colon = strchr(optarg, ':');
@@ -269,6 +273,7 @@ int main(int argc, char* argv[])
 			}
 		}
 	}
+
 	assert(source != NULL);
 
 	bool negdm = (nd < 0);
@@ -279,12 +284,14 @@ int main(int argc, char* argv[])
 	int nbeams_per_antenna = source->nbeams()*source->npols(); // number of beams including polarisations
 	int nbeams_in_total = nbeams_per_antenna*source->nants();
 	int npols_in = source->npols();
-	int nbeams_out;
+	int nbeams_out, npols_out;
 	if (polsum) { // assume polsum and antsum
 		nbeams_out = source->nbeams();
+		npols_out = 1;
 		assert(nbeams_per_antenna %2 == 0);
 	} else { // ant sum only
 		nbeams_out = source->nbeams()*source->npols();
+		npols_out = source->npols();
 	}
 	float nbeams_summed = (float(nbeams_in_total)/float(nbeams_out));
 	int nf = source->nchans();
@@ -307,6 +314,15 @@ int main(int argc, char* argv[])
 		// FDMT requres fmin < fmax
 		// rescaling will invert the channels now that we've changed the sign of foff
 		foff = -foff;
+	}
+
+	DadaSink* dada_sink = NULL;
+	if (export_dada_key != -1) {
+		char* hdr = NULL;
+		if (dada_source != NULL) {
+			hdr = dada_source->get_source_at(0)->get_header();
+		}
+		dada_sink = new DadaSink(*source, export_dada_key, hdr, npols_out, nbeams_out, nt);
 	}
 
 	// rescale output buffer
@@ -480,13 +496,21 @@ int main(int argc, char* argv[])
 		gpuErrchk(cudaDeviceSynchronize()); // Synchonize after doing all those asynchronous, multistream things
 		fdmt.t_copy_in.stop();
 
-
 		if (stopped) {// if we've run out of samples
 			break;
 		}
 
 		if (dump_data) {
 			dumparr("inbuf", iblock, &rescale_buf);
+		}
+		// Do asynchronous copy to dada output using the copy stream for antenna 0
+		if (dada_sink != NULL) {
+			void* outptr = dada_sink->open_block();
+			gpuErrchk(cudaMemcpyAsync(outptr,
+					rescale_buf.d_device,
+					array4d_size(&rescale_buf)*sizeof(uint8_t),
+					cudaMemcpyDeviceToHost,
+					streams[0]));
 		}
 
 		// Count how many times were flagged
@@ -560,6 +584,12 @@ int main(int argc, char* argv[])
 		}
 		tproc.stop();
 
+		// release dada block from output -
+		if (dada_sink != NULL) {
+			gpuErrchk(cudaStreamSynchronize(streams[0]));
+			dada_sink->close_block();
+		}
+
 		blocknum++;
 		iblock++;
 	}
@@ -604,5 +634,8 @@ int main(int argc, char* argv[])
 			"s System:" << usage.ru_stime.tv_sec << "s MaxRSS:" << usage.ru_maxrss/1024/1024 << "MB" << endl;
 	cout << "GPU Memory used " << (gpu_total_bytes - gpu_free_bytes)/1024/1024 << " of " << gpu_total_bytes /1024/124 << " MiB" << endl;
 	delete source;
+	if(dada_sink != NULL) {
+		delete dada_sink;
+	}
 }
 
