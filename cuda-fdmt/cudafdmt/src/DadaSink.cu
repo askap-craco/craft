@@ -39,7 +39,7 @@ DadaSink::DadaSink(DataSource& source, int key, char* hdr,
 	} else {
 		out_freq = source.fch1() + source.nchans()*source.foff();
 	}
-	assert(out_freq <= source.foff());
+	assert(out_freq <= source.fch1());
 	double out_foff = abs(source.foff());
 
 	uint64_t expected_block_size = npol_out*nbeams_out*source.nchans()*nt*sizeof(rescale_dtype);
@@ -56,6 +56,7 @@ DadaSink::DadaSink(DataSource& source, int key, char* hdr,
 	ascii_header_set(header_buf, "NBEAMS", "%d", nbeams_out); // polarisations summed
 	ascii_header_set(header_buf, "NCHAN", "%d", source.nchans()); // polarisations summed
 	ascii_header_set(header_buf, "NBIT", "%d", sizeof(rescale_dtype)*8); // floating point numbers
+	ascii_header_set(header_buf, "NT", "%d", nt);
 	ascii_header_set(header_buf, "TSAMP", "%0.12f", source.tsamp()); // tsamp unchanged from source
 	ascii_header_set(header_buf, "FREQ", "%0.12f", out_freq); // first channel
 	ascii_header_set(header_buf, "BW", "%0.12f", out_foff); // Frequency offset - different from source as rescaler sets first frequency to bottom always
@@ -97,4 +98,5 @@ void DadaSink::close_block() {
 		printf("DADA sink could not close block %d\n", m_blkid);
 		exit(EXIT_FAILURE);
 	}
+	m_current_block = NULL;
 }

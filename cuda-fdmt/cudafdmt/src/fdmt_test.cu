@@ -508,7 +508,7 @@ int main(int argc, char* argv[])
 			void* outptr = dada_sink->open_block();
 			gpuErrchk(cudaMemcpyAsync(outptr,
 					rescale_buf.d_device,
-					array4d_size(&rescale_buf)*sizeof(uint8_t),
+					array4d_size(&rescale_buf)*sizeof(rescale_dtype),
 					cudaMemcpyDeviceToHost,
 					streams[0]));
 		}
