@@ -14,13 +14,13 @@ echo Infile $infile hdr=$hdr
 #cat $hdr
 export DADA=$HOME/psrdada-install
 #export DADA=/home/craftop/askap/trunk/3rdParty/psrdada/psrdata
-#export DADA=/home/craftop/askap/trunk/3rdParty/psrdada/psrdada-537159/install/
+export DADA=/home/craftop/askap/trunk/3rdParty/psrdada/psrdada-537159/install/
 export PATH=$DADA/bin:$PATH
 export LD_LIBRARY_PATH=$DADA/lib:$LD_LIBRARY_PATH
 #cudafdmt=$HOME/craftdev/craft/cuda-fdmt/cudafdmt/src/cudafdmt
 
-cudafdmt=$HOME/git/craft/cuda-fdmt/cudafdmt/Debugtest_cuda/cudafdmt
-#cudafdmt=$HOME/git/craft/cuda-fdmt/cudafdmt/src/cudafdmt
+#cudafdmt=$HOME/git/craft/cuda-fdmt/cudafdmt/Debugtest_cuda/cudafdmt
+cudafdmt=$HOME/craftdev/craft/cuda-fdmt/cudafdmt/src/cudafdmt
 
 ls -l $cudafdmt
 # 84 samples/block
@@ -46,6 +46,7 @@ for keyoff in $@ ; do
 done
 
 rm -f *.dat
+
 let out_block_size="36*336*4*$nt"
 OUT_KEY=8001
 $DADA/bin/dada_db -d -k $OUT_KEY > /dev/null 2>&1
@@ -56,12 +57,7 @@ $DADA/bin/dada_dbdisk -z -k $OUT_KEY -D icsout/
 all_keys="$all_keys $DADA_KEY"
 
 #$cudafdmt -N 5 -t $nt -d 512 -r 1  -s 0 -o fredda.$1.cand -D -p $all_keys
-#$cudafdmt -t 512 -d 512 -r 1  -s 0  -M 0.2 -T 0.2 -C 6.0  -o fredda.$1.cand *.fil
-#cudapid=$!
-#cuda-gdb --args $cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1 -D -r 1 -K 30 -s 0
 
-#wait $cudapid
-wait
-
+#dada_db -d -k $DADA_KEY
 
 

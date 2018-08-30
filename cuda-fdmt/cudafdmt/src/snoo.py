@@ -55,8 +55,7 @@ def _main():
                 sn, sampnum, tsec, width, idt, dm, beamno, cand_mjd = best_cand
                 #print 'FOUND CANDIDATE', np.array2string(best_cand, precision=1), best_cand.shape
                 now = Time.now()
-                # FREDDA MJDs are wrong by UT-TAI = 37seconds
-                latency_ms = 37e3 - (cand_mjd - now.mjd)*86400.0*1e3
+                latency_ms = (now.mjd - cand_mjd)*86400.0*1e3
                 best_beam = int(beamno)
                 s = 'Found CANDIDATE: sn={} width={} dm={} mjd={} latency={}ms beam={}'.format(sn, width, dm, cand_mjd, latency_ms, best_beam)
                 print s

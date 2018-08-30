@@ -12,6 +12,7 @@
 #include <netdb.h>
 #include <assert.h>
 
+#define CAND_FORMAT "%0.2f %lu %0.4f %d %d %0.2f %d %0.9f\n"
 CandidateSink::CandidateSink(DataSource* srcfile, const char* filename,
 		bool negdm, const char* sockaddr, short sockprt) {
 	m_srcfile = srcfile;
@@ -68,21 +69,27 @@ void CandidateSink::add_candidate(int ibeam, int idt, int t, int ibc, float sn)
 	// Typical line: 11.1591 7505890 9499.64 12      178     736.883 6       7505720 7507042
 	// S/N sample_number dunno width dunno dm dunno dunno dunno
 	// dt = 4.15ms * DM * (nu1**-2 - nu2**-2)
-	// DM =
+	// t = the sample number from the beginning of the current block
 
+	// convert idt to DM in pc/cm3
 	float  dm = m_srcfile->dm_of_idt(idt);
-	double time_from_file = t*m_srcfile->tsamp();
+
+	// reference t to the beginning of the file, in samples
+	int tfile = t  + m_srcfile->current_sample();
+
+	double time_from_file = tfile*m_srcfile->tsamp(); // seconds
 	if (m_negdm) {
 		idt = -idt;
 		dm = -dm;
 	}
 	double cand_mjd = m_srcfile->tstart() + time_from_file/86400.0;
-	fprintf(m_candfile, "%f %lu %f %d %d %0.3f %d %0.9f\n", sn, t, time_from_file,
+	fprintf(m_candfile, CAND_FORMAT , sn, tfile, time_from_file,
 		ibc, idt, dm, ibeam, cand_mjd);
 
 	if (m_sockbuf != NULL) {
-		int line_len = snprintf(m_sockbuf+m_sockbuf_size, MAX_PACKET_BYTE, "%f %lu %f %d %d %0.3f %d %0.9f\n", sn, t, time_from_file,
-					ibc, idt, dm, ibeam, cand_mjd);
+		int line_len = snprintf(m_sockbuf+m_sockbuf_size, MAX_PACKET_BYTE,
+				CAND_FORMAT,
+				sn, tfile, time_from_file, ibc, idt, dm, ibeam, cand_mjd);
 		m_sockbuf_size += line_len;
 
 		// flush packet early if it's getting close to being big

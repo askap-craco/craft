@@ -562,8 +562,6 @@ int main(int argc, char* argv[])
 				dumparr("fdmt", iblock, &out_buf, false);
 				dumparr("ostate", iblock, & fdmt.ostate, true);
 			}
-			size_t sampno = iblock*nt;
-
 			//total_candidates += boxcar_threshonly(&out_buf, sampno, thresh, max_ncand_per_block, mindm, sink);
 			tboxcar.start();
 			boxcar_do_gpu (
@@ -573,7 +571,7 @@ int main(int argc, char* argv[])
 					&boxcar_discards,
 					thresh, max_ncand_per_block, mindm, maxbc, &candidate_list);
 			tboxcar.stop();
-			int ncand = candidate_list.copy_to_sink(sink, sampno);
+			int ncand = candidate_list.copy_to_sink(sink);
 			if (ncand >= max_ncand_per_block - 1) {
 				num_candidate_overflow_blocks++;
 			}
