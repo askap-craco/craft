@@ -273,9 +273,14 @@ int main(int argc, char* argv[])
 			}
 		}
 	}
+	assert(seek_seconds >= 0);
+	int num_skip_blocks = seek_seconds / source->tsamp() / nt;
+	printf("Seeking to start of data: block %d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source->tsamp());
+	if (num_skip_blocks > 0) {
+		source->seek_sample(nt*num_skip_blocks);
+	}
 
 	assert(source != NULL);
-
 	bool negdm = (nd < 0);
 	CandidateSink sink(source, out_filename, negdm, udp_host, udp_port);
 	cout << "spf tsamp " << source->tsamp()<< " ants " << source->nants() << " nbeams " << source->nbeams()
@@ -296,7 +301,7 @@ int main(int argc, char* argv[])
 	float nbeams_summed = (float(nbeams_in_total)/float(nbeams_out));
 	int nf = source->nchans();
 	int nbits = source->nbits();
-
+	printf("S/N Threshold %f Max ncand per block %d mindm %d \n", thresh, max_ncand_per_block, mindm);
 	//rescale input buffer
 	size_t in_buffer_bytes_per_ant = nbeams_per_antenna*nf*nt*nbits/8;
 	uint8_t* in_buffer_device;
@@ -385,13 +390,7 @@ int main(int argc, char* argv[])
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d nbeams_alloc=%d\n",
 			fmin, fmax, nf, nd, nt, nbeams_out, nbeams_alloc);
 	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams_out, nbeams_alloc, dump_data);
-	assert(seek_seconds >= 0);
-	int num_skip_blocks = seek_seconds / source->tsamp() / nt;
-	printf("Seeking to start of data: block %d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source->tsamp());
-	printf("S/N Threshold %f Max ncand per block %d mindm %d \n", thresh, max_ncand_per_block, mindm);
-	if (num_skip_blocks > 0) {
-	    source->seek_sample(nt*num_skip_blocks);
-	}
+
 	int blocknum = 0;
 	int iblock = num_skip_blocks;
 	unsigned long long total_candidates = 0;
