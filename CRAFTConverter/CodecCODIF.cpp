@@ -53,7 +53,7 @@ namespace               // Anonymous namespace for internal helpers.
     constexpr int      iBitsPerByte_c              = 8;      // Number of bits in a byte.
     constexpr int      iTimeForIntegerSamples_c    = 27;     // Period in seconds, for a whole number of samples.
     constexpr double   dTolerance_c                = 0.001;  // Tolerance for floating point calculations.
-    constexpr int     DUTC                        = 37;
+    constexpr int     DUTC                         = 37;
 
 }                       // End anonymous namespace.
 
@@ -89,6 +89,8 @@ namespace NCodec        // Part of the Codec namespace.
 	buf  = NULL;
         m_iSamplesPerWord = 0;
 	mask = 0;
+	convert = true;
+	lookup = NULL;
     }
 
     //////////
@@ -112,6 +114,10 @@ namespace NCodec        // Part of the Codec namespace.
         m_bSynced              = false;
         m_bFirstInputBlock     = false;
 	mask                   = 0;
+	if (lookup==NULL) {
+	  delete [] lookup;
+	  lookup = NULL;
+	}
 	//if (buf!=NULL) delete buf;
     }
 
@@ -452,6 +458,29 @@ namespace NCodec        // Part of the Codec namespace.
 
             // Create the header anew prior to encoding.
 
+	    if (convert) {
+	      if (m_iBitsPerSample==4) {
+		struct {signed int x:4;} s;
+		if (lookup!=NULL) delete[] lookup;
+		lookup = new uint8_t [256];
+		for (int i=0; i<256; i++) {
+		  int a = s.x = (i & 0xF);      // 4 bits lowest bits - bit extend
+		  int b = s.x = ((i>>4) & 0xF); // 4 bits higest bits - bit extend
+		  if (a==-8) {
+		    a = 7;
+		  } else {
+		    a = -a;
+		  }
+		  if (b==-8) {
+		    b = 7;
+		  } else {
+		    b = -b;
+		  }
+		  lookup[i] = (a&0xF) | ((b<<4)&0xF0);
+		}
+	      }
+	    }
+
             m_DFH.Reset();
 
 #ifdef _VERBOSE
@@ -498,7 +527,7 @@ namespace NCodec        // Part of the Codec namespace.
 	    printf("DEBUG: Assuming %lld samples per voltage dump\n", bufferSamples);
 
 	    unsigned long long startFrameId = m_ullTriggerFrameId - bufferSamples + m_iSamplesPerWord;
-	    // TriggerFrameId is the time of the last word, so need to allow for the number of samples/32bit word
+	    // StopFrameId is the time of the last word, so need to allow for the number of samples/32bit word
 	    
             unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
             unsigned long long BAT0MJDSec = m_ullBAT0/1e6;
@@ -596,10 +625,21 @@ namespace NCodec        // Part of the Codec namespace.
     // Multiple time samples per output CODIF word
     void CCodecCODIF::decodeVCRAFTBlock(WordDeque_t & rInput, vector<uint32_t>& vcraftData, vector<uint32_t>& codifData,
 				       int wordstoUnpack, int samplesPerWord, int *iWordCount) {
-
       // Grab next set of original samples
       for (int c=0; c< (wordstoUnpack) && ( ! rInput.empty()); c++) {
 	vcraftData[c] = rInput.front();
+	if (convert) {
+	  if (m_iBitsPerSample==1) {
+	    vcraftData[c] ^= 0xCCCCCCCC; // Flip every second sample
+	  } else if (m_iBitsPerSample==4) {
+	    uint32_t x = vcraftData[c];
+	    vcraftData[c] = (x&0x00FF00FF) | lookup[(x&0xFF00)>>8]<<8 | lookup[(x&0xFF000000)>>24]<<24;
+	  } else {
+	    fprintf(stderr, "Error: Cannot convert %d bit data\n", m_iBitsPerSample);
+	    exit(1);
+	  }
+	}
+	
 	rInput.pop_front();
 	(*iWordCount)++;
       }
@@ -614,11 +654,10 @@ namespace NCodec        // Part of the Codec namespace.
 	    }
 	  }
 	}
-      } else {
-
-	int wordPerGroup = wordstoUnpack/samplesPerWord; //  2          4
+      } else {                                           // 4bit
+	int wordPerGroup = wordstoUnpack/samplesPerWord; // 2          4
 	for (int i=0; i< samplesPerWord; i++) {          // 0..3       0..1
-	  for (int j=0; j<wordPerGroup; j++) {             // 0..1       0..3
+	  for (int j=0; j<wordPerGroup; j++) {           // 0..1       0..3
 	    int c = i*wordPerGroup + j;
 	    codifData[c] = 0;
 	    for (int k=0; k<samplesPerWord; k++) {

@@ -24,13 +24,18 @@ except KeyError:
 AIPS.userno = 702
 
 # Check invocation
-if not len(sys.argv) == 1:
-    print "Usage: %s <fits file> <json delay/phase file>" % sys.argv[0]
+if not len(sys.argv) == 2:
+    print "Usage: %s <AIPSFILE>" % sys.argv[0]
     sys.exit()
 
-snversion = 1
+snversion = 1    # Should get from getopt style argument
+aipsDisk = 1
 
-uvdata = AIPSUVData("CRAFTNEWPOS", "UVDATA", 1, 1)
+aipsfile = sys.argv[1]
+
+(name, aipsclass, seq) = aipsfile.split('.')
+
+uvdata = AIPSUVData(name, aipsclass, aipsDisk, int(seq))
 
 # Make a list of antennas
 maxanid = 0
@@ -65,13 +70,12 @@ for row in sntable:
         if abs(row.delay_1[i])>1 or (num_pol > 1 and abs(row.delay_1[i])>1): continue
         
         delays1[ant] += row.delay_1[i]
-        #if ant=='co13':
-        #    print  row.delay_1[i]
         if num_pol > 1:
             delays2[ant] += row.delay_2[i]
         delaysN[ant] += 1
        
 for ant in delays1:
-    print ant, delays1[ant]/delaysN[ant]*1e9,
-    print
-
+    if delaysN[ant]==0:
+        print ant, 0
+    else:
+        print ant, delays1[ant]/delaysN[ant]*1e9

@@ -23,7 +23,10 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-i','--nsamps', help='Number of samples per integration', type=int, default=1500)
     parser.add_argument('-s','--show', help='Show plots', action='store_true', default=False)
-    parser.add_argument('-n','--nfft', help='FFT size / 64. I.e. for 128 point FFT specify 2', type=int, default=1)
+    #parser.add_argument('-n','--nfft', help='FFT size / 64. I.e. for 128 point FFT specify 2', type=int, default=1)
+    parser.add_argument('-n','--nchan', help='FFT size / 64. I.e. for 128 point FFT specify 2. '+\
+            'If 0 (default) no finer channels are produced', type=int, default=0)
+    parser.add_argument('-d', '--npolout', help='1=XX+YY, 2=XX,XY,YX,YY', type=int, default=1)
     parser.add_argument('-o','--outfile', help='Outfile', default='beam.fil')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
@@ -46,7 +49,10 @@ def detect(files, values):
     if npolin == 1:
         npolout = 1
     elif npolin == 2:
-        npolout = 4
+        if values.npolout == 1:
+            npolout = 1
+        else:
+            raise NotimplementedError("Only XX+YY currently implemented")
     else:
         assert 'Unexpected number of input polarisations {}'.format(all_muxes.keys())
 
@@ -59,19 +65,40 @@ def detect(files, values):
     tstart = mux.start_mjd
     nbits = 32
     nchan = len(mux.freqs)
-    nfft = 64*values.nfft
-    nguard = 5*values.nfft
+ 
     nint = values.nsamps
-    nchanout = nfft - 2*nguard
-    finebw = foff/float(nchanout)
-    nsamps = mux.nsamps
+    nsamps_total = mux.nsamps
+    nsamps_total = mux.overlap_nsamps
 
-    bw_file = finebw
-    nchan_file = nchan*nchanout
-    sample_block = nint*nfft
-    tsamp = nint*nfft/infsamp
+    # Performs a finer channelisation
+    if values.nchan > 0:
+        nfft = 64*values.nchan
+        nguard = 5*values.nchan
+        nchanout = nfft - 2*nguard
+        bw_file = foff/float(nchanout)
+        # Take care of first channel
+        fch1 = fch1 - foff/2. + bw_file/2.
+
+        nchan_file = nchan*nchanout
+        sample_block = nint*nfft
+        tsamp = nint*nfft/infsamp
         
-    nsampout = nsamps/sample_block
+
+    # Just square and integrate each channel
+    elif values.nchan == 0:
+        nfft = 0
+        nguard = 0
+        nchanout = 1 
+        bw_file = foff
+
+        nchan_file = nchan
+        sample_block = nint
+        tsamp = nint/infsamp
+
+    else:
+        raise RuntimeError("Wrong --nchans provided: %i. Should be >= 0", values.nchan)
+
+    nsampout = int(nsamps_total/sample_block)
     nsampin = nsampout*sample_block
 
 
@@ -95,52 +122,72 @@ def detect(files, values):
     fout = SigprocFile(foutname, 'w', hdr)
 
     logging.debug('Writing sigproc header %s', hdr)
-    logging.debug(' nsamps=%s nsampin=%s nsapout=%s samp rate=%s',nsamps, nsampin, nsampout, infsamp)
+    logging.debug(' nsamps=%s nsampin=%s nsapout=%s samp rate=%s',nsamps_total, nsampin, nsampout, infsamp)
 
+    din = np.empty((npolin, sample_block, nchan), dtype=np.complex64)
+    dout = np.empty((npolout, nchan_file), dtype=np.float32) # XXX
     # reshape to integral number of integrations
     for s in xrange(nsampout):
         sampno = s*sample_block
-        din = np.empty((npolin, sample_block, nchan), dtype=np.float32)
+        logging.debug('block %i/%i, sampno: %i', s, nsampout,sampno)
         for ipol, pol in enumerate(pols):
             din[ipol, :, :]  = all_muxes[pol].read(sampno, sample_block)
+            #din[ipol, :, :] = np.zeros((sample_block, nchan))
 
-        dout = np.empty((npolout, nchan_file), dtype=np.float32)
+        # dout = np.empty((npolout, nchan_file), dtype=np.float32) #XXX
             
 
         for c in xrange(nchan):
-            dc = din[:, :, c]
-            # make blocks of nfft samples
-            dc.shape = (npolin, -1 ,nfft)
-            dfft = np.fft.fftshift(np.fft.fft(dc, axis=2), axes=2)
-            
-            # discard guard channels
-            dfft = dfft[:, :, nguard:nchanout+nguard]
-            invert = True
-            if invert:
-                dfft = dfft[:,:,::-1]
+            if values.nchan == 0:
+                # We don't have to perform fft
+                #for ipol in xrange(npolout):
+                #    dout[ipol, c] = np.vdot(din[ipol,:, c], din[ipol, :, c]).real
+                dfft = din[:, :, c]
+                dfft = dfft[:,:,np.newaxis]
+
+
+            else:
+                dc = din[:, :, c]
+                # make blocks of nfft samples
+                dc.shape = (npolin, -1 ,nfft)
+                dfft = np.fft.fftshift(np.fft.fft(dc, axis=1), axes=1)
                 
-            assert dfft.shape == (npolin, nint, nchanout)
+                # discard guard channels
+                dfft = dfft[:, :, nguard:nchanout+nguard]
+                invert = True
+                if invert:
+                    dfft = dfft[:,:,::-1]
+                    
+                assert dfft.shape == (npolin, nint, nchanout)
             
             # just take the absolute values, average over time and be done with it
-            if npolout == 1:
+            if npolin == 1:
                 #dabs = abs((dfft * np.conj(dfft))).mean(axis=0)
                 #assert len(dabs) == nchanout
                 #dabs = dabs[::-1] # invert spectra
                 #dabs= dabs.astype(np.float32) # convert to float32
                 #dout[0, :] = dabs
-                for thechan in xrange(dfft.shape[1]):
-                    p = dfft[0, thechan, :]
-                    dout[0, thechan] = np.vdot(p,p).real
-                
-            elif npolout == 4:
-                for chanout in xrange(nchanout):
-                    p1 = dfft[0, chanout, :]
-                    p2 = dfft[1, chanout, :]
-                    cross = np.vdot(p2, p1)
-                    dout[0, chanout] = np.vdot(p1, p1).real
-                    dout[1, chanout] = cross.real
-                    dout[2, chanout] = cross.imag
-                    dout[3, chanout] = np.vdot(p2, p2).real
+                for thechan in xrange(dfft.shape[2]):
+                    p = dfft[0, :, thechan]
+                    dout[0, c*nchanout+thechan] = np.vdot(p,p).real
+
+
+            elif npolin == 2:
+                if values.npolout == 1:
+                    for thechan in xrange(dfft.shape[2]):
+                        p1 = dfft[0, :, thechan]
+                        p2 = dfft[1, :, thechan]
+                        dout[0, c*nchanout+thechan] = np.vdot(p1,p1).real + np.vdot(p2,p2).real
+
+                elif values.npolout == 2: 
+                    for chanout in xrange(nchanout):
+                        p1 = dfft[0, chanout, :]
+                        p2 = dfft[1, chanout, :]
+                        cross = np.vdot(p2, p1)
+                        dout[0, chanout] = np.vdot(p1, p1).real
+                        dout[1, chanout] = cross.real
+                        dout[2, chanout] = cross.imag
+                        dout[3, chanout] = np.vdot(p2, p2).real
 
             if values.show:
                 pylab.plot(dabs)
