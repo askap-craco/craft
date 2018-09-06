@@ -20,9 +20,10 @@ export DADA=/home/craftop/askap/trunk/3rdParty/psrdada/psrdada-537159/install/
 export PATH=$DADA/bin:$PATH
 export LD_LIBRARY_PATH=$DADA/lib:$LD_LIBRARY_PATH
 #cudafdmt=$HOME/craftdev/craft/cuda-fdmt/cudafdmt/src/cudafdmt
-cudafdmt=$HOME/craftdev/craft/cuda-fdmt/cudafdmt/Debugtest_cuda/cudafdmt
+#cudafdmt=$HOME/craftdev/craft/cuda-fdmt/cudafdmt/Debugtest_cuda/cudafdmt
 #cudafdmt=$HOME/git/craft/cuda-fdmt/cudafdmt/Debugtest_cuda/cudafdmt
 #cudafdmt=$HOME/git/craft/cuda-fdmt/cudafdmt/src/cudafdmt
+cudafdmt=`which cudafdmt`
 
 ls -l $cudafdmt
 # 84 samples/block

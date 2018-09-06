@@ -172,10 +172,6 @@ void* DadaSource::get_next_buffer(size_t& nt)
 	// need to tell cuda to mark this as pinned memory, but only do it  the first time around
 	// This improves throughput from 2.5 GB/sec to 12 GB/sec.
 	size_t nbufs = ipcbuf_get_nbufs(&m_hdu->data_block->buf);
-	if (m_buf_num < nbufs) {
-		size_t blck_size = ipcbuf_get_bufsz(&m_hdu->data_block->buf);
-		//gpuErrchk(cudaHostRegister(ptr, blck_size, cudaHostRegisterDefault));
-	}
 	m_buf_num++;
 
 	m_got_buffer = true;

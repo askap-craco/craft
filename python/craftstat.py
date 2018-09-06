@@ -190,8 +190,10 @@ class CraftStatMaker(object):
 
         idxs = np.rint(self.fft_freqs * float(ntimes) * self.tsamp).astype(int)
         for n, i in zip(self.fft_freqs, idxs):
-            freq = '{:0.1f}'.format(n).replace('.','d')
-            stat['fft.{}Hz'.format(freq)] = dm0f[i]
+            if i < len(dm0f):
+                freq = '{:0.1f}'.format(n).replace('.','d')
+                print n, i, len(dm0f)
+                stat['fft.{}Hz'.format(freq)] = dm0f[i]
 
         stat['fft.max'] = dm0f[1:].max()
         stat['fft.mean'] = dm0f[1:].mean()
