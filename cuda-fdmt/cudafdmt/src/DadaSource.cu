@@ -230,16 +230,22 @@ void DadaSource::release_buffer() {
 }
 size_t DadaSource::seek_sample(size_t t)
 {
-  size_t nread = 0, nt=0;
-  while(true) {
-    // read buffers blankly
+  size_t nread = 0;
+  printf("Skipping to sample t=%d, current sample %d", t, m_current_sample);
+  // Can only skip forward
+  assert(t >= m_current_sample);
+
+  while(m_current_sample < t) {
+    printf("Skipping to sample t=%d, current sample %d", t, m_current_sample);
+    size_t nt;
     get_next_buffer(nt);
     nread += nt;
     // break if we've read enough, or it's finished reading entirely.
-    if (nread >= t || nt != m_nt) {
+    if (nt != m_nt) {
       break;
     }
   }
+  assert(m_current_sample == t);
 
   return nread;
   
