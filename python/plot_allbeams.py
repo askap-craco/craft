@@ -141,6 +141,7 @@ class Plotter(object):
         self.files = filenames
         print self.files[0]
         beams, files = load_beams(filenames, tstart, ntimes=1, return_files=True)
+        self.total_samples = min([f.nsamples for f in files])
         ntimes, self.nbeams, self.nfreq = beams.shape
 
         self.bnames = [f.filename.split('.')[-2] for f in files]
@@ -286,6 +287,10 @@ class Plotter(object):
             self.squeeze_zrange(0.5)
         elif event.key == 'r':
             self.rescale = not self.rescale
+        elif event.key == 'e':
+            self.goto_end()
+        elif event.key == 'b':
+            self.goto_beginning()
         elif event.key == 'ctrl+c':
             sys.exit(0)
         elif event.key == 'h' or event.key == '?':
@@ -297,6 +302,12 @@ class Plotter(object):
         if draw:
             self.clearfigs()
             self.draw()
+
+    def goto_start(self):
+        self.tstart = 0
+
+    def goto_end(self):
+        self.tstart = self.total_samples - self.ntimes
 
     def squeeze_zrange(self, mul):
         zmin, zmax = self.imzrange
@@ -398,8 +409,8 @@ class Plotter(object):
         print 'BISHAPE', bi.shape, 'ZRAGE', imzmin, imzmax
         fig, [rawax, tax, fax] = self.figs['dynspec']
         rawax.imshow(bi, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none')
-        if imzmin is None and imzmax is None:
-            self.imzrange = (bi.min(), bi.max())
+        #if imzmin is None and imzmax is None:
+        #self.imzrange = (bi.min(), bi.max())
             
         fax.plot(bi.mean(axis=1), freqs, label='mean')
         fax.plot(bi.max(axis=1), freqs, label='max')

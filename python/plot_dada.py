@@ -43,6 +43,7 @@ def _main():
     tstart, nint = map(int, values.time.split(','))
     dtype = np.dtype(f.hdr.get('DTYPE', '<f4'))
     order = f.hdr.get('DORDER', 'TFBP')
+    nint = int(f.hdr.get('NT', nint))
     sz = dtype.itemsize
     byteoff = 4*nchan*nbeam*npol*tstart
     f.fin.seek(byteoff + f.header_size)
@@ -52,20 +53,23 @@ def _main():
 
 def plot(f, dtype, nint, nbeam, nchan, npol, order, values):
     nelements = nbeam*nchan*nint*npol
-
     v = np.fromfile(f.fin, dtype=dtype, count=nelements)
-    
-    if order == 'TBPF':
-        v.shape = (nint, nbeam, npol, nchan)
-    elif order == 'TFBP':
+    # make output order TFBP if it isn't already
+    if order == 'TFBP':
         v.shape = (nint, nchan, nbeam, npol)
+    elif order == 'TBPF':
+        v.shape = (nint, nbeam, npol, nchan)
+        v = v.transpose([0, 3, 1, 2])
+    elif order == 'BPFT':
+        v.shape = (nbeam, npol, nchan, nint)
+        v = v.transpose([3, 2, 0, 1])
     else:
         raise ValueError('Unknown order %s' % order)
 
 
     print 'Got dtypes', dtype, 'ORDER', order, 'shape', v.shape
 
-    fig, axes = pylab.subplots(*map(int, values.nxy.split(',')))
+    fig, axes = pylab.subplots(*map(int, values.nxy.split(',')), sharex=True, sharey=True)
     if values.imrange:
         vmin, vmax = map(float, values.imrange.split(','))
     else:
@@ -73,9 +77,12 @@ def plot(f, dtype, nint, nbeam, nchan, npol, order, values):
         vmax = None
     
     for iax, ax in enumerate(axes.flat):
-        assert order=='TFBP'
+        assert v.shape == (nint, nchan, nbeam, npol) # assume ordering TFBP
         pol = iax / nbeam
         beam = iax % nbeam
+        if pol > npol or beam > nbeam:
+            break
+        
         img = v[:, :, beam,pol].T
         print 'beam', beam, 'pol', pol,'max/min/mean/rms {}/{}/{}/{}'.format(img.max(), img.min(), img.mean(), img.std())
         im = ax.imshow(img, aspect='auto', vmin=vmin, vmax=vmax, interpolation='none', origin='lower')
