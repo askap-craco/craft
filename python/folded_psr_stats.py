@@ -99,6 +99,7 @@ def extract_stats_from_archive(archive_fn):
     import subprocess as sb
     from astropy.time import Time
     psrstat_command = ["/home/sha355/bin/psrstat", "-j", "DFTp", "-Qq", "-c",
+                       "^off=minimum:smooth=mean:width=.5", "-c",
                        "name,int:mjd,weff,on:count,off:rms,on:max,off:avg,length,snr,snr=pdmp,snr",
                        archive_fn]
     psrstat_process = sb.Popen(psrstat_command, shell=False, stdout=sb.PIPE,
