@@ -250,6 +250,11 @@ size_t array4d_zero(array4d_t* a) {
 int array4d_dump(const array4d_t* a, const char* foutname)
 {
   FILE* fout = fopen(foutname, "w");
+  if (fout == 0) {
+	  perror("Couldn't dump file");
+	  printf("File was %s\n", foutname);
+	  exit(EXIT_FAILURE);
+  }
   fwrite(&a->nw, sizeof(int), 1, fout);
   fwrite(&a->nx, sizeof(int), 1, fout);
   fwrite(&a->ny, sizeof(int), 1, fout);
