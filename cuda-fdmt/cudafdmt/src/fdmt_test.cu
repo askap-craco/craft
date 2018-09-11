@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
 	int nt = 512;
 	float seek_seconds = 0.0;
 	int num_rescale_blocks = 2;
-	float decay_timescale = 0.2; // Seconds?
+	float decay_timescale = 1.0; // Seconds?
 	char ch;
 	float thresh = 10.0;
 	const char* out_filename = "fredda.cand";
