@@ -103,7 +103,9 @@ namespace NCodec
 	    int      m_iSamplesPerWord;
             Buffer_t m_DataFrameBuffer;
 	    char     *buf;
-	    int      mask;  
+	    int      mask;
+	    bool     convert;
+	    uint8_t  *lookup;
 
             //////////
             // Private methods.
@@ -118,7 +120,7 @@ namespace NCodec
             int  BytesPerTimeSampleForChannels( void ) const;
             bool SetPartialFrameParams( const int &riFrames );
 	    void decodeVCRAFTBlock(WordDeque_t & rInput, std::vector<uint32_t>& vcraftData, std::vector<uint32_t>& codifData,
-				   int wordstoUnpack, int samplePerOutword, int samlpesPerWord, int *iWordCount);
+				    int wordstoUnpack, int samplesPerWord, int *iWordCount);
 
 
     };

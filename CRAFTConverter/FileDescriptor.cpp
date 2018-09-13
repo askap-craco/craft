@@ -121,13 +121,10 @@ bool CFileDescriptor::SeekPastFileHeader( const int &riChannelSeekPosition )
 
 bool CFileDescriptor::SeekForward( const int &SeekPosition )
 {
-  printf("CFileDescriptor::SeekForward: Seeking forward %d bytes\n", SeekPosition);
   if ( IsOpen() )
     {
-      printf("   Currently at %ld\n", std::ftell(m_pFile));
       int status = std::fseek( m_pFile, SeekPosition, SEEK_CUR );
-      printf("   Now at %ld\n", std::ftell(m_pFile));
-        return (status  == 0 );
+      return (status  == 0 );
     }
 
     return false;

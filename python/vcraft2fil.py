@@ -23,8 +23,11 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-i','--nsamps', help='Number of samples per integration', type=int, default=1500)
     parser.add_argument('-s','--show', help='Show plots', action='store_true', default=False)
-    parser.add_argument('-d','--dm', help='Coherently dedisperse each channel to DM', type=float, default=None)
-    parser.add_argument('-n','--nfft', help='FFT size / 64. I.e. for 128 point FFT specify 2', type=int, default=1)
+    #parser.add_argument('-n','--nfft', help='FFT size / 64. I.e. for 128 point FFT specify 2', type=int, default=1)
+    parser.add_argument('-n','--nchan', help='FFT size / 64. I.e. for 128 point FFT specify 2. '+\
+            'If 0 (default) no finer channels are produced', type=int, default=0)
+    parser.add_argument('-d', '--npolout', help='1=XX+YY, 2=XX,XY,YX,YY', type=int, default=1)
+    parser.add_argument('-o','--outfile', help='Outfile', default='beam.fil')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -39,99 +42,162 @@ bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
 frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 
 def detect(files, values):
-    vfiles = [vcraft.VcraftFile(f) for f in files]
-    mux = vcraft.VcraftMux(vfiles)
+    #vfiles = [vcraft.VcraftFile(f) for f in files]
+    #mux = vcraft.VcraftMux(vfiles)
+    all_muxes = vcraft.mux_by_pol(files)
+    npolin = len(all_muxes)
+    if npolin == 1:
+        npolout = 1
+    elif npolin == 2:
+        if values.npolout == 1:
+            npolout = 1
+        else:
+            raise NotimplementedError("Only XX+YY currently implemented")
+    else:
+        assert 'Unexpected number of input polarisations {}'.format(all_muxes.keys())
+
+    pols = sorted(all_muxes.keys())
+    # pick random pol to get metadata - todo - check all muxes the same.
+    mux = all_muxes[pols[0]] 
     infsamp = mux.samp_rate # samples/sec for a coarse channel
     fch1 = mux.freqconfig.freq
     foff = mux.freqconfig.bw
     tstart = mux.start_mjd
     nbits = 32
-    nchan = mux.freqconfig.nchan
-    nfft = 64*values.nfft
-    nguard = 5*values.nfft
+    nchan = len(mux.freqs)
+ 
     nint = values.nsamps
-    nchanout = nfft - 2*nguard
-    finebw = foff/float(nchanout)
-    if values.dm is None:
-        bwout = finebw
-    else:
-        bwout = foff
+    nsamps_total = mux.nsamps
+    nsamps_total = mux.overlap_nsamps
+
+    # Performs a finer channelisation
+    if values.nchan > 0:
+        nfft = 64*values.nchan
+        nguard = 5*values.nchan
+        nchanout = nfft - 2*nguard
+        bw_file = foff/float(nchanout)
+        # Take care of first channel
+        fch1 = fch1 - foff/2. + bw_file/2.
+
+        nchan_file = nchan*nchanout
+        sample_block = nint*nfft
+        tsamp = nint*nfft/infsamp
         
-    tsamp = nint*nfft/infsamp
+
+    # Just square and integrate each channel
+    elif values.nchan == 0:
+        nfft = 0
+        nguard = 0
+        nchanout = 1 
+        bw_file = foff
+
+        nchan_file = nchan
+        sample_block = nint
+        tsamp = nint/infsamp
+
+    else:
+        raise RuntimeError("Wrong --nchans provided: %i. Should be >= 0", values.nchan)
+
+    nsampout = int(nsamps_total/sample_block)
+    nsampin = nsampout*sample_block
+
 
     hdr = {'data_type': 1,
            'tsamp': tsamp,
            'tstart': tstart,
            'fch1':fch1,
-           'foff':bwout,
+           'foff':bw_file,
            'nbits':nbits,
-           'nifs':1,
-           'nchans':nchan*nchanout,
+           'nifs':npolout,
+           'nchans':nchan_file,
            'src_raj':0.0, # todo: add sigprog.deg2sex(mux.beam_pos[0])
            'src_dej':0.0
 
     }
-    foutname = f.replace('.vcraft','.fil')
+    if values.outfile:
+        foutname = values.outfile
+    else:
+        foutname = f.replace('.vcraft','.fil')
+        
     fout = SigprocFile(foutname, 'w', hdr)
 
-    nsamps = mux.nsamps
-    nsampout = nsamps/(nint*nfft)
-    nsampin = nsampout*nint*nfft
-
     logging.debug('Writing sigproc header %s', hdr)
-    logging.debug(' nsamps=%s nsampin=%s nsapout=%s samp rate=%s',nsamps, nsampin, nsampout, infsamp)
+    logging.debug(' nsamps=%s nsampin=%s nsapout=%s samp rate=%s',nsamps_total, nsampin, nsampout, infsamp)
 
-    if values.dm is not None:
-        phaseramp = np.empty((nchan, nchanout), dtype=np.complex64)
-        foffset = (np.arange(nchanout) - float(nchanout)/2)*finebw # MHz
-        print 'FOFFSET', foffset
-        
-        for ichan, chanfreq in enumerate(mux.freqs):
-            freqs = (chanfreq + foffset)*1e-3 # GHz
-            delay_ms = 4.15*values.dm*(freqs[0]**-2 - freqs[-1]**-2)
-            delay_ns = delay_ms*1e6
-            delay_samp = delay_ms *1e-3 * infsamp
-            print values.dm, chanfreq, freqs[0], freqs[-1], delay_ms, delay_ns, delay_samp
-
-            phaseramp[ichan, :] = np.exp(np.pi*2j*delay_ns*foffset)
-
-        pylab.plot(np.degrees(np.angle(phaseramp.T)))
-        pylab.show()
-
-
+    din = np.empty((npolin, sample_block, nchan), dtype=np.complex64)
+    dout = np.empty((npolout, nchan_file), dtype=np.float32) # XXX
     # reshape to integral number of integrations
     for s in xrange(nsampout):
-        sampno = s*nint*nfft
-        df = mux.read(sampno, nint*nfft)
-        #df.shape = (nint, nfft, nchan)
+        sampno = s*sample_block
+        logging.debug('block %i/%i, sampno: %i', s, nsampout,sampno)
+        for ipol, pol in enumerate(pols):
+            din[ipol, :, :]  = all_muxes[pol].read(sampno, sample_block)
+            #din[ipol, :, :] = np.zeros((sample_block, nchan))
+
+        # dout = np.empty((npolout, nchan_file), dtype=np.float32) #XXX
+            
 
         for c in xrange(nchan):
-            #dc = df[:, :, c]
-            dc = df[:, c]
-            dc.shape = (-1, nfft)
-            dfft = np.fft.fftshift(np.fft.fft(dc, axis=1), axes=1)
-            dfft = dfft[:, nguard:nchanout+nguard]
-            assert dfft.shape == (nint, nchanout)
-            dabs = abs((dfft * np.conj(dfft))).mean(axis=0)
-            assert len(dabs) == nchanout
-            #dabs -= dabs.mean()
-            #dabs /= dabs.std()
-            #dabs *= 18*2
-            #dabs += 128
-            dabs = dabs[::-1]
-            dabs= dabs.astype(np.float32)
-            dabs.tofile(fout.fin)
+            if values.nchan == 0:
+                # We don't have to perform fft
+                #for ipol in xrange(npolout):
+                #    dout[ipol, c] = np.vdot(din[ipol,:, c], din[ipol, :, c]).real
+                dfft = din[:, :, c]
+                dfft = dfft[:,:,np.newaxis]
+
+
+            else:
+                dc = din[:, :, c]
+                # make blocks of nfft samples
+                dc.shape = (npolin, -1 ,nfft)
+                dfft = np.fft.fftshift(np.fft.fft(dc, axis=1), axes=1)
+                
+                # discard guard channels
+                dfft = dfft[:, :, nguard:nchanout+nguard]
+                invert = True
+                if invert:
+                    dfft = dfft[:,:,::-1]
+                    
+                assert dfft.shape == (npolin, nint, nchanout)
+            
+            # just take the absolute values, average over time and be done with it
+            if npolin == 1:
+                #dabs = abs((dfft * np.conj(dfft))).mean(axis=0)
+                #assert len(dabs) == nchanout
+                #dabs = dabs[::-1] # invert spectra
+                #dabs= dabs.astype(np.float32) # convert to float32
+                #dout[0, :] = dabs
+                for thechan in xrange(dfft.shape[2]):
+                    p = dfft[0, :, thechan]
+                    dout[0, c*nchanout+thechan] = np.vdot(p,p).real
+
+
+            elif npolin == 2:
+                if values.npolout == 1:
+                    for thechan in xrange(dfft.shape[2]):
+                        p1 = dfft[0, :, thechan]
+                        p2 = dfft[1, :, thechan]
+                        dout[0, c*nchanout+thechan] = np.vdot(p1,p1).real + np.vdot(p2,p2).real
+
+                elif values.npolout == 2: 
+                    for chanout in xrange(nchanout):
+                        p1 = dfft[0, chanout, :]
+                        p2 = dfft[1, chanout, :]
+                        cross = np.vdot(p2, p1)
+                        dout[0, chanout] = np.vdot(p1, p1).real
+                        dout[1, chanout] = cross.real
+                        dout[2, chanout] = cross.imag
+                        dout[3, chanout] = np.vdot(p2, p2).real
+
             if values.show:
                 pylab.plot(dabs)
                 pylab.show()
+                
+        dout.flatten().tofile(fout.fin)
 
 
 
 
-#    dfil = np.add.reduceat(dout, np.arange(0, nsamps, values.nsamps), axis=0)
-    # get rid of last sample
-
-    #dfil.tofile(fout.fin)
     fout.fin.close()
 
     if values.show:

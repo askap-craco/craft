@@ -197,7 +197,6 @@ namespace NCodec
             WordDeque_t &rDeque = m_SampleData.GetSamples();
 
 	    if (m_bPreload) {
-	      printf("DEBUG: preloading\n");
 	      m_pFile->Read( rDeque, m_iNumberOfChannels, 0, SEEK_CUR );
 	      m_bPreload = false;
 	    }
@@ -217,9 +216,8 @@ namespace NCodec
 
     bool CCodecVCRAFT::SeekForward( int iSkipBytes )
     {
-        // Skip SkipBytes forward through the file
-      printf("CCodecVCRAFT::SeekForward( %d)\n", iSkipBytes);
-        return m_pFile->SeekForward( iSkipBytes );
+      // Skip SkipBytes forward through the file
+      return m_pFile->SeekForward( iSkipBytes );
     }
 
     //////////
@@ -305,7 +303,7 @@ namespace NCodec
             RetrieveParameter( "CRAFT_MODE",            m_iMode );
             RetrieveParameter( "NBITS",                 m_iBitsPerSample );
             RetrieveParameter( "NPOL",                  m_iNumberofPol );
-            RetrieveParameter( "BEAMID",                m_iBeamId );
+            RetrieveParameter( "BEAM",                  m_iBeamId );
             RetrieveParameter( "FPGA_ID",               m_iFPGAId );
             RetrieveParameter( "CARD_NO",               m_iCardNumber );
             RetrieveParameter( "ANTENNA_NO",            m_iAntennaNumber );
@@ -313,14 +311,14 @@ namespace NCodec
             RetrieveParameter( "NOW_MJD",               m_dMJDNow );
             RetrieveParameter( "NOW_BAT",               m_ullNowBAT );
             RetrieveParameter( "START_WRITE_FRAMEID",   m_ullStartWriteFrameId );
-            RetrieveParameter( "STOP_WRITE_FRAMEID",    m_ullFinishWriteFrameId );
+            RetrieveParameter( "STOP_WRITE_FRAMEID",    m_ullStopWriteFrameId );
             RetrieveParameter( "TRIGGER_FRAMEID",       m_ullTriggerFrameId );
             RetrieveParameter( "START_WRITE_BAT",       m_ullStartWriteBAT );
-            RetrieveParameter( "STOP_WRITE_BAT",        m_ullFinishWriteBAT );
+            RetrieveParameter( "STOP_WRITE_BAT",        m_ullStopWriteBAT );
             RetrieveParameter( "TRIGGER_BAT",           m_ullTriggerWriteBAT );
 
             m_iBitsPerSample /= 2;
-            printf("Warning: Forcing NPOL==1\n");  m_iNumberofPol = 1;
+            //printf("Warning: Forcing NPOL==1\n");  m_iNumberofPol = 1;
 
             // UTC string (ISO formatted) verbatim from the VCRAFT header.
 

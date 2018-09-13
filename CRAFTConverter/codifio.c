@@ -104,7 +104,7 @@ int getCODIFFrameMJD(const codif_header *header)
   return mjd + header->seconds/86400; // Seconds will usually be greater than one day
 }
 
-double getCODIFFrameDMJD(const codif_header *header, int framepersec) 
+double getCODIFFrameDMJD(const codif_header *header, double framepersec) 
 {
   int mjd = getCODIFFrameMJD(header);
   int sec = getCODIFFrameSecond(header);
@@ -167,7 +167,7 @@ int nextCODIFHeader(codif_header *header, int framepersec) {
   if (header->frame>framepersec) {
     return(CODIF_ERROR);
   } else if (header->frame==framepersec) {
-    header->seconds++;
+    header->seconds += header->period;
     header->frame = 0;
   }
   return(CODIF_NOERROR);

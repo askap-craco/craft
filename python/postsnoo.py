@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/bin/env python
 import sys
 import requests
 import json
@@ -7,7 +7,24 @@ import socket
 import datetime
 import boto3
 
+
 def _main ():
+    '''
+    data = sys.stdin.readlines()
+    print type(data)
+    print data[0]
+    print "The contents of snoopy.log are", data[1]
+    line = data[1]
+    values = line.split(" ")
+    snr = values[0]
+    sampno = values[1]
+    t_start = values[2]
+    width = values[3]
+    dm = values[5]
+    beam = values[6]
+    mjd = values[7]
+    latency_ms = values[8]
+    '''
     
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
@@ -37,7 +54,6 @@ def _main ():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    
     slack (text,sb,scan,cid,ant,sb_alias)
 
 def fix_beam(beam):
@@ -49,6 +65,11 @@ def slack(text,sb,scan,cid,ant,sb_alias):
     
     plot_dir = '/data/TETHYS_1/bha03n/test/auto_plots'
 
+    #print "DM is",dm
+    slack (text,sb,scan,cid,ant,sb_alias)
+
+def slack(text,sb,scan,cid,ant,sb_alias):
+    
     data = sys.stdin.readlines()
     print type(data)
     print data[0]
@@ -127,8 +148,6 @@ def slack(text,sb,scan,cid,ant,sb_alias):
         }
     jmessage = json.dumps(message)
     r = requests.post(ASKAP_SLACK_URL, jmessage, headers = {'content-type': 'application/json'})
-    
-    
 
 if __name__ == '__main__':
         _main()

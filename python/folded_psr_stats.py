@@ -32,6 +32,7 @@ def _main():
     else:
         from influxdb import InfluxDBClient
         client = InfluxDBClient(host='akingest01', database='craft', username='craftwriter', password='craft')
+
     body = []
     for filename in values.files:
         try:

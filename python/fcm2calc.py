@@ -33,14 +33,18 @@ def _main():
     calcfile.add_antdata(antd, antnos)
     calcfile.writeto(foutname)
 
-
-
-
 def load_parset(fcmfile, prefix='common.antenna.ant'):
     f = open(fcmfile, 'rU')
     ant_data = {}
     for line in f:
         line = line.strip()
+        if line.startswith('#'):
+            continue
+
+        bits = line.split('=')
+        if len(bits) != 2:
+            continue
+        
         key, value = line.split('=')
         key = key.strip()
         value = value.strip()
@@ -58,7 +62,7 @@ def load_parset(fcmfile, prefix='common.antenna.ant'):
             d[smallkey] = value
             ant_data[antno] = d
         if key == 'common.antennas':
-            antnos = map(lambda x: int(x[3:]), value.replace('[','').replace(']','').split(','))
+            antnos = map(lambda x: int(x.replace('ant','')), value.replace('[','').replace(']','').split(','))
 
 
 

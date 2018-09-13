@@ -124,6 +124,7 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         rawd = rawdat[ibeam, :, 0, :]
         print 'Raw inbuf', rawdat.shape
         nchans, ntimes = rawd.shape
+        rawd = np.ma.masked_equal(rawd, 0.0)
         myimshow(rawax, rawd, aspect='auto', origin='lower')
 
         fdmtax = p(gs[1, 0:2])
@@ -185,10 +186,13 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         statplot(dm0ax, fname, 'dm0')
         rawdm0 = rawd.sum(axis=1).T
         dm0ax.plot(rawd.sum(axis=0).T)
-        dm0count = load4d(fname.replace('fdmt','dm0count'))
-        dm0countax = dm0ax.twinx()
-        dm0countax.plot(dm0count[0,0,ibeam,:])
-        dm0countax.set_ylim(0, None)
+        try:
+            dm0count = load4d(fname.replace('fdmt','dm0count'))
+            dm0countax = dm0ax.twinx()
+            dm0countax.plot(dm0count[0,0,ibeam,:])
+            dm0countax.set_ylim(0, None)
+        except:
+            print 'COunlt plot count'
 
         pylab.show()
 

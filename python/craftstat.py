@@ -129,14 +129,12 @@ class CraftStatMaker(object):
     def next_data(self):
         self.tstart += self.tstep + self.ntimes
         self.spfile.seek_sample(self.tstart)
-        assert self.spfile.nbits == 8
-        count = self.ntimes*self.spfile.nchans
-        d = np.fromfile(self.spfile.fin, dtype=np.uint8, count=count)
-        if len(d) == count:
-            d.shape = (self.ntimes,  self.spfile.nchans)
+        count = self.ntimes
+        try:
+            d = self.spfile[self.tstart:self.tstart+count]
             return d
-        else:
-            logging.debug("Finisshed at %d", self.tstart)
+        except:
+            logging.debug("Finished at %d", self.tstart)
             raise StopIteration
             
 
@@ -188,8 +186,9 @@ class CraftStatMaker(object):
 
         idxs = np.rint(self.fft_freqs * float(ntimes) * self.tsamp).astype(int)
         for n, i in zip(self.fft_freqs, idxs):
-            freq = '{:0.1f}'.format(n).replace('.','d')
-            stat['fft.{}Hz'.format(freq)] = dm0f[i]
+            if i < len(dm0f): # Sample rate might not be high enough to measure all freqs
+                freq = '{:0.1f}'.format(n).replace('.','d')
+                stat['fft.{}Hz'.format(freq)] = dm0f[i]
 
         stat['fft.max'] = dm0f[1:].max()
         stat['fft.mean'] = dm0f[1:].mean()
@@ -207,8 +206,10 @@ class CraftStatMaker(object):
             axes[0].set_xlabel('Time')
             axes[0].set_xlabel('Channel')
             axes[1].semilogy(fftfreqs, dm0f)
-            for f in self.fft_freqs:
-                axes[1].axvline(f)
+            for f, i in zip(self.fft_freqs, idxs):
+                #axes[1].axvline(f)
+                if i < len(dm0f):
+                    axes[1].semilogy(fftfreqs[i], dm0f[i], 'o')
 
             axes[1].semilogy(stat['fft.max.freq'], stat['fft.max'], 'x')
 
