@@ -31,7 +31,8 @@ def _main():
         influxout = open(values.outfile, 'w')
     else:
         from influxdb import InfluxDBClient
-        client = InfluxDBClient(host='akingest01', database='craft')
+        client = InfluxDBClient(host='akingest01', database='craft', username='craftwriter', password='craft')
+
     body = []
     for filename in values.files:
         try:
@@ -84,10 +85,11 @@ def get_folded_stats(filename_p, client, influxout, values):
                    'offrms': float(off_rms), 'onmax': float(on_max),
                    'offavg': float(off_avg), 'snr': float(snr),
                    'snr_max': float(snr_max), 'snr_pdmp': float(snr_pdmp),
-                   'tint': float(tint)}
+                   'tint': float(tint),
+                   'sbid': sbid }
 
     body = {'measurement': 'psrfold',
-            'tags': {'psr': name+name_extra, 'sbid': sbid, 'ant': ant,
+            'tags': {'psr': name+name_extra, 'ant': ant,
                      'beam': int(beam)},
             'time': int(tstamp*1e9),
             'fields': fields_dict}

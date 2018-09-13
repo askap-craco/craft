@@ -5,6 +5,8 @@ import json
 import logging
 import socket
 import datetime
+import boto3
+
 
 def _main ():
     '''
@@ -52,7 +54,17 @@ def _main ():
     else:
         logging.basicConfig(level=logging.INFO)
 
+    slack (text,sb,scan,cid,ant,sb_alias)
+
+def fix_beam(beam):
+    if (beam < 10):
+            beam = '0'+str(beam)
+    return beam
+
+def slack(text,sb,scan,cid,ant,sb_alias):
     
+    plot_dir = '/data/TETHYS_1/bha03n/test/auto_plots'
+
     #print "DM is",dm
     slack (text,sb,scan,cid,ant,sb_alias)
 
@@ -69,18 +81,15 @@ def slack(text,sb,scan,cid,ant,sb_alias):
     t_start = values[2]
     width = values[3]
     dm = values[5]
-    beam = values[6]
+    beam = int(values[6])
     mjd = values[7]
     latency_ms = values[8]
 
-    
+    beam = fix_beam(beam)
     ASKAP_SLACK_URL = "https://hooks.slack.com/services/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"
     SLACK_URL = { "askap": ASKAP_SLACK_URL }
     HOST = socket.gethostname()
-    
-    now = datetime.datetime.now()
-    expires = now + datetime.timedelta(minutes=10080)
-    
+
     message = {"text": text , "attachments" :
                [
                    {
@@ -134,7 +143,6 @@ def slack(text,sb,scan,cid,ant,sb_alias):
 
 
                                 ],
-                                     #"image_url": url1
                         }
                 ]
         }
