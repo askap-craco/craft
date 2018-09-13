@@ -39,11 +39,9 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    print sb
-    print scan
 
     check_realcand_flyseye(args)
-    slack (args) #text,sb,scan,cid,ant,sb_alias)
+    slack (args) 
 
     
 def fix_sb(sb):
@@ -55,7 +53,7 @@ def pol_beam(beam):
     beam = int(beam)
     beamx = 2 * beam
     beamy = 2 * beam + 1
-    #print beamx, beamy
+
     
     if (beamx < 9):
         beamx = '0'+str(beamx)
@@ -73,24 +71,24 @@ def fix_beam(beam):
     return str(beam)
     
 def make_vcraft_plots(sb,scan,cid,cid_vol,dm,beam_v,beam,ant,mjd, plot_time):
-	# Here cid would be the capture id for the particular observation.
-	# Here beam should be vcraft beam for the particular observation.
+    
+    # Here cid would be the capture id for the particular observation.
+    # Here beam should be vcraft beam for the particular observation.
+    
     print "X polarisation is",beam_v[0]
     print "Y polarisation is",beam_v[1]
     print "Making plots using filterbank made from voltages"
+    print "antenna is",ant
 
     original_sb = sb
     sb = fix_sb(sb)
     plot_dir = '/data/TETHYS_1/bha03n/test/auto_plots/'
     
-    #print "Vcraft beam is",beam
-    #print "CID to be used is",cid_vol
     for i in range (len(beam_v)):
         print "I is",i
         fil_path = ant +'/' + str(beam_v[i]) + '/beam.fil' 
         vcraft_path = ant+ '/'  + str(beam_v[i]) +'/'
         
-        #print "New filterbank path is",fil_path
         my_file = os.path.isfile(fil_path)
 
         if my_file:
@@ -102,8 +100,8 @@ def make_vcraft_plots(sb,scan,cid,cid_vol,dm,beam_v,beam,ant,mjd, plot_time):
             os.popen(cmd)
          
         assert os.path.isfile(fil_path), 'Looks like vcraft2fil didnt work'
-        output_file = '{}_{}_{}_{}_{}_{}_on'.format(original_sb, scan, cid, ant, beam_v[i])
-        cmd1v2 = 'dspsr -cepoch=start -D {dm:0.1f} -c {plot_time} -T {plot_time} -k askap -N source -O {plot_file}'.format(dm=dm, plot_time=plot_time, plot_file=output_file)
+        #output_file = '{}_{}_{}_{}_{}_{}_on'.format(original_sb, scan, cid, ant, beam_v[i])
+        #cmd1v2 = 'dspsr -cepoch=start -D {dm:0.1f} -c {plot_time} -T {plot_time} -k askap -N source -O {plot_file}'.format(dm=dm, plot_time=plot_time, plot_file=output_file)
                 
         cmd1 = 'dspsr -cepoch=start   -D ' + str(dm) + ' -c ' + str(plot_time) + '  -T ' + str(plot_time) + ' -k askap -N source -O '+ plot_dir +original_sb+'_'+scan+'_'+str(cid)+'_'+ant+'_'+str(beam_v[i]) + '_on'+' ' + fil_path
         print cmd1
@@ -121,14 +119,12 @@ def make_vcraft_plots(sb,scan,cid,cid_vol,dm,beam_v,beam,ant,mjd, plot_time):
     print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     
 def make_plots(sb,scan,cid,dm,beam,ant,mjd,plot_time):
-	# Here CID should be the scan ID and beam should be the actual beam
+    # Here CID should be the scan ID and beam should be the actual beam
 
     print "Making plots using offline filterbank"
-    #print "candidate in ",sb," at a DM of",dm
     # This is the case of making plots from the vcraft"
     fil_path = '/data/TETHYS_1/craftop/data/'+ sb + '/' + scan + '/' + ant + '/' + str(cid) + '/*' + str(beam) + '.fil'
     
-    #print "filterbank path is",fil_path
     plot_dir = '/data/TETHYS_1/bha03n/test/auto_plots/'
     start_pulse,nsamp,tsamp = find_start_time(sb,scan,cid,beam,mjd,ant)
     print nsamp
@@ -136,24 +132,18 @@ def make_plots(sb,scan,cid,dm,beam,ant,mjd,plot_time):
     tsamp_s = tsamp*1e-6
     print tsamp_s
     tobs = nsamp*tsamp_s
-    #print "Observation time", tobs, "s"
     t_left = tobs - start_pulse
-    #print "Time left after the pulse", t_left
     
     band = 336
     freq = 1.4
     delay = 8.3 * dm * band * np.power(freq,-3)
     delay_s = delay*1e-6
-    #print "despersive delay is",delay*1e-6
     
-    #plot_time = delay
-    #plot_time =  0.8 # This is for mode3!
     
     if (plot_time > t_left):
          plot_time = t_left
          
     timeoff = start_pulse - (plot_time/2)
-    #print "Timeoff is",timeoff
     
     
     cmd1 = 'dspsr -cepoch=start -S ' + str(timeoff) + ' -D ' + str(dm) + ' -c ' + str(plot_time) + '  -T ' + str(plot_time) + ' -k askap -N source -O '+ plot_dir +sb+'_'+scan+'_'+str(cid)+'_'+ant+'_'+str(beam)+'_off' + ' ' + fil_path
@@ -182,31 +172,19 @@ def check_realcand_flyseye(args):
     print beam_path
     beam_v = []
     for b in glob.glob(beam_path):
-        #print "File is",b
-        ant = b.split('/')[0]
+        #ant = b.split('/')[0]
         beam_v.append(b.split('/')[1])
         
-
-    print "The two polarisaion beams are",beam_v
-    #print "ant is",ant
-    #sb_new = fix_sb(sb)
+    beam_v = np.unique(beam_v)
+    print "The two polarisation beams are",beam_v
+    print "Antenna is",ant
     snop = np.loadtxt("snoopy.log")
-    #print snop
     snr = snop[0]
     fredsnop_mjd = snop[7]
     beam = int(snop[6])
     dm = snop[5]
-
     beam = fix_beam(beam) 
 
-    #beamx = beam_v[0]
-    #beamy = beam_v[1]
-    #beamx, beamy = pol_beam(beam)
-       
-    #print "Beam is",beam
-    #print "Beam X vcraft",  beamx
-    #print "I am passing",cid_vol
-    #print "Passing the Beam with x polarisation as",beamx
     print "Making plots now"
     mode_plot_time_map= {"0":0.7, "1":1.4,"2":3,"3":14}
                         
@@ -236,7 +214,7 @@ def find_start_time(sb,scan,cid,beam,mjd,ant):
     print "Start time of the pulse is",start_time
     return start_time,nsamp,tsamp
 
-def slack(args): #text,sb,scan,cid,ant,sb_alias):
+def slack(args): 
     sb = args.sbid
     sb_alias = args.alias
     scan = args.scan

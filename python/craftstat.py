@@ -55,7 +55,7 @@ def _main():
         influxout = open(values.outfile, 'w')
     else:
         from influxdb import InfluxDBClient
-        client = InfluxDBClient(host='akingest01', database='craft')
+        client = InfluxDBClient(host='akingest01', database='craft', username='craftwriter', password='craft')
 
     for filename in values.files:
         try:
