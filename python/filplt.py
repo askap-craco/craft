@@ -23,6 +23,7 @@ def _main():
     parser.add_argument('-m', '--mjd', type=float, help='MJD to plot')
     parser.add_argument('-s','--show', action='store_true', help='Show')
     parser.add_argument('-c','--cand-file', help='Candidate file')
+    parser.add_argument('-a','--all', action='store_true', help='Plot all beams if a candidate file is specified, not just the detection beam')
     parser.add_argument('-n','--nsamp', type=int, help='Number of samples', default=1024)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
@@ -40,11 +41,18 @@ def _main():
         if len(candidates.shape) == 1:
             candidates.shape = (1, -1)
         ncand = candidates.shape[0]
+
         for c in xrange(ncand):
             # 103.02 70298 60.9747 11 685 475.36 15 58374.2622446670 694.09
             mjd=candidates[c,7]
             dm=candidates[c,5]
-            for f in values.files:
+            beam=int(candidates[c,6])
+            if values.all:
+                beam_files = values.files
+            else:
+                beam_files = [f for f in values.files if int(f.split('.')[-2]) == beam]
+
+            for f in beam_files:
                 plot(f, values, mjd, dm)
 
 def plot(f, values, mjd=None, dm=None):
@@ -75,8 +83,8 @@ def plot(f, values, mjd=None, dm=None):
     d = s[samp_start:samp_start+nsamp]
     # rescale to roughly 0 mean and 1 variance
     d = d.astype(float)
-    d -= 128
-    d /= 18.
+    #d -= 128
+    #    d /= 18.
     
     assert s.header['nifs'] == 1
     assert d.shape == (nsamp, nchan)
@@ -101,7 +109,7 @@ def plot(f, values, mjd=None, dm=None):
         lbl = 'Offset (samples) from %0.9f'%mjd
         
     ax[1].set_xlabel(lbl)
-    #fig.savefig(f+'.png')
+    fig.savefig(f.replace('.fil','.png'))
 
     if values.show:
         pylab.show()
