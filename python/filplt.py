@@ -22,6 +22,7 @@ def _main():
     parser.add_argument('-d','--dm', type=float, default=0)
     parser.add_argument('-m', '--mjd', type=float, help='MJD to plot')
     parser.add_argument('-s','--show', action='store_true', help='Show')
+    parser.add_argument('-c','--cand-file', help='Candidate file')
     parser.add_argument('-n','--nsamp', type=int, help='Number of samples', default=1024)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
@@ -31,10 +32,22 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    for f in values.files:
-        plot(f, values)
+    if values.cand_file is None:
+        for f in values.files:
+            plot(f, values)
+    else:
+        candidates = np.loadtxt(values.cand_file, dtype=np.float64)
+        if len(candidates.shape) == 1:
+            candidates.shape = (1, -1)
+        ncand = candidates.shape[0]
+        for c in xrange(ncand):
+            # 103.02 70298 60.9747 11 685 475.36 15 58374.2622446670 694.09
+            mjd=candidates[c,7]
+            dm=candidates[c,5]
+            for f in values.files:
+                plot(f, values, mjd, dm)
 
-def plot(f, values):
+def plot(f, values, mjd=None, dm=None):
     s = sigproc.SigprocFile(f)
     fch1 = s.header['fch1']
     foff = s.header['foff']
@@ -42,16 +55,22 @@ def plot(f, values):
     tsamp = s.header['tsamp']
     tstart = s.header['tstart']
     nsamp = values.nsamp
-    if values.mjd is None:
+    if mjd is None:
+        mjd = values.mjd
+
+    if dm is None:
+        dm = values.dm
+        
+    if mjd is None:
         samp_start = nsamp/2
     else:
-        samp_start = int(np.round((values.mjd - tstart)*86400.0/tsamp)) - nsamp/2
+        samp_start = int(np.round((mjd - tstart)*86400.0/tsamp)) - nsamp/2
         if samp_start < 0:
             raise ValueError, 'Start sample is before start of filterbank start={}'.format(samp_start)
         if samp_start > s.file_size_elements:
             raise ValueError, 'End sample is after end of filterbank start={}'.format(samp_start)
 
-    print values.mjd, tstart, tsamp, samp_start
+    print tstart, tsamp, samp_start, 'MJD {:0.10f}'.format(mjd), 'dm', dm
 
     d = s[samp_start:samp_start+nsamp]
     # rescale to roughly 0 mean and 1 variance
@@ -64,7 +83,7 @@ def plot(f, values):
     channels = np.arange(nchan)*foff + fch1
     refchan = channels.min()
 
-    dd = roll_dedisperse(d, channels, refchan , tsamp, values.dm)
+    dd = roll_dedisperse(d, channels, refchan , tsamp, dm)
     sn = dd.mean(axis=1)*np.sqrt(nchan)
     offset = np.arange(nsamp) - nsamp/2
 
@@ -76,10 +95,10 @@ def plot(f, values):
     #fig.title(f)
     ax[1].set_ylabel('S/N')
     
-    if values.mjd is None:
+    if mjd is None:
         lbl = 'Offset (samples)'
     else:
-        lbl = 'Offset (samples) from %0.9f'%values.mjd
+        lbl = 'Offset (samples) from %0.9f'%mjd
         
     ax[1].set_xlabel(lbl)
     #fig.savefig(f+'.png')
