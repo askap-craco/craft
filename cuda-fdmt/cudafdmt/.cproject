@@ -66,8 +66,11 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
+					<fileInfo id="com.nvidia.cuda.ide.seven_five.configuration.debug.1134832286.90492777" name="fftbench.cu" rcbsApplicability="disable" resourcePath="src/fftbench.cu" toolsToInvoke="nvcc.compiler.base.1896988810.1745521646">
+						<tool id="nvcc.compiler.base.1896988810.1745521646" name="NVCC Compiler" superClass="nvcc.compiler.base.1896988810"/>
+					</fileInfo>
 					<sourceEntries>
-						<entry excluding="fredda.cu" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
+						<entry excluding="fftbench.cu|fredda.cu" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -102,7 +105,7 @@
 					<folderInfo id="com.nvidia.cuda.ide.seven_five.configuration.debug.1134832286.362592964." name="/" resourcePath="">
 						<toolChain id="com.nvidia.cuda.ide.toolchain.on_path.984065254" name="CUDA Toolkit on the path" superClass="com.nvidia.cuda.ide.toolchain.on_path">
 							<targetPlatform archList="all" binaryParser="com.nvidia.cuda.ide.elf;com.nvidia.cuda.ide.macho;com.nvidia.cuda.ide.cubin" id="com.nvidia.cuda.ide.targetPlatform.2013768608" isAbstract="false" name="Debug Platform" osList="linux,macosx" superClass="com.nvidia.cuda.ide.targetPlatform"/>
-							<builder buildPath="${workspace_loc:/cudafdmt}/Debugtest_cuda" id="com.nvidia.cuda.ide.builder.233783831" keepEnvironmentInBuildfile="true" name="CUDA Toolkit 8.0 Builder" parallelBuildOn="true" parallelizationNumber="optimal" superClass="com.nvidia.cuda.ide.builder"/>
+							<builder buildPath="${workspace_loc:/cudafdmt}/Debugtest_cuda" id="com.nvidia.cuda.ide.builder.233783831" keepEnvironmentInBuildfile="true" name="CUDA Toolkit 9.1 Builder" parallelBuildOn="true" parallelizationNumber="optimal" superClass="com.nvidia.cuda.ide.builder"/>
 							<tool commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX} ${OUTPUT} ${INPUTS} " id="nvcc.compiler.base.1333549116" name="NVCC Compiler" superClass="nvcc.compiler.base">
 								<option id="nvcc.compiler.include.paths.1363201954" name="Include paths (-I)" superClass="nvcc.compiler.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/Users/ban115/Downloads/cub/cub-1.6.4/cub"/>
@@ -181,7 +184,7 @@
 					<folderInfo id="com.nvidia.cuda.ide.seven_five.configuration.debug.1134832286.1566020468." name="/" resourcePath="">
 						<toolChain id="com.nvidia.cuda.ide.toolchain.on_path.1615983066" name="CUDA Toolkit on the path" superClass="com.nvidia.cuda.ide.toolchain.on_path">
 							<targetPlatform archList="all" binaryParser="com.nvidia.cuda.ide.elf;com.nvidia.cuda.ide.macho;com.nvidia.cuda.ide.cubin" id="com.nvidia.cuda.ide.targetPlatform.1499712631" isAbstract="false" name="Debug Platform" osList="linux,macosx" superClass="com.nvidia.cuda.ide.targetPlatform"/>
-							<builder buildPath="${workspace_loc:/cudafdmt}/Debugtest_cuda" id="com.nvidia.cuda.ide.builder.253211554" keepEnvironmentInBuildfile="true" name="CUDA Toolkit 8.0 Builder" parallelBuildOn="true" parallelizationNumber="optimal" superClass="com.nvidia.cuda.ide.builder"/>
+							<builder buildPath="${workspace_loc:/cudafdmt}/Debugtest_cuda" id="com.nvidia.cuda.ide.builder.253211554" keepEnvironmentInBuildfile="true" name="CUDA Toolkit 9.1 Builder" parallelBuildOn="true" parallelizationNumber="optimal" superClass="com.nvidia.cuda.ide.builder"/>
 							<tool commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX} ${OUTPUT} ${INPUTS} " id="nvcc.compiler.base.983767151" name="NVCC Compiler" superClass="nvcc.compiler.base">
 								<option id="nvcc.compiler.include.paths.575774230" name="Include paths (-I)" superClass="nvcc.compiler.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/Users/ban115/Downloads/cub/cub-1.6.4/cub"/>

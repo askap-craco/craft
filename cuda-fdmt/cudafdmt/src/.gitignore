@@ -3,5 +3,6 @@ test.in
 test.out
 *.o
 cudafdmt
+fftbench
 git_version
 

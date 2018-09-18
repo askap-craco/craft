@@ -1,8 +1,9 @@
 #CUDA_PATH?=/Developer/NVIDIA/CUDA-7.5
 #CUDA_PATH=/usr/local/cuda-5.5/
 
-objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_test.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o CandidateList.o DadaSource.o  InvalidSourceFormat.o Rescaler.o DataOrder.o DadaSet.o FilDirSet.o DadaSink.o
+objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o CandidateList.o DadaSource.o  InvalidSourceFormat.o Rescaler.o DataOrder.o DadaSet.o FilDirSet.o DadaSink.o
 
+all_objects=$(objects) fdmt_test.o fftbench.o
 
 include fredda.mk
 
@@ -14,25 +15,29 @@ GIT_VERSION := $(shell git describe --dirty --always --tags)
 
 NVCCFLAGS=-g -O3  -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler --compile --relocatable-device-code=true -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE)  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH) -I$(DADA_PATH)/include 
 
-NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE) -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE) -link -Xcompiler -L$(DADA_PATH)/lib -lpsrdada -lgomp -g 
+NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE) -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE) -link -Xcompiler -L$(DADA_PATH)/lib -lpsrdada -lgomp -lcufft -g 
 
 
 # Force rebuild on git change:http://stackoverflow.com/questions/3236145/force-gnu-make-to-rebuild-objects-affected-by-compiler-definition
 
-all: git_version cudafdmt
+all: git_version cudafdmt fftbenchapp
 
 .PHONY: all
 
 git_version: 
 	echo '$(GIT_VERSION)' | cmp -s - $@ || echo '$(GIT_VERSION)' > $@
 
-cudafdmt: $(objects) git_version
-	$(NVCC) $(NVLDFLAGS) -o cudafdmt $(objects)
+cudafdmt: $(objects) fdmt_test.o git_version
+	$(NVCC) $(NVLDFLAGS) -o cudafdmt $(objects) fdmt_test.o 
 
-$(objects): %o  : %cu
+fftbenchapp: fftbench.cu cufft_utils.h
+	$(NVCC) $(NVLDFLAGS) -o fftbench $(objects) fftbench.cu
+
+$(all_objects): %o  : %cu
 	$(NVCC) $(NVCCFLAGS) -o $@ -c $<
+
 
 .PHONY : clean
 
 clean :
-	rm cudafdmt $(objects)
+	rm cudafdmt fftbench $(objects)
