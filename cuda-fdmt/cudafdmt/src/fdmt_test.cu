@@ -432,6 +432,7 @@ int main(int argc, char* argv[])
 	// add signal handler
 	signal(SIGHUP, &handle_signal);
 	signal(SIGINT, &handle_signal);
+	signal(SIGTERM, &handle_signal);
 	int num_flagged_beam_chans = 0;
 	int num_flagged_times = 0;
 
@@ -464,7 +465,7 @@ int main(int argc, char* argv[])
 			int this_nt = source->read_samples_ant(&read_buf, iant);
 			if (this_nt != nt) { // WE've run out of samples
 				stopped = true;
-				//break;
+				break;
 			}
 			// File is in TBF order
 			// Output needs to be BFT order
