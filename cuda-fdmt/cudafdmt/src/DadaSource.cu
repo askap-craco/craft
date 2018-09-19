@@ -173,6 +173,7 @@ void* DadaSource::get_next_buffer(size_t& nt)
 		//m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
 		nt = nbytes/(npols()*nbeams()*nchans()*nbits()/8);
 	} else {
+		m_got_buffer = false;
 		nt = 0; // signal real failed
 	}
 

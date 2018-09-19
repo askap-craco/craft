@@ -432,6 +432,7 @@ int main(int argc, char* argv[])
 	// add signal handler
 	signal(SIGHUP, &handle_signal);
 	signal(SIGINT, &handle_signal);
+	signal(SIGTERM, &handle_signal);
 	int num_flagged_beam_chans = 0;
 	int num_flagged_times = 0;
 
