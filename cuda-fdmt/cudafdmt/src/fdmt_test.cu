@@ -433,8 +433,8 @@ int main(int argc, char* argv[])
 	signal(SIGHUP, &handle_signal);
 	signal(SIGINT, &handle_signal);
 	signal(SIGTERM, &handle_signal);
-	int num_flagged_beam_chans = 0;
-	int num_flagged_times = 0;
+	uint64_t num_flagged_beam_chans = 0;
+	uint64_t num_flagged_times = 0;
 
 	// Create streams - one for each antenan
 	const int MAX_NANT = 36;
@@ -540,14 +540,17 @@ int main(int argc, char* argv[])
 					// that channel will stay flagged for num_rescale_blocks
 					num_flagged_beam_chans += num_rescale_blocks;
 				}
-				// Count how many times have been flagged for this block
-				// TODO: DANGER DANGER! This doesn't count flagged times if num_rescale_blocks = 0
-				// This gave me a long headache at LAX when I set -s 1e30 stupidly.
-				int nsamps = (int)rescaler->nsamps.d[i];
-				// nsamps is the number of unflagged samples in nt*num_rescale_blocks samples
-				int nflagged = nt*num_rescale_blocks - nsamps;
-				assert (nflagged >= 0);
-				num_flagged_times += nflagged;
+
+				// it looks here like I'm counting twice, as we increment num_flagged_times outside the rescale_blocks_guard
+				// but I'm a bit wary here, bcasue of teh danger, danger
+//				// Count how many times have been flagged for this block
+//				// TODO: DANGER DANGER! This doesn't count flagged times if num_rescale_blocks = 0
+//				// This gave me a long headache at LAX when I set -s 1e30 stupidly.
+//				int nsamps = (int)rescaler->nsamps.d[i];
+//				// nsamps is the number of unflagged samples in nt*num_rescale_blocks samples
+//				int nflagged = nt*num_rescale_blocks - nsamps;
+//				assert (nflagged >= 0);
+//				num_flagged_times += nflagged;
 			}
 
 			if (dump_data) {
