@@ -158,7 +158,7 @@ int DadaSource::get_header_string(const char* name, char* out) {
 
 void* DadaSource::get_next_buffer(size_t& nt)
 {
-        m_read_timer.start();
+    m_read_timer.start();
 	// TODO: get main loop to release as soon as it's finished, rather than on next read, but it's too too much typing.
 	if (m_got_buffer) {
 		release_buffer();
@@ -166,18 +166,16 @@ void* DadaSource::get_next_buffer(size_t& nt)
 
   	uint64_t nbytes;
 	char* ptr = ipcio_open_block_read(m_hdu->data_block, &nbytes, &m_blkid);
-	assert(ptr != 0);
 	m_read_timer.stop();
+	if (ptr != 0) {
+		m_got_buffer = true;
+		// TODO check expected nbytes
+		//m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
+		nt = nbytes/(npols()*nbeams()*nchans()*nbits()/8);
+	} else {
+		nt = 0; // signal real failed
+	}
 
-	// need to tell cuda to mark this as pinned memory, but only do it  the first time around
-	// This improves throughput from 2.5 GB/sec to 12 GB/sec.
-	size_t nbufs = ipcbuf_get_nbufs(&m_hdu->data_block->buf);
-	m_buf_num++;
-
-	m_got_buffer = true;
-	// TODO check expected nbytes
-	//m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
-	nt = nbytes/(npols()*nbeams()*nchans()*nbits()/8);
 	return (void*) ptr;
 }
 

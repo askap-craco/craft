@@ -254,10 +254,11 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		}
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && fabs(dm0sum) < block_dm0thresh;
 		bool this_sample_ok = fabs(dm0z) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
+		bool beam_ok = ibeam != 71;
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh;
 		int outidx = t + nt*(outc + nf*outbeam);
 
-		if (this_sample_ok && last_sample_ok) {
+		if (this_sample_ok && last_sample_ok && beam_ok) {
 			sum += vin;
 			sum2 += vin*vin;
 			sum3 += vin*vin*vin;
