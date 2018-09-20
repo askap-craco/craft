@@ -3,6 +3,8 @@
 
 objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o CandidateList.o DadaSource.o  InvalidSourceFormat.o Rescaler.o DataOrder.o DadaSet.o FilDirSet.o DadaSink.o
 
+fftbench_objects=CudaTimer.o fftbench.o CpuTimer.o
+
 all_objects=$(objects) fdmt_test.o fftbench.o
 
 include fredda.mk
@@ -30,8 +32,8 @@ git_version:
 cudafdmt: $(objects) fdmt_test.o git_version
 	$(NVCC) $(NVLDFLAGS) -o cudafdmt $(objects) fdmt_test.o 
 
-fftbenchapp: fftbench.cu cufft_utils.h
-	$(NVCC) $(NVLDFLAGS) -o fftbench $(objects) fftbench.cu
+fftbenchapp:  cufft_utils.h $(fftbench_objects)
+	$(NVCC) $(NVLDFLAGS) -o fftbench $(fftbench_objects) 
 
 $(all_objects): %o  : %cu
 	$(NVCC) $(NVCCFLAGS) -o $@ -c $<
