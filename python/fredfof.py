@@ -28,7 +28,7 @@ count = 12
 header = 'S/N, sampno, secs from file start, boxcar, idt, dm, beamno,mjd, sampno_start, sampno_end, idt_start, idt_end, ncands'
 intf = '%d'
 floatf = '%0.3f'
-formats = (floatf, intf, floatf, intf, intf, floatf, intf,'%0.9f', intf, intf, intf, intf, intf)
+formats = (floatf, intf, floatf, intf, intf, floatf, intf,'%0.15f', intf, intf, intf, intf, intf)
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter

@@ -62,11 +62,11 @@ def _main():
     scalarmap._A = [] # URGH http://stackoverflow.com/questions/8342549/matplotlib-add-colorbar-to-a-sequence-of-line-plots
     consol = False
 
-
-    pylab.figure()
-    ax = pylab.gca()
     for f in values.files:
-        plot_file(f, values, ax, title=f)
+        plot_file(f, values, ax=None, title=f)
+        if values.show:
+            pylab.show()
+
 
     pylab.show()
 
@@ -195,7 +195,14 @@ def loadfile(fin):
 
     return np.array(a)
 
-def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=None):
+def plot_file(fin, values, ax=None, title=None, labels=True, subtitle=None, scmap=None):
+    if ax is None:
+        fig = pylab.figure()
+        gs = mpl.gridspec.GridSpec(2,2)
+        ax = plt.subplot(gs[1,:])
+        ax2 = plt.subplot(gs[0,0])
+        ax3 = plt.subplot(gs[0,1])
+        
     vin = loadfile(fin)
 
     if subtitle:
@@ -238,6 +245,18 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=Non
     for ib, b in enumerate(sorted(ubeams)):
         bmask = beamno == b
         ax.scatter(time[bmask], 1+dm[bmask], s=sn[bmask]**2, marker=markers[ib % len(markers)], c=boxcar[bmask], cmap=scmap, label='Beam %d' %b, picker=3, edgecolors='face', alpha=0.4, norm=mpl.colors.Normalize(1., 32.))
+        lbl = 'Beam {:d}'.format(int(b))
+        
+        if ax2 is not None:
+            ax2.hist(dm[bmask], label=lbl)
+            ax2.set_xlabel('DM (pc/cm3)')
+
+        if ax3 is not None:
+            ax3.hist(sn[bmask], label=lbl)
+            #ax3.legend(ncol=2)
+            ax3.set_xlabel('S/N')
+
+            
 
     ax.set_yscale('log')
     ax.set_ylim(1, 5000)
@@ -249,7 +268,7 @@ def plot_file(fin, values, ax, title=None, labels=True, subtitle=None, scmap=Non
         ax.set_ylabel('1+DM (pc/cm3)')
 
     if title:
-       ax.set_title(fin)
+       fig.suptitle(fin)
 
     if values.detail:
         plot_details(fin, vin, values, ax, title, labels, subtitle)
