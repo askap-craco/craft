@@ -345,6 +345,7 @@ class Plotter(object):
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
         if self.rescale:
+            print  'Doing rescale'
             beams -= beams.mean(axis=0)
             beams /= beams.std(axis=0)*np.sqrt(beams.shape[2])
             
@@ -416,11 +417,13 @@ class Plotter(object):
         fax.plot(bi.max(axis=1), freqs, label='max')
         fax.plot(bi.min(axis=1), freqs, label='min')
         fax.plot(bi.std(axis=1), freqs, label='std')
+        fax.plot(np.ones(nfreq), freqs, ls=':')
         #fax2 = fax.twiny()
         #fax2.plot(bi.std(axis=1),freqs, 'r', label='std')
         fax.set_ylim(freqs.min(), freqs.max())
         tax.plot(times, bi.mean(axis=0)*np.sqrt(nfreq), label='mean')
         tax.plot(times, bi.std(axis=0), label='std')
+        tax.plot(times, np.ones(ntimes), ls=':')
         #tax.plot(times, bi.max(axis=0), label='max')
         #tax.plot(times, bi.min(axis=0), label='min')
         tax.set_xlim(times.min(), times.max())
