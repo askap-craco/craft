@@ -32,12 +32,11 @@ def _main():
     else:
         from influxdb import InfluxDBClient
         client = InfluxDBClient(host='akingest01', database='craft', username='craftwriter', password='craft')
-
     body = []
     for filename in values.files:
         try:
             logging.debug("Handling {}".format(filename))
-            body.append(get_folded_stats(filename, client, influxout, values))
+            body.append(get_folded_stats(filename, client, influxout, values, values.verbose))
         except Exception as inst:
             logging.exception('Exception in get_folded_stats:{0}'.format(inst))
     if influxout is not None:
@@ -51,7 +50,7 @@ def _main():
     return 0
 
 
-def get_folded_stats(filename_p, client, influxout, values):
+def get_folded_stats(filename_p, client, influxout, values, verbose):
     filename = os.path.basename(filename_p)
     assert filename.endswith('.ar')
     filebits = filename.split('_')
@@ -72,7 +71,8 @@ def get_folded_stats(filename_p, client, influxout, values):
     beam = beam[1:] if beam.startswith('0') else beam
 
     name, tstamp, weff, on_count, off_rms, on_max,\
-        off_avg, tint, snr, snr_pdmp = extract_stats_from_archive(filename_p)
+        off_avg, tint, snr, snr_pdmp, nchan, nsubint,\
+        nchan_zapped = extract_stats_from_archive(filename_p, verbose)
     snr_max = -1.0
     if float(off_rms) != 0.0:
         snr_max = (float(on_max)-float(off_avg)) / float(off_rms)
@@ -81,15 +81,18 @@ def get_folded_stats(filename_p, client, influxout, values):
     snr = snr / sqrt(tint)
     snr_pdmp = snr_pdmp / sqrt(tint)
 
-    fields_dict = {'weff': float(weff), 'oncount': int(on_count),
-                   'offrms': float(off_rms), 'onmax': float(on_max),
-                   'offavg': float(off_avg), 'snr': float(snr),
-                   'snr_max': float(snr_max), 'snr_pdmp': float(snr_pdmp),
-                   'tint': float(tint),
-                   'sbid': sbid }
+    zap_frac = float(nchan_zapped)/float(nchan*nsubint)
+    snr_pdmp_zap = snr_pdmp / sqrt(1.-zap_frac)
+
+    fields_dict = {'weff': weff, 'oncount': on_count,
+                   'offrms': off_rms, 'onmax': on_max,
+                   'offavg': off_avg, 'snr': snr,
+                   'snr_max': snr_max, 'snr_pdmp': snr_pdmp,
+                   'snr_pdmp_zap': snr_pdmp_zap, 'zap_frac': zap_frac,
+                   'tint': tint}
 
     body = {'measurement': 'psrfold',
-            'tags': {'psr': name+name_extra, 'ant': ant,
+            'tags': {'psr': name+name_extra, 'sbid': sbid, 'ant': ant,
                      'beam': int(beam)},
             'time': int(tstamp*1e9),
             'fields': fields_dict}
@@ -97,13 +100,15 @@ def get_folded_stats(filename_p, client, influxout, values):
     return body
 
 
-def extract_stats_from_archive(archive_fn):
+def extract_stats_from_archive(archive_fn, verbose):
     import subprocess as sb
     from astropy.time import Time
     psrstat_command = ["/home/sha355/bin/psrstat", "-j", "DFTp", "-Qq", "-c",
                        "^off=minimum:smooth=mean:width=.5", "-c",
                        "name,int:mjd,weff,on:count,off:rms,on:max,off:avg,length,snr,snr=pdmp,snr",
                        archive_fn]
+    if verbose:
+        logging.debug("Running {}".format(psrstat_command))
     psrstat_process = sb.Popen(psrstat_command, shell=False, stdout=sb.PIPE,
                                stderr=sb.PIPE)
     (psrstat_out, psrstat_err) = psrstat_process.communicate()
@@ -145,18 +150,55 @@ def extract_stats_from_archive(archive_fn):
             on_max = -1
             snr = -1
             snr_pdmp = -1
+            tint = -1
             off_avg = -1
             print "Error interpreting psrstat output:"
             print psrstat_out
+            print len(out)
 
     weff_tmp = weff_turns.replace('.', '', 1).replace('e', '', 1).replace('-', '', 1)
     if not weff_tmp.isdigit():
         weff_turns = -1
 
     tstamp = Time(float(mjd), format="mjd").unix
-    return name, tstamp, float(weff_turns), float(on_count), float(off_rms),\
+
+    # get number of zapped channels:
+    psrstat_command = ["/home/sha355/bin/psrstat", "-Qq", "-c",
+                       "nchan,nsubint", archive_fn]
+    if verbose:
+        logging.debug("Running {}".format(psrstat_command))
+    psrstat_process = sb.Popen(psrstat_command, shell=False, stdout=sb.PIPE,
+                               stderr=sb.PIPE)
+    (psrstat_out, psrstat_err) = psrstat_process.communicate()
+    if verbose:
+        logging.debug("Obtained {}".format(psrstat_out))
+    out = psrstat_out.split()
+    nchan = out[0]
+    nsubint = out[1]
+
+    psrstat_command = ["/home/sha355/bin/psrstat", "-Qq", "-c",
+                       "int:wt", archive_fn]
+    if verbose:
+        logging.debug("Running {}".format(psrstat_command))
+    psrstat_process = sb.Popen(psrstat_command, shell=False, stdout=sb.PIPE,
+                               stderr=sb.PIPE)
+    (psrstat_out, psrstat_err) = psrstat_process.communicate()
+    out = psrstat_out.split()[0].split(",")
+    nchan_zapped = out.count('0')
+    if verbose:
+        logging.debug("Determined {} zapped channels (out of {})".format(nchan_zapped, int(nchan)*int(nsubint)))
+
+    if verbose:
+        debug_str = "Obtained {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10} {11} {12}"
+        debug_str = debug_str.format(name, mjd, weff_turns, on_count,
+                                      off_rms, on_max, off_avg, tint, snr, snr_pdmp,
+                                      nchan, nsubint, nchan_zapped)
+        logging.debug(debug_str)
+
+
+    return name, tstamp, float(weff_turns), int(on_count), float(off_rms),\
         float(on_max), float(off_avg), float(tint), float(snr),\
-        float(snr_pdmp)
+        float(snr_pdmp), int(nchan),int(nsubint),int(nchan_zapped)
 
 
 if __name__ == "__main__":
