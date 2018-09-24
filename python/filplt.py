@@ -63,6 +63,7 @@ def plot(f, values, mjd=None, dm=None):
         
     if mjd is None:
         samp_start = nsamp/2
+        mjd = tstart + samp_start*tsamp/86400.0
     else:
         samp_start = int(np.round((mjd - tstart)*86400.0/tsamp)) - nsamp/2
         if samp_start < 0:
@@ -70,13 +71,14 @@ def plot(f, values, mjd=None, dm=None):
         if samp_start > s.file_size_elements:
             raise ValueError, 'End sample is after end of filterbank start={}'.format(samp_start)
 
+
     print tstart, tsamp, samp_start, 'MJD {:0.10f}'.format(mjd), 'dm', dm
 
     d = s[samp_start:samp_start+nsamp]
     # rescale to roughly 0 mean and 1 variance
     d = d.astype(float)
-    d -= 128
-    d /= 18.
+    #d -= 128
+#    d /= 18.
     
     assert s.header['nifs'] == 1
     assert d.shape == (nsamp, nchan)

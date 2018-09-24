@@ -399,16 +399,21 @@ class Plotter(object):
         if nbeams > 1:
             self.draw_many(beams, im_extent, origin, imzmin, imzmax, freqs)
         else:
-            self.draw_single(beams, im_extent, origin, imzmin, imzmax, freqs, times)
+            self.draw_single(beams, im_extent, origin, freqs, times)
 
         pylab.draw()
 
-    def draw_single(self, beams, im_extent, origin, imzmin, imzmax, freqs, times):
+    def draw_single(self, beams, im_extent, origin, freqs, times):
         bi = beams[:, 0, :]
         ntimes, nfreq = bi.shape
         bi = bi.T
-        print 'BISHAPE', bi.shape, 'ZRAGE', imzmin, imzmax
         fig, [rawax, tax, fax] = self.figs['dynspec']
+        if self.imzrange is None:
+            self.imzrange = (bi.min(), bi.max())
+
+        imzmin, imzmax = self.imzrange
+        print 'BISHAPE', bi.shape, 'ZRAGE', imzmin, imzmax
+        
         rawax.imshow(bi, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none')
         #if imzmin is None and imzmax is None:
         #self.imzrange = (bi.min(), bi.max())
