@@ -36,7 +36,7 @@ def _main ():
     #mode = args.mode
 
     # Temp fix
-    sb = sb[0:2]+'0'+sb[2:]
+    #sb = sb[0:2]+'0'+sb[2:]
     cid = fix_cid(cid)
         
     if values.verbose:
