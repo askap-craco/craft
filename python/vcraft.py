@@ -138,7 +138,7 @@ class VcraftFile(object):
         fin = self.fin
         nchan = len(self.freqs)
         self.fin.seek(self.hdrsize)
-        assert startsamp >= 0, 'Invalid startsamp {}'.format(startsamp)
+        assert startsamp >= 0, 'Invalid startsamp {} {}'.format(startsamp, self.fname)
         if nsamp is None:
             nsamp = self.nsamps - startsamp
 
@@ -357,7 +357,10 @@ class VcraftMux(object):
         for ifile, f in enumerate(self._files):
             out_chans = self.freqconfig.chanmaps[ifile, :]
             fsamp_start = samp_start + self.sample_offsets[ifile]
-            d[:, out_chans] = f.read(fsamp_start, nsamp)
+            try:
+                d[:, out_chans] = f.read(fsamp_start, nsamp)
+            except:
+                warnings.warn('File read at funny time. Setting to zero')
 
         return d
 
