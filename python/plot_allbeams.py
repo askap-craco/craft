@@ -287,6 +287,7 @@ class Plotter(object):
             self.squeeze_zrange(0.5)
         elif event.key == 'r':
             self.rescale = not self.rescale
+            self.imzrange = None
         elif event.key == 'e':
             self.goto_end()
         elif event.key == 'b':

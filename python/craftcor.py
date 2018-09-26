@@ -16,6 +16,7 @@ from calc11 import ResultsFile
 from corruvfits import CorrUvFitsFile
 from astropy.coordinates import SkyCoord
 import multiprocessing
+import signal
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -213,6 +214,9 @@ class FringeRotParams(object):
 
 class Correlator(object):
     def __init__(self, ants, sources, values):
+        self.running = True
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
         self.ants = ants
         self.values = values
         self.pool = None
@@ -252,7 +256,7 @@ class Correlator(object):
         self.f0 = self.ants[0].vfile.freqs[0]
         self.freqs = self.ants[0].vfile.freqs
         self.fmid = self.freqs.mean()
-        self.inttime_secs = self.nint*self.nfft/(self.fs*1e6)
+        self.inttime_secs = float(self.nint*self.nfft)/(self.fs*1e6)
         self.inttime_days = self.inttime_secs/86400.
         self.curr_intno = 0
         self.curr_samp = self.curr_intno*self.nint + 1000
@@ -264,6 +268,8 @@ class Correlator(object):
 
         logging.debug('F0 %f FINE CHANNEL %f kHz num=%d freqs=%s', self.f0, self.fine_chanbw*1e3, self.nfine_chan, self.freqs)
 
+    def exit_gracefully(self, signum, frame):
+        self.running = False
 
     def parse_parset(self):
         self.parset = {}
@@ -337,12 +343,18 @@ class Correlator(object):
 
     def do_f(self):
         for iant, ant in enumerate(self.ants):
+            if not self.running:
+                raise KeyboardInterrupt()
+
             ant.do_f(self)
 
     def do_x(self):
         nant = len(self.ants)
         for ia1 in xrange(nant):
             for ia2 in xrange(ia1, nant):
+                if not self.running:
+                    raise KeyboardInterrupt()
+                    
                 a1 = self.ants[ia1]
                 a2 = self.ants[ia2]
                 self.do_x_corr(a1, a2)
@@ -429,7 +441,7 @@ def _main():
     #antennas = [AntennaSource(vcraft.VcraftFile(f)) for f in values.files]
     corr = Correlator(antennas, sources, values)
     try:
-        while(True):
+        while(corr.running):
             #fq = corr.fileout.fq_table()
             #an = corr.fileout.an_table(corr.ants)
             #su = corr.fileout.su_table(sources)

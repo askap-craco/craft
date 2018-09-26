@@ -10,6 +10,7 @@ import os
 import pyfits
 from pyfits import Column as Col
 from astropy.time import Time
+import warnings
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -216,7 +217,8 @@ class CorrUvFitsFile(object):
         dayfrac = jd - day
 
         visdata['UU'], visdata['VV'], visdata['WW'] = uvw
-        visdata['DATE'] = jd
+        warnings.warn('Not sure whether this whould be day or jd')
+        visdata['DATE'] = day 
         visdata['_DATE'] = dayfrac
         visdata['BASELINE'] = (ia1 + 1)*256 + ia2 + 1
         visdata['INTTIM'] = inttim
