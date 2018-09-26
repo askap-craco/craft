@@ -63,7 +63,12 @@ def _main():
         if bl not in outfiles.keys():
             a1 = get_antname(hdu, ia1)
             a2 = get_antname(hdu, ia2)
-            outf = '{}-{}-{}.fil'.format(fin.replace('.fits',''),a1,a2)
+            if ia1 == ia2:
+                extra = 'auto'
+            else:
+                extra = 'cross'
+                
+            outf = '{}-{}-{}-{}.fil'.format(fin.replace('.fits',''),a1,a2, extra)
             jd = row['DATE']
             inttime = row['INTTIM']
             dayfrac = row['_DATE']
