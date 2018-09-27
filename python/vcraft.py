@@ -369,6 +369,7 @@ def mux_by_pol(filenames, delays=None):
     :return: Dictionary keyened by 'X' or "Y
     '''
     all_files = [VcraftFile(f) for f in filenames]
+    all_files.sort(key=lambda f:f.pol)
     mux_by_pol = itertools.groupby(all_files, lambda f:f.pol)
     muxes = {pol:VcraftMux(list(files), delays) for pol, files in mux_by_pol}
     
@@ -377,6 +378,8 @@ def mux_by_pol(filenames, delays=None):
 
 def mux_by_antenna(filenames, delays=None):
     all_files = [VcraftFile(f) for f in filenames]
+    all_files.sort(key=lambda f:f.hdr['ANT'][0])
+    ants = [f.hdr['ANT'][0] for f in all_files]
     mux_by_ant = itertools.groupby(all_files, lambda f:f.hdr['ANT'][0])
     muxes = [VcraftMux(list(files), delays) for antname, files in mux_by_ant]
     muxes.sort(key=lambda mux: mux.antno) # sort by antenna number
