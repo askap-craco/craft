@@ -17,13 +17,12 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-s','--show', action='store_true', default=False, help='Show plots')
     parser.add_argument('-t','--scan', help='Scan to use, 1st=0, 2nd=1, ...', type=int, default=0)
-    parser.add_argument('-p','--hdata', help='Path to header files', type=str, required=True)
-    parser.add_argument('-d','--data', help='Path to .real and .imag data files', dest='files', required=True)
+    parser.add_argument('-p','--hfiles', help='Path to header files', type=str, required=True, nargs='*')
+    parser.add_argument('-d','--data', help='Path to .real and .imag data files', dest='files', required=True, nargs='*')
     parser.add_argument('-b','--beam', help='Beam number', type=int, required=True)
     parser.add_argument('-i','--sbid', help='SB ID', type=int, required=True)
     values = parser.parse_args()
 
-    hpath	  = values.hdata
     beamno	  = values.beam
     mode	  = '?'
     sb		  = 'SB' + str(values.sbid)
@@ -42,19 +41,11 @@ def _main():
 
     SN_THRESHOLD = 2.0
 
-    hfiles = glob.glob('{}co*/beam{}/co*_c*_f*.{}'.format(hpath, beamno, fileextension))
-
-    if sb not in hpath and sb not in values.files:
-    	print 'WARNING: {} is not in the directory paths to the header files and .real files.'.format(sb)
-
-    if not hfiles:
-    	print 'No header files for beam{} in {}'.format(beamno, hpath)
-	sys.exit()
-    else:
-    	print 'Header files for beam{}: {}'.format(beamno, hpath)
-    
-
-    antennalist = next(os.walk(hpath))[1]
+    #hfiles = glob.glob('{}ak*/beam{}/ak*_c*_f*.{}'.format(hpath, beamno, fileextension))
+    hfiles = values.hfiles
+    hdrs = [DadaHeader.fromfile(f) for f in hfiles]
+        
+    antennalist = sorted(set([f['ANT'][0].lower() for f in hdrs]))
     print 'Antennalist: ', antennalist
 
     # determine the available cards from the header files
@@ -74,7 +65,7 @@ def _main():
     for f in hfiles:
         hdr = DadaHeader.fromfile(f)
 
-	antenna_s = 'co{:02d}'.format(int(hdr.get_value('ANTENNA_NO')))
+	antenna_s = 'ak{:02d}'.format(int(hdr.get_value('ANTENNA_NO')))
     	antenna_i = antennalist.index(antenna_s)
     
     	card = int(hdr.get_value('CARD_NO'))
@@ -116,33 +107,17 @@ def _main():
     nchan = 54
     freqs = (ncards * nfpgas * nfpgachans) - 1
 
-    dfiles = glob.glob('{}/*_b{}_*.real'.format(values.files, beamno))
+    dfiles = values.files
     if not dfiles:
     	print 'No data files in {} for beam{}'.format(values.files, beamno)
 	sys.exit()
 
     cf_sorted_spec = np.zeros((nant, len(dfiles), ncards * nfpgas * nfpgachans, nchan), dtype=np.complex64)
     cf_sorted_av   = np.zeros((nant, len(dfiles), ncards * nfpgas, nchan), dtype=np.complex64)
-    timestamps = []
+    timestamps = dfiles
 
     for f in dfiles:
     	scan = dfiles.index(f)
-	print 'Reading data for scan {}'.format(f)
-
-	# get the timestamp of the scan from the filename
-	filename = f[len(values.files):]
-	timestamplen = 14		# timestamp of the scan is 14 characters long
-	for sindex in range(len(filename) - timestamplen + 1):
-	    try:
-	    	timestamp = int(filename[sindex:sindex + timestamplen])
-		timestamps.append(timestamp)
-		break
-	    except ValueError as ex:
-	    	pass
-
-	if not timestamps:
-	    print 'Timestamp of the scan not found in filename {}'.format(filename)
-
         rfile = f
         imagfile = f.replace('.real','.imag')
         rdata = np.loadtxt(rfile)
@@ -206,6 +181,7 @@ def _main():
 		    if snoffset > SN_THRESHOLD:
 		    	offset = cf_sorted_av.shape[3]/2 - ioffsetmax
 
+                print 'DELAYS', delays.shape
 		delays[antenna+1, scan, fpga] = offset
 		#print '{} c{} f{} {}'.format(antennalist[antenna+1], fpga/nfpgas + 1, fpga%nfpgas, offset)
 
