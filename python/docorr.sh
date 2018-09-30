@@ -5,8 +5,8 @@
 #dlname=`basename $3`
 #outdir=$4
 
-suffix=$1
-shift
+#suffix=$1
+#shift
 
 if [[ ! -e $fcm ]] ; then
     echo No FCM $fcm
@@ -23,6 +23,8 @@ fi
 
 outdir=$corrdir/$suffix
 
+echo "WRITING DATA TO $outdir"
+
 mkdir -p $outdir
 chmod a+w $outdir
 
@@ -34,12 +36,17 @@ fi
 for f in $@ ; do
     dlname=`basename $f`
     echo "DL NAME IS $dlname"
-    beams=`ls -d $f/*/beam?? |  awk -F / '{print $3}' | sort | uniq`
+    beams=`ls -d $f/*/beam37 |  awk -F / '{print $3}' | sort | uniq`
     echo "BEAMS ARE $beams"
     for b in $beams; do
 	b=`basename $b`
 	echo "beam is $b"
-	craftcor.py --parset $fcm --calcfile $calcfile  -i 1024 -o $outdir/${dlname}_${b}.fits $dlname/*/$b/*.vcraft --fft-size=1
+	
+	#tsp craftcor.py --parset $fcm --calcfile $calcfile  -i 16384 -o $outdir/${dlname}_call_${b}.fits $dlname/ak??/$b/*c*.vcraft --fft-size=1
+
+	for c in {1..7} ; do
+	    tsp craftcor.py --parset $fcm --calcfile $calcfile  -i 16384 -o $outdir/${dlname}_c${c}_${b}.fits $dlname/ak??/$b/*c${c}*.vcraft --fft-size=1
+	done
     done
 done
 

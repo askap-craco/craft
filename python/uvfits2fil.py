@@ -36,7 +36,6 @@ def _main():
     hdu = fits.open(fin)
     g = hdu['PRIMARY']
     hdu.info()
-    print g.columns
     outfiles = {}
     hdr = g.header
     fcent = hdr['CRVAL4'] / 1e6 # MHz

@@ -25,6 +25,7 @@ def _main():
     parser.add_argument('-c','--cand-file', help='Candidate file')
     parser.add_argument('-a','--all', action='store_true', help='Plot all beams if a candidate file is specified, not just the detection beam')
     parser.add_argument('-n','--nsamp', type=int, help='Number of samples', default=1024)
+    parser.add_argument('-r','--rescale', action='store_true', help='Rescale')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -79,8 +80,7 @@ def plot(f, values, mjd=None, dm=None):
         if samp_start > s.file_size_elements:
             raise ValueError, 'End sample is after end of filterbank start={}'.format(samp_start)
 
-
-    print tstart, tsamp, samp_start, 'MJD {:0.10f}'.format(mjd), 'dm', dm
+    print 'tstart={} tsamp={} samp_start={} nsamp={} fil nsampsn={} MJD={:10f} dm={}'.format(tstart, tsamp, samp_start, nsamp, s.nsamples, mjd, dm)
 
     d = s[samp_start:samp_start+nsamp]
     # rescale to roughly 0 mean and 1 variance
@@ -89,6 +89,9 @@ def plot(f, values, mjd=None, dm=None):
     assert d.shape == (nsamp, nchan)
     channels = np.arange(nchan)*foff + fch1
     refchan = channels.min()
+    if values.rescale:
+        d -= d.mean(axis=0)
+        d /= d.std(axis=0)
 
     dd = roll_dedisperse(d, channels, refchan , tsamp, dm)
     sn = dd.mean(axis=1)*np.sqrt(nchan)

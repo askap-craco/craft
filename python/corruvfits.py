@@ -241,6 +241,7 @@ class CorrUvFitsFile(object):
         for ia, a in enumerate(self.dshape[::-1]):
             hdr['NAXIS{}'.format(ia+2)] = a
 
+
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
