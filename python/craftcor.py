@@ -388,7 +388,7 @@ class Correlator(object):
                         #xx[:,pout] = (d1 * np.conj(d2)).mean(axis=0)
                         # vdot conjugates the first argument
                         # this is equivalent to (d1 * conj(d2)).mean(axis=0)
-                        if self.sideband == 1:
+                        if self.sideband == -1:
                             xx[c, pout] = np.vdot(d2[:, c], d1[:, c])/ntimes
                         else:# take complex conjugate if inverted
                             xx[c, pout] = np.vdot(d1[:, c], d2[:, c])/ntimes
@@ -408,14 +408,14 @@ class Correlator(object):
 
 
 def parse_delays(values):
-    delayfile = os.path.join(os.path.dirname(values.parset), 'fpga_delays.txt')
+    delayfile = values.calcfile.replace('.im','.hwdelays')
     delays = {}
     if os.path.exists(delayfile):
         with open(delayfile, 'rU') as dfile:
             for line in dfile:
                 bits = line.split()
                 if not line.startswith('#') and len(bits) == 2:
-                    delays[bits[0].strip()] = int(bits[1])
+                    delays[bits[0].strip()] = -int(bits[1])
 
         logging.info('Loaded %s delays from %s', len(delays), delayfile)
     else:
