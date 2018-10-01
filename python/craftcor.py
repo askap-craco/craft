@@ -168,10 +168,7 @@ class AntennaSource(object):
         nfine = corr.nfft - 2*corr.nguard_chan
 
         for c in xrange(corr.ncoarse_chan):
-            offset_freq = -1
-            warnings.warn('Adding frequency offset taht we dont understand of {}'.format(offset_freq))
-            cfreq = corr.freqs[c] + offset_freq
-            coarse_off = cfreq - corr.f0
+            cfreq = corr.freqs[c]
             freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw
             if corr.sideband == -1:
                 freqs = -freqs

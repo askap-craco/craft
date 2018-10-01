@@ -284,6 +284,13 @@ class VcraftMux(object):
         self.samp_rate = float(self.hdr_identical('SAMP_RATE'))
         freq_str = self.allhdr('FREQS')
         freqs = np.array([map(float, flist.split(',')) for flist in freq_str])
+
+        # there was traditionally a frequency offset of + 1inserted in the header
+        # undo it if nothing is specified in the header to the contrary
+        
+        freq_offset = float(self.hdr_identical('FREQ_OFFSET', -1.0))
+        freqs += freq_offset
+        
         nchan_per_file = len(freqs[0])
         assert freqs.shape == (len(self._files), nchan_per_file)
         
@@ -323,21 +330,21 @@ class VcraftMux(object):
         self.pol = pols[0]
 
 
-    def allhdr(self, cardname):
+    def allhdr(self, cardname, default=None):
         '''
         Returns a list of header values for all files, with the given card name
         '''
-        header_values = [f.hdr[cardname][0] for f in self._files]
+        header_values = [f.hdr.get_value(cardname, default) for f in self._files]
         return header_values
 
-    def hdr_identical(self, cardname):
+    def hdr_identical(self, cardname, default=None):
         '''
         Returns the header value for the given cardname. 
         Checks the value is the same for all files. If not, it throws a ValueError
         '''
-        hdr_values = set(self.allhdr(cardname))
+        hdr_values = set(self.allhdr(cardname, default))
         if len(hdr_values) != 1:
-            raise ValueError('Exepected the same header value for {} for all files. Got these values {}'.format(cardname, self.allhdr(cardname)))
+            raise ValueError('Exepected the same header value for {} for all files. Got these values {}'.format(cardname, self.allhdr(cardname, default)))
 
         return hdr_values.pop()
 

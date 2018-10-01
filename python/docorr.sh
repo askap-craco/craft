@@ -42,10 +42,10 @@ for f in $@ ; do
 	b=`basename $b`
 	echo "beam is $b"
 	
-	#tsp craftcor.py --parset $fcm --calcfile $calcfile  -i 16384 -o $outdir/${dlname}_call_${b}.fits $dlname/ak??/$b/*c*.vcraft --fft-size=1
+	tsp craftcor.py --parset $fcm --calcfile $calcfile  -i 1024 -o $outdir/${dlname}_c_${b}.fits $dlname/ak??/$b/*c4_f3.vcraft --fft-size=1
 
 	for c in {1..7} ; do
-	    tsp craftcor.py --parset $fcm --calcfile $calcfile  -i 16384 -o $outdir/${dlname}_c${c}_${b}.fits $dlname/ak??/$b/*c${c}*.vcraft --fft-size=1
+	    echo tsp craftcor.py --parset $fcm --calcfile $calcfile  -i 16384 -o $outdir/${dlname}_c${c}_${b}.fits $dlname/ak??/$b/*c${c}*.vcraft --fft-size=1
 	done
     done
 done
