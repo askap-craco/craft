@@ -45,10 +45,11 @@ class CorrUvFitsFile(object):
         hdr['BSCALE'] = 1.0
         hdr['BZERO'] = 0.0
         hdr['BUNIT'] = 'UNCALIB'
+        refchan = float(nchan)/2. + 0.5 # half a channel because it's centered on DC 
         # CTYPES
         self.add_type(2, ctype='COMPLEX', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
         self.add_type(3, ctype='STOKES', crval=-5.0, cdelt=-1.0, crpix=1.0, crota=0.0)
-        self.add_type(4, ctype='FREQ', crval=fcent*1e6, cdelt=foff*1e6, crpix=(float(nchan)/2. + 1), crota=0.0)
+        self.add_type(4, ctype='FREQ', crval=fcent*1e6, cdelt=foff*1e6, crpix=refchan, crota=0.0)
         self.add_type(5, ctype='IF', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
         self.add_type(6, ctype='RA', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
         self.add_type(7, ctype='DEC', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
