@@ -24,6 +24,7 @@ def _main():
     parser = ArgumentParser(description='Convert uvfits file to filterbank', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s', '--show', action='store_true', help='show plots')
+    parser.add_argument('--weight', action='store_true', help='Multiply output by weight')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -41,7 +42,7 @@ def _main():
     fcent = hdr['CRVAL4'] / 1e6 # MHz
     foff = hdr['CDELT4'] / 1e6 # MHz
     ref_channel = hdr['CRPIX4'] # pixels
-    fch1 = fcent - foff*ref_channel
+
 
     for row in g.data:
         bl = int(row['BASELINE'])
@@ -54,6 +55,9 @@ def _main():
         spec.real = data[0,0,0,:,0,0]
         spec.imag = data[0,0,0,:,0,1]
         weights = data[0,0,0,:,0,2]
+        if values.weight:
+            spec *= weights
+            
         if values.show:
             pylab.plot(spec.real)
             pylab.plot(spec.imag)
@@ -74,6 +78,7 @@ def _main():
             fulljd = float(jd) + float(dayfrac)
             mjd = fulljd - 2400000.5
             print 'dates', jd, dayfrac, fulljd, '{:15}'.format(mjd)
+            fch1 = fcent - foff*(nchan - ref_channel)
             hdr = {'fch1':fch1, 'foff':foff,'tsamp':inttime, 'tstart':mjd, 'nbits':32, 'nifs':1, 'nchans':nchan, 'src_raj':0.0, 'src_dej':0.0}
             print 'Opening', bl, outf, hdr
             fout = sigproc.SigprocFile(outf, 'w', hdr)
