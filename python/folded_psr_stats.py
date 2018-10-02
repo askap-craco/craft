@@ -94,7 +94,7 @@ def get_folded_stats(filename_p, influxout, values, verbose):
     snr_pdmp_zap = snr_pdmp / sqrt(1.-zap_frac)
 
     toa_unc, toa_gof, freq = get_timing_stats(filename_p, name, verbose)
-    flux, flux_err = get_psr_flux(filename_p, freq, name, verbose)
+    flux, flux_err, snr_flux = get_psr_flux(filename_p, freq, name, verbose)
 
     fields_dict = {'weff': weff, 'oncount': on_count,
                    'offrms': off_rms, 'onmax': on_max,
@@ -102,7 +102,7 @@ def get_folded_stats(filename_p, influxout, values, verbose):
                    'snr_max': snr_max, 'snr_pdmp': snr_pdmp,
                    'snr_pdmp_zap': snr_pdmp_zap, 'zap_frac': zap_frac,
                    'tint': tint, 'toa_unc': toa_unc, 'toa_gof': toa_gof,
-                   'flux': flux, 'flux_err': flux_err}
+                   'flux': flux, 'flux_err': flux_err, 'snr_flux': snr_flux}
 
     body = {'measurement': 'psrfold',
             'tags': {'psr': name+name_extra, 'sbid': sbid, 'ant': ant,
@@ -150,11 +150,12 @@ def get_psr_flux(filename_p, freq, name, verbose):
                    filename_p]
     if verbose:
         logging.debug("Running {}".format(psrflux_cmd))
-    psrflux_proc = sb.Popen(psrflux_cmd, shell=False)
+    psrflux_proc = sb.Popen(psrflux_cmd, shell=False, stdout=sb.PIPE,
+                            stderr=sb.PIPE)
     (psrflux_out, psrflux_err) = psrflux_proc.communicate()
     if psrflux_err:
         print "Problem with psrflux:", psrflux_err
-        return -1.0, -1.0
+        return -1.0, -1.0, -1.0
     else:
         psrflux_out_fn = filename_p + ".ds"
         with open(psrflux_out_fn) as fh:
@@ -162,12 +163,26 @@ def get_psr_flux(filename_p, freq, name, verbose):
                 line = fh.readline()
                 line_el = line.split()
                 if line_el[0] != '#':
-                    flux = float(line_el[4])
-                    flux_err = float(line_el[5])
-                    return flux, flux_err
+                    try:
+                        flux = float(line_el[4])
+                        flux_err = float(line_el[5])
+                        snr_flux = flux / flux_err
+                        return flux, flux_err, snr_flux
+                    except ValueError:
+                        logging.error("Couldn't parse psrflux output for {}".format(filename_p))
+                        logging.error(line)
+                        return -1.0, -1.0, -1.0
+                    except ZeroDivisionError:
+                        logging.error("Couldn't estimate S/N from psrflux for {}".format(filename_p))
+                        logging.error("{} {}".format(flux, flux_err))
+                        return flux, flux_err, -1.0
+                    except:
+                        logging.error("Unknown error for {}".format(filename_p))
+                        logging.error(line)
+                        return -1.0, -1.0, -1.0
                 if not line:
                     break
-        return -1.0, -1.0
+        return -1.0, -1.0, -1.0
 
 
 def extract_snrs_from_archive(archive_fn, verbose):
