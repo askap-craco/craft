@@ -286,6 +286,7 @@ class VcraftMux(object):
         freqs = np.array([map(float, flist.split(',')) for flist in freq_str])
 
         # there was traditionally a frequency offset of + 1inserted in the header
+        # See craft-232
         # undo it if nothing is specified in the header to the contrary
         
         freq_offset = float(self.hdr_identical('FREQ_OFFSET', -1.0))
