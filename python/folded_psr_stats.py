@@ -94,7 +94,10 @@ def get_folded_stats(filename_p, influxout, values, verbose):
     snr_pdmp_zap = snr_pdmp / sqrt(1.-zap_frac)
 
     toa_unc, toa_gof, freq = get_timing_stats(filename_p, name, verbose)
+    toa_unc = toa_unc * sqrt(tint)
+
     flux, flux_err, snr_flux = get_psr_flux(filename_p, freq, name, verbose)
+    snr_flux = snr_flux / sqrt(tint)
 
     fields_dict = {'weff': weff, 'oncount': on_count,
                    'offrms': off_rms, 'onmax': on_max,
@@ -123,25 +126,27 @@ def get_timing_stats(filename_p, name, verbose):
     (pat_out, pat_err) = pat_process.communicate()
 
     if pat_err:
-        print "Error while running pat:", pat_err
-        return -1.0, -1.0, ""
-    else:
-        pat_out_lines = pat_out.split('\n')
-        if len(pat_out_lines) > 3:
-            print "Error, expected 3 lines from pat, got {}: {}".format(
-                    len(pat_out_lines), pat_out)
-        if "FORMAT" not in pat_out_lines[0]:
-            print "Problem with pat output:", pat_out
+        if "WARNING" in pat_err:
+            logging.warn("WARNING while running pat: {}".format(pat_err))
+        else:
+            logging.error("Error while running pat: {}".format(pat_err))
             return -1.0, -1.0, ""
-        # This should:
-        # file freq SAT unc tel fe_flag fe be_flag be f_flag f bw_flag bw
-        # tobs_flag tobs tmplt_flag tmplt gof_flag gof nbin_flag nbin
-        toa = pat_out_lines[1].split()
-        toa_unc = float(toa[3])
-        toa_gof = float(toa[18])
-        freq_label = toa[16].split('_')[-1].split('.')[0]
+    pat_out_lines = pat_out.split('\n')
+    if len(pat_out_lines) > 3:
+        print "Error, expected 3 lines from pat, got {}: {}".format(
+                len(pat_out_lines), pat_out)
+    if "FORMAT" not in pat_out_lines[0]:
+        print "Problem with pat output:", pat_out
+        return -1.0, -1.0, ""
+    # This should:
+    # file freq SAT unc tel fe_flag fe be_flag be f_flag f bw_flag bw
+    # tobs_flag tobs tmplt_flag tmplt gof_flag gof nbin_flag nbin
+    toa = pat_out_lines[1].split()
+    toa_unc = float(toa[3])
+    toa_gof = float(toa[18])
+    freq_label = toa[16].split('_')[-1].split('.')[0]
 
-        return toa_unc, toa_gof, freq_label
+    return toa_unc, toa_gof, freq_label
 
 
 def get_psr_flux(filename_p, freq, name, verbose):
@@ -154,35 +159,35 @@ def get_psr_flux(filename_p, freq, name, verbose):
                             stderr=sb.PIPE)
     (psrflux_out, psrflux_err) = psrflux_proc.communicate()
     if psrflux_err:
-        print "Problem with psrflux:", psrflux_err
-        return -1.0, -1.0, -1.0
-    else:
+        if "unloading" not in psrflux_err:
+            print "Problem with psrflux:", psrflux_err
+            return -1.0, -1.0, -1.0
         psrflux_out_fn = filename_p + ".ds"
-        with open(psrflux_out_fn) as fh:
-            while True:
-                line = fh.readline()
-                line_el = line.split()
-                if line_el[0] != '#':
-                    try:
-                        flux = float(line_el[4])
-                        flux_err = float(line_el[5])
-                        snr_flux = flux / flux_err
-                        return flux, flux_err, snr_flux
-                    except ValueError:
-                        logging.error("Couldn't parse psrflux output for {}".format(filename_p))
-                        logging.error(line)
-                        return -1.0, -1.0, -1.0
-                    except ZeroDivisionError:
-                        logging.error("Couldn't estimate S/N from psrflux for {}".format(filename_p))
-                        logging.error("{} {}".format(flux, flux_err))
-                        return flux, flux_err, -1.0
-                    except:
-                        logging.error("Unknown error for {}".format(filename_p))
-                        logging.error(line)
-                        return -1.0, -1.0, -1.0
-                if not line:
-                    break
-        return -1.0, -1.0, -1.0
+    with open(psrflux_out_fn) as fh:
+        while True:
+            line = fh.readline()
+            line_el = line.split()
+            if line_el[0] != '#':
+                try:
+                    flux = float(line_el[4])
+                    flux_err = float(line_el[5])
+                    snr_flux = flux / flux_err
+                    return flux, flux_err, snr_flux
+                except ValueError:
+                    logging.error("Couldn't parse psrflux output for {}".format(filename_p))
+                    logging.error(line)
+                    return -1.0, -1.0, -1.0
+                except ZeroDivisionError:
+                    logging.error("Couldn't estimate S/N from psrflux for {}".format(filename_p))
+                    logging.error("{} {}".format(flux, flux_err))
+                    return flux, flux_err, -1.0
+                except:
+                    logging.error("Unknown error for {}".format(filename_p))
+                    logging.error(line)
+                    return -1.0, -1.0, -1.0
+            if not line:
+                break
+    return -1.0, -1.0, -1.0
 
 
 def extract_snrs_from_archive(archive_fn, verbose):
