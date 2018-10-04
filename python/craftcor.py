@@ -274,7 +274,7 @@ class Correlator(object):
         self.calcmjd()
         self.get_fr_data()
         self.fileout = CorrUvFitsFile(values.outfile, self.fmid, self.sideband*self.fine_chanbw, \
-                                      self.nfine_chan, self.npol_out, sources, ants, self.sideband)
+                                      self.nfine_chan, self.npol_out, self.mjd0, sources, ants, self.sideband)
 
         logging.debug('F0 %f FINE CHANNEL %f kHz num=%d freqs=%s', self.f0, self.fine_chanbw*1e3, self.nfine_chan, self.freqs)
 

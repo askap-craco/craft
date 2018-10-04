@@ -345,6 +345,8 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
+        beams = np.ma.masked_equal(beams, 0)
+        
         if self.rescale:
             print  'Doing rescale'
             beams -= beams.mean(axis=0)

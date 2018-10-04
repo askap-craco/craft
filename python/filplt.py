@@ -80,7 +80,7 @@ def plot(f, values, mjd=None, dm=None):
         if samp_start > s.file_size_elements:
             raise ValueError, 'End sample is after end of filterbank start={}'.format(samp_start)
 
-    print 'tstart={} tsamp={} samp_start={} nsamp={} fil nsampsn={} MJD={:10f} dm={}'.format(tstart, tsamp, samp_start, nsamp, s.nsamples, mjd, dm)
+    print 'tstart={} tsamp={} samp_start={} nsamp={} fil nsampsn={} MJD={:10f} dm={} fch1={}'.format(tstart, tsamp, samp_start, nsamp, s.nsamples, mjd, dm, fch1)
 
     d = s[samp_start:samp_start+nsamp]
     # rescale to roughly 0 mean and 1 variance
@@ -88,7 +88,12 @@ def plot(f, values, mjd=None, dm=None):
     assert s.header['nifs'] == 1
     assert d.shape == (nsamp, nchan)
     channels = np.arange(nchan)*foff + fch1
-    refchan = channels.min()
+
+    if values.cand_file and values.cand_file.endswith('.finf'):
+        refchan = 1e300
+    else:
+        refchan = channels.min()
+        
     if values.rescale:
         d -= d.mean(axis=0)
         d /= d.std(axis=0)

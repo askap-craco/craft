@@ -14,10 +14,10 @@ import warnings
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
-parnames = ('UU','VV','WW','DATE','_DATE','BASELINE','FREQSEL','SOURCE','INTTIM','DATA')
+parnames = ('UU','VV','WW','DATE','BASELINE','FREQSEL','SOURCE','INTTIM','DATA')
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan, npol, sources, antennas, sideband):
+    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband):
         self.dshape = [1,1,1,nchan, npol, 3]
         hdr = pyfits.Header()
         self.hdr = hdr
@@ -25,6 +25,8 @@ class CorrUvFitsFile(object):
         self.foff = foff
         self.fcent = fcent
         self.npol = npol
+        self.mjd0 = mjd0
+        self.jd0 = self.mjd0 + 2400000.5
         self.bandwidth = foff*nchan
         self.sources = sources
         self.antennas = antennas
@@ -39,7 +41,7 @@ class CorrUvFitsFile(object):
         hdr['EXTEND'] = (True, 'Tables will follow')
         hdr['BLOCKED'] = (True, 'File may be blocked')
         hdr['GROUPS'] = (True, 'Random group UV data')
-        hdr['PCOUNT'] = (9, 'Number of random parameters')
+        hdr['PCOUNT'] = (8, 'Number of random parameters')
         hdr['GCOUNT'] = (1, 'Number of groups (rows) - updated when file closed')
         hdr['EPOCH'] = 2e3
         hdr['BSCALE'] = 1.0
@@ -47,8 +49,8 @@ class CorrUvFitsFile(object):
         hdr['BUNIT'] = 'UNCALIB'
         refchan = float(nchan)/2. + 0.5 # half a channel because it's centered on DC 
         # CTYPES
-        self.add_type(2, ctype='COMPLEX', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
-        self.add_type(3, ctype='STOKES', crval=-5.0, cdelt=-1.0, crpix=1.0, crota=0.0)
+        self.add_type(2, ctype='COMPLEX', crval=1.0, cdelt=1.0, crpix=1.0)
+        self.add_type(3, ctype='STOKES', crval=-5.0, cdelt=-1.0, crpix=1.0)
         self.add_type(4, ctype='FREQ', crval=fcent*1e6, cdelt=foff*1e6, crpix=refchan, crota=0.0)
         self.add_type(5, ctype='IF', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
         self.add_type(6, ctype='RA', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
@@ -58,12 +60,12 @@ class CorrUvFitsFile(object):
         self.add_type(1, ptype='UU', pscal=1.0, pzero=0.0)
         self.add_type(2, ptype='VV', pscal=1.0, pzero=0.0)
         self.add_type(3, ptype='WW', pscal=1.0, pzero=0.0)
-        self.add_type(4, ptype='DATE', pscal=1.0, pzero=0.0, comment='Day number')
-        self.add_type(5, ptype='DATE', pscal=1.0, pzero=0.0, comment='Day fraction')
-        self.add_type(6, ptype='BASELINE', pscal=1.0, pzero=0.0)
-        self.add_type(7, ptype='FREQSEL', pscal=1.0, pzero=0.0)
-        self.add_type(8, ptype='SOURCE', pscal=1.0, pzero=0.0)
-        self.add_type(9, ptype='INTTIM', pscal=1.0, pzero=0.0)
+        self.add_type(4, ptype='DATE', pscal=1.0, pzero=self.jd0, comment='Day number')
+        #self.add_type(5, ptype='DATE', pscal=1.0, pzero=0.0, comment='Day fraction')
+        self.add_type(5, ptype='BASELINE', pscal=1.0, pzero=0.0)
+        self.add_type(6, ptype='FREQSEL', pscal=1.0, pzero=0.0)
+        self.add_type(7, ptype='SOURCE', pscal=1.0, pzero=0.0)
+        self.add_type(8, ptype='INTTIM', pscal=1.0, pzero=0.0)
 
         #self.first_time.format = 'fits'
         hdr['OBJECT'] = 'MULTI'
@@ -79,7 +81,7 @@ class CorrUvFitsFile(object):
         self.fout.write(hdr.tostring())
         self.ngroups = 0
         self.dtype = [('UU', '>f4'), ('VV', '>f4'), ('WW', '>f4'), \
-            ('DATE', '>f4'), ('_DATE', '>f4'), ('BASELINE', '>f4'), \
+            ('DATE', '>f4'), ('BASELINE', '>f4'), \
             ('FREQSEL', '>f4'), ('SOURCE', '>f4'), ('INTTIM', '>f4'), \
             ('DATA', '>f4', (1, 1, 1, nchan, npol, 3))]
 
@@ -218,9 +220,8 @@ class CorrUvFitsFile(object):
         dayfrac = jd - day
 
         visdata['UU'], visdata['VV'], visdata['WW'] = uvw
-        warnings.warn('Not sure whether this whould be day or jd')
-        visdata['DATE'] = day 
-        visdata['_DATE'] = dayfrac
+        visdata['DATE'] = jd - self.jd0
+        #visdata['_DATE'] = dayfrac
         visdata['BASELINE'] = (ia1 + 1)*256 + ia2 + 1
         visdata['INTTIM'] = inttim
         visdata['FREQSEL'] = 1
