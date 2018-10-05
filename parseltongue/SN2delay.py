@@ -3,15 +3,18 @@
 ################################################################################
 # AIPS imports
 ################################################################################
-from AIPS import AIPS, AIPSDisk
-from AIPSTask import AIPSTask, AIPSList
-from AIPSData import AIPSUVData, AIPSImage, AIPSCat
+#from AIPS import AIPS, AIPSDisk
+from AIPS import AIPS
+#from AIPSTask import AIPSTask, AIPSList
+#from AIPSTask import AIPSTask
+#from AIPSData import AIPSUVData, AIPSImage, AIPSCat
+from AIPSData import AIPSUVData
 #from AIPSTV import AIPSTV
 
 ################################################################################
 # General python imports
 ################################################################################
-import sys, os, math
+import argparse, sys, os, math
 #import json
 
 ################################################################################
@@ -22,16 +25,23 @@ try:
 except KeyError:
     aipsver = '31DEC18'
 AIPS.userno = 702
+snversion = 1
 
-# Check invocation
-if not len(sys.argv) == 2:
-    print "Usage: %s <AIPSFILE>" % sys.argv[0]
-    sys.exit()
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--user', help="AIPS user number", type=int)
+parser.add_argument('-s', '--sn', help="SN table version", type=int)
+parser.add_argument('-o', '--outfile', help="Save delays to file")
+parser.add_argument("-a", "--av", default=False, action="store_true", help="Average IFs")
+parser.add_argument('aipsfile', help="AIPS  file ")
+args = parser.parse_args()
 
-snversion = 1    # Should get from getopt style argument
+if args.user is not None: AIPS.userno = args.user
+if args.sn is not None: snversion = args.user
+avgIf = args.av
+
 aipsDisk = 1
 
-aipsfile = sys.argv[1]
+aipsfile = args.aipsfile
 
 (name, aipsclass, seq) = aipsfile.split('.')
 
@@ -62,20 +72,44 @@ num_snterms = num_if*num_pol
 for row in sntable:
     ant = annames[row.antenna_no-1]
     if not ant in delays1:
-        delays1[ant] = 0.0
-        delays2[ant] = 0.0
-        delaysN[ant] = 0 
-    
-    for i in range(num_if):
-        if abs(row.delay_1[i])>1 or (num_pol > 1 and abs(row.delay_1[i])>1): continue
-        
-        delays1[ant] += row.delay_1[i]
-        if num_pol > 1:
-            delays2[ant] += row.delay_2[i]
-        delaysN[ant] += 1
-       
-for ant in delays1:
-    if delaysN[ant]==0:
-        print ant, 0
+        delays1[ant] = [0.0]*num_if
+        delays2[ant] = [0.0]*num_if
+        delaysN[ant] = 0
+
+    if num_if==1:
+        rowDelay1 = [row.delay_1]
+        if num_pol>1:
+            rowDelay2 = [row.delay_2]
     else:
-        print ant, delays1[ant]/delaysN[ant]*1e9
+        rowDelay1 = row.delay_1
+        if num_pol>1:
+            rowDelay2 = row.delay_2
+    for i in range(num_if):
+        if abs(rowDelay1[i])>1 or (num_pol > 1 and abs(rowDelay2[i])>1): continue
+        delays1[ant][i] += rowDelay1[i]
+        if num_pol > 1:
+            delays2[ant][i] += rowDelay2[i]
+    delaysN[ant] += 1
+
+if avgIf:
+    for ant in delays1:
+        for i in range(1,num_if):
+            delays1[ant][0] += delays1[ant][i]
+        delaysN[ant] *= num_if
+
+    for ant in sorted(delays1):
+        if delaysN[ant]==0:
+            print ant, 0
+        else:
+            print ant, delays1[ant][0]/delaysN[ant]*1e9
+
+else:
+
+    for ant in sorted(delays1):
+        if delaysN[ant]==0:
+            print ant, 0
+        else:
+            print ant,
+            for i in range(num_if):
+                print delays1[ant][i]/delaysN[ant]*1e9,",",
+            print
