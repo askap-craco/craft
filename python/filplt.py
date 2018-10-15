@@ -22,6 +22,7 @@ def _main():
     parser.add_argument('-d','--dm', type=float, default=0)
     parser.add_argument('-m', '--mjd', type=float, help='MJD to plot')
     parser.add_argument('-s','--show', action='store_true', help='Show')
+    parser.add_argument('-n','--nsamp', type=int, help='Number of sample', default=2048)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -40,17 +41,21 @@ def plot(f, values):
     nchan = s.header['nchans']
     tsamp = s.header['tsamp']
     tstart = s.header['tstart']
-    nsamp = 4096
-    print values.mjd, tstart, tsamp
+    nsamp = values.nsamp
 
     if values.mjd is None:
         samp_start = nsamp/2
     else:
-        samp_start = int(np.round((values.mjd - tstart)/tsamp))
+        samp_start = int(np.round((values.mjd -tstart)*86400.0/tsamp)) - nsamp/2
+
+        print values.mjd, tstart, tsamp, samp_start
+            
         if samp_start < 0:
             raise ValueError, 'Start sample is before start of filterbank'
-        if samp_start > s.nsamp:
+        if samp_start > s.nsamples:
             raise ValueError, 'End sample is after end of filterbank'
+
+
 
     d = s[samp_start:samp_start+nsamp]
     # rescale to roughly 0 mean and 1 variance
@@ -78,7 +83,7 @@ def plot(f, values):
         pylab.show()
 
 
-    fig.close()
+    pylab.close(fig)
 
         
 
