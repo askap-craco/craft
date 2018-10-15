@@ -50,11 +50,11 @@ namespace NCodec
             double              m_dMJDNow;
 
             unsigned long long  m_ullStartWriteFrameId;
-            unsigned long long  m_ullFinishWriteFrameId;
+            unsigned long long  m_ullStopWriteFrameId;
             unsigned long long  m_ullTriggerFrameId;
 
             unsigned long long  m_ullStartWriteBAT;
-            unsigned long long  m_ullFinishWriteBAT;
+            unsigned long long  m_ullStopWriteBAT;
             unsigned long long  m_ullTriggerWriteBAT;
             unsigned long long  m_ullNowBAT;
 
@@ -100,10 +100,10 @@ namespace NCodec
                 m_dMJDNow               = 0.0;
 
                 m_ullStartWriteFrameId   = 0;
-                m_ullFinishWriteFrameId  = 0;
+                m_ullStopWriteFrameId  = 0;
                 m_ullTriggerFrameId      = 0;
                 m_ullStartWriteBAT      = 0;
-                m_ullFinishWriteBAT     = 0;
+                m_ullStopWriteBAT     = 0;
                 m_ullTriggerWriteBAT    = 0;
                 m_ullNowBAT             = 0;
 

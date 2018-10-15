@@ -6,7 +6,7 @@ for f in $@ ; do
     if [[ ! -e $f.mir ]] ; then
 	fits in=$f.fits out=$f.mir op=uvin
 	uvflag vis=$f.mir flagval=unflag select=-auto
-	uvaver vis=$f.mir out=$f.uvaver line=chan,48,1,54
+	uvaver vis=$f.mir out=$f.uvaver line=chan,48,1,9
 	uvspec vis=$f.mir select=ant\(1\) interval=1 axis=freq,real log=$f.uvspec.real
 	uvspec vis=$f.mir select=ant\(1\) interval=1 axis=freq,imag log=$f.uvspec.imag
 	mfcal vis=$f.uvaver interval=1

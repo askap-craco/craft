@@ -287,7 +287,10 @@ class SigprocFile(object):
         
     def print_header(self):
         for k,v, in self.header.iteritems():
-            print k, ':', v
+            if isinstance(v, float):
+                print '{}:{:0.15f}'.format(k,v)
+            else:
+                print k, ':', v
         
 
 def _main():

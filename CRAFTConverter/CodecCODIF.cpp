@@ -53,7 +53,7 @@ namespace               // Anonymous namespace for internal helpers.
     constexpr int      iBitsPerByte_c              = 8;      // Number of bits in a byte.
     constexpr int      iTimeForIntegerSamples_c    = 27;     // Period in seconds, for a whole number of samples.
     constexpr double   dTolerance_c                = 0.001;  // Tolerance for floating point calculations.
-    constexpr int     DUTC                        = 37;
+    constexpr int     DUTC                         = 37;
 
 }                       // End anonymous namespace.
 
@@ -89,6 +89,8 @@ namespace NCodec        // Part of the Codec namespace.
 	buf  = NULL;
         m_iSamplesPerWord = 0;
 	mask = 0;
+	convert = false;
+	lookup = NULL;
     }
 
     //////////
@@ -112,6 +114,10 @@ namespace NCodec        // Part of the Codec namespace.
         m_bSynced              = false;
         m_bFirstInputBlock     = false;
 	mask                   = 0;
+	if (lookup==NULL) {
+	  delete [] lookup;
+	  lookup = NULL;
+	}
 	//if (buf!=NULL) delete buf;
     }
 
@@ -374,6 +380,23 @@ namespace NCodec        // Part of the Codec namespace.
     ///////////////////////////////////////////////////////////////////////////
     // Private internal helpers.
 
+    // Return expected number of samples in a voltage dump - needed to correct time because VCRAFT file contains time
+    // of LAST sample. Logic taken from vcraft.py
+    unsigned long long voltage_samples(int mode) {
+      int samples_per_word[] = {1,2,4,16,1,2,4,16};
+      int mode_beams[] = {72,72,72,72,2,2,2,2};
+
+      if (mode>7 || mode < 0) {
+	fprintf(stderr, "Error: Mode must be 0..7, not %d\n", mode);
+	exit(1);
+      }
+      int max_sets = 29172;
+
+      //  Number of sample vs mode
+      return (max_sets*32*samples_per_word[mode]*72/mode_beams[mode]);
+    }
+
+  
     bool CCodecCODIF::ConfigureDFH( void )
     {
         bool bSuccess = false;      // Assume failure for now.
@@ -429,13 +452,34 @@ namespace NCodec        // Part of the Codec namespace.
 	    m_iDataArrayWords  = m_iDataArraySize/sizeof(uint32_t);
             assert( m_iDataFrameSize <= iMaxPacketSize_c );
 
-	    //printf("********samplesPerFrame=%d  DataArray=%d\n", samplesPerFrame, m_iDataFrameSize);
-
 	    // Get a pointer to the underlying DFH structure.
 
             CODIFDFH_t *pDFH = static_cast<CODIFDFH_t *>( m_DFH );
 
             // Create the header anew prior to encoding.
+
+	    if (convert) {
+	      if (m_iBitsPerSample==4) {
+		struct {signed int x:4;} s;
+		if (lookup!=NULL) delete[] lookup;
+		lookup = new uint8_t [256];
+		for (int i=0; i<256; i++) {
+		  int a = s.x = (i & 0xF);      // 4 bits lowest bits - bit extend
+		  int b = s.x = ((i>>4) & 0xF); // 4 bits higest bits - bit extend
+		  if (a==-8) {
+		    a = 7;
+		  } else {
+		    a = -a;
+		  }
+		  if (b==-8) {
+		    b = 7;
+		  } else {
+		    b = -b;
+		  }
+		  lookup[i] = (a&0xF) | ((b<<4)&0xF0);
+		}
+	      }
+	    }
 
             m_DFH.Reset();
 
@@ -479,11 +523,17 @@ namespace NCodec        // Part of the Codec namespace.
 
             // Figure out the "previous" Period restart
 
+	    unsigned long long bufferSamples = voltage_samples(m_iMode);
+	    printf("DEBUG: Assuming %lld samples per voltage dump\n", bufferSamples);
+
+	    unsigned long long startFrameId = m_ullTriggerFrameId - bufferSamples + m_iSamplesPerWord;
+	    // StopFrameId is the time of the last word, so need to allow for the number of samples/32bit word
+	    
             unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
             unsigned long long BAT0MJDSec = m_ullBAT0/1e6;
-            unsigned long long PeriodsSinceBAT0 = m_ullTriggerFrameId / uiSampleIntervalsPerPeriod; // Will round down
+            unsigned long long PeriodsSinceBAT0 = startFrameId / uiSampleIntervalsPerPeriod; // Will round down
             int frameseconds = (BAT0MJDSec -DUTC - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
-            unsigned long framenumber = (m_ullTriggerFrameId % uiSampleIntervalsPerPeriod) / samplesPerFrame;
+            unsigned long framenumber = (startFrameId % uiSampleIntervalsPerPeriod) / samplesPerFrame;
 
 	    mask = (1<<(m_iBitsPerSample*2))-1;
 
@@ -494,7 +544,7 @@ namespace NCodec        // Part of the Codec namespace.
             // There will be samples that don't fit in a frame (ie first sample may start between frames)
             // These will need to be calculated and eventually discarded
 
-            int initialSamples = m_ullTriggerFrameId % samplesPerFrame;
+            int initialSamples = startFrameId % samplesPerFrame;
 
             if ( initialSamples!=0 )
             {
@@ -575,10 +625,21 @@ namespace NCodec        // Part of the Codec namespace.
     // Multiple time samples per output CODIF word
     void CCodecCODIF::decodeVCRAFTBlock(WordDeque_t & rInput, vector<uint32_t>& vcraftData, vector<uint32_t>& codifData,
 				       int wordstoUnpack, int samplesPerWord, int *iWordCount) {
-
       // Grab next set of original samples
       for (int c=0; c< (wordstoUnpack) && ( ! rInput.empty()); c++) {
 	vcraftData[c] = rInput.front();
+	if (convert) {
+	  if (m_iBitsPerSample==1) {
+	    vcraftData[c] ^= 0xCCCCCCCC; // Flip every second sample
+	  } else if (m_iBitsPerSample==4) {
+	    uint32_t x = vcraftData[c];
+	    vcraftData[c] = (x&0x00FF00FF) | lookup[(x&0xFF00)>>8]<<8 | lookup[(x&0xFF000000)>>24]<<24;
+	  } else {
+	    fprintf(stderr, "Error: Cannot convert %d bit data\n", m_iBitsPerSample);
+	    exit(1);
+	  }
+	}
+	
 	rInput.pop_front();
 	(*iWordCount)++;
       }
@@ -593,11 +654,10 @@ namespace NCodec        // Part of the Codec namespace.
 	    }
 	  }
 	}
-      } else {
-
-	int wordPerGroup = wordstoUnpack/samplesPerWord; //  2          4
+      } else {                                           // 4bit
+	int wordPerGroup = wordstoUnpack/samplesPerWord; // 2          4
 	for (int i=0; i< samplesPerWord; i++) {          // 0..3       0..1
-	  for (int j=0; j<wordPerGroup; j++) {             // 0..1       0..3
+	  for (int j=0; j<wordPerGroup; j++) {           // 0..1       0..3
 	    int c = i*wordPerGroup + j;
 	    codifData[c] = 0;
 	    for (int k=0; k<samplesPerWord; k++) {

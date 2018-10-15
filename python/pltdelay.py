@@ -12,14 +12,26 @@ import os
 import sys
 import logging
 import subprocess
+import crafthdr
+import itertools
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
+
+def load_headers(hdr_files):
+    hdrs = [crafthdr.DadaHeader.fromfile(f) for f in hdr_files]
+    hdrs.sort(key=lambda h: (int(h.get_value('ANTENNA_NO'), int(h.get_value('CARD_NO')), int(h.get_value('FPGA_ID')))))
+    group_hdrs = itertools.groupby(hdrs, key=lambda h:h.get_value('ANT'))
+    ant_hdrs = {ant:hdrs for ant, hdrs in group_hdrs}
+    print ant_hdrs.keys()
+    return ant_hdrs
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s','--show', action='store_true', default=False, help='Show plots')
+    parser.add_argument('-n','--nant', help='Number of antennas', type=int)
+    parser.add_argument('--headers', help='Header files', nargs='*')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -28,7 +40,7 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    nant = 6
+    nant = values.nant
     nchan = 54
 
     for f in values.files:
@@ -55,16 +67,19 @@ def _main():
         fulld.shape = (nant, -1, nchan)
         delayspec = np.fft.fftshift(np.fft.fft(fulld, axis=2), axes=2)
         print 'DElayspec', delayspec.shape, delayspec.dtype
-        fig, ax = pylab.subplots(2,3)
+        ncol = int(np.ceil(np.sqrt(nant)))
+        nrow = (nant)//ncol + 1
+        print 'NROW, NCOL', nrow, ncol
+
+        fig, ax = pylab.subplots(nrow, ncol)
         ax = ax.flatten()
         #fig2, ax2 = pylab.subplots(2,3)
         
         #ax2 = ax2.flatten()
         xaxis_reshape = xaxis.reshape(-1, nchan).mean(axis=1)
-        extent = (xaxis[0], xaxis[-1], -nchan/2, nchan/2)
+        extent = (xaxis[0], xaxis[-1], -nchan/2 + 0.5, nchan/2 + 0.5)
         for a in xrange(nant):
             ax[a].imshow(np.log10(abs(delayspec[a, :, :].T)), aspect='auto', extent=extent)
-            #ax2[a].plot(np.angle(fulld[a, :,:]).flatten(), '.')
             if a == 0:
                 ax[a].set_ylabel('delay (samples)')
             if a == 3:

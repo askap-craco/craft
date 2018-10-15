@@ -141,6 +141,7 @@ class Plotter(object):
         self.files = filenames
         print self.files[0]
         beams, files = load_beams(filenames, tstart, ntimes=1, return_files=True)
+        self.total_samples = min([f.nsamples for f in files])
         ntimes, self.nbeams, self.nfreq = beams.shape
 
         self.bnames = [f.filename.split('.')[-2] for f in files]
@@ -286,6 +287,11 @@ class Plotter(object):
             self.squeeze_zrange(0.5)
         elif event.key == 'r':
             self.rescale = not self.rescale
+            self.imzrange = None
+        elif event.key == 'e':
+            self.goto_end()
+        elif event.key == 'b':
+            self.goto_beginning()
         elif event.key == 'ctrl+c':
             sys.exit(0)
         elif event.key == 'h' or event.key == '?':
@@ -297,6 +303,12 @@ class Plotter(object):
         if draw:
             self.clearfigs()
             self.draw()
+
+    def goto_start(self):
+        self.tstart = 0
+
+    def goto_end(self):
+        self.tstart = self.total_samples - self.ntimes
 
     def squeeze_zrange(self, mul):
         zmin, zmax = self.imzrange
@@ -333,7 +345,10 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
+        beams = np.ma.masked_equal(beams, 0)
+        
         if self.rescale:
+            print  'Doing rescale'
             beams -= beams.mean(axis=0)
             beams /= beams.std(axis=0)*np.sqrt(beams.shape[2])
             
@@ -387,27 +402,36 @@ class Plotter(object):
         if nbeams > 1:
             self.draw_many(beams, im_extent, origin, imzmin, imzmax, freqs)
         else:
-            self.draw_single(beams, im_extent, origin, imzmin, imzmax, freqs, times)
+            self.draw_single(beams, im_extent, origin, freqs, times)
 
         pylab.draw()
 
-    def draw_single(self, beams, im_extent, origin, imzmin, imzmax, freqs, times):
+    def draw_single(self, beams, im_extent, origin, freqs, times):
         bi = beams[:, 0, :]
         ntimes, nfreq = bi.shape
         bi = bi.T
-        print 'BISHAPE', bi.shape, 'ZRAGE', imzmin, imzmax
         fig, [rawax, tax, fax] = self.figs['dynspec']
-        rawax.imshow(bi, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none')
-        if imzmin is None and imzmax is None:
+        if self.imzrange is None:
             self.imzrange = (bi.min(), bi.max())
+
+        imzmin, imzmax = self.imzrange
+        print 'BISHAPE', bi.shape, 'ZRAGE', imzmin, imzmax
+        
+        rawax.imshow(bi, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none')
+        #if imzmin is None and imzmax is None:
+        #self.imzrange = (bi.min(), bi.max())
             
         fax.plot(bi.mean(axis=1), freqs, label='mean')
         fax.plot(bi.max(axis=1), freqs, label='max')
         fax.plot(bi.min(axis=1), freqs, label='min')
+        fax.plot(bi.std(axis=1), freqs, label='std')
+        fax.plot(np.ones(nfreq), freqs, ls=':')
         #fax2 = fax.twiny()
         #fax2.plot(bi.std(axis=1),freqs, 'r', label='std')
         fax.set_ylim(freqs.min(), freqs.max())
-        tax.plot(times, bi.mean(axis=0), label='mean')
+        tax.plot(times, bi.mean(axis=0)*np.sqrt(nfreq), label='mean')
+        tax.plot(times, bi.std(axis=0), label='std')
+        tax.plot(times, np.ones(ntimes), ls=':')
         #tax.plot(times, bi.max(axis=0), label='max')
         #tax.plot(times, bi.min(axis=0), label='min')
         tax.set_xlim(times.min(), times.max())

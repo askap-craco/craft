@@ -17,17 +17,18 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 # Indeces of the center, min and max columns for time and dm
 snidx =0
 t0 = 1
-t1 = 7
-t2 = 8
+bno=6
+t1 = 8
+t2 = 9
 d0 = 4
-d1 = 9
-d2 = 10
-count = 11
+d1 = 10
+d2 = 11
+count = 12
 
-header = 'S/N, sampno, secs from file start, boxcar, idt, dm, beamno, sampno_start, sampno_end, idt_start, idt_end, ncands'
+header = 'S/N, sampno, secs from file start, boxcar, idt, dm, beamno,mjd, sampno_start, sampno_end, idt_start, idt_end, ncands'
 intf = '%d'
 floatf = '%0.3f'
-formats = (floatf, intf, floatf, intf, intf, floatf, intf, intf, intf, intf, intf, intf)
+formats = (floatf, intf, floatf, intf, intf, floatf, intf,'%0.15f', intf, intf, intf, intf, intf)
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -61,12 +62,12 @@ def load(fin, values):
 
         bits = map(float, line.split())
         # filter for width
-        if bits[3] < values.wmax and bits[4] > values.dmmin and bits[0] > values.snmin:
+        if bits[3] < values.wmax and bits[4] > values.dmmin and bits[0] > values.snmin and bits[bno] != 35:
             d.append(bits)
         else: # ignore it
             pass
 
-    return np.array(d, dtype=np.float32)
+    return np.array(d)
 
 def fof_file(fin, values):
     d = load(fin, values)
