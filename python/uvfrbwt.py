@@ -33,8 +33,12 @@ class UvFitsReader(object):
 
     def mjds(self):
         jds = self.g.data['DATE'].astype(np.float64)
-        dayfrac = self.g.data['_DATE'].astype(np.float64)
-        fulljd = jds + dayfrac
+        if '_DATE' in self.g.columns.names:
+            dayfrac = self.g.data['_DATE'].astype(np.float64)
+            fulljd = jds + dayfrac
+        else:
+            fulljd = jds
+        
         mjd = fulljd - 2400000.5
         return mjd
         
