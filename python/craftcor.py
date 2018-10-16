@@ -72,10 +72,11 @@ class PlotOut(object):
         print_delay(xx)
         ax1.plot(abs(xx))
         ax2.plot(np.degrees(xxang), 'o')
-        nf = self.corr.nfine_per_coarse
+        nf = self.corr.nfine_out_per_coarse
         for i in xrange(self.corr.ncoarse_chan):
             ax2.axvline(nf*i, c='r')
             ax1.axvline(nf*i, c='r')
+            print 'PLOTSTUFF', nf, i, nf*i, nf*(i+1), self.corr.ncoarse_chan, xx.shape
             print_delay(xx[nf*i:nf*(i+1)])
 
         lag = np.fft.fftshift(abs(np.fft.fft(xx)))
@@ -260,6 +261,12 @@ class Correlator(object):
         self.nfine_chan = self.ncoarse_chan*self.nfine_per_coarse
         self.fine_chanbw = self.coarse_chanbw / float(self.nfine_per_coarse)
         self.full_bw = self.fine_chanbw * self.nfine_chan
+        self.fscrunch = values.fscrunch
+        assert self.fscrunch >= 1
+        assert self.nfine_per_coarse % self.fscrunch == 0, 'Fsrunch must yield an integer number of fine channels per coarse channel'
+        self.nfine_out_per_coarse = self.nfine_per_coarse / self.fscrunch
+        self.nfine_out_chan = self.nfine_out_per_coarse*self.ncoarse_chan
+        self.out_chanbw = self.coarse_chanbw / float(self.nfine_out_per_coarse)
         self.npol_in = 1
         self.npol_out = 1
         #self.f0 = self.ants[0].vfile.freqs.mean() # centre frequency for fringe rotation
@@ -273,8 +280,8 @@ class Correlator(object):
         self.prodout = PlotOut(self)
         self.calcmjd()
         self.get_fr_data()
-        self.fileout = CorrUvFitsFile(values.outfile, self.fmid, self.sideband*self.fine_chanbw, \
-                                      self.nfine_chan, self.npol_out, self.mjd0, sources, ants, self.sideband)
+        self.fileout = CorrUvFitsFile(values.outfile, self.fmid, self.sideband*self.out_chanbw, \
+                                      self.nfine_out_chan, self.npol_out, self.mjd0, sources, ants, self.sideband)
 
         logging.debug('F0 %f FINE CHANNEL %f kHz num=%d freqs=%s', self.f0, self.fine_chanbw*1e3, self.nfine_chan, self.freqs)
 
@@ -394,7 +401,14 @@ class Correlator(object):
                     print 'Error', e
                     import ipdb
                     ipdb.set_trace()
-                    
+
+
+        if self.fscrunch > 1:
+            chans = np.arange(self.nfine_chan, step=self.fscrunch)
+            xx = np.add.reduceat(xx, chans, axis=0)/float(self.fscrunch)
+
+        assert xx.shape == (self.nfine_out_chan, self.npol_out)
+            
         self.put_product(a1, a2, xx)
 
     def put_product(self, a1, a2, xx):
@@ -459,6 +473,7 @@ def _main():
     parser.add_argument('-p','--parset', help='Parset for delays')
     parser.add_argument('--show', help='Show plot', action='store_true', default=False)
     parser.add_argument('-i','--nint', help='Number of fine spectra to average', type=int, default=128)
+    parser.add_argument('-f','--fscrunch', help='Frequency average by this factor', default=1, type=int)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
