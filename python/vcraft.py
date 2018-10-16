@@ -138,7 +138,7 @@ class VcraftFile(object):
         fin = self.fin
         nchan = len(self.freqs)
         self.fin.seek(self.hdrsize)
-        assert startsamp >= 0, 'Invalid startsamp {}'.format(startsamp)
+        assert startsamp >= 0, 'Invalid startsamp {} {}'.format(startsamp, self.fname)
         if nsamp is None:
             nsamp = self.nsamps - startsamp
 
@@ -284,6 +284,14 @@ class VcraftMux(object):
         self.samp_rate = float(self.hdr_identical('SAMP_RATE'))
         freq_str = self.allhdr('FREQS')
         freqs = np.array([map(float, flist.split(',')) for flist in freq_str])
+
+        # there was traditionally a frequency offset of + 1inserted in the header
+        # See craft-232
+        # undo it if nothing is specified in the header to the contrary
+        
+        freq_offset = float(self.hdr_identical('FREQ_OFFSET', -1.0))
+        freqs += freq_offset
+        
         nchan_per_file = len(freqs[0])
         assert freqs.shape == (len(self._files), nchan_per_file)
         
@@ -323,21 +331,21 @@ class VcraftMux(object):
         self.pol = pols[0]
 
 
-    def allhdr(self, cardname):
+    def allhdr(self, cardname, default=None):
         '''
         Returns a list of header values for all files, with the given card name
         '''
-        header_values = [f.hdr[cardname][0] for f in self._files]
+        header_values = [f.hdr.get_value(cardname, default) for f in self._files]
         return header_values
 
-    def hdr_identical(self, cardname):
+    def hdr_identical(self, cardname, default=None):
         '''
         Returns the header value for the given cardname. 
         Checks the value is the same for all files. If not, it throws a ValueError
         '''
-        hdr_values = set(self.allhdr(cardname))
+        hdr_values = set(self.allhdr(cardname, default))
         if len(hdr_values) != 1:
-            raise ValueError('Exepected the same header value for {} for all files. Got these values {}'.format(cardname, self.allhdr(cardname)))
+            raise ValueError('Exepected the same header value for {} for all files. Got these values {}'.format(cardname, self.allhdr(cardname, default)))
 
         return hdr_values.pop()
 
@@ -357,7 +365,10 @@ class VcraftMux(object):
         for ifile, f in enumerate(self._files):
             out_chans = self.freqconfig.chanmaps[ifile, :]
             fsamp_start = samp_start + self.sample_offsets[ifile]
-            d[:, out_chans] = f.read(fsamp_start, nsamp)
+            try:
+                d[:, out_chans] = f.read(fsamp_start, nsamp)
+            except:
+                warnings.warn('File read at funny time. Setting to zero')
 
         return d
 
@@ -366,6 +377,7 @@ def mux_by_pol(filenames, delays=None):
     :return: Dictionary keyened by 'X' or "Y
     '''
     all_files = [VcraftFile(f) for f in filenames]
+    all_files.sort(key=lambda f:f.pol)
     mux_by_pol = itertools.groupby(all_files, lambda f:f.pol)
     muxes = {pol:VcraftMux(list(files), delays) for pol, files in mux_by_pol}
     
@@ -374,6 +386,8 @@ def mux_by_pol(filenames, delays=None):
 
 def mux_by_antenna(filenames, delays=None):
     all_files = [VcraftFile(f) for f in filenames]
+    all_files.sort(key=lambda f:f.hdr['ANT'][0])
+    ants = [f.hdr['ANT'][0] for f in all_files]
     mux_by_ant = itertools.groupby(all_files, lambda f:f.hdr['ANT'][0])
     muxes = [VcraftMux(list(files), delays) for antname, files in mux_by_ant]
     muxes.sort(key=lambda mux: mux.antno) # sort by antenna number

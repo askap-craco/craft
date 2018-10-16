@@ -183,6 +183,11 @@ def _main():
     print fb
     pylab.figure()
     pylab.plot(fb.c)
+    pylab.figure()
+    fc = np.fft.fftshift(np.fft.fft(fb.c))
+    np.savetxt('fc_fft.txt', abs(fc))
+    np.savetxt('coeffs.txt', fb.c)
+    pylab.plot(abs(fc))
 
     snr = 10.
     N = 10*fb.K
@@ -201,10 +206,10 @@ def _main():
     #pylab.xlim(0, 50)
 
     pylab.figure()
-    xfbb = fb.synthesis(xfb)
+    #xfbb = fb.synthesis(xfb)
 
     pylab.plot(x)
-    pylab.plot(xfbb)
+    #pylab.plot(xfbb)
 
     pylab.show()
     

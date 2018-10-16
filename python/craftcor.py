@@ -16,6 +16,8 @@ from calc11 import ResultsFile
 from corruvfits import CorrUvFitsFile
 from astropy.coordinates import SkyCoord
 import multiprocessing
+import signal
+import warnings
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -117,6 +119,10 @@ class AntennaSource(object):
         self.mjdstart = self.vfile.start_mjd
         self.trigger_frame = self.vfile.start_frameid
         self.hdr = self.vfile.hdr
+        self.init_geom_delay_us = None
+        self.all_geom_delays = []
+        self.all_mjds = []
+        print 'antenna {} {}'.format(self.antname, self.vfile.freqconfig)
 
     def do_f(self, corr):
         self.frparams = FringeRotParams(corr, self)
@@ -124,6 +130,14 @@ class AntennaSource(object):
         framediff_samp = corr.refant.trigger_frame - self.trigger_frame
         framediff_us = framediff_samp / corr.fs
         (geom_delay_us, geom_delay_rate_us) = corr.get_geometric_delay_delayrate_us(self)
+        self.all_geom_delays.append(geom_delay_us)
+        self.all_mjds.append(corr.curr_mjd_mid)
+
+        #logging.debug'ALL GEOM DELAYS', self.all_geom_delays, type(geom_delay_us)
+        #print 'ALL MJDs', self.all_mjds
+        # test with 0 delay rate
+        #geom_delay_us = self.all_geom_delays[0]
+        
         geom_delay_samp = geom_delay_us * corr.fs
         fixed_delay_us = corr.get_fixed_delay_usec(self.antno)
         fixed_delay_samp = fixed_delay_us*corr.fs
@@ -141,22 +155,20 @@ class AntennaSource(object):
             self.antname, framediff_samp, geom_delay_samp, fixed_delay_samp,
             total_delay_samp, whole_delay, frac_delay_samp, nsamp,
             360.*frac_delay_us*corr.f0)
-        logging.debug('F %s us delays: frame: %f geo %f fixed %f total %f whole: %d frac: %f nsamp: %d phase=%f deg',
+        logging.debug('F %s us delays: frame: %f geo %f fixed %f total %f whole: %d frac: %f nsamp: %d phase=%f deg rate=%e',
                 self.antname, framediff_us, geom_delay_us, fixed_delay_us,
                 total_delay_us, whole_delay_us, frac_delay_us, nsamp,
-                360.*frac_delay_us*corr.f0)
+                      360.*frac_delay_us*corr.f0, geom_delay_rate_us)
 
         sampoff = corr.curr_samp*corr.nfft + whole_delay
         rawd = self.vfile.read(sampoff, nsamp)
-        assert rawd.shape == (nsamp, corr.ncoarse_chan), 'Unexpected shape from vfile: {}'.format(rawd.shape)
+        assert rawd.shape == (nsamp, corr.ncoarse_chan), 'Unexpected shape from vfile: {} expected ({},{})'.format(rawd.shape, nsamp, corr.ncoarse_chan)
         self.data = np.zeros((corr.nint, corr.nfine_chan, corr.npol_in), dtype=np.complex64)
         d1 = self.data
         nfine = corr.nfft - 2*corr.nguard_chan
 
         for c in xrange(corr.ncoarse_chan):
-            #cfreq = self.vfile.freqs[c]
             cfreq = corr.freqs[c]
-            coarse_off = cfreq - corr.f0
             freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw
             if corr.sideband == -1:
                 freqs = -freqs
@@ -198,9 +210,9 @@ class FringeRotParams(object):
 
     def __init__(self, corr, ant):
         mid_data = corr.frdata_mid[ant.antname]
-        self.u,self.v,self.w,self.delay = [mid_data[c] for c in FringeRotParams.cols]
-        self.delay_start = corr.frdata_start[ant.antname]['DELAY (us)']
-        self.delay_end = corr.frdata_end[ant.antname]['DELAY (us)']
+        self.u,self.v,self.w,self.delay = map(float, [mid_data[c] for c in FringeRotParams.cols])
+        self.delay_start = float(corr.frdata_start[ant.antname]['DELAY (us)'])
+        self.delay_end = float(corr.frdata_end[ant.antname]['DELAY (us)'])
         self.delay_rate = (self.delay_end - self.delay_start)/float(corr.nint)
         self.ant = ant
         self.corr = corr
@@ -213,6 +225,9 @@ class FringeRotParams(object):
 
 class Correlator(object):
     def __init__(self, ants, sources, values):
+        self.running = True
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
         self.ants = ants
         self.values = values
         self.pool = None
@@ -241,7 +256,6 @@ class Correlator(object):
         self.ncoarse_chan = len(self.refant.vfile.freqs)
         self.sideband = -1
         self.coarse_chanbw = 1.0
-        self.drxfs = 1536.0
         self.nfine_per_coarse = self.nfft - 2*self.nguard_chan
         self.nfine_chan = self.ncoarse_chan*self.nfine_per_coarse
         self.fine_chanbw = self.coarse_chanbw / float(self.nfine_per_coarse)
@@ -252,7 +266,7 @@ class Correlator(object):
         self.f0 = self.ants[0].vfile.freqs[0]
         self.freqs = self.ants[0].vfile.freqs
         self.fmid = self.freqs.mean()
-        self.inttime_secs = self.nint*self.nfft/(self.fs*1e6)
+        self.inttime_secs = float(self.nint*self.nfft)/(self.fs*1e6)
         self.inttime_days = self.inttime_secs/86400.
         self.curr_intno = 0
         self.curr_samp = self.curr_intno*self.nint + 1000
@@ -260,10 +274,12 @@ class Correlator(object):
         self.calcmjd()
         self.get_fr_data()
         self.fileout = CorrUvFitsFile(values.outfile, self.fmid, self.sideband*self.fine_chanbw, \
-                                      self.nfine_chan, self.npol_out, sources, ants, self.sideband)
+                                      self.nfine_chan, self.npol_out, self.mjd0, sources, ants, self.sideband)
 
         logging.debug('F0 %f FINE CHANNEL %f kHz num=%d freqs=%s', self.f0, self.fine_chanbw*1e3, self.nfine_chan, self.freqs)
 
+    def exit_gracefully(self, signum, frame):
+        self.running = False
 
     def parse_parset(self):
         self.parset = {}
@@ -337,12 +353,18 @@ class Correlator(object):
 
     def do_f(self):
         for iant, ant in enumerate(self.ants):
+            if not self.running:
+                raise KeyboardInterrupt()
+
             ant.do_f(self)
 
     def do_x(self):
         nant = len(self.ants)
         for ia1 in xrange(nant):
             for ia2 in xrange(ia1, nant):
+                if not self.running:
+                    raise KeyboardInterrupt()
+                    
                 a1 = self.ants[ia1]
                 a2 = self.ants[ia2]
                 self.do_x_corr(a1, a2)
@@ -363,7 +385,7 @@ class Correlator(object):
                         #xx[:,pout] = (d1 * np.conj(d2)).mean(axis=0)
                         # vdot conjugates the first argument
                         # this is equivalent to (d1 * conj(d2)).mean(axis=0)
-                        if self.sideband == 1:
+                        if self.sideband == -1:
                             xx[c, pout] = np.vdot(d2[:, c], d1[:, c])/ntimes
                         else:# take complex conjugate if inverted
                             xx[c, pout] = np.vdot(d1[:, c], d2[:, c])/ntimes
@@ -383,14 +405,14 @@ class Correlator(object):
 
 
 def parse_delays(values):
-    delayfile = os.path.join(os.path.dirname(values.parset), 'fpga_delays.txt')
+    delayfile = values.calcfile.replace('.im','.hwdelays')
     delays = {}
     if os.path.exists(delayfile):
         with open(delayfile, 'rU') as dfile:
             for line in dfile:
                 bits = line.split()
                 if not line.startswith('#') and len(bits) == 2:
-                    delays[bits[0].strip()] = int(bits[1])
+                    delays[bits[0].strip()] = -int(bits[1])
 
         logging.info('Loaded %s delays from %s', len(delays), delayfile)
     else:
@@ -398,6 +420,32 @@ def parse_delays(values):
 
 
     return delays
+
+def load_sources(calcfile):
+    calc_input = calcfile.replace('.im','.calc')
+    d = {}
+    for line in open(calc_input, 'rU'):
+        if len(line) == 0 or line.startswith('#'):
+            continue
+        bits = line.split(':')
+        if len(bits) != 2:
+            continue
+        
+        k,v = bits
+
+        d[k.strip()] = v.strip()
+
+    assert d['NUM SOURCES'] == '1'
+    name = d['SOURCE 0 NAME']
+    # ra/dec in radians
+    ra = float(d['SOURCE 0 RA'])
+    dec = float(d['SOURCE 0 DEC'])
+    pos = SkyCoord(ra, dec, unit=('rad','rad'), frame='icrs')
+    sources = [{'name':name,'ra':pos.ra.deg,'dec':pos.dec.deg}]
+
+    return sources
+
+
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -420,16 +468,14 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     calcresults = ResultsFile(values.calcfile)
-    m87pos = SkyCoord(3.276089, 0.21626172, unit=('rad','rad'), frame='icrs')
-    sources = [{'name':'M87','ra':m87pos.ra.deg,'dec':m87pos.dec.deg}]
+    sources = load_sources(values.calcfile)
     # hacking delays
     delaymap = parse_delays(values)
-    print sources
     antennas = [AntennaSource(mux) for mux in vcraft.mux_by_antenna(values.files, delaymap)]
     #antennas = [AntennaSource(vcraft.VcraftFile(f)) for f in values.files]
     corr = Correlator(antennas, sources, values)
     try:
-        while(True):
+        while(corr.running):
             #fq = corr.fileout.fq_table()
             #an = corr.fileout.an_table(corr.ants)
             #su = corr.fileout.su_table(sources)
