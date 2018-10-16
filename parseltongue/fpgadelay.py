@@ -4,9 +4,11 @@
 # AIPS imports
 ################################################################################
 from AIPS import AIPS, AIPSDisk
-from AIPSTask import AIPSTask, AIPSList
-from AIPSData import AIPSUVData, AIPSImage, AIPSCat
-from AIPSTV import AIPSTV
+from AIPSTask import AIPSTask
+#from AIPSTask import AIPSTask, AIPSList
+from AIPSData import AIPSUVData
+#from AIPSData import AIPSUVData, AIPSImage, AIPSCat
+#from AIPSTV import AIPSTV
 
 ################################################################################
 # General python imports
