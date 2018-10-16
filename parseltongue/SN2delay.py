@@ -30,7 +30,6 @@ snversion = 1
 parser = argparse.ArgumentParser()
 parser.add_argument('-u', '--user', help="AIPS user number", type=int)
 parser.add_argument('-s', '--sn', help="SN table version", type=int)
-parser.add_argument('-o', '--outfile', help="Save delays to file")
 parser.add_argument("-a", "--av", default=False, action="store_true", help="Average IFs")
 parser.add_argument('aipsfile', help="AIPS  file ")
 args = parser.parse_args()
