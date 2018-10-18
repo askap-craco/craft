@@ -46,6 +46,10 @@ aipsfile = args.aipsfile
 
 uvdata = AIPSUVData(name, aipsclass, aipsDisk, int(seq))
 
+if not uvdata.exists():
+    print aipsfile, "does not exists! Aborting"
+    sys.exit()
+
 # Make a list of antennas
 maxanid = 0
 antable = uvdata.table('AN', 1)
@@ -72,13 +76,12 @@ for row in sntable:
     ant = annames[row.antenna_no-1]
     if not ant in delays1:
         delays1[ant] = [0.0]*num_if
-        delays2[ant] = [0.0]*num_if
+        if num_pol>1: delays2[ant] = [0.0]*num_if
         delaysN[ant] = 0
 
     if num_if==1:
         rowDelay1 = [row.delay_1]
-        if num_pol>1:
-            rowDelay2 = [row.delay_2]
+        if num_pol>1: rowDelay2 = [row.delay_2]
     else:
         rowDelay1 = row.delay_1
         if num_pol>1:
@@ -86,15 +89,18 @@ for row in sntable:
     for i in range(num_if):
         if abs(rowDelay1[i])>1 or (num_pol > 1 and abs(rowDelay2[i])>1): continue
         delays1[ant][i] += rowDelay1[i]
-        if num_pol > 1:
-            delays2[ant][i] += rowDelay2[i]
+        if num_pol > 1: delays2[ant][i] += rowDelay2[i]
     delaysN[ant] += 1
 
 if avgIf:
     for ant in delays1:
+        delaysN[ant] *= num_if
         for i in range(1,num_if):
             delays1[ant][0] += delays1[ant][i]
-        delaysN[ant] *= num_if
+        if num_pol>1: 
+            delaysN[ant] *= 2
+            for i in range(num_if):
+                delays1[ant][0] += delays2[ant][i]
 
     for ant in sorted(delays1):
         if delaysN[ant]==0:
@@ -108,7 +114,7 @@ else:
         if delaysN[ant]==0:
             print ant, 0
         else:
-            print ant,
-            for i in range(num_if):
-                print delays1[ant][i]/delaysN[ant]*1e9,",",
-            print
+            if num_pol>1: 
+                print ant, ','.join([str(delays1[ant][i]/delaysN[ant]*1e9)+','+str(delays2[ant][i]/delaysN[ant]*1e9) for i in range(num_if)])
+            else:
+                print ant, ','.join([str(delays1[ant][i]/delaysN[ant]*1e9) for i in range(num_if)])
