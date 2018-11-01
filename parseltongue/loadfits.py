@@ -4,7 +4,7 @@
 # AIPS imports
 ################################################################################
 from AIPS import AIPS, AIPSDisk
-from AIPSTask import AIPSTask
+from AIPSTask import AIPSTask, AIPSList
 from AIPSData import AIPSUVData
 
 ################################################################################
@@ -18,7 +18,7 @@ pid = os.getpid()
 # Set up AIPS stuff
 ################################################################################
 try:
-    aipsver = os.environ['PSRPIAIPSVER']
+    aipsver = os.environ['AIPSVER']
 except KeyError:
     aipsver = '31DEC18'
 AIPS.userno = 702
@@ -27,6 +27,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-u', '--user', help="AIPS user number", type=int)
 parser.add_argument('-d', '--disk', default=1, help="AIPS disk", type=int)
 parser.add_argument('-o', '--outfile', default="data", help="Output AIPS file")
+parser.add_argument('-a', '--antlist', help="Force antenna list")
 parser.add_argument('fitsfile', nargs='+', help="Input FITS data")
 args = parser.parse_args()
 
@@ -37,7 +38,7 @@ aipsDisk = args.disk
 ################################################################################
 # Some useful functions
 ################################################################################
-def fitld_uvfits(uvfitsfile, aipsdata):
+def fitld_uvfits(uvfitsfile, aipsdata, antlist=None):
     # Load FITS file and immediatetly reduce spectral resolution
     SpecAv = 18 # Amount of channels to average - should make dynamic
 
@@ -56,6 +57,11 @@ def fitld_uvfits(uvfitsfile, aipsdata):
     os.system("rm -f " + tempinfits)
     os.system("ln -s " + uvfitsfile + " " + tempinfits)
     fitld.datain = tempinfits
+
+    if antlist is not None:
+        antname = [x.strip() for x in antlist.split(',')]
+        fitld.antname = AIPSList(antname)
+    
     fitld()
     os.system("rm -f " + tempinfits)
 
@@ -95,6 +101,7 @@ def gluUV(card_uvdata, glu_uvdata):
     lastMerge = None
     thisout = None
     nleft = nfits
+    ntmp = 1
     while nleft>0:
         if lastMerge != None:
             vbglu.indata = lastMerge
@@ -128,18 +135,20 @@ def gluUV(card_uvdata, glu_uvdata):
             vbglu.outdata = glu_uvdata
             thisout = None
         else:
-            thisout = AIPSUVData("GLU{}".format(pid), "UVDATA", aipsDisk, 1)
+            thisout = AIPSUVData("GLU{}-{}".format(pid, ntmp), "UVDATA", aipsDisk, 1)
             if thisout.exists(): thisout.zap()
             vbglu.outdata = thisout
+            ntmp += 1
 
         vbglu()
-        if nleft>0:
-            if lastMerge is not None:
-                lastMerge.zap()
-                pass
-            lastMerge = thisout
+        if lastMerge is not None:
+            lastMerge.zap()
+        lastMerge = thisout
+
     if thisout is not None:
         thisout.zap()
+
+        
 def mergeIF(inuv, outname):    
     # Merge all IFs in input file to a single IF and reduce spectral resolution
     IFcol = -1
@@ -186,7 +195,7 @@ for c, fits in enumerate(args.fitsfile):
         sys.exit()
     
     # Load up the FITS file into AIPS
-    fitld_uvfits(fits, uvdata)
+    fitld_uvfits(fits, uvdata, args.antlist)
     card_uvdata.append(uvdata)
 
 gluUVdata = AIPSUVData("TMPGLU{}".format(pid), "UVDATA", aipsDisk, 1)
