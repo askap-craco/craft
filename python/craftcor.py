@@ -380,12 +380,14 @@ class Correlator(object):
         npolout = self.npol_out
         xx = np.empty([self.nfine_chan, npolout], dtype=np.complex64)
         #np.seterr(all='raise')
+        rfidelay = self.values.rfidelay
         for p1 in xrange(self.npol_in):
             for p2 in xrange(self.npol_in):
                 d1 = a1.data[:, :, p1]
                 d2 = a2.data[:, :, p2]
                 pout = p2 + p1*self.npol_in
-                ntimes = float(d1.shape[0])
+                ntimesi = d1.shape[0] - rfidelay
+                ntimes = float(ntimesi)
 
                 try:
                     for c in xrange(self.nfine_chan):
@@ -393,9 +395,9 @@ class Correlator(object):
                         # vdot conjugates the first argument
                         # this is equivalent to (d1 * conj(d2)).mean(axis=0)
                         if self.sideband == -1:
-                            xx[c, pout] = np.vdot(d2[:, c], d1[:, c])/ntimes
+                            xx[c, pout] = np.vdot(d2[:ntimesi, c], d1[rfidelay:, c])/ntimes
                         else:# take complex conjugate if inverted
-                            xx[c, pout] = np.vdot(d1[:, c], d2[:, c])/ntimes
+                            xx[c, pout] = np.vdot(d1[:ntimesi, c], d2[rfidelay:, c])/ntimes
                             
                 except Exception, e:
                     print 'Error', e
@@ -426,7 +428,7 @@ def parse_delays(values):
             for line in dfile:
                 bits = line.split()
                 if not line.startswith('#') and len(bits) == 2:
-                    delays[bits[0].strip()] = -int(bits[1])
+                    delays[bits[0].strip()] = int(bits[1])
 
         logging.info('Loaded %s delays from %s', len(delays), delayfile)
     else:
@@ -474,6 +476,7 @@ def _main():
     parser.add_argument('--show', help='Show plot', action='store_true', default=False)
     parser.add_argument('-i','--nint', help='Number of fine spectra to average', type=int, default=128)
     parser.add_argument('-f','--fscrunch', help='Frequency average by this factor', default=1, type=int)
+    parser.add_argument('--rfidelay', type=int, help='Delay in fine samples to add to second component to make an RFI data set', default=0)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
