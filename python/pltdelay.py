@@ -31,6 +31,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s','--show', action='store_true', default=False, help='Show plots')
     parser.add_argument('-n','--nant', help='Number of antennas', type=int)
+    parser.add_argument('-c','--nchan', help='Number of channels per MHz', type=int, default=54)
     parser.add_argument('--headers', help='Header files', nargs='*')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
@@ -41,7 +42,7 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     nant = values.nant
-    nchan = 54
+    nchan = values.nchan
 
     for f in values.files:
         rfile = f

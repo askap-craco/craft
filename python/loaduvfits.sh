@@ -5,15 +5,15 @@ for f in $@ ; do
 
     if [[ ! -e $f.mir ]] ; then
 	fits in=$f.fits out=$f.mir op=uvin
+	prthd in=$f.mir
 	uvflag vis=$f.mir flagval=unflag select=-auto
 	uvspec vis=$f.mir select=ant\(1\) interval=1 axis=freq,real log=$f.uvspec.real
 	uvspec vis=$f.mir select=ant\(1\) interval=1 axis=freq,imag log=$f.uvspec.imag
-
+	#mfcal vis=$f.mir interval=1
     fi
 
-    continue
     if [[ ! -e $f.uvaver ]] ; then
-	uvaver vis=$f.mir out=$f.uvaver line=chan,2016,1,9
+	uvaver vis=$f.mir out=$f.uvaver line=chan,336,1,6 options=nopass,nocal,npol
 	mfcal vis=$f.uvaver interval=1
 	uvspec vis=$f.uvaver axis=freq,phase device=$f.uvaver.uvspec.png/png interval=1 nxy=3,4
 

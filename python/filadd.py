@@ -34,7 +34,7 @@ def _main():
     tstarts = np.array([f.tstart for f in infiles])
     tstart_max = max(tstarts)
     sampoffs = np.round((tstart_max - tstarts)*86400.0/s0.tsamp).astype(int)
-    print sampoffs
+    print 'Sample offsets', sampoffs
     nin = len(infiles)
     foff_out = s0.foff 
     # If you average N channels together, the center frequency moves.

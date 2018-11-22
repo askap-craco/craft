@@ -428,7 +428,7 @@ def parse_delays(values):
             for line in dfile:
                 bits = line.split()
                 if not line.startswith('#') and len(bits) == 2:
-                    delays[bits[0].strip()] = int(bits[1])
+                    delays[bits[0].strip()] = -int(bits[1])
 
         logging.info('Loaded %s delays from %s', len(delays), delayfile)
     else:

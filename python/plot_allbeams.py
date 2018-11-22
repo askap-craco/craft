@@ -328,8 +328,8 @@ class Plotter(object):
         a - zoom in by 2
         t - increase tscrunch by 1 bin
         T - decrease tscrunch by 1 bin
-        f - increase fscrunch by 1 bin
-        F - decrease fscrunch by 1 bin
+        z - increase fscrunch by 1 bin
+        Z - decrease fscrunch by 1 bin
         d - Dedisperse (I'll ask for the DM on the cmdline
         c - Increase colormap zoom
         C - Decrease colormap zoom
@@ -347,10 +347,6 @@ class Plotter(object):
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
         beams = np.ma.masked_equal(beams, 0)
         
-        if self.rescale:
-            print  'Doing rescale'
-            beams -= beams.mean(axis=0)
-            beams /= beams.std(axis=0)*np.sqrt(beams.shape[2])
             
         f0 = files[0]
         self.beams = beams
@@ -365,6 +361,11 @@ class Plotter(object):
 
         if self.fscrunch_factor != 1:
             beams = fscrunch(beams, self.fscrunch_factor)
+            
+        if self.rescale:
+            print  'Doing rescale'
+            beams -= beams.mean(axis=0)
+            beams /= beams.std(axis=0) 
 
         ntimes, nbeams, nfreq = beams.shape
         mjdstart = f0.tstart
