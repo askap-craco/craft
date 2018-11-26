@@ -27,13 +27,18 @@
 //typedef cufftComplex ftype;
 
 template <class intype>
-void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataType otype)
+void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataType otype, bool inplace)
 {
 	CudaTimer t;
-	intype *data;
+	intype *data, *out_data;
 	cufftHandle plan;
 	size_t data_size=sizeof(intype)*n*(n/2 + 1)*batch;
 	gpuErrchk(cudaMalloc((void**) &data, data_size));
+	if (inplace) {
+	  out_data = data;
+	} else {
+	  gpuErrchk(cudaMalloc((void**) &out_data, data_size));
+	}
 
 	long long int nsize[] = {n,n };
 
@@ -58,22 +63,25 @@ void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataT
 			));
 
 	// warm up
-	cufftSafeCall(cufftXtExec(plan, data, data, CUFFT_INVERSE));
+	cufftSafeCall(cufftXtExec(plan, data, out_data, CUFFT_INVERSE));
 
 	int niter = 100;
 	for (int i = 0; i < niter; ++i) {
 		t.start();
 		//cufftSafeCall(cufftExecC2R(plan, data, (outtype*) data));
-		cufftSafeCall(cufftXtExec(plan, data, data, CUFFT_INVERSE));
+		cufftSafeCall(cufftXtExec(plan, data, out_data, CUFFT_INVERSE));
 		t.stop();
 
 	}
 	float tavg_us = t.get_average_time() / float(batch) * 1e3f;
 
-	printf("%dx%d FFT batch=%d data=%d MB in-place type=%d-> %d. Worksize=%d MB: %f microseconds/FFT= %f k FFTs/sec\n",
-				n,n,batch,data_size/1024/1024, itype,otype, worksize/1024/1024, tavg_us, 1./tavg_us*1e6f/1e3f);
+	printf("%dx%d FFT batch=%d data=%d MB in-place=%d type=%d-> %d. Worksize=%d MB: %f microseconds/FFT= %f k FFTs/sec\n",
+	       n,n,batch,data_size/1024/1024, inplace, itype,otype, worksize/1024/1024, tavg_us, 1./tavg_us*1e6f/1e3f);
 	cufftSafeCall(cufftDestroy(plan));
 	gpuErrchk(cudaFree(data));
+	if (! inplace) {
+	  gpuErrchk(cudaFree(out_data));
+	}
 }
 
 int main(int argc, char* argv[])
@@ -105,8 +113,14 @@ int main(int argc, char* argv[])
 
 	for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
 		int batch = 1 << batch2;
-		timefft<cufftComplex>(n,batch,itype, etype, otype);
+		timefft<cufftComplex>(n,batch,itype, etype, otype, false);
 	}
+
+	for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
+		int batch = 1 << batch2;
+		timefft<cufftComplex>(n,batch,itype, etype, otype, true);
+	}
+
 
 	itype = CUDA_C_16F;
 	etype = CUDA_C_16F;
@@ -114,8 +128,14 @@ int main(int argc, char* argv[])
 
 	for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
 		int batch = 1 << batch2;
-		timefft<half2>(n,batch,itype, etype, otype);
+		timefft<half2>(n,batch,itype, etype, otype, false);
 	}
+
+	for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
+		int batch = 1 << batch2;
+		timefft<half2>(n,batch,itype, etype, otype, true);
+	}
+
 
 	printf("Benchmark finished\n");
 }
