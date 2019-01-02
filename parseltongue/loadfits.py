@@ -27,6 +27,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-u', '--user', help="AIPS user number", type=int)
 parser.add_argument('-d', '--disk', default=1, help="AIPS disk", type=int)
 parser.add_argument('-o', '--outfile', default="data", help="Output AIPS file")
+parser.add_argument('-f', '--fitsfileoutname', default="", help="Output FITS file, blank doesn't write")
 parser.add_argument('-a', '--antlist', help="Force antenna list")
 parser.add_argument('fitsfile', nargs='+', help="Input FITS data")
 args = parser.parse_args()
@@ -178,6 +179,8 @@ def mergeIF(inuv, outname):
     indxr = AIPSTask('indxr', version  = aipsver)
     indxr.indata = outData
     indxr()
+
+    return outData
     
 ################################################################################
 # Main code
@@ -203,9 +206,16 @@ if gluUVdata.exists(): glUVdata.zap()
 
 gluUV(card_uvdata, gluUVdata)
 
-mergeIF(gluUVdata, args.outfile)
+outdata = mergeIF(gluUVdata, args.outfile)
 
 for c in card_uvdata:
     c.zap()
 gluUVdata.zap()
 
+if args.fitsfileoutname != "":
+    if not args.fitsfileoutname[0] == '/':
+        args.fitsfileoutname = os.getcwd() + '/' + args.fitsfileoutname
+    fittp = AIPSTask("fittp")
+    fittp.indata = outdata
+    fittp.dataout = args.fitsfileoutname
+    fittp()
