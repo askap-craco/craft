@@ -54,6 +54,7 @@ def fring_fpga(aipsdata):
     fring.indata = aipsdata
     fring.refant = 1
     fring.solint = 0.5
+    fring.dparm[9] = 1
     fring()
 
     
@@ -106,7 +107,7 @@ for row in sntable:
         delaysN[ant] = 0
             
     for i in range(num_if):
-        if abs(row.delay_1[i])>1 or (num_pol > 1 and abs(row.delay_2[i])>1): continue
+        #if abs(row.delay_1[i])>1 or (num_pol > 1 and abs(row.delay_2[i])>1): continue
 
         delays1[ant][i] += row.delay_1[i]
         if num_pol>1: delays2[ant][i] += row.delay_2[i]
@@ -114,6 +115,7 @@ for row in sntable:
 
 if avgIf:
     for ant in delays1:
+        #print ant
         delaysN[ant] *= num_if
         for i in range(1,num_if):
             delays1[ant][0] += delays1[ant][i]
@@ -121,23 +123,22 @@ if avgIf:
             delaysN[ant] *= 2
             for i in range(num_if):
                 delays1[ant][0] += delays2[ant][i]
+        #print delays1[ant][0]
 
-
-    for ant in delays1:
+    for ant in sorted(delays1):
         if args.outfile is not None:
             delayfile =  open(args.outfile, 'a+')
         if delaysN[ant]>0:
             FPGAdelay = delays1[ant][0]/delaysN[ant]*1e9/6750.0
-            if abs(FPGAdelay>0.1):
+            if abs(FPGAdelay)>0.1:
                 print "{} {:3.0f}".format(ant, FPGAdelay)
                 if args.outfile is not None:
-                    delayfile.write("{} {} {:3.0f} {:3.0f}\n".format(ant, fpga, FPGAdelay, FPGAdelay))
+                    delayfile.write("{} {} {:3.0f}\n".format(ant, fpga, FPGAdelay))
         if args.outfile is not None:
             delayfile.close()
 
 else:
-
-    for ant in delays1:
+    for ant in sorted(delays1):
         if delaysN[ant]==0:
             print ant, 0
         else:
