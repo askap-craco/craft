@@ -29,6 +29,8 @@ parser.add_argument('-d', '--disk', default=1, help="AIPS disk", type=int)
 parser.add_argument('-o', '--outfile', default="data", help="Output AIPS file")
 parser.add_argument('-f', '--fitsfileoutname', default="", help="Output FITS file, blank doesn't write")
 parser.add_argument('-a', '--antlist', help="Force antenna list")
+parser.add_argument('-s', '--specav', default=18, help="Spectral Averaging", type=int)
+parser.add_argument("-m", "--nomerge", default=False, action="store_true", help="Don't Merge IFs")
 parser.add_argument('fitsfile', nargs='+', help="Input FITS data")
 args = parser.parse_args()
 
@@ -39,15 +41,18 @@ aipsDisk = args.disk
 ################################################################################
 # Some useful functions
 ################################################################################
-def fitld_uvfits(uvfitsfile, aipsdata, antlist=None):
+def fitld_uvfits(uvfitsfile, aipsdata, antlist=None, specAv=None):
     # Load FITS file and immediatetly reduce spectral resolution
-    SpecAv = 18 # Amount of channels to average - should make dynamic
+    if specAv is None: specAv = 18 # Amount of channels to average
 
     if not os.path.exists(uvfitsfile):
         print uvfitsfile + " does not exist! Aborting."
         sys.exit()
 
-    loadUV = AIPSUVData("TMPLOAD{}".format(pid), "UVDATA", aipsDisk, 1)
+    if specAv==0:
+        loadUV = aipsdata
+    else:
+        loadUV = AIPSUVData("TMPLOAD{}".format(pid), "UVDATA", aipsDisk, 1)
     if loadUV.exists(): loadUV.zap()
         
     fitld = AIPSTask('fitld', version = aipsver)
@@ -66,30 +71,31 @@ def fitld_uvfits(uvfitsfile, aipsdata, antlist=None):
     fitld()
     os.system("rm -f " + tempinfits)
 
-    FreqCol = None
-    for i, t in enumerate(loadUV.header['ctype']):
-        if t=='FREQ':
-            FreqCol = i
-            break
+    if specAv>0:
+        FreqCol = None
+        for i, t in enumerate(loadUV.header['ctype']):
+            if t=='FREQ':
+                FreqCol = i
+                break
 
-    if FreqCol is None:
-        print "Error: Could not find FREQ column in UV data"
-        exit()
+        if FreqCol is None:
+            print "Error: Could not find FREQ column in UV data"
+            exit()
 
-    num_freq = loadUV.header['naxis'][FreqCol]
-    if num_freq%SpecAv:
-        print "Error: Cannot divide {} into {}. Aborting".format(SpecAv,num_freq)
-        exit()
+        num_freq = loadUV.header['naxis'][FreqCol]
+        if num_freq%specAv:
+            print "Error: Cannot divide {} into {}. Aborting".format(specAv,num_freq)
+            exit()
 
-    avspc = AIPSTask('avspc', version = aipsver)
-    avspc.indata = loadUV
-    avspc.outdata = aipsdata
-    avspc.avoption = 'SUBS'
-    avspc.doacor = 1
-    avspc.channel = SpecAv
-    avspc()
+        avspc = AIPSTask('avspc', version = aipsver)
+        avspc.indata = loadUV
+        avspc.outdata = aipsdata
+        avspc.avoption = 'SUBS'
+        avspc.doacor = 1
+        avspc.channel = specAv
+        avspc()
 
-    loadUV.zap()
+        loadUV.zap()
 
 def gluUV(card_uvdata, glu_uvdata):
     vbglu = AIPSTask('vbglu', version = aipsver)
@@ -150,7 +156,7 @@ def gluUV(card_uvdata, glu_uvdata):
         thisout.zap()
 
         
-def mergeIF(inuv, outname):    
+def mergeIF(inuv, outData):    
     # Merge all IFs in input file to a single IF and reduce spectral resolution
     IFcol = -1
     for i, t in enumerate(inuv.header['ctype']):
@@ -164,11 +170,6 @@ def mergeIF(inuv, outname):
 
     num_if = inuv.header['naxis'][IFcol]
 
-    seq = 1
-    while True:
-        outData = AIPSUVData(outname, "UVDATA", aipsDisk, seq)
-        if not outData.exists(): break
-        seq += 1
 
     morif = AIPSTask('morif', version = aipsver)
     morif.indata = inuv
@@ -180,38 +181,54 @@ def mergeIF(inuv, outname):
     indxr.indata = outData
     indxr()
 
-    return outData
-    
 ################################################################################
 # Main code
 ################################################################################
 
 card_uvdata = []
 
+single = len(args.fitsfile)==1
+
+seq = 1
+while True:
+    outdata = AIPSUVData(args.outfile, "UVDATA", aipsDisk, seq)
+    if not outdata.exists(): break
+    seq += 1
+
+
 for c, fits in enumerate(args.fitsfile):
 
-    uvdata = AIPSUVData("TMPUV{}_{}".format(c+1, pid), "UVDATA", aipsDisk, 1)
-    if uvdata.exists(): uvdata.zap()
+    if single and args.nomerge:
+        uvdata = outdata
+    else:
+        uvdata = AIPSUVData("TMPUV{}_{}".format(c+1, pid), "UVDATA", aipsDisk, 1)
+        if uvdata.exists(): uvdata.zap()
 
     if not os.path.exists(fits):
         print "{} does not exist. Aborting".format(fits)
         sys.exit()
     
     # Load up the FITS file into AIPS
-    fitld_uvfits(fits, uvdata, args.antlist)
+    fitld_uvfits(fits, uvdata, args.antlist, args.specav)
     card_uvdata.append(uvdata)
 
-gluUVdata = AIPSUVData("TMPGLU{}".format(pid), "UVDATA", aipsDisk, 1)
-if gluUVdata.exists(): glUVdata.zap()
+if single:
+    gluUVdata = card_uvdata[0]    
+else:
+    gluUVdata = AIPSUVData("TMPGLU{}".format(pid), "UVDATA", aipsDisk, 1)
+    if gluUVdata.exists(): glUVdata.zap()
+    gluUV(card_uvdata, gluUVdata)
 
-gluUV(card_uvdata, gluUVdata)
-
-outdata = mergeIF(gluUVdata, args.outfile)
-
-for c in card_uvdata:
-    c.zap()
-gluUVdata.zap()
-
+if not args.nomerge:
+    mergeIF(gluUVdata, outdata)
+    for c in card_uvdata:
+        c.zap()
+    if not single: gluUVdata.zap()
+else:
+    if not single:
+        for c in card_uvdata:
+            c.zap()
+    
 if args.fitsfileoutname != "":
     if not args.fitsfileoutname[0] == '/':
         args.fitsfileoutname = os.getcwd() + '/' + args.fitsfileoutname
