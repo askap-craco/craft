@@ -25,18 +25,27 @@ AIPS.userno = 702
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-u', '--user', help="AIPS user number", type=int)
-parser.add_argument('-d', '--disk', default=1, help="AIPS disk", type=int)
+parser.add_argument('-D', '--disk', default=1, help="AIPS disk", type=int)
 parser.add_argument('-o', '--outfile', default="data", help="Output AIPS file")
-parser.add_argument('-f', '--fitsfileoutname', default="", help="Output FITS file, blank doesn't write")
+parser.add_argument('-f', '--fitsfileoutname', help="Output FITS file, default doesn't write")
 parser.add_argument('-a', '--antlist', help="Force antenna list")
 parser.add_argument('-s', '--specav', default=18, help="Spectral Averaging", type=int)
 parser.add_argument("-m", "--nomerge", default=False, action="store_true", help="Don't Merge IFs")
+parser.add_argument("-d", "--delete", default=False, action="store_true", help="Delete AIPS file if writing FITS out")
 parser.add_argument('fitsfile', nargs='+', help="Input FITS data")
 args = parser.parse_args()
 
 if args.user is not None: AIPS.userno = args.user
 
 aipsDisk = args.disk
+
+fitsfileoutname = args.fitsfileoutname
+if fitsfileoutname is not None:
+    if not fitsfileoutname[0] == '/':
+        fitsfileoutname = os.getcwd() + '/' + args.fitsfileoutname
+        if os.path.exists(fitsfileoutname):
+        print "Warning: {} already exists. Aborting".format(fitsfileoutname)
+        sys.exit()
 
 ################################################################################
 # Some useful functions
@@ -229,10 +238,12 @@ else:
         for c in card_uvdata:
             c.zap()
     
-if args.fitsfileoutname != "":
+if args.fitsfileoutname is not None:
     if not args.fitsfileoutname[0] == '/':
         args.fitsfileoutname = os.getcwd() + '/' + args.fitsfileoutname
     fittp = AIPSTask("fittp")
     fittp.indata = outdata
     fittp.dataout = args.fitsfileoutname
     fittp()
+    if args.delete:
+        outdata.zap()
