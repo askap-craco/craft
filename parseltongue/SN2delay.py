@@ -24,14 +24,14 @@ snversion = 1
 parser = argparse.ArgumentParser()
 parser.add_argument('-u', '--user', help="AIPS user number", type=int)
 parser.add_argument('-s', '--sn', help="SN table version", type=int)
-parser.add_argument("-a", "--av", default=False, action="store_true", help="Average IFs")
+parser.add_argument("-a", "-av", "--av", default=False, action="store_true", help="Average IFs")
 parser.add_argument("-r", "--rate", default=False, action="store_true", help="Do rate, not delay")
 parser.add_argument("-c", "--clip", help="Ignore values with magnitude greater than this in average", type=float)
 parser.add_argument('aipsfile', help="AIPS  file ")
 args = parser.parse_args()
 
 if args.user is not None: AIPS.userno = args.user
-if args.sn is not None: snversion = args.user
+if args.sn is not None: snversion = args.sn
 avgIf = args.av
 rate = args.rate
 clip = args.clip
