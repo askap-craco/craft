@@ -4,9 +4,8 @@
 # AIPS imports
 ################################################################################
 from AIPS import AIPS, AIPSDisk
-from AIPSTask import AIPSTask, AIPSList
-from AIPSData import AIPSUVData, AIPSImage, AIPSCat
-from AIPSTV import AIPSTV
+from AIPSTask import AIPSTask
+from AIPSData import AIPSUVData
 
 ################################################################################
 # General python imports
@@ -55,6 +54,7 @@ def fring_fpga(aipsdata):
     fring.indata = aipsdata
     fring.refant = 1
     fring.solint = 0.5
+    fring.dparm[9] = 1
     fring()
 
     
@@ -88,7 +88,8 @@ for row in antable:
     annames[row.nosta-1] = row.anname.strip()
 
 # Read the AIPS delays and phases
-delays = {}
+delays1 = {}
+delays2 = {}
 delaysN = {}
 
 sntable = uvdata.table('SN', 1)
@@ -98,47 +99,52 @@ num_snterms = num_if*num_pol
 
 fpga = os.path.basename(os.getcwd())
 
-if num_pol>1:
-    print "Only support single polarisation"
-    exit()
-
 for row in sntable:
     ant = annames[row.antenna_no-1]
-    if not ant in delays:
-        delays[ant] = [0.0]*num_if
+    if not ant in delays1:
+        delays1[ant] = [0.0]*num_if
+        if num_pol>1: delays2[ant] = [0.0]*num_if
         delaysN[ant] = 0
             
     for i in range(num_if):
-        if abs(row.delay_1[i])>1 or (num_pol > 1 and abs(row.delay_1[i])>1): continue
+        #if abs(row.delay_1[i])>1 or (num_pol > 1 and abs(row.delay_2[i])>1): continue
 
-        delays[ant][i] += row.delay_1[i]
+        delays1[ant][i] += row.delay_1[i]
+        if num_pol>1: delays2[ant][i] += row.delay_2[i]
     delaysN[ant] += 1
 
 if avgIf:
-    for ant in delays:
-        for i in range(1,num_if):
-            delays[ant][0] += delays[ant][i]
+    for ant in delays1:
+        #print ant
         delaysN[ant] *= num_if
+        for i in range(1,num_if):
+            delays1[ant][0] += delays1[ant][i]
+        if num_pol>1:
+            delaysN[ant] *= 2
+            for i in range(num_if):
+                delays1[ant][0] += delays2[ant][i]
+        #print delays1[ant][0]
 
-    for ant in delays:
+    for ant in sorted(delays1):
         if args.outfile is not None:
             delayfile =  open(args.outfile, 'a+')
         if delaysN[ant]>0:
-            FPGAdelay = delays[ant][0]/delaysN[ant]*1e9/6750.0
-            if abs(FPGAdelay>0.1):
+            FPGAdelay = delays1[ant][0]/delaysN[ant]*1e9/6750.0
+            if abs(FPGAdelay)>0.1:
                 print "{} {:3.0f}".format(ant, FPGAdelay)
                 if args.outfile is not None:
-                    delayfile.write("{} {} {:3.0f} {:3.0f}\n".format(ant, fpga, FPGAdelay, FPGAdelay))
+                    delayfile.write("{} {} {:3.0f}\n".format(ant, fpga, FPGAdelay))
         if args.outfile is not None:
             delayfile.close()
 
 else:
-
-    for ant in delays:
+    for ant in sorted(delays1):
         if delaysN[ant]==0:
             print ant, 0
         else:
             print ant,
             for i in range(num_if):
-                print "{:4.1f}".format(delays[ant][i]/delaysN[ant]*1e9/6750.0),",",
+                print "{:4.1f}".format(delays1[ant][i]/delaysN[ant]*1e9/6750.0),",",
+                if num_pol>1:
+                    print "{:4.1f}".format(delays2[ant][i]/delaysN[ant]*1e9/6750.0),",",
             print
