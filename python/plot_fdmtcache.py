@@ -135,7 +135,7 @@ def plot_cache(fdmt):
             
             #pylab.plot(dt_range, dt2, label='Subband {}'.format(iif))
 
-        fig.text(0.5, 0.98, 'Iteration {}'.format(iiter), ha='center', va='top')
+        fig.text(0.5, 0.98, 'Iteration {} nf={} ndt={}'.format(iiter, len(nf_data), len(dt_range)), ha='center', va='top')
         fig.text(0.5, 0.02, 'Delta t', ha='center', va='bottom')
 
 
@@ -163,7 +163,7 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     nchan = 512
-    fdmt = Fdmt(1440.-nchan, 1440., nchan, 512, 512)
+    fdmt = Fdmt(1440.-nchan, 1440., nchan, 512, 128)
     plot_cache(fdmt)
     
 
