@@ -311,6 +311,7 @@ def _main():
         print "Header size", fin.header_size_bytes
         print "Data size", fin.data_size_bytes
         print "Number of elements", fin.file_size_elements
+        print 'Duration (seconds)', fin.observation_duration
     
 
 if __name__ == '__main__':

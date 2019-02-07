@@ -1,0 +1,18 @@
+This directory contains casa tasks for use with craft.
+
+See: https://casaguides.nrao.edu/index.php/Writing_a_CASA_Task
+
+INSTALLATION:
+- start casa
+- cd to this directory
+- in casa run os.system('buildmytasks')
+
+RUNNING
+For every session you need to run in casa
+execfile('/<path_to_task_directory>/mytasks.py')
+
+TASKS
+There's only one:
+task freqwt.
+
+Type help freqwt for more information.

@@ -74,13 +74,14 @@ def plot(f, values, mjd=None, dm=None):
         samp_start = nsamp/2
         mjd = tstart + samp_start*tsamp/86400.0
     else:
-        samp_start = int(np.round((mjd - tstart)*86400.0/tsamp)) - nsamp/2
-        if samp_start < 0:
-            raise ValueError, 'Start sample is before start of filterbank start={}'.format(samp_start)
-        if samp_start > s.file_size_elements:
-            raise ValueError, 'End sample is after end of filterbank start={}'.format(samp_start)
+        samp_start = int(np.round((values.mjd -tstart)*86400.0/tsamp)) - nsamp/2
 
-    print 'tstart={} tsamp={} samp_start={} nsamp={} fil nsampsn={} MJD={:10f} dm={} fch1={}'.format(tstart, tsamp, samp_start, nsamp, s.nsamples, mjd, dm, fch1)
+        print values.mjd, tstart, tsamp, samp_start
+            
+        if samp_start < 0:
+            raise ValueError, 'Start sample is before start of filterbank'
+        if samp_start > s.nsamples:
+            raise ValueError, 'End sample is after end of filterbank'
 
     d = s[samp_start:samp_start+nsamp]
     # rescale to roughly 0 mean and 1 variance
@@ -120,7 +121,6 @@ def plot(f, values, mjd=None, dm=None):
 
     if values.show:
         pylab.show()
-
 
 def roll_dedisperse(d, channels, refchan, tsamp, dm):
     dd = d.copy()
