@@ -39,7 +39,7 @@ def _main():
         
         # shape = beam, idm, t, boxcar
         d = alld[values.beam, values.dm, :, :]
-        fig, axes = pylab.subplots(1,4)
+        fig, axes = pylab.subplots(2,3)
         ax = axes.flatten()
         ax[0].plot(d)
         ax[0].set_xlabel('Sample')
@@ -57,7 +57,19 @@ def _main():
         print 'S/N per beam idm=%d t=%d bc=%d: %s' % (values.dm, values.time, values.boxcar, alld[:, values.dm, values.time, values.boxcar])
 
         ax3 = ax[3]
-        ax3.imshow(alld[values.beam, :, :, values.boxcar])
+        ax3.imshow(alld[values.beam, :, :, values.boxcar], aspect='auto')
+
+        ax4 = ax[4]
+        for w in (0,1,30,31):
+            ax4.hist(alld[values.beam,:,:,w].flatten(), bins=100, histtype='step', label='w={}'.format(w))
+            
+        ax4.legend()
+        ax4.set_xlabel('S/N')
+        ax4.set_ylabel('Number of points')
+
+        ax5 = ax[5]
+        x = alld[values.beam,values.dm,:,values.boxcar]
+        ax5.loglog(abs(np.fft.rfft(x)))
         
                     
         pylab.show()
