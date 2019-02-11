@@ -28,6 +28,8 @@ echo "WRITING DATA TO $outdir"
 mkdir -p $outdir
 chmod a+w $outdir
 ln -s $outdir/voltages `pwd`
+cp $fcm $outdir/
+cp $calcfile $outdir/
 
 if [[ ! -w $outdir ]] ; then
     echo "$outdir not writable"
@@ -39,15 +41,20 @@ ismall=16
 for f in $@ ; do
     dlname=`basename $f`
     echo "DL NAME IS $dlname"
-    beams=`ls -d $f/*/beam37 |  awk -F / '{print $3}' | sort | uniq`
+    beams=`ls -d $f/*/beam?? |  awk -F / '{print $3}' | sort | uniq`
     echo "BEAMS ARE $beams"
     for b in $beams; do
 	b=`basename $b`
 	echo "beam is $b"
-	tsp craftcor.py --parset $fcm --calcfile $calcfile  -i ${ismall} -o $outdir/${dlname}_c4_f3_${b}_i${ismall}.fits $dlname/ak??/$b/*c4_f3.vcraft --fft-size=1
+	#tsp craftcor.py --parset $fcm --calcfile $calcfile  -i ${ismall} -o $outdir/${dlname}_c1_f1_${b}_i${ismall}.fits $dlname/ak??/$b/*c1_f1.vcraft --fft-size=1
+	itime=1
+	fscrunch=9
+	tsp craftcor.py --parset $fcm --calcfile $calcfile  -i $itime -o $outdir/${dlname}_call_${b}_i${itime}_f${fscrunch}.fits $dlname/ak??/$b/*c*.vcraft --fft-size=1 -f $fscrunch
 
+	#tsp craftcor.py --parset $fcm --calcfile $calcfile  -i $itime -o $outdir/${dlname}_call_${b}_i${itime}_f${fscrunch}_rfi1.fits $dlname/ak??/$b/*c*.vcraft --fft-size=1 -f $fscrunch --rfidelay 1
+	
 	for c in {1..7} ; do
-	    tsp craftcor.py --parset $fcm --calcfile $calcfile  -i 1024 -o $outdir/${dlname}_c${c}_${b}.fits $dlname/ak??/$b/*c${c}*.vcraft --fft-size=1
+	    echo tsp craftcor.py --parset $fcm --calcfile $calcfile  -i $itime -o $outdir/${dlname}_c${c}_${b}_i${itime}_f${fscrunch}.fits $dlname/ak??/$b/*c${c}*.vcraft --fft-size=1 -f $fscrunch
 	done
     done
 done

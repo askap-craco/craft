@@ -43,7 +43,6 @@ def _main():
     foff = hdr['CDELT4'] / 1e6 # MHz
     ref_channel = hdr['CRPIX4'] # pixels
 
-
     for row in g.data:
         bl = int(row['BASELINE'])
         ia1 = bl % 256 - 1
@@ -74,10 +73,10 @@ def _main():
             outf = '{}-{}-{}-{}.fil'.format(fin.replace('.fits',''),a1,a2, extra)
             jd = row['DATE']
             inttime = row['INTTIM']
-            dayfrac = row['_DATE']
-            fulljd = float(jd) + float(dayfrac)
+            #dayfrac = row['_DATE']
+            fulljd = float(jd) 
             mjd = fulljd - 2400000.5
-            print 'dates', jd, dayfrac, fulljd, '{:15}'.format(mjd)
+            print 'dates', jd,  fulljd, '{:15}'.format(mjd)
             fch1 = fcent - foff*(nchan - ref_channel)
             hdr = {'fch1':fch1, 'foff':foff,'tsamp':inttime, 'tstart':mjd, 'nbits':32, 'nifs':1, 'nchans':nchan, 'src_raj':0.0, 'src_dej':0.0}
             print 'Opening', bl, outf, hdr

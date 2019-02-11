@@ -18,6 +18,7 @@ from astropy.coordinates import SkyCoord
 import multiprocessing
 import signal
 import warnings
+from scipy.interpolate import interp1d
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -72,10 +73,11 @@ class PlotOut(object):
         print_delay(xx)
         ax1.plot(abs(xx))
         ax2.plot(np.degrees(xxang), 'o')
-        nf = self.corr.nfine_per_coarse
+        nf = self.corr.nfine_out_per_coarse
         for i in xrange(self.corr.ncoarse_chan):
             ax2.axvline(nf*i, c='r')
             ax1.axvline(nf*i, c='r')
+            print 'PLOTSTUFF', nf, i, nf*i, nf*(i+1), self.corr.ncoarse_chan, xx.shape
             print_delay(xx[nf*i:nf*(i+1)])
 
         lag = np.fft.fftshift(abs(np.fft.fft(xx)))
@@ -260,6 +262,12 @@ class Correlator(object):
         self.nfine_chan = self.ncoarse_chan*self.nfine_per_coarse
         self.fine_chanbw = self.coarse_chanbw / float(self.nfine_per_coarse)
         self.full_bw = self.fine_chanbw * self.nfine_chan
+        self.fscrunch = values.fscrunch
+        assert self.fscrunch >= 1
+        assert self.nfine_per_coarse % self.fscrunch == 0, 'Fsrunch must yield an integer number of fine channels per coarse channel'
+        self.nfine_out_per_coarse = self.nfine_per_coarse / self.fscrunch
+        self.nfine_out_chan = self.nfine_out_per_coarse*self.ncoarse_chan
+        self.out_chanbw = self.coarse_chanbw / float(self.nfine_out_per_coarse)
         self.npol_in = 1
         self.npol_out = 1
         #self.f0 = self.ants[0].vfile.freqs.mean() # centre frequency for fringe rotation
@@ -273,8 +281,8 @@ class Correlator(object):
         self.prodout = PlotOut(self)
         self.calcmjd()
         self.get_fr_data()
-        self.fileout = CorrUvFitsFile(values.outfile, self.fmid, self.sideband*self.fine_chanbw, \
-                                      self.nfine_chan, self.npol_out, self.mjd0, sources, ants, self.sideband)
+        self.fileout = CorrUvFitsFile(values.outfile, self.fmid, self.sideband*self.out_chanbw, \
+                                      self.nfine_out_chan, self.npol_out, self.mjd0, sources, ants, self.sideband)
 
         logging.debug('F0 %f FINE CHANNEL %f kHz num=%d freqs=%s', self.f0, self.fine_chanbw*1e3, self.nfine_chan, self.freqs)
 
@@ -325,7 +333,6 @@ class Correlator(object):
 
         return (delay, delayrate)
 
-
     def calcmjd(self):
         i = float(self.curr_intno)
         self.curr_mjd_start = self.mjd0 + self.inttime_days*(i + 0.0)
@@ -373,12 +380,14 @@ class Correlator(object):
         npolout = self.npol_out
         xx = np.empty([self.nfine_chan, npolout], dtype=np.complex64)
         #np.seterr(all='raise')
+        rfidelay = self.values.rfidelay
         for p1 in xrange(self.npol_in):
             for p2 in xrange(self.npol_in):
                 d1 = a1.data[:, :, p1]
                 d2 = a2.data[:, :, p2]
                 pout = p2 + p1*self.npol_in
-                ntimes = float(d1.shape[0])
+                ntimesi = d1.shape[0] - rfidelay
+                ntimes = float(ntimesi)
 
                 try:
                     for c in xrange(self.nfine_chan):
@@ -386,15 +395,22 @@ class Correlator(object):
                         # vdot conjugates the first argument
                         # this is equivalent to (d1 * conj(d2)).mean(axis=0)
                         if self.sideband == -1:
-                            xx[c, pout] = np.vdot(d2[:, c], d1[:, c])/ntimes
+                            xx[c, pout] = np.vdot(d2[:ntimesi, c], d1[rfidelay:, c])/ntimes
                         else:# take complex conjugate if inverted
-                            xx[c, pout] = np.vdot(d1[:, c], d2[:, c])/ntimes
+                            xx[c, pout] = np.vdot(d1[:ntimesi, c], d2[rfidelay:, c])/ntimes
                             
                 except Exception, e:
                     print 'Error', e
                     import ipdb
                     ipdb.set_trace()
-                    
+
+
+        if self.fscrunch > 1:
+            chans = np.arange(self.nfine_chan, step=self.fscrunch)
+            xx = np.add.reduceat(xx, chans, axis=0)/float(self.fscrunch)
+
+        assert xx.shape == (self.nfine_out_chan, self.npol_out)
+            
         self.put_product(a1, a2, xx)
 
     def put_product(self, a1, a2, xx):
@@ -420,6 +436,114 @@ def parse_delays(values):
 
 
     return delays
+
+def parse_gpplt(fin):
+    ''' 
+    Parse a miriad gpplt exported log file
+
+    :returns: tuple(x, values) where x is an array of strings
+    containing x values (dependant on the type of file)
+    and values is a (len(x), Nant) numpy array
+    '''
+    with open(fin, 'rU') as f:
+
+        all_values = [] 
+        curr_values = []
+        x = []
+        for line in f:
+            if line.startswith('#') or line.strip() == '':
+                continue
+
+            # X value is in the first 16 columns
+            # if empty, it's a continuation of previous antennas
+            sz = 14
+            xfield = line[0:sz].strip()
+            bits = map(float, line[sz:].split())
+            if xfield == '':
+                curr_values.extend(bits)
+            else:
+                x.append(xfield)
+                curr_values = []
+                all_values.append(curr_values)
+                curr_values.extend(bits)
+
+        v = np.array(all_values)
+        # make 2D
+        if v.ndim == 1:
+            v = v[np.newaxis, :]
+
+        assert v.ndim == 2
+
+    return np.array(x), v
+
+class MiriadGainSolutions(object):
+    def __init__(self, file_root):
+        '''Loads gpplt exported bandpass and gain calibration solutions.
+        Expects 4 files at the following names, produced by miriad gpplt
+        with the given options
+
+        Limitations: Currently does no time interpolation - just uses first time
+        $file_root.gains.real - yaxis=real
+        $file_root.gains.imag - yaxis=imag
+        $file_root.bandpass.real - options=bandpass, yaxis=real
+        $file_root.bandpass.imag - options=bandpass, yaxis=imag
+        
+        '''
+        times1, g_real = parse_gpplt(file_root+'.gains.real')
+        times2, g_imag = parse_gpplt(file_root+'.gains.imag')
+
+        assert all(times1 == times2), 'Times in gains real/imag dont match'
+        assert g_real.shape == g_imag.shape, 'Unequal shapes of gain files'
+
+        freqs1, bp_real = parse_gpplt(file_root+'.bandpass.real')
+        freqs2, bp_imag = parse_gpplt(file_root+'.bandpass.imag')
+        assert all(freqs1 == freqs2), 'Freqs in bandpass real/imag dont match'
+
+        assert bp_real.shape == bp_imag.shape, 'Unequal shapes of bandpass files'
+        nant = g_real.shape[1]
+        assert bp_real.shape[1] == nant, 'Unequal number of antennas in gain and bandpass files'
+        self.nant = nant
+        self.freqs = np.array(freqs1).astype(np.float) # convert to float
+        self.times = times1 # TODO: Parse times.
+        if len(times1) > 1:
+            warnings.warn('MiriadSolution can only handle 1 time step')
+            
+        self.bp_real = bp_real
+        self.bp_imag = bp_imag
+        self.g_real = g_real
+        self.g_imag = g_imag
+        # arrays indexed by antenna index
+        print self.freqs.shape, bp_real.shape
+        self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant]) for iant in xrange(nant)]
+        self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant]) for iant in xrange(nant)]
+
+    def get_solution(self, iant, time, freq_ghz):
+        '''
+        Get solution including time and bandpass
+        iant - antenna index
+        time - some version of time. Ignored for now
+        freq_ghz - frequency float in Ghz
+        '''
+        f_real = self.bp_real_interp[iant](freq_ghz)
+        f_imag = self.bp_imag_interp[iant](freq_ghz)
+        bp_value = f_real + 1j*f_imag
+
+        g_value = self.g_real[0,iant] + 1j*self.g_imag[0,iant]
+        total_value = bp_value * g_value
+        
+        return total_value
+
+    def plot(self):
+        fig, ax = pylab.subplots(3,3)
+        ax = ax.flatten()
+        for i in xrange(min(9, self.nant)):
+            freq_ghz = self.freqs
+            sol = self.get_solution(i, 0, freq_ghz)
+            ax[i].plot(freq_ghz, abs(sol))
+            ax2 = ax[i].twinx()
+            ax2.plot(freq_ghz, np.degrees(np.angle(sol)), 'ro')
+            ax[i].set_xlabel('Freq(GHz)')
+                        
 
 def load_sources(calcfile):
     calc_input = calcfile.replace('.im','.calc')
@@ -459,6 +583,9 @@ def _main():
     parser.add_argument('-p','--parset', help='Parset for delays')
     parser.add_argument('--show', help='Show plot', action='store_true', default=False)
     parser.add_argument('-i','--nint', help='Number of fine spectra to average', type=int, default=128)
+    parser.add_argument('-f','--fscrunch', help='Frequency average by this factor', default=1, type=int)
+    parser.add_argument('--rfidelay', type=int, help='Delay in fine samples to add to second component to make an RFI data set', default=0)
+    parser.add_argument('--mirsolutions', help='Root file name for miriad gain solutions')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -469,6 +596,13 @@ def _main():
 
     calcresults = ResultsFile(values.calcfile)
     sources = load_sources(values.calcfile)
+    solutions = None
+
+    if values.mirsolutions is not None:
+        solutions = MiriadGainSolutions(values.mirsolutions)
+        solutions.plot()
+        pylab.show()
+        
     # hacking delays
     delaymap = parse_delays(values)
     antennas = [AntennaSource(mux) for mux in vcraft.mux_by_antenna(values.files, delaymap)]
