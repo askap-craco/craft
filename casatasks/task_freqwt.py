@@ -62,7 +62,7 @@ def freqwt(vis, specfile, weightdata=True, cutoff=0.0):
     casalog.origin('freqwt')
     spec = load_spectrum(specfile)
     weight_interp = {}
-    for pol, weightd in weights.iteritems():
+    for pol, weightd in spec.iteritems():
         weightsf = weightd[:, 0]
         weightsa = weightd[:, 1]
         casalog.post('Weights file {} pol {} has {} frequencies from {:02f}-{:02f} GHz amplitude max/min/mean/std = {:02f}/{:02f}/{:02f}/{:02f}'
