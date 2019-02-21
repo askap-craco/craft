@@ -1,0 +1,9 @@
+
+ACLOCAL_AMFLAGS = -I config
+
+SUBDIRS = Management
+
+SUBDIRS    += 3rdparty src scripts config 
+
+EXTRA_DIST = cudalt.py
+
