@@ -75,7 +75,7 @@ void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataT
 	}
 	float tavg_us = t.get_average_time() / float(batch) * 1e3f;
 
-	printf("%dx%d FFT batch=%d data=%d MB in-place=%d type=%d-> %d. Worksize=%d MB: %f microseconds/FFT= %f k FFTs/sec\n",
+	printf("%dx%d FFT batch=%d data=%d MB in-place=%d type=%d-> %d. Worksize=%d MB: %f microseconds/FFT= %f k FFTs/sec total=%0.2fs\n",
 	       n,n,batch,data_size/1024/1024, inplace, itype,otype, worksize/1024/1024, tavg_us, 1./tavg_us*1e6f/1e3f);
 	cufftSafeCall(cufftDestroy(plan));
 	gpuErrchk(cudaFree(data));
