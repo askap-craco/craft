@@ -9,7 +9,8 @@ CUDA_ARCH=compute_60
 CUDA_CODE=sm_60
 
 # path to cub.h from cub-1.6.4 https://nvlabs.github.io/cub/
-CUB_PATH=$(HOME)/build/cub/cub-1.6.4/cub/
+CUB_PATH=$(CRAFT)/include/cub-1.8.0/cub/
 
 # path to PSRDADA: http://psrdada.sourceforge.net/
-DADA_PATH=/home/craftop/askap/trunk/3rdParty/psrdada/psrdada-537159/install/
+#DADA_PATH=/home/craftop/askap/trunk/3rdParty/psrdada/psrdada-537159/install/
+DADA_PATH=$(CRAFT)/include/psrdada/
