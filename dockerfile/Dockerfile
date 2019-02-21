@@ -60,7 +60,8 @@ RUN pwd && mkdir build/ && \
 ENV CUDA=/usr/local/cuda
 
 # install FREDDA
-WORKDIR $CRAFT/src/cuda-fdmt/cufdafdmt/src/
-ENV PATH=$CRAFT/src/cuda-fdmt/cudafdmt/src/:$PATH
+ENV FREDDA=$CRAFT/src/cuda-fdmt/cudafdmt/src/
+WORKDIR $FREDDA
+ENV PATH=$FREDDA:$PATH
 RUN cp fredda.mk.template fredda.mk
-RUN make
+RUN make -j 24
