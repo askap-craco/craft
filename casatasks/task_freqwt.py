@@ -4,7 +4,7 @@ from scipy.interpolate import interp1d
 import re
 
 
-def load_spectrum(fname, polre=r'.*TARGET\.\cube\.(.*)\.image-raster'):
+def load_spectrum(fname, polre=r'.*_([XYIQUV]*)\.image-raster'):
     '''
     Loads spectrum from a text file - produced by CASA (somehow?)
     
@@ -59,14 +59,15 @@ def plot_spec(spec):
 
 def freqwt(vis, specfile, weightdata=True, cutoff=0.0):
 
+    import pylab
     casalog.origin('freqwt')
     spec = load_spectrum(specfile)
     weight_interp = {}
-    for pol, weightd in spec.iteritems():
+    for pol, weightd in spec.iteritems(): #weights.iteritems():
         weightsf = weightd[:, 0]
         weightsa = weightd[:, 1]
         casalog.post('Weights file {} pol {} has {} frequencies from {:02f}-{:02f} GHz amplitude max/min/mean/std = {:02f}/{:02f}/{:02f}/{:02f}'
-                     .format(specfile, pol, weightd.shape[0], weightsf[0], weightsf[1], weightsa.max(), weightsa.min(), \
+                     .format(specfile, pol, weightd.shape[0], weightsf[0], weightsf[-1], weightsa.max(), weightsa.min(), \
                              weightsa.mean(), weightsa.std()))
         weight_interp[pol] = interp1d(weightsf, weightsa, kind='linear', fill_value='extrapolate')
 
@@ -101,11 +102,15 @@ def freqwt(vis, specfile, weightdata=True, cutoff=0.0):
 
 
     tb.open(vis, nomodify=False)
+    nblank = 0
     for r in xrange(tb.nrows()):
         inw = tb.getcell('WEIGHT_SPECTRUM', r)
         # assume spectral window 0
         winno = '0'
         weightspec = specwin[winno]['weightspec']
+        if np.all(weightspec.flatten() == 0):
+            weightspec += 1
+            nblank += 1
         wamp = specwin[winno]['wamp']
         wmask = specwin[winno]['wmask']
         inw *= weightspec
@@ -120,7 +125,8 @@ def freqwt(vis, specfile, weightdata=True, cutoff=0.0):
 
     casalog.post('Weighted {} rows'.format(tb.nrows()))
                 
-    tb.addreadmeline('Modified weights from {}'.format(specfile))
+    tb.addreadmeline('Modified weights from {}. {} blank rows '.format(specfile, nblank))
+    casalog.post('Replaced weights in {} rows'.format(nblank))
     if weightdata:
         tb.addreadmeline('Modified data from {}'.format(specfile))
 

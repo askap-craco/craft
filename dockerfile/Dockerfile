@@ -36,7 +36,7 @@ ENV PATH=$CRAFT/src/python:$PATH
 ENV PYTHONPATH=$CRAFT/src/python:$PYTHONPATH
 
 
-# install CUB
+# install CUB - FREDDA needs this to compile
 WORKDIR $CRAFT/include/
 RUN wget https://github.com/NVlabs/cub/archive/1.8.0.zip
 RUN unzip 1.8.0.zip
