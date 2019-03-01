@@ -4,7 +4,7 @@ from scipy.interpolate import interp1d
 import re
 
 
-def load_spectrum(fname, polre=r'.*_([XYIQUV]*)\.image-raster'):
+def load_spectrum(fname, polre=r'.*[_.]([XYIQUV]*)\.image-raster'):
     '''
     Loads spectrum from a text file - produced by CASA (somehow?)
     
@@ -21,7 +21,7 @@ def load_spectrum(fname, polre=r'.*_([XYIQUV]*)\.image-raster'):
     out[currpol] = []
     last_freq = None
     with open(fname, 'rU') as f:
-        for line in f:
+        for iline, line in enumerate(f):
             line = line.strip()
             if line.startswith('#'): # its a comment
                 m = polre.match(line)
@@ -30,12 +30,13 @@ def load_spectrum(fname, polre=r'.*_([XYIQUV]*)\.image-raster'):
                 else: # it's a new polarisation
                     currpol = m.groups(1)[0]
                     out[currpol] = []
+                    last_freq = None
             else:
                 bits = line.split()
                 if len(bits) == 2:
                     freq, amp = map(float, bits)
                     if last_freq is not None and freq < last_freq:
-                        s = 'Spectrum frequency is not monotonic! Please put only one spectrum in or split spectra by comment regex{}'.format(polre.pattern)
+                        s = 'Spectrum frequency is not monotonic on line {}! Please put only one spectrum in or split spectra by comment regex: {}'.format(iline+1, polre.pattern)
                         casalog.post(s, priority='ERROR')
                         raise ValueError(s)
                     last_freq = freq
@@ -72,7 +73,7 @@ def freqwt(vis, specfile, weightdata=True, cutoff=0.0):
         spec = load_spectrum(specfile)
     except:
         casalog.post('Exception loading spectrum. No visibilities weighted', priority='ERROR')
-        return
+        raise
 
     weight_interp = {}
     for pol, weightd in spec.iteritems(): #weights.iteritems():
