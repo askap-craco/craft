@@ -45,7 +45,7 @@ def run_fittp(aipsdata, fitsfile):
     # Write an AIPS file out as uvfits
 
     if not fitsfile[0] == '/':
-        fitsfile = os.getcwd() + '/' + args.fitsfileoutname
+        fitsfile = os.getcwd() + '/' + fitsfile
     
     if os.path.exists(fitsfile):
         print "Warning: {} already exists. Aborting".format(fitsfile)
