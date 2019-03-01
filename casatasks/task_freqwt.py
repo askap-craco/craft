@@ -19,6 +19,7 @@ def load_spectrum(fname, polre=r'.*_([XYIQUV]*)\.image-raster'):
     currpol = 'I'
     out = {}
     out[currpol] = []
+    last_freq = None
     with open(fname, 'rU') as f:
         for line in f:
             line = line.strip()
@@ -32,7 +33,13 @@ def load_spectrum(fname, polre=r'.*_([XYIQUV]*)\.image-raster'):
             else:
                 bits = line.split()
                 if len(bits) == 2:
-                    out[currpol].append(map(float, bits))
+                    freq, amp = map(float, bits)
+                    if last_freq is not None and freq < last_freq:
+                        s = 'Spectrum frequency is not monotonic! Please put only one spectrum in or split spectra by comment regex{}'.format(polre.pattern)
+                        casalog.post(s, priority='ERROR')
+                        raise ValueError(s)
+                    last_freq = freq
+                    out[currpol].append((freq, amp))
 
     # convert to numpy array
     out2 = {}
@@ -61,7 +68,12 @@ def freqwt(vis, specfile, weightdata=True, cutoff=0.0):
 
     import pylab
     casalog.origin('freqwt')
-    spec = load_spectrum(specfile)
+    try:
+        spec = load_spectrum(specfile)
+    except:
+        casalog.post('Exception loading spectrum. No visibilities weighted', priority='ERROR')
+        return
+
     weight_interp = {}
     for pol, weightd in spec.iteritems(): #weights.iteritems():
         weightsf = weightd[:, 0]
