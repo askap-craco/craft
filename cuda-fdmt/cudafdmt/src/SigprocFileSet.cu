@@ -31,8 +31,8 @@ SigprocFileSet::SigprocFileSet(int nt, int argc, char* filenames[]) : m_nt(nt) {
 
 	// Create read buffer
 	int in_num_elements = nt*nchans()*nbeams(); // Number of elements per block read
-	size_t in_num_bytes = sizeof(uint8_t)*8*in_num_elements/nbits(); //
-	printf("Read buffer is %d elements or %d bytes\n", in_num_elements, in_num_bytes);
+	size_t in_num_bytes = in_num_elements*nbits()/(8*sizeof(uint8_t)); // Number of bytes per block
+	printf("SigprocFileSet: Read buffer is %d elements or %d bytes\n", in_num_elements, in_num_bytes);
 	gpuErrchk(cudaMallocHost(&read_buf, in_num_bytes));
 	assert(read_buf);
 
