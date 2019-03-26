@@ -53,7 +53,7 @@ size_t SigprocFileSet::read_samples(void** output)
 	// Returns BFT ordering
 	int beamno = 0;
 	size_t nread;
-	size_t bytes_per_block = nchans()*m_nt*8/nbits();
+	size_t bytes_per_block = nchans()*m_nt*nbits()/8;
 	for(int i = 0; i < m_files.size(); i++) {
 		SigprocFile* fin = m_files.at(i);
 		int offset = beamno*bytes_per_block;

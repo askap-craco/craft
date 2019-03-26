@@ -437,7 +437,7 @@ int main(int argc, char* argv[])
 	uint64_t num_flagged_times = 0;
 
 	// Create streams - one for each antenan
-	const int MAX_NANT = 36;
+	const int MAX_NANT = 72;
 	cudaStream_t streams[MAX_NANT];
 	assert(source->nants() <= MAX_NANT);
 	for (int i = 0; i < source->nants(); i++) {

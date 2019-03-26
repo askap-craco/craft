@@ -51,7 +51,7 @@ public:
 		return first_source->tsamp();
 	}
 	double tstart() {
-		return first_source->tstart();
+		return m_latest_tstart;
 	}
 	DataOrder data_order() {
 		return first_source->data_order();
@@ -74,6 +74,7 @@ private:
 	int m_nt;
 	int m_current_ant;
 	glob_t m_filglob;
+	double m_latest_tstart;
 
 };
 
