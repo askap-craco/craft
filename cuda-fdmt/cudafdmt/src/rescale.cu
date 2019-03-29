@@ -540,6 +540,8 @@ void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale, int iant)
 			rescale.kurt_thresh,
 			rescale.flag_grow,
 			boff);
+	// zero decay offsets after updating block offsets - otherwise you get big steps. CRAFT-206
+	array4d_zero(&rescale.decay_offset);
 	gpuErrchk(cudaDeviceSynchronize());
 	rescale.sampnum = 0;
 }
