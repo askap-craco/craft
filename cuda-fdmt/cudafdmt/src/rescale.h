@@ -129,7 +129,7 @@ template <int nsamps_per_word, typename wordT> __device__ __host__ inline rescal
 
 template <> __device__ __host__ inline rescale_dtype extract_sample<1, float>(const float word, int sampno)
 {
-	return ((rescale_dtype) word)*1e-8f;// boy do I hate myself for this.
+	return ((rescale_dtype) word);// boy do I hate myself for this.
 }
 
 template <> __device__ __host__ inline rescale_dtype extract_sample<1, double>(const double word, int sampno)
@@ -192,10 +192,10 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 
 	int rsidx = c + nf*rsbeam; // rescale index: BF order
 	// all these reads are nice and coalesced
-	rescale_dtype sum = sumarr[rsidx]; // read from global memory
-	rescale_dtype sum2 = sum2arr[rsidx]; // read from global
-	rescale_dtype sum3 = sum3arr[rsidx];
-	rescale_dtype sum4 = sum4arr[rsidx];
+	rescale_dtype mean = sumarr[rsidx]; // read from global memory
+	rescale_dtype m2 = sum2arr[rsidx]; // read from global
+	rescale_dtype m3 = sum3arr[rsidx];
+	rescale_dtype m4 = sum4arr[rsidx];
 	rescale_dtype decay_offset = decay_offsetarr[rsidx];  // read from global
 	rescale_dtype offset = offsetarr[rsidx]; // read from global
 	rescale_dtype scale = scalearr[rsidx]; // read from global
@@ -259,17 +259,44 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		int outidx = t + nt*(outc + nf*outbeam);
 
 		if (this_sample_ok && last_sample_ok && beam_ok) {
-			sum += vin;
-			sum2 += vin*vin;
-			sum3 += vin*vin*vin;
-			sum4 += vin*vin*vin*vin;
-			// non-coalesced write (transpose. Sorry)
+			// Calculate higher order modments using a numerically stable approach.
+			// See: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+			// https://people.xiph.org/~tterribe/notes/homs.html
+			/* def online_kurtosis(data):
+		    n = mean = M2 = M3 = M4 = 0
+
+		    for x in data:
+		        n1 = n
+		        n = n + 1
+		        delta = x - mean
+		        delta_n = delta / n
+		        delta_n2 = delta_n * delta_n
+		        term1 = delta * delta_n * n1
+		        mean = mean + delta_n
+		        M4 = M4 + term1 * delta_n2 * (n*n - 3*n + 3) + 6 * delta_n2 * M2 - 4 * delta_n * M3
+		        M3 = M3 + term1 * delta_n * (n - 2) - 3 * delta_n * M2
+		        M2 = M2 + term1
+
+		    kurtosis = (n*M4) / (M2*M2) - 3
+		    return kurtosis
+		    */
+
+			rescale_dtype n1 = rescale_dtype(nsamps);
+			nsamps += 1;
+			rescale_dtype n = rescale_dtype(nsamps);
+			rescale_dtype delta = vin - mean;
+			rescale_dtype delta_n = delta / n;
+			rescale_dtype delta_n2 =  delta_n * delta_n;
+			rescale_dtype term1 = delta * delta_n * n1;
+			mean += delta_n;
+			m4 += term1 * delta_n2 * (n*n - 3.0f*n + 3.0f) + 6.0f * delta_n2 * m2 - 4.0f * delta_n * m3;
+			m3 += term1 * delta_n * (n - 2.0f) - 3.0f * delta_n * m2;
+			m2 += term1;
 
 			//outarr[outidx] += sout;
-
 			// doing an atomic add for polarisation summing and antenna summing - probably adds some overhead but we'll see.t
 			atomicAdd(outarr + outidx, sout);
-			nsamps += 1;
+
 		} else {
 //			printf("FLAG ibeam/c/t %d/%d/%d dm0/sout/dm0min %f/%f/%f flags %d/%d/%d\n", ibeam, c, t,
 //					fabs(dm0z), fabs(sout), dm0min,
@@ -285,10 +312,10 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 	}
 
 	// write everything back to global memory -- all coalesced
-	sumarr[rsidx] = sum;
-	sum2arr[rsidx] = sum2;
-	sum3arr[rsidx] = sum3;
-	sum4arr[rsidx] = sum4;
+	sumarr[rsidx] = mean;
+	sum2arr[rsidx] = m2;
+	sum3arr[rsidx] = m3;
+	sum4arr[rsidx] = m4;
 	decay_offsetarr[rsidx] = decay_offset;
 	nsampsarr[rsidx] = (float)nsamps;
 }
