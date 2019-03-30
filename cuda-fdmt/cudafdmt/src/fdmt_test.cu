@@ -309,7 +309,6 @@ int main(int argc, char* argv[])
 	gpuErrchk( cudaMalloc((void**) &in_buffer_device, in_buffer_bytes_per_ant*source->nants() ));
 
 	float foff =  (float) source->foff();
-	assert(foff < 0);
 	float fmax = (float) source->fch1() - foff; // The FDMT seems to want this offset to make sense of the world. Not sure why.
 	float fmin = fmax + nf*foff;
 

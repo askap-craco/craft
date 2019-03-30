@@ -506,7 +506,7 @@ __global__ void boxcar_do_kernel3 (
 	cand.idt = idt;
 	cand.ibeam = ibeam;
 
-	const fdmt_dtype ibc_scale = sqrtf((float) (ibc + 1));
+	const fdmt_dtype ibc_scale = sqrtf(float(ibc + 1));
 	threshold *= ibc_scale;// scale threshold, otherwise you have to do lots of processing per sample, which is wasteful.
 	int fullt = 0;
 
@@ -517,7 +517,7 @@ __global__ void boxcar_do_kernel3 (
 
 		// store in shared memory - should be coalesced
 		thread_indata[thread_dt][ibc] = vin;
-		__syncthreads(); // actually should do a __syncwarp here - cuda9 required
+		__syncthreads(); // TODO: actually should do a __syncwarp here - cuda9 required
 
 		// loop through shared memory
 		for (int t = 0 ; t < NBOX; ++t) {
