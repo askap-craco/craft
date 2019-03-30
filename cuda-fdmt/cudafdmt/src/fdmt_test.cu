@@ -46,7 +46,8 @@ void runtest_usage() {
 			"   -o FILE - Candidate filename\n"
 			"   -U host:port - UDP host:port to send candidates to\n"
 			"   -x SN - threshold S/N\n"
-			"   -D dump intermediate data to disk\n"
+			"   -D dump intermediate data to disk (SLOW)\n"
+			"   -R dump rescaler data to disk\n"
 			"   -B b - Process b beams simultaneously to save memory\n"
 			"   -r R - Blocks per rescale update (0 for no rescaling)\n"
 			"   -S S - Seek to this number of seconds before starting\n"
@@ -94,7 +95,7 @@ void dumparr(const char* prefix, const int blocknum, array4d_t* arr, bool copy=t
 		}
 	}
 
-	printf("Dumping %s %s %d zeros\n", prefix, fbuf, nz);
+	//printf("Dumping %s %s %d zeros\n", prefix, fbuf, nz);
 	array4d_dump(arr, fbuf);
 }
 
@@ -122,6 +123,7 @@ int main(int argc, char* argv[])
 	float thresh = 10.0;
 	const char* out_filename = "fredda.cand";
 	bool dump_data = false;
+	bool do_dump_rescaler = false;
 	int cuda_device = 0;
 	float kurt_thresh = INFINITY;
 	float std_thresh = INFINITY;
@@ -147,7 +149,7 @@ int main(int argc, char* argv[])
 	}
 	printf("\n");
 
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:Dg:M:T:U:K:G:C:n:m:b:z:N:X:uhp")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:DRg:M:T:U:K:G:C:n:m:b:z:N:X:uhp")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -166,6 +168,9 @@ int main(int argc, char* argv[])
 			break;
 		case 'D':
 			dump_data = true;
+			break;
+		case 'R':
+			do_dump_rescaler = true;
 			break;
 		case 'r':
 			num_rescale_blocks = atoi(optarg);
@@ -483,7 +488,7 @@ int main(int argc, char* argv[])
 
 				// update scale and offset
 				rescaler->update_scaleoffset(rescaler->noflag_options, iant, streams[iant]);
-				if(dump_data) {
+				if (do_dump_rescaler) {
 					dump_rescaler(-1, rescaler);
 				}
 			}
@@ -553,7 +558,7 @@ int main(int argc, char* argv[])
 //				num_flagged_times += nflagged;
 			}
 
-			if (dump_data) {
+			if (do_dump_rescaler) {
 				dump_rescaler(iblock, rescaler);
 			}
 		}
