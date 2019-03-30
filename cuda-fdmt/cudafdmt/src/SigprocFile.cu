@@ -72,6 +72,12 @@ SigprocFile::SigprocFile(const char* filename) {
 	  perror("Could not set advice\n");
 	  exit(EXIT_FAILURE);
 	}
+
+	// block size must be a multiple of 8 bits
+	if (nbits()*nifs()*nchans() % 8  != 0) {
+		printf("SigprocFile: File %s nbits=%d not supported\n", filename, nbits());
+		throw InvalidSourceFormat();
+	}
 }
 
 SigprocFile::~SigprocFile() {
@@ -113,7 +119,7 @@ int SigprocFile::header_int(const char* hname) const {
 
 size_t SigprocFile::seek_sample(size_t t)
 {
-	size_t boff = t*nifs()*nchans() + m_hdr_nbytes;
+	size_t boff = t*nifs()*nchans()*nbits()/8 + m_hdr_nbytes;
 	if(fseek(m_file, boff, SEEK_SET) < 0) {
 		printf("SigprocFile: Could not seek to offset of file %s\n. Error: %s", m_filename, strerror(errno));
 		assert(0);
@@ -143,14 +149,14 @@ size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
 {
 	// RETURNS TBF ordering. WARNING: This will deeply confuse the output if nbeams != 1
 	assert(nifs() == 1); // Otherwise users will be confused. TODO: get sources to tell user what data order is
-	//assert(m_nbits == 8);
-	size_t nreq = nt*m_nifs*m_nchans;
-	size_t nelements = fread(output, sizeof(uint8_t), nreq, m_file);
-	size_t ont = nelements/m_nifs/m_nchans;
-	m_samples_read += ont;
+	size_t nelements = nt*m_nifs*m_nchans;
+	size_t nreq_bytes = nelements*m_nbits/8;
+	size_t nbytes_read = fread(output, sizeof(uint8_t), nreq_bytes, m_file);
+	size_t output_nsamp = nbytes_read * 8 / m_nbits / m_nifs / m_nchans;
+	m_samples_read += output_nsamp;
 	m_current_sample += nt;
-	advise_block(sizeof(uint8_t)*nreq);
-	return ont;
+	advise_block(sizeof(uint8_t)*nreq_bytes);
+	return output_nsamp;
 }
 
 

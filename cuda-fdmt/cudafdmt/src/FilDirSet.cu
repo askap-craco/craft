@@ -23,6 +23,7 @@ FilDirSet::FilDirSet(int nt, int argc, char* dirnames[]) {
 		m_sources.push_back(curr_source);
 		if (i == 0) {
 			first_source = m_sources[0];
+			m_latest_tstart = first_source->tstart();
 		} else {
 			assert(first_source->nchans() == curr_source->nchans());
 			assert(first_source->nbits() == curr_source->nbits());
@@ -31,11 +32,19 @@ FilDirSet::FilDirSet(int nt, int argc, char* dirnames[]) {
 			assert(first_source->fch1() == curr_source->fch1());
 			assert(first_source->foff() == curr_source->foff());
 			assert(first_source->data_order() == curr_source->data_order());
+			if (curr_source->tstart() > m_latest_tstart) {
+				m_latest_tstart = curr_source->tstart();
+			}
 		}
 	}
+
 	m_nt = nt;
 	m_current_ant = 0;
 	assert(m_nt > 0);
+
+	// align all sources
+	seek_sample(0);
+
 }
 
 FilDirSet::~FilDirSet() {
@@ -47,8 +56,13 @@ FilDirSet::~FilDirSet() {
 }
 
 size_t FilDirSet::seek_sample(size_t offset) {
-	for(int i = 0 ; i < m_sources.size(); i++) {
-		m_sources.at(i)->seek_sample(offset);
+	// need to offset each source to a different offset
+
+	for(auto source : m_sources) {
+		double mjddiff = m_latest_tstart - source->tstart();
+		assert(mjddiff >= 0);
+		int64_t sampoff = (int64_t) round(mjddiff * 86400.0 / source->tsamp());
+		source->seek_sample(sampoff);
 	}
 	return offset;
 }

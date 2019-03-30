@@ -406,10 +406,10 @@ __global__ void rescale_calc_dm0stats_kernel (
 
 
 __global__ void rescale_update_scaleoffset_kernel (
-		rescale_dtype* __restrict__ sum,
-		rescale_dtype* __restrict__ sum2,
-		rescale_dtype* __restrict__ sum3,
-		rescale_dtype* __restrict__ sum4,
+		rescale_dtype* __restrict__ m1,
+		rescale_dtype* __restrict__ m2,
+		rescale_dtype* __restrict__ m3,
+		rescale_dtype* __restrict__ m4,
 		rescale_dtype* __restrict__ meanarr,
 		rescale_dtype* __restrict__ stdarr,
 		rescale_dtype* __restrict__ kurtarr,
@@ -430,19 +430,26 @@ __global__ void rescale_update_scaleoffset_kernel (
 	int rsbeam = ibeam + boff;
 	int i = c + nf*rsbeam;
 	rescale_dtype nsamp = nsamparr[i];
-	rescale_dtype mean = sum[i]/nsamp;
-	rescale_dtype mean2 = sum2[i]/nsamp;
-	rescale_dtype mean3 = sum3[i]/nsamp;
-	rescale_dtype mean4 = sum4[i]/nsamp;
-	rescale_dtype variance = mean2 - mean*mean;
+	rescale_dtype mean = m1[i];
+//	rescale_dtype mean2 = sum2[i]/nsamp;
+//	rescale_dtype mean3 = sum3[i]/nsamp;
+//	rescale_dtype mean4 = sum4[i]/nsamp;
+	rescale_dtype variance = m2[i]/(nsamp - 1.0f);
 	rescale_dtype std = sqrtf(variance);
+
 
 	// Excess Kurtosis is k = E([X-mu]**4)/(Var[X]**2) - 3
 	// numerator = E[X**4] - 4E[X][E[X**3] + 6 E[X**2]E[X]**2 - 3E[X]**4
-	rescale_dtype kurt = (mean4 - 4*mean*mean3 + 6*mean2*mean*mean - 3*mean*mean*mean*mean)/(variance*variance) -3 ;
+	//rescale_dtype kurt = (mean4 - 4*mean*mean3 + 6*mean2*mean*mean - 3*mean*mean*mean*mean)/(variance*variance) -3
+	// from here: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+
+    rescale_dtype kurt = (nsamp*m4[i]) / (m2[i]*m2[i]) - 3.0f;
 	if (!isfinite(kurt)) {
 		kurt = 0;
 	}
+
+	rescale_dtype skew = sqrtf(nsamp)*m3[i]/powf(m2[i], 1.5f);
+
 	// save flag inputs
 
 	rescale_dtype prev_mean = meanarr[i];
@@ -493,7 +500,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 			scale = 1.0;
 			offset = -mean + target_mean/scale;
 		} else {
-			scale = target_stdev / sqrt(variance);
+			scale = target_stdev / sqrtf(variance);
 			offset = -mean + target_mean/scale;
 		}
 	}
@@ -502,10 +509,10 @@ __global__ void rescale_update_scaleoffset_kernel (
 	scalearr[i] = scale;
 
 	// reset values to zero
-	sum[i] = 0.0;
-	sum2[i] = 0.0;
-	sum3[i] = 0.0;
-	sum4[i] = 0.0;
+	m1[i] = 0.0;
+	m2[i] = 0.0;
+	m3[i] = 0.0;
+	m4[i] = 0.0;
 	nsamparr[i] = 0;
 }
 void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale, int iant)
@@ -533,6 +540,8 @@ void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale, int iant)
 			rescale.kurt_thresh,
 			rescale.flag_grow,
 			boff);
+	// zero decay offsets after updating block offsets - otherwise you get big steps. CRAFT-206
+	array4d_zero(&rescale.decay_offset);
 	gpuErrchk(cudaDeviceSynchronize());
 	rescale.sampnum = 0;
 }

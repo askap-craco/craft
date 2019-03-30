@@ -50,10 +50,10 @@ void runtest_usage() {
 			"   -B b - Process b beams simultaneously to save memory\n"
 			"   -r R - Blocks per rescale update (0 for no rescaling)\n"
 			"   -S S - Seek to this number of seconds before starting\n"
-			"   -M M - Channel Mean flagging threshold (3 is OK)\n"
-			"   -T T - Channel StdDev flagging threshold (3 is OK)\n"
-			"   -K K - Channel Kurtosis threshold (0.8 is pretty good)\n"
-			"   -G N - Channel flag channel growing (flags N channels either side of a bad channel)\n"
+			"   -M M - Channel Mean relative change threshold (0.2 is OK)\n"
+			"   -T T - Channel StdDev relative changed flagging threshold (0.2 is OK)\n"
+			"   -K K - Channel Kurtosis threshold (3 is pretty good)\n"
+//			"   -G N - Channel flag channel growing (flags N channels either side of a bad channel)\n"
 			"   -z Z - Zap times with 0 DM above threshold Z\n"
 			"   -C C - Zap time/frequency cells with S/N above threshold C\n"
 			"   -u   - Subtract DM0 time series from spectrum\n"
@@ -436,7 +436,7 @@ int main(int argc, char* argv[])
 	uint64_t num_flagged_times = 0;
 
 	// Create streams - one for each antenan
-	const int MAX_NANT = 36;
+	const int MAX_NANT = 72;
 	cudaStream_t streams[MAX_NANT];
 	assert(source->nants() <= MAX_NANT);
 	for (int i = 0; i < source->nants(); i++) {
