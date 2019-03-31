@@ -477,10 +477,13 @@ __global__ void rescale_update_scaleoffset_kernel (
 	}
 	kurtoff = fabs(kurt);
 
+	rescale_dtype integration_nsamp =  1024;
+	rescale_dtype gtest =fabs( mean*mean/(std*std)/integration_nsamp - 1.0f);
+
 	// some of these divisions can be by 0, and the thresholds can be inf - this handles all that.
 
 	 bool thresh_ok = (meanoff <= mean_thresh) &&
-			(stdoff <= std_thresh) &&
+			(gtest<= std_thresh) &&
 			(kurtoff <= kurt_thresh);
 
 	if (! thresh_ok) {

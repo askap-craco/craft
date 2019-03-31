@@ -110,6 +110,7 @@ void dump_rescaler(int iblock, Rescaler* rescaler)
 	dumparr("dm0stats", iblock, &rescaler->dm0stats);
 	dumparr("scale", iblock, &rescaler->scale);
 	dumparr("offset", iblock, &rescaler->offset);
+	dumparr("decay_offset", iblock, &rescaler->decay_offset);
 }
 
 int main(int argc, char* argv[])
