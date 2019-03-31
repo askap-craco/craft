@@ -79,6 +79,7 @@ void Rescaler::update_scaleoffset(RescaleOptions& options, int iant, cudaStream_
 			sum2.d_device,
 			sum3.d_device,
 			sum4.d_device,
+			decay_offset.d_device,
 			mean.d_device,
 			std.d_device,
 			kurt.d_device,

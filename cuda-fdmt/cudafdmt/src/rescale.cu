@@ -410,6 +410,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype* __restrict__ m2,
 		rescale_dtype* __restrict__ m3,
 		rescale_dtype* __restrict__ m4,
+		rescale_dtype* __restrict__ decayoffsetarr,
 		rescale_dtype* __restrict__ meanarr,
 		rescale_dtype* __restrict__ stdarr,
 		rescale_dtype* __restrict__ kurtarr,
@@ -431,6 +432,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 	int i = c + nf*rsbeam;
 	rescale_dtype nsamp = nsamparr[i];
 	rescale_dtype mean = m1[i];
+//	rescale_dtype decayoff = decayoffsetarr[i];
 //	rescale_dtype mean2 = sum2[i]/nsamp;
 //	rescale_dtype mean3 = sum3[i]/nsamp;
 //	rescale_dtype mean4 = sum4[i]/nsamp;
@@ -499,14 +501,19 @@ __global__ void rescale_update_scaleoffset_kernel (
 		} else if (variance == 0.0) {
 			scale = 1.0;
 			offset = -mean + target_mean/scale;
+			//decayoffsetarr[i] = 0.0f;
+
 		} else {
 			scale = target_stdev / sqrtf(variance);
 			offset = -mean + target_mean/scale;
+			//decayoffsetarr[i] = 0.0f;
+
 		}
 	}
 
 	offsetarr[i] = offset;
 	scalearr[i] = scale;
+
 
 	// reset values to zero
 	m1[i] = 0.0;
@@ -527,6 +534,7 @@ void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale, int iant)
 			rescale.sum2.d_device,
 			rescale.sum3.d_device,
 			rescale.sum4.d_device,
+			rescale.decay_offset.d_device,
 			rescale.mean.d_device,
 			rescale.std.d_device,
 			rescale.kurt.d_device,
@@ -541,7 +549,7 @@ void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale, int iant)
 			rescale.flag_grow,
 			boff);
 	// zero decay offsets after updating block offsets - otherwise you get big steps. CRAFT-206
-	array4d_zero(&rescale.decay_offset);
+	//array4d_zero(&rescale.decay_offset);
 	gpuErrchk(cudaDeviceSynchronize());
 	rescale.sampnum = 0;
 }

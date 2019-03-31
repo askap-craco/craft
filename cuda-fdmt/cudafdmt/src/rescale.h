@@ -89,6 +89,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype* __restrict__ sum2,
 		rescale_dtype* __restrict__ sum3,
 		rescale_dtype* __restrict__ sum4,
+		rescale_dtype* __restrict__ decayoffsetarr,
 		rescale_dtype* __restrict__ meanarr,
 		rescale_dtype* __restrict__ stdarr,
 		rescale_dtype* __restrict__ kurtarr,
@@ -229,15 +230,17 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		wordT word = inarr[wordidx];
 		rescale_dtype vin = extract_sample<nsamps_per_word, wordT>(word, s);
 
-		rescale_dtype vout = (vin + offset) * scale;
-		rescale_dtype sout = vout;
-		if (k == 0) { // If we set the timescale to zero, we just don't do any decaying
+		//rescale_dtype vout = (vin + offset) * scale;
+		//rescale_dtype sout = vout;
+		rescale_dtype sout;
+		if (k == 0) { // If we set the timescale to zero, we just don't do any decaying - use block offset
 			decay_offset = 0;
-			sout = vout;
-		} else {
-			decay_offset = (vout + decay_offset*k)/(1.0 + k);
-			sout = vout - decay_offset;
+			sout = (vin + offset)* scale;
+		} else { // use decay offset - don't use block offset
+			decay_offset = (vin + decay_offset*k)/(1.0 + k);
+			sout = (vin - decay_offset)*scale;
 		}
+
 		int dm0idx = t + nt*rsbeam; // DM0 idx: BT order
 		rescale_dtype dm0count = dm0countarr[dm0idx];
 		rescale_dtype dm0sum = dm0arr[dm0idx] ; // sum accros dm0 - not normalised
