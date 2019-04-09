@@ -31,6 +31,14 @@ Rescaler::Rescaler(RescaleOptions& _options) : options(_options)
 	rescale_arraymalloc(&scale, nbeams, nf, alloc_host);
 	rescale_arraymalloc(&offset, nbeams, nf, alloc_host);
 	rescale_arraymalloc(&decay_offset, nbeams, nf, alloc_host);
+
+	weights.nw = 1;
+	weights.nx = options.nants;
+	weights.ny = nbeams;
+	weights.nz = nf;
+	array4d_malloc(&weights, true, true);
+	array4d_set(&weights, 1.0);
+
 	array4d_set(&scale, 1.0);
 
 	// set up the options to use if we don't want to do flagging
@@ -85,6 +93,7 @@ void Rescaler::update_scaleoffset(RescaleOptions& options, int iant, cudaStream_
 			kurt.d_device,
 			offset.d_device,
 			scale.d_device,
+			weights.d_device,
 			nsamps.d_device,
 			options.target_stdev,
 			options.target_mean,
@@ -101,6 +110,17 @@ void Rescaler::update_scaleoffset(RescaleOptions& options, int iant, cudaStream_
 void Rescaler::set_scaleoffset(float s_scale, float s_offset) {
 	array4d_set(&scale, s_scale);
 	array4d_set(&offset, s_offset);
+}
+
+void Rescaler::flag_channel(int channel) {
+	assert(channel > 0 && channel < options.nf);
+	for (int iant = 0 ;iant < options.nants; iant++) {
+		for (int ibeam = 0; ibeam < options.nbeams_per_ant; ibeam++) {
+			int idx = array4d_idx(&weights, 0, iant, ibeam, channel);
+			weights.d[idx] = 0.0f;
+		}
+	}
+	array4d_copy_to_device(&weights);
 }
 
 void Rescaler::update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions &options, int iant, cudaStream_t stream) {

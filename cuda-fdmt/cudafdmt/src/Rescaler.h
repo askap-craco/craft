@@ -56,12 +56,12 @@ public:
 	array4d_t dm0stats; // max/min/mean/variance of Dm0 accross time
 	array4d_t nsamps; // number of used samples summed
 	array4d_t decay_offset;
+	array4d_t weights; // weights for antennas/beams.
 	uint64_t sampnum;
 	int num_elements;
 	int num_elements_per_ant;
 	RescaleOptions options;
 	RescaleOptions noflag_options;
-
 
 	// Parameters
 	/* I put so much effort into this I'm scared of deleting it now
@@ -79,6 +79,7 @@ public:
 	void update_scaleoffset(RescaleOptions& options, int iant, cudaStream_t stream = 0);
 	void set_scaleoffset(float s_scale, float s_offset);
 	void update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream=0);
+	void flag_channel(int channel); // Set weights to zero for all beams/antennas fo rthis channel
 
 private:
 

@@ -31,6 +31,7 @@ typedef struct _rescale_gpu_t {
 	array4d_t sum4; // sum v**4 - for kurtosis
 	array4d_t scale;
 	array4d_t offset;
+	array4d_t weights;
 	array4d_t mean; // mean
 	array4d_t std; // stdev
 	array4d_t kurt; // kurtosis
@@ -95,7 +96,8 @@ __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype* __restrict__ kurtarr,
 		rescale_dtype* __restrict__ offsetarr,
 		rescale_dtype* __restrict__ scalearr,
-		rescale_dtype* nsamparr,
+		rescale_dtype* __restrict__ weightsarr,
+		rescale_dtype* __restrict__ nsamparr,
 		rescale_dtype target_stdev,
 		rescale_dtype target_mean,
 		rescale_dtype mean_thresh,

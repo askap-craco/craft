@@ -402,9 +402,6 @@ __global__ void rescale_calc_dm0stats_kernel (
 	//printf("DM stats ibeam=%d max/min/mean/var %f/%f/%f/%f\n", ibeam, dm0max, dm0min, dm0mean, dm0var);
 }
 
-
-
-
 __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype* __restrict__ m1,
 		rescale_dtype* __restrict__ m2,
@@ -416,7 +413,8 @@ __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype* __restrict__ kurtarr,
 		rescale_dtype* __restrict__ offsetarr,
 		rescale_dtype* __restrict__ scalearr,
-		rescale_dtype* nsamparr,
+		rescale_dtype* __restrict__ weights,
+		rescale_dtype* __restrict__ nsamparr,
 		rescale_dtype target_stdev,
 		rescale_dtype target_mean,
 		rescale_dtype mean_thresh,
@@ -438,6 +436,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 //	rescale_dtype mean4 = sum4[i]/nsamp;
 	rescale_dtype variance = m2[i]/(nsamp - 1.0f);
 	rescale_dtype std = sqrtf(variance);
+	rescale_dtype weight = weights[i];
 
 
 	// Excess Kurtosis is k = E([X-mu]**4)/(Var[X]**2) - 3
@@ -502,12 +501,12 @@ __global__ void rescale_update_scaleoffset_kernel (
 			offset = offsetarr[i];
 			scale = scalearr[i];
 		} else if (variance == 0.0) {
-			scale = 1.0;
+			scale = 1.0*weight;
 			offset = -mean + target_mean/scale;
 			//decayoffsetarr[i] = 0.0f;
 
 		} else {
-			scale = target_stdev / sqrtf(variance);
+			scale = (target_stdev / sqrtf(variance))*weight;
 			offset = -mean + target_mean/scale;
 			//decayoffsetarr[i] = 0.0f;
 
@@ -543,6 +542,7 @@ void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale, int iant)
 			rescale.kurt.d_device,
 			rescale.offset.d_device,
 			rescale.scale.d_device,
+			rescale.weights.d_device,
 			rescale.nsamps.d_device,
 			rescale.target_stdev,
 			rescale.target_mean,
