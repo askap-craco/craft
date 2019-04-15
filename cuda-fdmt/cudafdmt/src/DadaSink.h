@@ -9,6 +9,7 @@
 #define DADASINK_H_
 
 #include "DataSource.h"
+#include "FreddaParams.h"
 #include "dada_hdu.h"
 #include "dada_def.h"
 #include "ipcio.h"
@@ -21,8 +22,8 @@ class DadaSink {
 	void* m_current_block;
 
 public:
-	DadaSink(DataSource& source, int key, char* hdr,
-			int npol_out, int nbeams_out, int nt);
+	DadaSink(int key, char* hdr,
+			FreddaParams& params);
 	virtual ~DadaSink();
 	inline void* current_block() { return m_current_block; }
 	void* open_block();

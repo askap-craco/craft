@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <assert.h>
+#include "ascii_header.h"
 
 void runtest_usage() {
 	fprintf(stderr,
@@ -162,32 +163,33 @@ void FreddaParams::parse(int argc, char* argv[])
 	assert(seek_seconds >= 0);
 }
 
-void FreddaParams::set_source(DataSource& source) {
+void FreddaParams::set_source(DataSource& _source) {
 	// rescaling always puts the minimum frequency as the channel 0
-	if (source.foff() > 0) {
-		out_freq = source.fch1();
+	source = &_source;
+	if (source->foff() > 0) {
+		out_freq = source->fch1();
 	} else {
-		out_freq = source.fch1() + source.nchans()*source.foff();
+		out_freq = source->fch1() + source->nchans()*source->foff();
 	}
-	assert(out_freq <= source.fch1());
-	out_foff = abs(source.foff());
+	assert(out_freq <= source->fch1());
+	out_foff = abs(source->foff());
 
-	nbeams_per_antenna = source.nbeams()*source.npols(); // number of beams including polarisations
-	nbeams_in_total = nbeams_per_antenna*source.nants();
-	npols_in = source.npols();
+	nbeams_per_antenna = source->nbeams()*source->npols(); // number of beams including polarisations
+	nbeams_in_total = nbeams_per_antenna*source->nants();
+	npols_in = source->npols();
 	if (polsum) { // assume polsum and antsum
-		nbeams_out = source.nbeams();
+		nbeams_out = source->nbeams();
 		npols_out = 1;
 		assert(nbeams_per_antenna %2 == 0);
 	} else { // ant sum only
-		nbeams_out = source.nbeams()*source.npols();
-		npols_out = source.npols();
+		nbeams_out = source->nbeams()*source->npols();
+		npols_out = source->npols();
 	}
 	nbeams_summed = (float(nbeams_in_total)/float(nbeams_out));
-	nf = source.nchans();
-	nbits = source.nbits();
-	foff =  (float) source.foff();
-	fmax = (float) source.fch1() - foff; // The FDMT seems to want this offset to make sense of the world. Not sure why.
+	nf = source->nchans();
+	nbits = source->nbits();
+	foff =  (float) source->foff();
+	fmax = (float) source->fch1() - foff; // The FDMT seems to want this offset to make sense of the world. Not sure why.
 	fmin = fmax + nf*foff;
 
 	if (nd < 0) { // Flip the band to calculate negative DMs
@@ -196,5 +198,61 @@ void FreddaParams::set_source(DataSource& source) {
 		// rescaling will invert the channels now that we've changed the sign of foff
 		foff = -foff;
 	}
+}
+
+void FreddaParams::to_dada(char header_buf[])
+{
+
+	ascii_header_set(header_buf, "NT", "%d", nt);
+	ascii_header_set(header_buf, "ND", "%d", nd);
+	ascii_header_set(header_buf, "SEEK_SECONDS", "%f", seek_seconds);
+	ascii_header_set(header_buf, "NUM_RESCALE_BLOCKS", "%d", num_rescale_blocks);
+	ascii_header_set(header_buf, "DECAY_TIMESCALE", "%f", decay_timescale);
+	ascii_header_set(header_buf, "THRESH", "%f", thresh);
+	ascii_header_set(header_buf, "OUT_FILENAME", "%s", out_filename);
+	ascii_header_set(header_buf, "DUMP_DATA", "%d", dump_data);
+	ascii_header_set(header_buf, "DO_DUMP_RESCALER", "%d", do_dump_rescaler);
+	ascii_header_set(header_buf, "CUDA_DEVICE", "%d", cuda_device);
+	ascii_header_set(header_buf, "KURT_THRESH", "%f", kurt_thresh);
+	ascii_header_set(header_buf, "STD_THRESH", "%f", std_thresh);
+	ascii_header_set(header_buf, "MEAN_THRESH", "%f", mean_thresh);
+	ascii_header_set(header_buf, "DM0_THRESH", "%f", dm0_thresh);
+	ascii_header_set(header_buf, "CELL_THRESH", "%f", cell_thresh);
+	ascii_header_set(header_buf, "FLAG_GROW", "%d", flag_grow);
+	ascii_header_set(header_buf, "MAX_NCAND_PER_BLOCK", "%d", max_ncand_per_block);
+	ascii_header_set(header_buf, "MINDM", "%d", mindm);
+	ascii_header_set(header_buf, "MAXBC", "%d", maxbc);
+	ascii_header_set(header_buf, "MAX_NBLOCKS", "%d", max_nblocks);
+	ascii_header_set(header_buf, "NBEAMS_ALLOC", "%d", nbeams_alloc);
+	ascii_header_set(header_buf, "SUBTRACT_DM0", "%d", subtract_dm0);
+	ascii_header_set(header_buf, "POLSUM", "%d", polsum);
+	ascii_header_set(header_buf, "UDP_HOST", "%s", udp_host);
+	ascii_header_set(header_buf, "UDP_PORT", "%d", udp_port);
+	ascii_header_set(header_buf, "EXPORT_DADA_KEY", "%x", export_dada_key);
+	ascii_header_set(header_buf, "OUT_FREQ", "%f", out_freq);
+	ascii_header_set(header_buf, "OUT_FOFF", "%f", out_foff);
+	ascii_header_set(header_buf, "NBEAMS_PER_ANTENNA", "%d", nbeams_per_antenna);
+	ascii_header_set(header_buf, "NBEAMS_IN_TOTAL", "%d", nbeams_in_total);
+	ascii_header_set(header_buf, "NPOLS_IN", "%dd", npols_in);
+	ascii_header_set(header_buf, "NBEAMS_OUT", "%d", nbeams_out);
+	ascii_header_set(header_buf, "NPOLS_OUT", "%d", npols_out);
+	ascii_header_set(header_buf, "NBEAMS_SUMMED", "%f", nbeams_summed);
+	ascii_header_set(header_buf, "NF", "%d", nf);
+	ascii_header_set(header_buf, "NBITS", "%d", nbits);
+	ascii_header_set(header_buf, "FOFF", "%f", foff);
+	ascii_header_set(header_buf, "FMAX", "%f", fmax);
+	ascii_header_set(header_buf, "FMIN", "%f", fmin);
+	ascii_header_set(header_buf, "SOURCE_FCH1", "%f", source->fch1());
+	ascii_header_set(header_buf, "SOURCE_FOFF", "%f", source->foff());
+	ascii_header_set(header_buf, "SOURCE_TSTART", "%0.12f", source->tstart());
+	ascii_header_set(header_buf, "SOURCE_TSAMP", "%0.12f", source->tsamp());
+	ascii_header_set(header_buf, "SOURCE_NANTS", "%d", source->nants());
+	ascii_header_set(header_buf, "SOURCE_NBEAMS", "%d", source->nbeams());
+	ascii_header_set(header_buf, "SOURCE_NPOLS", "%d", source->npols());
+	ascii_header_set(header_buf, "SOURCE_NCHANS", "%d", source->nchans());
+	ascii_header_set(header_buf, "SOURCE_NBITS", "%d", source->nbits());
+	ascii_header_set(header_buf, "SOURCE_DATA_ORDER", "%f", source->data_order());
+
+
 }
 

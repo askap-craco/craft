@@ -10,9 +10,7 @@
 #include "ascii_header.h"
 
 
-DadaSink::DadaSink(DataSource& source, int key, char* hdr,
-		int npol_out, int nbeams_out, int nt
-) {
+DadaSink::DadaSink(int key, char* hdr, FreddaParams& params) {
 	m_hdu = dada_hdu_create(NULL);
 	dada_hdu_set_key(m_hdu, key);
 	if (dada_hdu_connect(m_hdu) < 0) {
@@ -33,7 +31,7 @@ DadaSink::DadaSink(DataSource& source, int key, char* hdr,
 		memcpy(header_buf, hdr, hdrlen*sizeof(char));
 	}
 
-	uint64_t expected_block_size = npol_out*nbeams_out*source.nchans()*nt*sizeof(rescale_dtype);
+	uint64_t expected_block_size = params.npols_out*params.nbeams_out*params.source->nchans()*params.nt*sizeof(rescale_dtype);
 	if (m_data_block_size != expected_block_size) {
 		printf("DADA output is block size is %d but expected %d\n",
 				m_data_block_size, expected_block_size);
@@ -44,18 +42,18 @@ DadaSink::DadaSink(DataSource& source, int key, char* hdr,
 	ascii_header_set(header_buf, "HDR_VERSION", "%s", "1.0");
 	ascii_header_set(header_buf, "INSTRUMENT", "%s", "FREDDA_ICS");
 	ascii_header_set(header_buf, "FREDDA_VERSION", "%s", VERSION);
-	ascii_header_set(header_buf, "NPOL", "%d", npol_out); // polarisations summed
-	ascii_header_set(header_buf, "NBEAMS", "%d", nbeams_out); // polarisations summed
-	ascii_header_set(header_buf, "NCHAN", "%d", source.nchans()); // polarisations summed
+	ascii_header_set(header_buf, "NPOL", "%d", params.npols_out); // polarisations summed
+	ascii_header_set(header_buf, "NBEAMS", "%d", params.nbeams_out); // polarisations summed
+	ascii_header_set(header_buf, "NCHAN", "%d", params.source->nchans()); // polarisations summed
 	ascii_header_set(header_buf, "NBIT", "%d", sizeof(rescale_dtype)*8); // floating point numbers
-	ascii_header_set(header_buf, "NT", "%d", nt);
-	ascii_header_set(header_buf, "TSAMP", "%0.12f", source.tsamp()); // tsamp unchanged from source
-	ascii_header_set(header_buf, "FREQ", "%0.12f", out_freq); // first channel
-	ascii_header_set(header_buf, "BW", "%0.12f", out_foff); // Frequency offset - different from source as rescaler sets first frequency to bottom always
-	ascii_header_set(header_buf, "MJD_START", "%0.12f", source.current_mjd()); // mjd of first sample
+	ascii_header_set(header_buf, "NT", "%d", params.nt);
+	ascii_header_set(header_buf, "TSAMP", "%0.12f", params.source->tsamp()); // tsamp unchanged from source
+	ascii_header_set(header_buf, "FREQ", "%0.12f", params.out_freq); // first channel
+	ascii_header_set(header_buf, "BW", "%0.12f", params.out_foff); // Frequency offset - different from source as rescaler sets first frequency to bottom always
+	ascii_header_set(header_buf, "MJD_START", "%0.12f", params.source->current_mjd()); // mjd of first sample
 	ascii_header_set(header_buf, "DORDER", "%s", "BPFT");
 	ascii_header_set(header_buf, "HDR_SIZE", "%d", header_size);
-	ascii_header_set(header_buf, "DATA_TYPE", "%s", "CRAFT");
+	ascii_header_set(header_buf, "DATA_TYPE", "%s", "CRAFT_SEARCH");
 
 	if (ipcbuf_mark_filled(m_hdu->header_block, header_size) < 0) {
 		printf("Could not mark filled dada sink header block\n");

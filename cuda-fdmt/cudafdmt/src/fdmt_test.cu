@@ -144,7 +144,7 @@ int main(int argc, char* argv[])
 		if (dada_source != NULL) {
 			hdr = dada_source->get_source_at(0)->get_header();
 		}
-		dada_sink = new DadaSink(*source, params.export_dada_key, hdr, params.npols_out, params.nbeams_out, params.nt);
+		dada_sink = new DadaSink(params.export_dada_key, hdr, params);
 	}
 
 	const bool dump_data = params.dump_data;

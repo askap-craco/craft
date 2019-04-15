@@ -58,7 +58,7 @@ public:
 	virtual ~FreddaParams();
 	void set_source(DataSource& source);
 	void parse(int argc, char* argv[]);
-
+	void to_dada(char header_buf[]);
 };
 
 
