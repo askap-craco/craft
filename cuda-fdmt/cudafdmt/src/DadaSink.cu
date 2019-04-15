@@ -32,15 +32,6 @@ DadaSink::DadaSink(DataSource& source, int key, char* hdr,
 		assert(hdrlen < header_size);
 		memcpy(header_buf, hdr, hdrlen*sizeof(char));
 	}
-	// rescaling always puts the minimum frequency as the channel 0
-	double out_freq;
-	if (source.foff() > 0) {
-		out_freq = source.fch1();
-	} else {
-		out_freq = source.fch1() + source.nchans()*source.foff();
-	}
-	assert(out_freq <= source.fch1());
-	double out_foff = abs(source.foff());
 
 	uint64_t expected_block_size = npol_out*nbeams_out*source.nchans()*nt*sizeof(rescale_dtype);
 	if (m_data_block_size != expected_block_size) {
@@ -48,6 +39,7 @@ DadaSink::DadaSink(DataSource& source, int key, char* hdr,
 				m_data_block_size, expected_block_size);
 		exit(EXIT_FAILURE);
 	}
+
 	// set some header parameters - probably could set more, but it's a pain. Sheesh metadata is trickly
 	ascii_header_set(header_buf, "HDR_VERSION", "%s", "1.0");
 	ascii_header_set(header_buf, "INSTRUMENT", "%s", "FREDDA_ICS");

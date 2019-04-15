@@ -33,43 +33,11 @@
 #include "Rescaler.h"
 #include "rescale.h"
 #include "DadaSink.h"
+#include "FreddaParams.h"
 
 
 using namespace std;
 
-void runtest_usage() {
-	fprintf(stderr,
-			"cudafdmt [options] [infile [infile[ ...]]\n"
-			"   -d D - Number of dispersion trials. Negative D computes negative DMs\n"
-			"   -t T - Samples per block\n"
-			"   -s S - Decay timescale\n"
-			"   -o FILE - Candidate filename\n"
-			"   -U host:port - UDP host:port to send candidates to\n"
-			"   -x SN - threshold S/N\n"
-			"   -D dump intermediate data to disk (SLOW)\n"
-			"   -R dump rescaler data to disk\n"
-			"   -B b - Process b beams simultaneously to save memory\n"
-			"   -r R - Blocks per rescale update (0 for no rescaling)\n"
-			"   -S S - Seek to this number of seconds before starting\n"
-			"   -M M - Channel Mean relative change threshold (0.2 is OK)\n"
-			"   -T T - Channel StdDev relative changed flagging threshold (0.2 is OK)\n"
-			"   -K K - Channel Kurtosis threshold (3 is pretty good)\n"
-//			"   -G N - Channel flag channel growing (flags N channels either side of a bad channel)\n"
-			"   -z Z - Zap times with 0 DM above threshold Z\n"
-			"   -C C - Zap time/frequency cells with S/N above threshold C\n"
-			"   -u   - Subtract DM0 time series from spectrum\n"
-			"   -p   - Sum polarisations\n"
-			"   -n ncand - Maximum mumber of candidates to write per block\n"
-			"   -m mindm - Minimum DM to report candidates for (to ignore 0 DM junk)\n"
-			"   -b maxbc - Maximum boxcar to create a candidate. Candidates with peaks above this boxcar are ignored\n"
-			"   -g G - CUDA device\n"
-			"   -N N - Maximum number of blocks to process before quitting\n"
-			"   -X x - Export incoherent sum data to this DADA key\n"
-			"   -h Print this message\n"
-			"    Version: %s\n"
-			, VERSION);
-	exit(EXIT_FAILURE);
-}
 
 volatile bool stopped;
 
@@ -115,144 +83,14 @@ void dump_rescaler(int iblock, Rescaler* rescaler)
 
 int main(int argc, char* argv[])
 {
-	int nd = 1024;
-	int nt = 512;
-	float seek_seconds = 0.0;
-	int num_rescale_blocks = 2;
-	float decay_timescale = 1.0; // Seconds?
-	char ch;
-	float thresh = 10.0;
-	const char* out_filename = "fredda.cand";
-	bool dump_data = false;
-	bool do_dump_rescaler = false;
-	int cuda_device = 0;
-	float kurt_thresh = INFINITY;
-	float std_thresh = INFINITY;
-	float mean_thresh = INFINITY;
-	float dm0_thresh = INFINITY;
-	float cell_thresh = INFINITY;
-	int flag_grow = 3;
-	int max_ncand_per_block = 4096;
-	int mindm = 0;
-	int maxbc = 32;
-	int max_nblocks = INT_MAX;
-	int nbeams_alloc = -1;
-	bool subtract_dm0 = false;
-	bool polsum = false;
-	char udp_host[128];
-	bzero(udp_host, 128);
-	short udp_port = -1;
-	int export_dada_key = -1;
-
-	printf("Fredda version %s starting. Cmdline: ", VERSION);
-	for (int c = 0; c < argc; ++c) {
-		printf("%s ", argv[c]);
-	}
+	FreddaParams params; // this is new - I haven't finished refactoring everything to take advantage of FreddaParams
+	params.parse(argc, argv);
+	int nt = params.nt;
+	int nd = params.nd;
+	int nf = params.nf;
 	printf("\n");
-
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:DRg:M:T:U:K:G:C:n:m:b:z:N:X:uhp")) != -1) {
-		switch (ch) {
-		case 'd':
-			nd = atoi(optarg);
-			break;
-		case 't':
-			nt = atoi(optarg);
-			break;
-		case 's':
-			decay_timescale = atof(optarg);
-			break;
-		case 'o':
-			out_filename = optarg;
-			break;
-		case 'x':
-			thresh = atof(optarg);
-			break;
-		case 'D':
-			dump_data = true;
-			break;
-		case 'R':
-			do_dump_rescaler = true;
-			break;
-		case 'r':
-			num_rescale_blocks = atoi(optarg);
-			break;
-		case 'S':
-			seek_seconds = atof(optarg);
-			break;
-		case 'g':
-			cuda_device = atoi(optarg);
-			break;
-		case 'K':
-			kurt_thresh = atof(optarg);
-			break;
-		case 'T':
-			std_thresh = atof(optarg);
-			break;
-		case 'M':
-			mean_thresh = atof(optarg);
-			break;
-		case 'G':
-			flag_grow = atoi(optarg);
-			break;
-		case 'C':
-			cell_thresh = atof(optarg);
-			break;
-		case 'n':
-			max_ncand_per_block = atoi(optarg);
-			break;
-		case 'm':
-			mindm = atoi(optarg);
-			break;
-		case 'u':
-			subtract_dm0 = true;
-			break;
-		case 'b':
-			maxbc = atoi(optarg);
-			break;
-		case 'z':
-			dm0_thresh = atof(optarg);
-			break;
-		case 'N':
-			max_nblocks = atoi(optarg);
-			break;
-		case 'p':
-			polsum = true;
-			break;
-		case 'B':
-			nbeams_alloc = atoi(optarg);
-			break;
-		case 'X':
-			sscanf(optarg, "%x",&export_dada_key);
-			break;
-		case 'U':
-		{
-			char* colon = strchr(optarg, ':');
-			if (colon == NULL) {
-				printf("Invalid hostport\n");
-				exit(EXIT_FAILURE);
-			}
-			memcpy(udp_host, optarg, colon-optarg);
-			udp_port = atoi(colon+1);
-		}
-		break;
-
-		case '?':
-		case 'h':
-		default:
-			runtest_usage();
-		}
-	}
-	argc -= optind;
-	argv += optind;
-
-	if (argc == 0) {
-		printf("Not enough arguments: %d\n");
-		exit(EXIT_FAILURE);
-	}
-
-	printf("\n");
-	printf("Setting cuda device to %d\n", cuda_device);
-	gpuErrchk( cudaSetDevice(cuda_device));
+	printf("Setting cuda device to %d\n", params.cuda_device);
+	gpuErrchk( cudaSetDevice(params.cuda_device));
 
 	CpuTimer tall;
 	CpuTimer tproc;
@@ -279,62 +117,38 @@ int main(int argc, char* argv[])
 			}
 		}
 	}
-	assert(seek_seconds >= 0);
-	int num_skip_blocks = seek_seconds / source->tsamp() / nt;
+	assert(source != NULL);
+	int num_skip_blocks = params.seek_seconds / source->tsamp() / nt;
 	printf("Seeking to start of data: block %d nsamples=%d time=%fs\n", num_skip_blocks, num_skip_blocks*nt, num_skip_blocks*nt*source->tsamp());
 	if (num_skip_blocks > 0) {
 		source->seek_sample(nt*num_skip_blocks);
 	}
-
-	assert(source != NULL);
-	bool negdm = (nd < 0);
-	CandidateSink sink(source, out_filename, negdm, udp_host, udp_port);
+	params.set_source(*source);
+	bool negdm = (params.nd < 0);
+	CandidateSink sink(source, params.out_filename, negdm, params.udp_host, params.udp_port);
 	cout << "spf tsamp " << source->tsamp()<< " ants " << source->nants() << " nbeams " << source->nbeams()
 			<< " npols "<< source->npols() << " fch1 " << source->fch1() << " nchans "
 			<< source->nchans() << " foff " << source->foff() << endl;
-	int nbeams_per_antenna = source->nbeams()*source->npols(); // number of beams including polarisations
-	int nbeams_in_total = nbeams_per_antenna*source->nants();
-	int npols_in = source->npols();
-	int nbeams_out, npols_out;
-	if (polsum) { // assume polsum and antsum
-		nbeams_out = source->nbeams();
-		npols_out = 1;
-		assert(nbeams_per_antenna %2 == 0);
-	} else { // ant sum only
-		nbeams_out = source->nbeams()*source->npols();
-		npols_out = source->npols();
-	}
-	float nbeams_summed = (float(nbeams_in_total)/float(nbeams_out));
-	int nf = source->nchans();
-	int nbits = source->nbits();
-	printf("S/N Threshold %f Max ncand per block %d mindm %d \n", thresh, max_ncand_per_block, mindm);
+
+	printf("S/N Threshold %f Max ncand per block %d mindm %d \n", params.thresh, params.max_ncand_per_block, params.mindm);
 	//rescale input buffer
-	size_t in_buffer_bytes_per_ant = nbeams_per_antenna*nf*nt*nbits/8;
+	size_t in_buffer_bytes_per_ant = params.nbeams_per_antenna*nf*nt*params.nbits/8;
 	uint8_t* in_buffer_device;
 	printf("Copy in buffer size = %d MB per ant = %d MB TOTAL \n", in_buffer_bytes_per_ant/(1024l*1024l), in_buffer_bytes_per_ant*source->nants()/(1024l*1024l));
 	gpuErrchk( cudaMalloc((void**) &in_buffer_device, in_buffer_bytes_per_ant*source->nants() ));
 
-	float foff =  (float) source->foff();
-	float fmax = (float) source->fch1() - foff; // The FDMT seems to want this offset to make sense of the world. Not sure why.
-	float fmin = fmax + nf*foff;
-
-
-	if (nd < 0) { // Flip the band to calculate negative DMs
-		nd = -nd; // make nd positive -otherwise array sizes get confuddled
-		// FDMT requres fmin < fmax
-		// rescaling will invert the channels now that we've changed the sign of foff
-		foff = -foff;
-	}
 
 	DadaSink* dada_sink = NULL;
-	if (export_dada_key != -1) {
+	if (params.export_dada_key != -1) {
 		char* hdr = NULL;
 		if (dada_source != NULL) {
 			hdr = dada_source->get_source_at(0)->get_header();
 		}
-		dada_sink = new DadaSink(*source, export_dada_key, hdr, npols_out, nbeams_out, nt);
+		dada_sink = new DadaSink(*source, params.export_dada_key, hdr, params.npols_out, params.nbeams_out, params.nt);
 	}
 
+	const bool dump_data = params.dump_data;
+	const int nbeams_out = params.nbeams_out;
 	// rescale output buffer
 	array4d_t rescale_buf;
 	rescale_buf.nw = nbeams_out;
@@ -364,21 +178,21 @@ int main(int argc, char* argv[])
 	RescaleOptions rescale = {};
 	rescale.interval_samps = nt;
 	rescale.target_mean = 0.0;
-	rescale.target_stdev = 1.0/sqrt(nbeams_summed);
-	rescale.decay_constant = 0.35 * decay_timescale / source->tsamp(); // This is how the_decimator.C does it, I think.
-	rescale.mean_thresh = mean_thresh;
-	rescale.std_thresh = std_thresh;
-	rescale.kurt_thresh = kurt_thresh;
-	rescale.flag_grow = flag_grow;
-	rescale.dm0_thresh = dm0_thresh;
-	rescale.cell_thresh = cell_thresh;
-	rescale.invert_freq = (foff < 0);
-	rescale.subtract_dm0 = subtract_dm0;
+	rescale.target_stdev = 1.0/sqrt(params.nbeams_summed);
+	rescale.decay_constant = 0.35 * params.decay_timescale / source->tsamp(); // This is how the_decimator.C does it, I think.
+	rescale.mean_thresh = params.mean_thresh;
+	rescale.std_thresh = params.std_thresh;
+	rescale.kurt_thresh = params.kurt_thresh;
+	rescale.flag_grow = params.flag_grow;
+	rescale.dm0_thresh = params.dm0_thresh;
+	rescale.cell_thresh = params.cell_thresh;
+	rescale.invert_freq = (params.foff < 0);
+	rescale.subtract_dm0 = params.subtract_dm0;
 	rescale.nt = nt;
 	rescale.nf = nf;
-	rescale.nbeams_per_ant = nbeams_per_antenna;
+	rescale.nbeams_per_ant = params.nbeams_per_antenna;
 	rescale.nants = source->nants();
-	rescale.polsum = polsum;
+	rescale.polsum = params.polsum;
 	rescale.nbits = source->nbits();
 	rescale.in_order = source->data_order();
 	// set guess of initial scale and offset to dm0 thresholding works
@@ -406,8 +220,8 @@ int main(int argc, char* argv[])
 	// Create fdmt
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d nbeams_alloc=%d\n",
-			fmin, fmax, nf, nd, nt, nbeams_out, nbeams_alloc);
-	fdmt_create(&fdmt, fmin, fmax, nf, nd, nt, nbeams_out, nbeams_alloc, dump_data);
+			params.fmin, params.fmax, nf, nd, nt, nbeams_out, params.nbeams_alloc);
+	fdmt_create(&fdmt, params.fmin, params.fmax, nf, nd, nt, nbeams_out, params.nbeams_alloc, dump_data);
 
 	int blocknum = 0;
 	int iblock = num_skip_blocks;
@@ -441,7 +255,7 @@ int main(int argc, char* argv[])
 	array4d_malloc(&boxcar_data, dump_data, dump_data);
 	array4d_zero(&boxcar_data);
 
-	CandidateList candidate_list(max_ncand_per_block);
+	CandidateList candidate_list(params.max_ncand_per_block);
 
 	// measure bytes used
 	size_t gpu_free_bytes, gpu_total_bytes;
@@ -468,7 +282,7 @@ int main(int argc, char* argv[])
 			printf("Stopped due to signal received\n");
 			break;
 		}
-		if (blocknum >= max_nblocks) {
+		if (blocknum >= params.max_nblocks) {
 			break;
 		}
 
@@ -493,7 +307,7 @@ int main(int argc, char* argv[])
 					read_buf, in_buffer_bytes_per_ant*sizeof(uint8_t), cudaMemcpyHostToDevice, streams[iant]));
 			//tproc.start();
 			//trescale.start();
-			if (blocknum == 0 && num_rescale_blocks > 0) { // if first block rescale and update with no
+			if (blocknum == 0 && params.num_rescale_blocks > 0) { // if first block rescale and update with no
 				// flagging so we can work out roughly what the scales are
 				// Send output to junk buffer - silly but will fix later
 				// TODO: Remove junk buffer to save memory
@@ -501,7 +315,7 @@ int main(int argc, char* argv[])
 
 				// update scale and offset
 				rescaler->update_scaleoffset(rescaler->noflag_options, iant, streams[iant]);
-				if (do_dump_rescaler) {
+				if (params.do_dump_rescaler) {
 					dump_rescaler(-1, rescaler);
 				}
 			}
@@ -532,11 +346,11 @@ int main(int argc, char* argv[])
 		}
 
 		// Count how many times were flagged
-		assert(num_rescale_blocks >= 0);
+		assert(params.num_rescale_blocks >= 0);
 		array4d_copy_to_host(&rescaler->nsamps); // must do this before updaing scaleoffset, which resets nsamps to zero
 		tproc.start();
 
-		for(int i = 0; i < nf*nbeams_in_total; ++i) {
+		for(int i = 0; i < nf*params.nbeams_in_total; ++i) {
 			int nsamps = (int)rescaler->nsamps.d[i]; // nsamps is the number of unflagged samples from this block
 			int nflagged = rescaler->sampnum - nsamps;
 			// rescale.sampnum is the total number of samples that has gone into the rescaler since resetting
@@ -545,7 +359,7 @@ int main(int argc, char* argv[])
 		}
 
 		// do rescaling if required
-		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0) {
+		if (params.num_rescale_blocks > 0 && blocknum % params.num_rescale_blocks == 0) {
 			for(int iant = 0; iant < source->nants(); ++iant) {
 				rescaler->update_scaleoffset(rescaler->options, iant);
 			}
@@ -553,10 +367,10 @@ int main(int argc, char* argv[])
 			// Count how many  channels have been flagged for this whole block
 			// by looking at how many channels have scale==0
 			array4d_copy_to_host(&rescaler->scale);
-			for(int i = 0; i < nf*nbeams_in_total; ++i) {
+			for(int i = 0; i < nf*params.nbeams_in_total; ++i) {
 				if (rescaler->scale.d[i] == 0) {
 					// that channel will stay flagged for num_rescale_blocks
-					num_flagged_beam_chans += num_rescale_blocks;
+					num_flagged_beam_chans += params.num_rescale_blocks;
 				}
 
 				// it looks here like I'm counting twice, as we increment num_flagged_times outside the rescale_blocks_guard
@@ -571,12 +385,12 @@ int main(int argc, char* argv[])
 //				num_flagged_times += nflagged;
 			}
 
-			if (do_dump_rescaler) {
+			if (params.do_dump_rescaler) {
 				dump_rescaler(iblock, rescaler);
 			}
 		}
 
-		if (blocknum >= num_rescale_blocks) {
+		if (blocknum >= params.num_rescale_blocks) {
 			/// Execute the FDMT
 			fdmt_execute(&fdmt, rescale_buf.d_device, out_buf.d);
 			if (dump_data) {
@@ -590,10 +404,10 @@ int main(int argc, char* argv[])
 					&boxcar_data,
 					&boxcar_history,
 					&boxcar_discards,
-					thresh, max_ncand_per_block, mindm, maxbc, &candidate_list);
+					params.thresh, params.max_ncand_per_block, params.mindm, params.maxbc, &candidate_list);
 			tboxcar.stop();
 			int ncand = candidate_list.copy_to_sink(sink);
-			if (ncand >= max_ncand_per_block - 1) {
+			if (ncand >= params.max_ncand_per_block - 1) {
 				num_candidate_overflow_blocks++;
 			}
 			total_candidates += ncand;
@@ -622,7 +436,7 @@ int main(int argc, char* argv[])
 		total_discards += (int)boxcar_discards.d[i];
 	}
 
-
+	const int nbeams_in_total = params.nbeams_in_total;
 	double boxcar_ngops = (double)nbeams_out*(double)nt*(double)nd*2.0*(double)NBOX/1e9;
 	double data_nsecs = blocknum*nt*source->tsamp();
 
