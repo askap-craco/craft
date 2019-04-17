@@ -1,7 +1,7 @@
 #CUDA_PATH?=/Developer/NVIDIA/CUDA-7.5
 #CUDA_PATH=/usr/local/cuda-5.5/
 
-objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o CandidateList.o DadaSource.o  InvalidSourceFormat.o Rescaler.o DataOrder.o DadaSet.o FilDirSet.o DadaSink.o
+objects=CudaTimer.o SigprocFileSet.o array.o boxcar.o cudafdmt.o fdmt.o fdmt_utils.o rescale.o CandidateSink.o CpuTimer.o DataSource.o SigprocFile.o CandidateList.o DadaSource.o  InvalidSourceFormat.o Rescaler.o DataOrder.o DadaSet.o FilDirSet.o DadaSink.o Array4dDumper.o FreddaParams.o
 
 fftbench_objects=CudaTimer.o fftbench.o CpuTimer.o
 
