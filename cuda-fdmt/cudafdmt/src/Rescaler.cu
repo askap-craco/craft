@@ -7,7 +7,7 @@
 
 #include "Rescaler.h"
 
-Rescaler::Rescaler(RescaleOptions& _options) : options(_options)
+Rescaler::Rescaler(RescaleOptions& _options, FreddaParams& params) : options(_options)
 {
 	bool alloc_host = true; // Need host memory allocated for rescale because we copy back to count flags
 	int nbeams = options.nbeams_per_ant * options.nants;
@@ -63,10 +63,25 @@ Rescaler::Rescaler(RescaleOptions& _options) : options(_options)
 		printf("Invalid rescaling input order\n");
 		exit(EXIT_FAILURE);
 	}
+	if (params.do_dump_rescaler) {
+		dumpers.push_back(new Array4dDumper(mean, "mean", params));
+		dumpers.push_back(new Array4dDumper(std, "std", params));
+		dumpers.push_back(new Array4dDumper(kurt, "kurt", params));
+		dumpers.push_back(new Array4dDumper(nsamps, "nsamps", params));
+		dumpers.push_back(new Array4dDumper(dm0, "dm0", params));
+		dumpers.push_back(new Array4dDumper(dm0count, "dm0count", params));
+		dumpers.push_back(new Array4dDumper(dm0stats, "dm0stats", params));
+		dumpers.push_back(new Array4dDumper(scale, "offset", params));
+		dumpers.push_back(new Array4dDumper(decay_offset, "decay_offset", params));
+
+	}
 }
 
 Rescaler::~Rescaler() {
-
+	for (auto d : dumpers) {
+		delete d;
+	}
+	dumpers.clear();
 }
 
 void Rescaler::reset(array4d_t& rescale_buf)
@@ -104,6 +119,12 @@ void Rescaler::update_scaleoffset(RescaleOptions& options, int iant, cudaStream_
 			boff);
 	if (iant == 0) {
 		sampnum = 0;
+	}
+}
+
+void Rescaler::dump() {
+	for (auto d : dumpers) {
+		d->dump();
 	}
 }
 

@@ -15,14 +15,22 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <string>
+using std::string;
 
 class Array4dDumper {
 
 	FILE* m_fout;
+	std::string m_name;
+	array4d_t& m_target;
+	size_t m_num_elements;
+	void _fwrite(const void* ptr, size_t size, size_t count);
 
 public:
 	Array4dDumper(array4d_t& target, const char* name, FreddaParams& params);
 	virtual ~Array4dDumper();
+	void dump();
+
 };
 
 

@@ -84,10 +84,9 @@ void dump_rescaler(int iblock, Rescaler* rescaler)
 int main(int argc, char* argv[])
 {
 	FreddaParams params; // this is new - I haven't finished refactoring everything to take advantage of FreddaParams
+	const int nt = params.nt;
+	const int nd = params.nd;
 	params.parse(argc, argv);
-	int nt = params.nt;
-	int nd = params.nd;
-	int nf = params.nf;
 	printf("\n");
 	printf("Setting cuda device to %d\n", params.cuda_device);
 	gpuErrchk( cudaSetDevice(params.cuda_device));
@@ -96,21 +95,22 @@ int main(int argc, char* argv[])
 	CpuTimer tproc;
 	CudaTimer trescale;
 	CudaTimer tboxcar;
+	CudaTimer tdump;
 	tall.start();
 
 	DataSource* source = NULL;
 	DadaSet* dada_source = NULL; // for debugging
 	try {
 		// load sigproc file
-		SigprocFileSet* fs_source = new SigprocFileSet(nt, argc, argv);
+		SigprocFileSet* fs_source = new SigprocFileSet(nt, params.argc, params.argv);
 		source = fs_source;
 	} catch (InvalidSourceFormat& e) {
 		try {
-			dada_source = new DadaSet(nt, argc, argv);
+			dada_source = new DadaSet(nt, params.argc, params.argv);
 			source = dada_source;
 		} catch (InvalidSourceFormat& e) {
 			try {
-				source = new FilDirSet(nt, argc, argv);
+				source = new FilDirSet(nt, params.argc, params.argv);
 			} catch (InvalidSourceFormat& e) {
 				printf("No valid inputs\n");
 				exit(EXIT_FAILURE);
@@ -123,7 +123,11 @@ int main(int argc, char* argv[])
 	if (num_skip_blocks > 0) {
 		source->seek_sample(nt*num_skip_blocks);
 	}
+
+	// need to set source after seek sample otherwise start sample not correctly set
 	params.set_source(*source);
+
+	const int nf = params.nf; // Don't know nf until we know the source
 	bool negdm = (params.nd < 0);
 	CandidateSink sink(source, params.out_filename, negdm, params.udp_host, params.udp_port);
 	cout << "spf tsamp " << source->tsamp()<< " ants " << source->nants() << " nbeams " << source->nbeams()
@@ -202,7 +206,7 @@ int main(int argc, char* argv[])
 			rescale.mean_thresh, rescale.std_thresh, rescale.kurt_thresh,
 			rescale.dm0_thresh, rescale.cell_thresh,
 			rescale.flag_grow);
-	Rescaler* rescaler = new Rescaler(rescale);
+	Rescaler* rescaler = new Rescaler(rescale, params);
 	rescaler->set_scaleoffset(1.0f, 0.0f); // Just pass it straight through without rescaling
 
 	float flag_freqs_mhz[] = {1111.0f, 1144.0f};
@@ -315,8 +319,11 @@ int main(int argc, char* argv[])
 
 				// update scale and offset
 				rescaler->update_scaleoffset(rescaler->noflag_options, iant, streams[iant]);
+
 				if (params.do_dump_rescaler) {
-					dump_rescaler(-1, rescaler);
+					tdump.start();
+					rescaler->dump();
+					tdump.stop();
 				}
 			}
 
@@ -386,7 +393,9 @@ int main(int argc, char* argv[])
 			}
 
 			if (params.do_dump_rescaler) {
-				dump_rescaler(iblock, rescaler);
+				tdump.start();
+				rescaler->dump();
+				tdump.stop();
 			}
 		}
 
@@ -453,6 +462,7 @@ int main(int argc, char* argv[])
 	cout << "FREDDA Total "<< endl << tall << endl;
 	cout << "FREDDA Procesing "<< endl << tproc << endl;
 	cout << "Rescale "<< endl << trescale << endl;
+	cout << "Rescale dumping " << endl << tdump << endl;
 	fdmt_print_timing(&fdmt);
 	cout << "Boxcar "<< endl << tboxcar << endl;
 	cout << "FDMT " << ((double)fdmt.nops)/1e9
@@ -467,6 +477,7 @@ int main(int argc, char* argv[])
 			"s System:" << usage.ru_stime.tv_sec << "s MaxRSS:" << usage.ru_maxrss/1024/1024 << "MB" << endl;
 	cout << "GPU Memory used " << (gpu_total_bytes - gpu_free_bytes)/1024/1024 << " of " << gpu_total_bytes /1024/124 << " MiB" << endl;
 	delete source;
+	delete rescaler;
 	if(dada_sink != NULL) {
 		delete dada_sink;
 	}

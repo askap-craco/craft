@@ -7,10 +7,15 @@
 
 #ifndef RESCALER_H_
 #define RESCALER_H_
+#include <vector>
 
 #include "rescale.h"
 #include "array.h"
 #include "DataOrder.h"
+#include "FreddaParams.h"
+#include "Array4dDumper.h"
+
+using std::vector;
 
 //const rescale_dtype RESINFINITY = 1.0f/0.0f;
 
@@ -63,6 +68,8 @@ public:
 	RescaleOptions options;
 	RescaleOptions noflag_options;
 
+	std::vector<Array4dDumper* > dumpers;
+
 	// Parameters
 	/* I put so much effort into this I'm scared of deleting it now
 	Rescaler(int _nbeams, int _nf, int _nt,
@@ -71,7 +78,7 @@ public:
 			float _dm0_thresh, float _cell_thresh,
 			int _flag_grow, bool _invert_freq, bool _subtract_dm0);
 			*/
-	Rescaler(RescaleOptions& _options);
+	Rescaler(RescaleOptions& _options, FreddaParams& params);
 
 	virtual ~Rescaler();
 
@@ -80,7 +87,7 @@ public:
 	void set_scaleoffset(float s_scale, float s_offset);
 	void update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream=0);
 	void flag_channel(int channel); // Set weights to zero for all beams/antennas fo rthis channel
-
+	void dump(); // Dump rescaler data to disk
 private:
 
 	template <int nsamps_per_word, typename wordT>

@@ -54,6 +54,8 @@ public:
 	float foff;
 	float fmax; // The FDMT seems to want this offset to make sense of the world. Not sure why.
 	float fmin;
+	int argc;
+	char** argv;
 	FreddaParams();
 	virtual ~FreddaParams();
 	void set_source(DataSource& source);

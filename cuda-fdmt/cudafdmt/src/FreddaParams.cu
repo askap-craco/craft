@@ -53,8 +53,9 @@ FreddaParams::FreddaParams() {
 FreddaParams::~FreddaParams() {
 }
 
-void FreddaParams::parse(int argc, char* argv[])
-{
+void FreddaParams::parse(int _argc, char* _argv[]) {
+	argc = _argc;
+	argv = &_argv[0];
 	printf("Fredda version %s starting. Cmdline: ", VERSION);
 	for (int c = 0; c < argc; ++c) {
 		printf("%s ", argv[c]);
@@ -251,7 +252,7 @@ void FreddaParams::to_dada(char header_buf[])
 	ascii_header_set(header_buf, "SOURCE_NPOLS", "%d", source->npols());
 	ascii_header_set(header_buf, "SOURCE_NCHANS", "%d", source->nchans());
 	ascii_header_set(header_buf, "SOURCE_NBITS", "%d", source->nbits());
-	ascii_header_set(header_buf, "SOURCE_DATA_ORDER", "%f", source->data_order());
+	ascii_header_set(header_buf, "SOURCE_DATA_ORDER", "%d", source->data_order());
 
 
 }
