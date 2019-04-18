@@ -8,43 +8,55 @@ __author__ = 'Keith Bannister <keith.bannister@csiro.au>'
 
 import logging
 import numpy as np
-
-DEFAULT_HEADER_SIZE = 4096
+from crafthdr import DadaHeader
 
 class DadaFile(object):
     def __init__(self, filename):
         self.filename = filename
+        assert os.path.isfile(self.filename)
+        self.hdr = DadaHeader.fromfile(self.filename)
+        self.hdr_size = int(self.hdr.get_value('HDR_SIZE'))
+        self.shape = self.hdr.get_value('SHAPE') # throws exception if not defined
+        self.shape = np.array(map(int, self.shape.split(',')))
+        self.dtype = np.dtype(self.hdr.get_value('DTYPE', '<f4'))
+        self.block_size_bytes = np.prod(self.shape)*self.dtype.itemsize
         self.fin = open(self.filename, 'r')
-        self.header_size = DEFAULT_HEADER_SIZE
 
-        # parse twice, in case the first time the header size isnt' enough 
-        self.header_size = self._parse_header(self.header_size)
-        self.header_size = self._parse_header(self.header_size)
+    @property
+    def nblocks(self):
+        nbytes = os.path.getsize(self.filename)
+        nblocks = (nbytes - self.hdr_size) // self.block_size_bytes # truncated
+
+    def get_block(self, blockid):
+        if blockid < 0:
+            raise ValueError('Invalid blockid {}'.format(blockid))
         
-    def _parse_header(self, size):
-        self.fin.seek(0)
-        hdrbytes = self.fin.read(size)
-        self.hdr = {}
-        for line in hdrbytes.split('\n'):
-            bits = line.split(None, 1)
-            if len(bits) == 1:
-                continue
-            
-            name, value = line.split(None, 1)
-            self.hdr[name.strip()] = value.strip()
+        if blockid >= self.nblocks:
+            raise ValueError('BlockID {} past the end of file'.format(blockid))
 
-        return int(self.hdr['HDR_SIZE'])
+        assert 0 <= blockid < self.nblocks
 
-    def __getitem__(self, key):
-        if isinstance(key, int):
-            self.fin.seek(self.header_size+key);
-            return self.fin.read(key)
-        elif isinstance(key, slice):
-            assert slice.step is None, 'Cant do strided access'
-            self.fin.seek(self.header_size + key.start)
-            sz = key.start - key.stop
-            assert sz > 0, 'Cant do negative directions'
-            return self.fin.read(sz)
+        self.fin.seek(self.hdr_size + blockid*self.block_size_bytes)
+        count = np.prod(self.shape)
+        d = np.fromfile(self.fine, count=count, dtype=self.dtype)
+        d.shape = self.shape
+        return d
+
+    def blocks(self):
+        '''
+        Iterates over blocks in the data
+        '''
+        blockid = 0
+        # check number of blocks on every interation in case someone has written
+        # to the file since we last looked.
+        while blockid < self.nblocks:
+            yield self[blockid]
+
+    def __getitem__(self, index):
+        return self.get_block(index)
+
+    def __len__(self):
+        return self.nblocks
 
 def _main():
     from argparse import ArgumentParser

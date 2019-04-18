@@ -8,33 +8,72 @@ import numpy as np
 import os
 import sys
 import logging
-from plot_fredda import load4d
 import crafthdr
 import re
 import glob
 import sigproc
+import dada
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
-fred_file_re = re.compile('(.*)_e([0-9]+).dat')
+fred_file_re = re.compile('(.*).dada')
 
-def type_epoch_of(p):
-    ''' Returns fredda type and epoch (as an int) of a given path
-    Throws exception if not a  FREDDA path
-
-    >>> type_epoch_of('mean_e12.dat')
-    ('mean', 12)
-
-    >>> type_epoch_of('/path/to/mean_e12.dat')
-    ('mean', 12)
-    '''
-    m = fred_file_re.match(os.path.basename(p))
+def type_of_file(p):
+    f = os.path.basename(p)
+    m = fred_file_re.match(f)
     if m is None:
-        raise ValueError('Path {} is not a FREDDA output'.format(p))
+        raise ValueError('Path {} is not a valid FREDDA output'.format(p))
 
-    g = m.groups()
-    
-    return (g[0], int(g[1]))
+    return g[0]
+
+class FreddaRescaleBlock(dict):
+    def __init__(self, rsdata, blkid):
+        for df in rsdata.dada_files:
+            name = df.hdr.get_value('DATA_NAME')
+            data = df[blkid]
+            self[name] = data
+
+        self.mjd = rsdata.tstart + blkid*rsdata.tsamp
+        self.rsdata = rsdata
+        self.blkid = blkid
+
+class FreddaRescaleData(object):
+    def __init__(self, path):
+        self.path = path
+
+        dada_file_paths = glob.glob(os.path.join(self.path, '*.dada'))
+        self.dada_files = [dada.DadaFile(f) for f in dada_file_paths]
+        hdr = self.dada_files[0].hdr
+        self.hdr = hdr
+        
+        f1 = float(hdr.get_value('OUT_FREQ'))
+        foff = float(hdr.get_value('OUT_FOFF'))
+        nchan = int(hdr.get_value('NF'))
+        self.freqs = np.arange(nchan)*foff + f1
+        self.nbeams = int(hdr.get_value('NB'))
+        self.nbeams_per_antenna = int(self.hdr.get_value['NBEAMS_PER_ANTENNA'])
+        self.npol = int(self.hdr.get_value('NPOLS_IN'))
+        self.nbteams_in_total = int(self.hdr.get_value('NBEAMS_IN_TOTAL'))
+        self.nt = int(self.hdr.get_value('NT'))
+        self.nd = int(self.hdr.get_value('ND'))
+        self.tstart = float(self.hdr.get_value('SOURCE_TSTART'))
+        self.tsamp = float(self.hdr.get_value('TSAMP')) # tsamp fo rrescaling different from source tsamp
+
+    @property
+    def nblocks(self):
+        return min(map(len, self.dada_files))
+
+    def get_block(self, blkid):
+        return FreddaRescaleBlock(blkid)
+
+    def __getitem__(self, blkid):
+        return self.get_block(blkid)
+
+    def blocks(self):
+        blkid = 0
+        while blkid < self.nblocks:
+            return self[blkid]
+
 
 class DataDir(object):
     def __init__(self, rootobj, path):
@@ -64,7 +103,6 @@ class StartDir(DataDir):
         DataDir.__init__(self, *args, **kwargs)
         self._hdr = None # lazy
         
-
     @property
     def antname(self):
         return self.rootobj.name
@@ -144,19 +182,14 @@ class StartDir(DataDir):
 
         return d
 
-    def list_fredda_output_paths(self, epoch=None):
+    def list_fredda_output_paths(self):
         '''
         Returns a list of all the paths to fredda outputs.
         If epoch=None, then it will return all epochs
         Otherwise, specific epoch as an int
         It there are no fredda outputs, it will return an empty list
         '''
-        if epoch is None:
-            pattern = '*_e[0-9]+.dat'
-        else:
-            pattern = '*_e{:d}.dat'.format(epoch)
-            
-        paths = self._pathglob(pattern)
+        paths = self._pathglob('*.dada')
 
         return paths
 
@@ -168,32 +201,12 @@ class StartDir(DataDir):
         '''
         
         paths = self.list_fredda_output_paths(epoch)
-        fred_types = set(type_epoch_of(p)[0] for p in paths)
+        fred_types = set(type_of_file(p) for p in paths)
 
         return fred_types
 
-    @property
-    def list_fredda_epochs(self):
-        '''
-        Returns a sorted list of fredda epochs. Not all epochs have all types of data
-        '''
-        paths = self.list_fredda_output_paths()
-        epochs = sorted(set([type_epoch_of(p)[1] for p in paths]))
-        return epochs
-
-    @property
-    def fredda_epochs(self, epoch=None):
-        '''
-        Returns a map, keyed by epoch number, with the value a set of fredda data types
-        '''
-        
-
-    @property
-    def last_fredda_epoch(self):
-        '''
-        Returns the last fredda epoch currently in this directory, as an integer
-        '''
-        return max(self.list_fredda_epochs)
+    def fredda_data(self):
+        return FreddaRescaleData(self.path)
 
 class ScanDir(DataDir):
     
@@ -287,7 +300,6 @@ class AntennaDir(DataDir):
             s += 'CLOSED'
 
         return s
-
 
 class SchedblockDir(DataDir):
 
