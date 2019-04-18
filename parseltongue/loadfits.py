@@ -44,8 +44,8 @@ if fitsfileoutname is not None:
     if not fitsfileoutname[0] == '/':
         fitsfileoutname = os.getcwd() + '/' + args.fitsfileoutname
         if os.path.exists(fitsfileoutname):
-        print "Warning: {} already exists. Aborting".format(fitsfileoutname)
-        sys.exit()
+            print "Warning: {} already exists. Aborting".format(fitsfileoutname)
+            sys.exit()
 
 ################################################################################
 # Some useful functions

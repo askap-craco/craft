@@ -62,7 +62,7 @@ file:///opt/casa/code/xmlcasa/xml/casa.xsd">
    
    vis -- name of input image file
    spec -- text file of spectrum - see output of some function. The first column should be frequency in GHz, the second column should be the amplitude
-
+   cutoff - value below which the spectrum is ignored and weighted to zero.
   </example>
 
 </task>
