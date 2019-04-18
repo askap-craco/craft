@@ -58,7 +58,7 @@ typedef struct _rescale_gpu_t {
 
 } rescale_gpu_t __attribute__((__aligned__(16)));
 
-void rescale_arraymalloc(array4d_t* arr, uint64_t nbeams, uint64_t nf, bool alloc_host);
+void rescale_arraymalloc(array4d_t* arr,uint64_t nant, uint64_t nbeams, uint64_t nf, bool alloc_host);
 
 rescale_t* rescale_allocate(rescale_t* rescale, uint64_t nelements) ;
 rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uint64_t nf, uint64_t nt, bool alloc_host);

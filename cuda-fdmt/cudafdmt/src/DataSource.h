@@ -40,6 +40,7 @@ public:
 	virtual double current_mjd();
 	
 	virtual char* name() = 0;
+	virtual const char* antenna_name() { return ""; };
 	float dm_of_idt(int idt) {
 
 			float nu1 = fch1()/1e3;

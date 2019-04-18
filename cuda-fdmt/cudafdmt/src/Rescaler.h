@@ -66,6 +66,7 @@ public:
 	int num_elements;
 	int num_elements_per_ant;
 	RescaleOptions options;
+	FreddaParams& params;
 	RescaleOptions noflag_options;
 
 	std::vector<Array4dDumper* > dumpers;

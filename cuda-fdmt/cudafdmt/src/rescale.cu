@@ -264,10 +264,10 @@ rescale_dtype* rescale_cumalloc(uint64_t sz)
 	return ptr;
 }
 
-void rescale_arraymalloc(array4d_t* arr, uint64_t nbeams, uint64_t nf, bool alloc_host)
+void rescale_arraymalloc(array4d_t* arr, uint64_t nant, uint64_t nbeams, uint64_t nf, bool alloc_host)
 {
 	arr->nw = 1;
-	arr->nx = 1;
+	arr->nx = nant;
 	arr->ny = nbeams;
 	arr->nz = nf;
 	//printf("Allocating array ");
@@ -280,20 +280,20 @@ void rescale_arraymalloc(array4d_t* arr, uint64_t nbeams, uint64_t nf, bool allo
 rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uint64_t nf, uint64_t nt, bool alloc_host)
 {
 	uint64_t nelements = nbeams*nf;
-	rescale_arraymalloc(&rescale->sum, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&rescale->sum2, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&rescale->sum3, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&rescale->sum4, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&rescale->mean, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&rescale->std, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&rescale->kurt, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&rescale->dm0, nbeams, nt, alloc_host);
-	rescale_arraymalloc(&rescale->dm0count, nbeams, nt, alloc_host);
-	rescale_arraymalloc(&rescale->dm0stats, nbeams, 4, alloc_host); // max, min, mean, var
-	rescale_arraymalloc(&rescale->nsamps, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&rescale->scale, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&rescale->offset, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&rescale->decay_offset, nbeams, nf, alloc_host);
+	rescale_arraymalloc(&rescale->sum, 1, nbeams, nf, alloc_host);
+	rescale_arraymalloc(&rescale->sum2, 1, nbeams, nf, alloc_host);
+	rescale_arraymalloc(&rescale->sum3, 1, nbeams, nf, alloc_host);
+	rescale_arraymalloc(&rescale->sum4, 1, nbeams, nf, alloc_host);
+	rescale_arraymalloc(&rescale->mean,1,  nbeams, nf, alloc_host);
+	rescale_arraymalloc(&rescale->std, 1, nbeams, nf, alloc_host);
+	rescale_arraymalloc(&rescale->kurt,1,  nbeams, nf, alloc_host);
+	rescale_arraymalloc(&rescale->dm0, 1, nbeams, nt, alloc_host);
+	rescale_arraymalloc(&rescale->dm0count, 1, nbeams, nt, alloc_host);
+	rescale_arraymalloc(&rescale->dm0stats, 1, nbeams, 4, alloc_host); // max, min, mean, var
+	rescale_arraymalloc(&rescale->nsamps, 1, nbeams, nf, alloc_host);
+	rescale_arraymalloc(&rescale->scale, 1, nbeams, nf, alloc_host);
+	rescale_arraymalloc(&rescale->offset, 1, nbeams, nf, alloc_host);
+	rescale_arraymalloc(&rescale->decay_offset, 1, nbeams, nf, alloc_host);
 	array4d_set(&rescale->scale, 1.0);
 
 	rescale->sampnum = 0;

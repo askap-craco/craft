@@ -98,6 +98,7 @@ private:
     size_t m_buf_num;
     void* m_reorder_buffer;
     CpuTimer m_transpose_timer;
+    char m_antenna_name[128];
     int m_key;
 
 };

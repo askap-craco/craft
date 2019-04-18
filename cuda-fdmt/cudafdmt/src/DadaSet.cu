@@ -70,7 +70,7 @@ void DadaSet::sync(size_t offset) {
 	// max_sampdiff is the sample number we want to get to for all the input sources
 
 	// Loop through inputs again, and read blocks until aligned with latest_sampnum
-	void* dummy_output;
+	//void* dummy_output;
 	for (int i = 0; i < m_sources.size(); ++i) {
 		DadaSource* curr_source = m_sources.at(i);
 		curr_source->seek_sample(target_sample);
@@ -97,6 +97,18 @@ size_t DadaSet::read_samples_ant(void** output, int iant)
 {
 	DadaSource* curr_source = m_sources.at(iant);
 	return curr_source->read_samples(output);
+}
+
+const char* DadaSet::antenna_name()
+{
+	for (auto& src : m_sources)
+	{
+		m_antenna_name.append(src->antenna_name());
+		if (&src != &m_sources.back()) {
+			m_antenna_name.append(",");
+		}
+	}
+	return m_antenna_name.c_str();
 }
 
 

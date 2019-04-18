@@ -9,10 +9,11 @@
 #define DADASET_H_
 #include "DataSource.h"
 #include "DadaSource.h"
+#include <string>
 #include <assert.h>
 #include <vector>
 
-
+using std::string;
 
 class DadaSet : public DataSource {
 public:
@@ -65,6 +66,7 @@ public:
 	size_t read_samples(void** output);
 
 	size_t read_samples_ant(void** output, int iant);
+	const char* antenna_name();
 
 	DadaSource* get_source_at(int idx) {
 		return m_sources.at(idx);
@@ -77,6 +79,7 @@ private:
 	void sync(size_t offset);
 	int m_nt;
 	int m_current_ant;
+	std::string m_antenna_name;
 };
 
 

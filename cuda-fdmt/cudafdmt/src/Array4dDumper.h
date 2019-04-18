@@ -25,9 +25,10 @@ class Array4dDumper {
 	array4d_t& m_target;
 	size_t m_num_elements;
 	void _fwrite(const void* ptr, size_t size, size_t count);
+	bool m_auto_copy;
 
 public:
-	Array4dDumper(array4d_t& target, const char* name, FreddaParams& params);
+	Array4dDumper(array4d_t& target, const char* name, FreddaParams& params, bool auto_copy=true);
 	virtual ~Array4dDumper();
 	void dump();
 

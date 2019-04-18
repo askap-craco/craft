@@ -7,34 +7,36 @@
 
 #include "Rescaler.h"
 
-Rescaler::Rescaler(RescaleOptions& _options, FreddaParams& params) : options(_options)
+Rescaler::Rescaler(RescaleOptions& _options, FreddaParams& _params) : params(_params), options(_options)
 {
 	bool alloc_host = true; // Need host memory allocated for rescale because we copy back to count flags
-	int nbeams = options.nbeams_per_ant * options.nants;
-	int nf = options.nf;
-	int nt = options.nt;
-	num_elements = nbeams*nf;
-	num_elements_per_ant = options.nbeams_per_ant * nf;
+	const int nb = options.nbeams_per_ant;
+	const int na = options.nants;
+	const int total_nbeams = na*nb;
+	const int nf = options.nf;
+	const int nt = options.nt;
+	num_elements = total_nbeams*nf;
+	num_elements_per_ant = nb * nf;
 	sampnum = 0;
 	options.interval_samps = nt;
-	rescale_arraymalloc(&sum, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&sum2, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&sum3, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&sum4, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&mean, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&std, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&kurt, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&dm0, nbeams, nt, alloc_host);
-	rescale_arraymalloc(&dm0count, nbeams, nt, alloc_host);
-	rescale_arraymalloc(&dm0stats, nbeams, 4, alloc_host); // max, min, mean, var
-	rescale_arraymalloc(&nsamps, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&scale, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&offset, nbeams, nf, alloc_host);
-	rescale_arraymalloc(&decay_offset, nbeams, nf, alloc_host);
+	rescale_arraymalloc(&sum, na, nb, nf, alloc_host);
+	rescale_arraymalloc(&sum2, na, nb, nf, alloc_host);
+	rescale_arraymalloc(&sum3, na, nb, nf, alloc_host);
+	rescale_arraymalloc(&sum4, na, nb, nf, alloc_host);
+	rescale_arraymalloc(&mean, na, nb, nf, alloc_host);
+	rescale_arraymalloc(&std, na, nb, nf, alloc_host);
+	rescale_arraymalloc(&kurt, na, nb, nf, alloc_host);
+	rescale_arraymalloc(&dm0, na, nb, nt, alloc_host);
+	rescale_arraymalloc(&dm0count, na, nb, nt, alloc_host); // reset on update
+	rescale_arraymalloc(&dm0stats, na, nb, 4, alloc_host); // max, min, mean, var
+	rescale_arraymalloc(&nsamps, na, nb, nf, alloc_host);
+	rescale_arraymalloc(&scale, na, nb, nf, alloc_host);
+	rescale_arraymalloc(&offset, na, nb, nf, alloc_host);
+	rescale_arraymalloc(&decay_offset, na, nb, nf, alloc_host);
 
 	weights.nw = 1;
-	weights.nx = options.nants;
-	weights.ny = nbeams;
+	weights.nx = na;
+	weights.ny = nb;
 	weights.nz = nf;
 	array4d_malloc(&weights, true, true);
 	array4d_set(&weights, 1.0);
@@ -67,13 +69,13 @@ Rescaler::Rescaler(RescaleOptions& _options, FreddaParams& params) : options(_op
 		dumpers.push_back(new Array4dDumper(mean, "mean", params));
 		dumpers.push_back(new Array4dDumper(std, "std", params));
 		dumpers.push_back(new Array4dDumper(kurt, "kurt", params));
-		dumpers.push_back(new Array4dDumper(nsamps, "nsamps", params));
+		dumpers.push_back(new Array4dDumper(nsamps, "nsamps", params, false));
+		dumpers.push_back(new Array4dDumper(scale, "scale", params));
+		dumpers.push_back(new Array4dDumper(offset, "offset", params));
+		dumpers.push_back(new Array4dDumper(decay_offset, "decay_offset", params));
 		dumpers.push_back(new Array4dDumper(dm0, "dm0", params));
 		dumpers.push_back(new Array4dDumper(dm0count, "dm0count", params));
 		dumpers.push_back(new Array4dDumper(dm0stats, "dm0stats", params));
-		dumpers.push_back(new Array4dDumper(scale, "offset", params));
-		dumpers.push_back(new Array4dDumper(decay_offset, "decay_offset", params));
-
 	}
 }
 
@@ -97,6 +99,9 @@ void Rescaler::update_scaleoffset(RescaleOptions& options, int iant, cudaStream_
 	assert(num_elements_per_ant % nthreads == 0);
 	int nblocks = num_elements_per_ant / nthreads;
 	int boff = iant*options.nbeams_per_ant;
+	if (params.do_dump_rescaler) { // the scaleoffset kernel overwrites nsamps in device memory - but we want to keep it for flaggin
+		array4d_copy_to_host(&nsamps);
+	}
 	rescale_update_scaleoffset_kernel<<<nblocks, nthreads, 0, stream>>>(
 			sum.d_device,
 			sum2.d_device,

@@ -234,7 +234,7 @@ void FreddaParams::to_dada(char header_buf[])
 	ascii_header_set(header_buf, "OUT_FOFF", "%f", out_foff);
 	ascii_header_set(header_buf, "NBEAMS_PER_ANTENNA", "%d", nbeams_per_antenna);
 	ascii_header_set(header_buf, "NBEAMS_IN_TOTAL", "%d", nbeams_in_total);
-	ascii_header_set(header_buf, "NPOLS_IN", "%dd", npols_in);
+	ascii_header_set(header_buf, "NPOLS_IN", "%d", npols_in);
 	ascii_header_set(header_buf, "NBEAMS_OUT", "%d", nbeams_out);
 	ascii_header_set(header_buf, "NPOLS_OUT", "%d", npols_out);
 	ascii_header_set(header_buf, "NBEAMS_SUMMED", "%f", nbeams_summed);
@@ -253,7 +253,8 @@ void FreddaParams::to_dada(char header_buf[])
 	ascii_header_set(header_buf, "SOURCE_NCHANS", "%d", source->nchans());
 	ascii_header_set(header_buf, "SOURCE_NBITS", "%d", source->nbits());
 	ascii_header_set(header_buf, "SOURCE_DATA_ORDER", "%d", source->data_order());
-
+	ascii_header_set(header_buf, "SOURCE_NAME", "%s", source->name());
+	ascii_header_set(header_buf, "SOURCE_ANTENNA_NAME", "%s", source->antenna_name());
 
 }
 
