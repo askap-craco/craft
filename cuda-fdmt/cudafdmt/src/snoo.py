@@ -46,7 +46,7 @@ def _main():
             idt = npdata[:, 4]
             dm = npdata[:, 5]
             beamno = npdata[:, 6]
-            mask = (sn > values.min_sn) & (width < values.max_boxcar) & (dm > values.min_dm) & (beamno != 35) & (tsec > 10.)
+            mask = (sn > values.min_sn) & (width < values.max_boxcar) & (dm > values.min_dm) & (beamno != 35) & (tsec > 15.)
             if np.any(mask):
                 goodat = npdata[mask, :]
                 good_sn = goodat[:, 0]
