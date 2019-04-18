@@ -20,6 +20,36 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 def plot(f, values):
     d = FreddaRescaleData(f)
     print d.hdr
+    print d.dada_files
+    print d.dada_files[0].nblocks
+    print d.nblocks
+
+    fig, ax = pylab.subplots(3,3)
+    ax = ax.flatten()
+    blkidx = 4
+    iant = 1
+    bd = d[blkidx]
+    iax = 0
+
+    for iname, name in enumerate(['mean','std','kurt','scale','offset', 'decay_offset', 'nsamps']):
+
+        bdn = bd[name][iant, :, :]
+        print name, bdn.shape
+        ax[iax].plot(d.freqs, bdn.T)
+        ax[iax].set_title(name)
+        iax += 1
+
+    axstart = iname + 1
+    for iname, name in enumerate(['dm0','dm0count']):
+        bdn = bd[name][iant, :, :]
+        print name, bdn.shape
+        ax[iax].plot(bdn.T)
+        ax[iax].set_title(name)
+        iax += 1
+
+
+    pylab.show()
+
     
 
 def _main():
