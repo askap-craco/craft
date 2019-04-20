@@ -21,7 +21,7 @@ public:
 
 	int get_header_int(const char* name);
 	double get_header_double(const char* name);
-	int get_header_string(const char* name, char* out);
+	int get_header_string(const char* name, char* out, const char* sdefault="");
 
 
 	int npols() {

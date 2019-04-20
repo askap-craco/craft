@@ -85,7 +85,7 @@ DadaSource::DadaSource(int nt, const char* keyname, bool lock) {
 	m_fch1 = get_header_double("FREQ");
 	m_foff = get_header_double("BW");
 	m_tstart = get_header_double("MJD_START");
-	get_header_string("ANTENNA_NAME", m_antenna_name);
+	get_header_string("ANTENNA_NAME", m_antenna_name, keyname);
 	m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
 	m_current_sample = 0;
 	m_nt = nt;
@@ -147,11 +147,11 @@ double DadaSource::get_header_double(const char* name) {
 	return d;
 }
 
-int DadaSource::get_header_string(const char* name, char* out) {
+int DadaSource::get_header_string(const char* name, char* out, const char* sdefault) {
 	assert(m_hdr);
 	if (ascii_header_get(m_hdr, name, "%s", out) < 0) {
 		printf("Could not get header %s\n",name);
-		exit(EXIT_FAILURE);
+		strcpy(out, sdefault);
 	}
 
 	return 0;
