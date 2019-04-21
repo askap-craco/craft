@@ -84,9 +84,10 @@ void dump_rescaler(int iblock, Rescaler* rescaler)
 int main(int argc, char* argv[])
 {
 	FreddaParams params; // this is new - I haven't finished refactoring everything to take advantage of FreddaParams
+	params.parse(argc, argv);
+
 	const int nt = params.nt;
 	const int nd = params.nd;
-	params.parse(argc, argv);
 	printf("\n");
 	printf("Setting cuda device to %d\n", params.cuda_device);
 	gpuErrchk( cudaSetDevice(params.cuda_device));
@@ -287,6 +288,7 @@ int main(int argc, char* argv[])
 			break;
 		}
 		if (blocknum >= params.max_nblocks) {
+			printf("Max block exceeded. Quitting %d %d", blocknum, params.max_nblocks);
 			break;
 		}
 
@@ -300,6 +302,7 @@ int main(int argc, char* argv[])
 			void* read_buf;
 			int this_nt = source->read_samples_ant(&read_buf, iant);
 			if (this_nt != nt) { // WE've run out of samples
+				printf("iant %d returned %d samples but nt=%d. Finishing \n", iant, this_nt, nt);
 				stopped = true;
 				break;
 			}
@@ -336,6 +339,7 @@ int main(int argc, char* argv[])
 		fdmt.t_copy_in.stop();
 
 		if (stopped) {// if we've run out of samples
+			printf("Run out of samples\n");
 			break;
 		}
 

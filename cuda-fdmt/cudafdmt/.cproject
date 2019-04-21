@@ -66,8 +66,8 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
-					<fileInfo id="com.nvidia.cuda.ide.seven_five.configuration.debug.1134832286.90492777" name="fftbench.cu" rcbsApplicability="disable" resourcePath="src/fftbench.cu" toolsToInvoke="nvcc.compiler.base.1896988810.1745521646">
-						<tool id="nvcc.compiler.base.1896988810.1745521646" name="NVCC Compiler" superClass="nvcc.compiler.base.1896988810"/>
+					<fileInfo id="com.nvidia.cuda.ide.seven_five.configuration.debug.1134832286.191636875" name="fdmt_test.cu" rcbsApplicability="disable" resourcePath="src/fdmt_test.cu" toolsToInvoke="nvcc.compiler.base.1896988810.880500069">
+						<tool id="nvcc.compiler.base.1896988810.880500069" name="NVCC Compiler" superClass="nvcc.compiler.base.1896988810"/>
 					</fileInfo>
 					<sourceEntries>
 						<entry excluding="fftbench.cu|fredda.cu" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
