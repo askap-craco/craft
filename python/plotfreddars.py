@@ -2,7 +2,7 @@
 """
 Template for making scripts to run from the command line
 
-Copyright (C) CSIRO 2017
+Copyright (C) CSIRO 2019
 """
 import pylab
 import matplotlib as mpl
@@ -11,25 +11,51 @@ import numpy as np
 import os
 import sys
 import logging
-import pandas as pd
+from rtdata import FreddaRescaleData
+
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
-def loadcand(fin):
-    print 'Loading', fin
-    icscand = np.loadtxt(fin, usecols=(0,1,2,3,4,5,6,7))
-    icsmask = (icscand[:,0] >= 7) & (65 < icscand[:,5]) & (icscand[:, 5] < 70) 
-    icscand = icscand[icsmask, :]
-    idxs = np.argsort(icscand[:, 1]) # sort bty sample number
-    icscand = icscand[idxs, :]
-    return icscand
 
+def plot(f, values):
+    d = FreddaRescaleData(f)
+    print d.hdr
+    print d.dada_files
+    print d.dada_files[0].nblocks
+    print d.nblocks
+
+    fig, ax = pylab.subplots(3,3)
+    ax = ax.flatten()
+    blkidx = 4
+    iant = 1
+    bd = d[blkidx]
+    iax = 0
+
+    for iname, name in enumerate(['mean','std','kurt','scale','offset', 'decay_offset', 'nsamps']):
+
+        bdn = bd[name][iant, :, :]
+        print name, bdn.shape
+        ax[iax].plot(d.freqs, bdn.T)
+        ax[iax].set_title(name)
+        iax += 1
+
+    axstart = iname + 1
+    for iname, name in enumerate(['dm0','dm0count']):
+        bdn = bd[name][iant, :, :]
+        print name, bdn.shape
+        ax[iax].plot(bdn.T)
+        ax[iax].set_title(name)
+        iax += 1
+
+
+    pylab.show()
+
+    
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-d','--dm', type=float, help='DM')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -38,24 +64,8 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    mjd0 = None
     for f in values.files:
-        d = loadcand(f)
-        print d.shape
-        sn = d[:, 0]
-        sampno = d[:, 1]
-        secs = d[:, 2]
-        mjd = d[:, 7]
-        if mjd0 is None:
-            mjd0 = mjd[0]
-
-        secoff = (mjd - mjd0)*86400.0
-        pylab.plot(secoff, sn, label=f)
-
-    pylab.legend()
-    pylab.show()
-
-        
+        plot(f, values)
     
 
 if __name__ == '__main__':

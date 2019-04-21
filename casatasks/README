@@ -1,0 +1,30 @@
+This directory contains casa tasks for use with craft.
+
+See: https://casaguides.nrao.edu/index.php/Writing_a_CASA_Task
+
+INSTALLATION:
+- start casa
+- cd to this directory
+- in casa run os.system('buildmytasks')
+
+RUNNING
+For every session you need to run in casa
+execfile('/<path_to_task_directory>/mytasks.py')
+
+or go to $HOME/.casa/init.py and add
+execfile('/<path_to_task_directory>/mytasks.py')
+
+TASKS
+There's only one:
+task freqwt.
+
+Type help freqwt for more information.
+
+If you want to plot the spectra do
+
+%load_ext autoload
+%aimport task_freqwt
+
+spec = task_freqwt.load_spec('Path/to/spec')
+task_freqwt.plot_spec(spec):
+

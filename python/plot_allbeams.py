@@ -287,6 +287,7 @@ class Plotter(object):
             self.squeeze_zrange(0.5)
         elif event.key == 'r':
             self.rescale = not self.rescale
+            self.imzrange = None
         elif event.key == 'e':
             self.goto_end()
         elif event.key == 'b':
@@ -327,8 +328,8 @@ class Plotter(object):
         a - zoom in by 2
         t - increase tscrunch by 1 bin
         T - decrease tscrunch by 1 bin
-        f - increase fscrunch by 1 bin
-        F - decrease fscrunch by 1 bin
+        z - increase fscrunch by 1 bin
+        Z - decrease fscrunch by 1 bin
         d - Dedisperse (I'll ask for the DM on the cmdline
         c - Increase colormap zoom
         C - Decrease colormap zoom
@@ -344,10 +345,8 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
-        if self.rescale:
-            print  'Doing rescale'
-            beams -= beams.mean(axis=0)
-            beams /= beams.std(axis=0)*np.sqrt(beams.shape[2])
+        beams = np.ma.masked_equal(beams, 0)
+        
             
         f0 = files[0]
         self.beams = beams
@@ -362,6 +361,11 @@ class Plotter(object):
 
         if self.fscrunch_factor != 1:
             beams = fscrunch(beams, self.fscrunch_factor)
+            
+        if self.rescale:
+            print  'Doing rescale'
+            beams -= beams.mean(axis=0)
+            beams /= beams.std(axis=0) 
 
         ntimes, nbeams, nfreq = beams.shape
         mjdstart = f0.tstart
@@ -399,16 +403,21 @@ class Plotter(object):
         if nbeams > 1:
             self.draw_many(beams, im_extent, origin, imzmin, imzmax, freqs)
         else:
-            self.draw_single(beams, im_extent, origin, imzmin, imzmax, freqs, times)
+            self.draw_single(beams, im_extent, origin, freqs, times)
 
         pylab.draw()
 
-    def draw_single(self, beams, im_extent, origin, imzmin, imzmax, freqs, times):
+    def draw_single(self, beams, im_extent, origin, freqs, times):
         bi = beams[:, 0, :]
         ntimes, nfreq = bi.shape
         bi = bi.T
-        print 'BISHAPE', bi.shape, 'ZRAGE', imzmin, imzmax
         fig, [rawax, tax, fax] = self.figs['dynspec']
+        if self.imzrange is None:
+            self.imzrange = (bi.min(), bi.max())
+
+        imzmin, imzmax = self.imzrange
+        print 'BISHAPE', bi.shape, 'ZRAGE', imzmin, imzmax
+        
         rawax.imshow(bi, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none')
         #if imzmin is None and imzmax is None:
         #self.imzrange = (bi.min(), bi.max())

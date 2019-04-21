@@ -25,6 +25,7 @@ def _main():
     parser.add_argument('-c','--cand-file', help='Candidate file')
     parser.add_argument('-a','--all', action='store_true', help='Plot all beams if a candidate file is specified, not just the detection beam')
     parser.add_argument('-n','--nsamp', type=int, help='Number of samples', default=1024)
+    parser.add_argument('-r','--rescale', action='store_true', help='Rescale')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -71,25 +72,32 @@ def plot(f, values, mjd=None, dm=None):
         
     if mjd is None:
         samp_start = nsamp/2
+        mjd = tstart + samp_start*tsamp/86400.0
     else:
-        samp_start = int(np.round((mjd - tstart)*86400.0/tsamp)) - nsamp/2
-        if samp_start < 0:
-            raise ValueError, 'Start sample is before start of filterbank start={}'.format(samp_start)
-        if samp_start > s.file_size_elements:
-            raise ValueError, 'End sample is after end of filterbank start={}'.format(samp_start)
+        samp_start = int(np.round((values.mjd -tstart)*86400.0/tsamp)) - nsamp/2
 
-    print tstart, tsamp, samp_start, 'MJD {:0.10f}'.format(mjd), 'dm', dm
+        print values.mjd, tstart, tsamp, samp_start
+            
+        if samp_start < 0:
+            raise ValueError, 'Start sample is before start of filterbank'
+        if samp_start > s.nsamples:
+            raise ValueError, 'End sample is after end of filterbank'
 
     d = s[samp_start:samp_start+nsamp]
     # rescale to roughly 0 mean and 1 variance
     d = d.astype(float)
-    #d -= 128
-    #    d /= 18.
-    
     assert s.header['nifs'] == 1
     assert d.shape == (nsamp, nchan)
     channels = np.arange(nchan)*foff + fch1
-    refchan = channels.min()
+
+    if values.cand_file and values.cand_file.endswith('.finf'):
+        refchan = 1e300
+    else:
+        refchan = channels.min()
+        
+    if values.rescale:
+        d -= d.mean(axis=0)
+        d /= d.std(axis=0)
 
     dd = roll_dedisperse(d, channels, refchan , tsamp, dm)
     sn = dd.mean(axis=1)*np.sqrt(nchan)
@@ -113,7 +121,6 @@ def plot(f, values, mjd=None, dm=None):
 
     if values.show:
         pylab.show()
-
 
 def roll_dedisperse(d, channels, refchan, tsamp, dm):
     dd = d.copy()

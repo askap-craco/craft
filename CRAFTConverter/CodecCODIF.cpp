@@ -89,7 +89,7 @@ namespace NCodec        // Part of the Codec namespace.
 	buf  = NULL;
         m_iSamplesPerWord = 0;
 	mask = 0;
-	convert = true;
+	convert = false;
 	lookup = NULL;
     }
 

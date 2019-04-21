@@ -91,12 +91,12 @@ def get_meas(filename, client, influxout, values):
         statbits = ['{}={}'.format(statname, stat) for (statname, stat) in s.iteritems()]
         outs += ','.join(statbits)
         outs += ' {}\n'.format(unix_nanosec)
-        field_dict = {}
+        field_dict = {'sbid':sbid,'scanid':scanid}
         for sname, v in s.iteritems():
             field_dict[sname] = v
-            
+
         body = {'measurement':'craftstat',
-                'tags':{'sbid':sbid,'scanid':scanid,'ant':ant,'beam':b},
+                'tags':{'ant':ant,'beam':b},
                 'time':unix_nanosec,
                 'fields':field_dict
                 }
@@ -148,8 +148,9 @@ class CraftStatMaker(object):
         self.tstart += self.tstep * self.ntimes
 
         # Normalise to nominal 0 mean, unit stdev - HACK!
-        bi -= 128
-        bi /= 18
+        if self.spfile.nbits == 8:
+            bi -= 128
+            bi /= 18
 
         stat = np.zeros((3 + len(self.fft_freqs)))
 

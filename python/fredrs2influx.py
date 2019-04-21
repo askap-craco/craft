@@ -1,0 +1,105 @@
+#!/usr/bin/env python
+"""
+Template for making scripts to run from the command line
+
+Copyright (C) CSIRO 2019
+"""
+import pylab
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import sys
+import logging
+from rtdata import FreddaRescaleData
+from astropy.time import Time
+from influxdb import InfluxDBClient
+
+
+__author__ = "Keith Bannister <keith.bannister@csiro.au>"
+
+def convert(v):
+    if np.isnan(v):
+        return None
+    else:
+        return v
+
+def isok(v):
+    return not np.isnan(v)
+
+class Stats(object):
+    def __init__(self, antennas, nbeams, time):
+        self.antennas = antennas
+        self.nbeams = nbeams
+        self.data = {}
+        self.time = time
+
+    def to_influx(self):
+        s = ''
+        statnames = self.data.keys()
+        body = []
+        for ia, a in enumerate(self.antennas):
+            for b in xrange(self.nbeams):
+                fields = {statname:self.data[statname][ia, b] for statname in statnames
+                          if isok(self.data[statname][ia, b])}
+                tags = {'antenna':a, 'beam':b}
+                m = {
+                    'measurement':'freddars',
+                    'tags':tags,
+                    'fields':fields,
+                    'time':self.time
+                    }
+                body.append(m)
+                
+        return body
+
+    def __iadd__(self, v):
+        statname, d, summary = v
+        assert d.shape == (len(self.antennas), self.nbeams), 'INvalid shape:{}'.format(d.shape)
+        self.data[statname + '_' + summary] = d
+        return self
+        
+
+def plot(f, values):
+    d = FreddaRescaleData(f)
+    client = InfluxDBClient(database='craft', host='akingest01', username='craftwriter', password='craft')
+    print 'ANT', d.antennas
+    print 'NBEAM', d.nbeams
+    
+    for block in d.blocks():
+        t = Time(block.mjd, format='mjd')
+        print 'TIME', t.isot, block.mjd, block.rsdata.tstart, block.rsdata.tsamp
+        stat = Stats(d.antennas, d.nbeams, t.isot)
+        names = ['mean','std','kurt','scale','offset', 'decay_offset', 'nsamps', 'dm0']
+        names = ['mean', 'std','kurt', 'scale', 'offset']
+        for iname, name in enumerate(names):
+            bdn = block[name] # shape = [nant, nbeam, nchan] nbeam includes both pols
+            stat += name, bdn.max(axis=2), 'max'
+            stat += name, bdn.min(axis=2), 'min'
+            stat += name, bdn.mean(axis=2), 'mean'
+            stat += name, bdn.std(axis=2), 'std'
+            stat += name, np.median(bdn, axis=2), 'med'
+            stat += name, (bdn == 0).sum(axis=2), 'nzero'
+        
+        body = stat.to_influx()
+        client.write_points(body)
+        
+
+def _main():
+    from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+    parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
+    parser.add_argument(dest='files', nargs='+')
+    parser.set_defaults(verbose=False)
+    values = parser.parse_args()
+    if values.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    for f in values.files:
+        plot(f, values)
+    
+
+if __name__ == '__main__':
+    _main()

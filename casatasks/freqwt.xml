@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" ?>
+
+<casaxml xmlns="http://casa.nrao.edu/schema/psetTypes.html"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://casa.nrao.edu/schema/casa.xsd
+file:///opt/casa/code/xmlcasa/xml/casa.xsd">
+
+<task type="function" name="freqwt" category="editing">
+
+  <shortdescription>Adjust WEIGHTS_SPECTRUM and optionally data by a spectrum</shortdescription>
+      
+  <description>Adjust WEIGHTS_SPECTRUM and optionally data by a spectrum.
+
+  freqwt loads the the weights as a text file. The first column is frequency in GHz, second column is an amplitude (w).
+
+  freqwt does a first order interpolation if the input specturm and WEIGHTS_SPECTRUM column are on different frequency grids.
+
+  Values of the interpoltion that are less than the cutoff are set to zero.
+
+  freqwt multiplies WEIGHTS_SPECTRUM column by w[i]**2/sum(w**2).
+
+  If weightdata=True, it also divides the DATA column by w[i], where the weights are non-zero.
+
+  
+  </description>
+
+  <input>
+
+    <param type="string" name="vis" mustexist="true">
+      <description>Input measurement set</description>
+      <value></value>
+    </param>
+
+    <param type="string" name="specfile" mustexist="true">
+      <description>Spectrum file to weight by</description>
+      <value></value>
+    </param>
+
+    <param type="bool" name="weightdata" mustexist="false">
+      <description>Divide data by the weights as well</description>
+      <value>True</value>
+    </param>
+
+
+    <param type="double" name="cutoff" mustexist="false">
+      <description>Set weights to zero if spectrum amplitude is below this number</description>
+      <value>0</value>
+    </param>
+
+  <constraints>
+  </constraints>
+
+  </input>
+
+  <returns type="void"/>
+
+  <example>
+    Adjust WEIGHTS_SPECTRUM and optionally data by a spectrum
+
+   Keyword arguments:
+   
+   vis -- name of input image file
+   spec -- text file of spectrum - see output of some function. The first column should be frequency in GHz, the second column should be the amplitude
+   cutoff - value below which the spectrum is ignored and weighted to zero.
+  </example>
+
+</task>
+
+</casaxml>
