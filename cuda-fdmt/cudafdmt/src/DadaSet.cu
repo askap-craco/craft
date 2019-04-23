@@ -70,7 +70,7 @@ void DadaSet::sync(size_t offset) {
 	// max_sampdiff is the sample number we want to get to for all the input sources
 
 	// Loop through inputs again, and read blocks until aligned with latest_sampnum
-	//void* dummy_output;
+	void* dummy_output;
 	for (int i = 0; i < m_sources.size(); ++i) {
 		DadaSource* curr_source = m_sources.at(i);
 		curr_source->seek_sample(target_sample);

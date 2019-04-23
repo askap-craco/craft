@@ -85,7 +85,7 @@ DadaSource::DadaSource(int nt, const char* keyname, bool lock) {
 	m_fch1 = get_header_double("FREQ");
 	m_foff = get_header_double("BW");
 	m_tstart = get_header_double("MJD_START");
-	get_header_string("ANTENNA_NAME", m_antenna_name, keyname);
+	get_header_string("ANTNAME", m_antenna_name, keyname);
 	m_bytes_per_block = npols()*nbeams()*nchans()*nbits()*nt/8;
 	m_current_sample = 0;
 	m_nt = nt;
@@ -250,6 +250,8 @@ size_t DadaSource::seek_sample(size_t t)
   return nread;
   
 }
+
+
 
 char* DadaSource::name()
 {

@@ -75,6 +75,9 @@ public:
 		return m_hdr;
 	}
 
+
+	const char* antenna_name() { return m_antenna_name; };
+
 private:
 	void* get_next_buffer(size_t& nt);
 

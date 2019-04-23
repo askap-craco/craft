@@ -42,6 +42,7 @@ Array4dDumper::Array4dDumper(array4d_t& target, const char* name, FreddaParams& 
 	ascii_header_set(header_buf, "TSAMP", "%0.12f", params.source->tsamp()*params.nt*params.num_rescale_blocks); // tsamp unchanged from source
 	params.to_dada(header_buf);
 	_fwrite(header_buf, sizeof(char), HDR_SIZE);
+	fflush(m_fout);
 }
 
 Array4dDumper::~Array4dDumper() {
