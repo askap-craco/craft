@@ -98,7 +98,7 @@ def find_friends_mask(myd, d, values):
     mysamp1, mysamp2, myidt1, myidt2 = myd[t1], myd[t2], myd[d1], myd[d2]
     mysamp = myd[t0]
     myidt = myd[d0]
-    assert mysamp1 <= mysamp <= mysamp2
+    assert mysamp1 <= mysamp <= mysamp2, 'Invalid mmysamp {} <= {} <= {}'.format(mysamp1, mysamp, mysamp2)
     assert myidt1 <= myidt <= myidt2
     tmask1 = mysamp1 - values.tdist <= d[:, t2]
     tmask2 = mysamp2 + values.tdist >= d[:, t1]

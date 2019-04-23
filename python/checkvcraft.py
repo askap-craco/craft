@@ -25,7 +25,7 @@ def _main():
     parser.add_argument('-c','--channel', type=int, help='Channel to plot', default=0)
     parser.add_argument('-n','--fft-size', type=int, help='FFT size per coarse channel', default=128)
     parser.add_argument('-s','--show', action='store_true', help="plot where it's all gone wrong")
-    parser.add_argument('-n','--nsamp', type=int, help='Number of samples to compare', default=4096)
+    parser.add_argument('-t','--nsamp', type=int, help='Number of samples to compare', default=4096)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -110,7 +110,7 @@ def _main():
     fstart = max(trigger_frameids)
     f0 = fstart - trigger_frameids[0]
     d0 = files[0].read(f0, N)
-    chan = 4
+    chan = 0
     ncrap = 1440
     for f in files:
         foff = fstart - f.trigger_frameid

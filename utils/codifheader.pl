@@ -38,10 +38,8 @@ EOF
 }
 
 foreach (@ARGV) {
-  open(VDIF, $_) || die "Could not open $_: $!\n";
+  open(CODIF, $_) || die "Could not open $_: $!\n";
 
-
-# 	sysseek VDIF, 8, SEEK_SET;
 
   print "Reading $_\n\n";
 
@@ -49,23 +47,23 @@ foreach (@ARGV) {
   while (1) {
 
     if ($skip>0) {
-      my $status = sysseek VDIF, $skip, SEEK_SET;
+      my $status = sysseek CODIF, $skip, SEEK_SET;
       if (! defined $status) {
 	warn "Error trying to skip $skip bytes - skipping file\n";
 	last;
       } elsif ($status != $skip) {
-	warn "Failed to skip $skip bytes - is this a VDIF file?\n";
+	warn "Failed to skip $skip bytes - is this a CODIF file?\n";
 	last;
       }
     }
 
     ($invalid, $complex, $seconds, $frame, $version, $nbits, $newframelength, $refepoch, 
      $representation,  $antid, $sampleblocklength, $nchan, $threadid, $groupid, $period, 
-     $numsamples, $sync) = readheader(*VDIF);
+     $numsamples, $sync) = readheader(*CODIF);
 
     if (!defined $invalid) {
       print "   empty file\n" if ($first);
-      close(VDIF);
+      close(CODIF);
       last;
     }
 
@@ -140,15 +138,15 @@ EOF
 	$lastsec = $seconds;
       }
     } elsif ($dosync) {
-      if ($sync!=0xADEADBEE) {
-	my $pos = sysseek(VDIF, 0, 1) - 64; # Account for header
+      if ($sync!=0xABADDEED) {
+	my $pos = sysseek(CODIF, 0, 1) - 64; # Account for header
 	die "Bad sync ($hexsync) at offset $pos\n";
       }
     }
     
-    my $status = sysseek(VDIF, $framelength, 1);
+    my $status = sysseek(CODIF, $framelength, 1);
     if (!defined $status) {
-      close(VDIF);
+      close(CODIF);
       last;
     }
     last if ($once);
