@@ -69,7 +69,7 @@ def plot(f, values):
     for block in d.blocks():
         t = Time(block.mjd, format='mjd')
         print 'TIME', t.isot, block.mjd, block.rsdata.tstart, block.rsdata.tsamp
-        stat = Stats(d.antennas, d.nbeams, t.isot)
+        stat = Stats(d.antennas, d.nbeams_per_antenna, t.isot)
         names = ['mean','std','kurt','scale','offset', 'decay_offset', 'nsamps', 'dm0']
         names = ['mean', 'std','kurt', 'scale', 'offset']
         for iname, name in enumerate(names):
@@ -80,6 +80,13 @@ def plot(f, values):
             stat += name, bdn.std(axis=2), 'std'
             stat += name, np.median(bdn, axis=2), 'med'
             stat += name, (bdn == 0).sum(axis=2), 'nzero'
+
+            # if this axis is the frequency axis - just guessing
+            if bdn.shape[2] == len(d.freqs):
+                maxfreqidx = np.argmax(bdn, axis=2)
+                freqmax = d.freqs[maxfreqidx.flat]
+                freqmax.shape = maxfreqidx.shape
+                stat += name, freqmax, 'freqmax'
         
         body = stat.to_influx()
         client.write_points(body)

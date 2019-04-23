@@ -45,16 +45,17 @@ class DadaFile(object):
         d.shape = self.shape
         return d
 
-    def blocks(self):
+    def blocks(self, step=1):
         '''
         Iterates over blocks in the data
         '''
+        assert step >= 1
         blockid = 0
         # check number of blocks on every interation in case someone has written
         # to the file since we last looked.
         while blockid < self.nblocks:
             yield self[blockid]
-            blockid += 1
+            blockid += step
 
     def __getitem__(self, index):
         return self.get_block(index)

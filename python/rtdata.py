@@ -39,7 +39,7 @@ class FreddaRescaleBlock(dict):
             data = data[0,:,:,:]
             self[name] = data
 
-        self.mjd = rsdata.tstart + blkid*rsdata.tsamp
+        self.mjd = rsdata.tstart + blkid*rsdata.tsamp/86400.
         self.rsdata = rsdata
         self.blkid = blkid
 
@@ -81,11 +81,12 @@ class FreddaRescaleData(object):
     def __getitem__(self, blkid):
         return self.get_block(blkid)
 
-    def blocks(self):
+    def blocks(self, step=1):
+        assert step >= 1
         blkid = 0
         while blkid < self.nblocks:
             yield self[blkid]
-            blkid += 1
+            blkid += step
 
 
 class DataDir(object):
