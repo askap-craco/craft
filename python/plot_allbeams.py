@@ -164,6 +164,7 @@ class Plotter(object):
         self.rescale = False
         self.set_position_sample(tstart, ntimes)
         self.imzrange = None
+        self.histfig = None
         if nbeams == 1:
             self.mk_single_fig('dynspec', '', 'Time (%s) after %f' % (xunit, mjdstart), 'Frequency (%s)' % yunit)
         else:
@@ -171,6 +172,7 @@ class Plotter(object):
             self.mkfig('std', 'Bandpass stdDev', 'Frequency (%s)' % yunit ,'Bandpass StdDev')
             self.mkfig('kurt','Kurtosis', 'Frequency (%s)' % yunit, 'Kurtosis')
             self.mkfig('dynspec', 'Dynamic spectrum', 'Time (%s) after %f' % (xunit, mjdstart), 'Frequency (%s)' % yunit)
+            self.mkfig('time','Time series', 'Time (%s) after %f' % (xunit, mjdstart), 'Amplitude')
 
         if nbeams > 1:
             self.mkfig('cov', 'Beam covariance', 'beam no', 'beamno', 1,1)
@@ -293,7 +295,9 @@ class Plotter(object):
             self.goto_beginning()
         elif event.key == 'ctrl+c':
             sys.exit(0)
-        elif event.key == 'h' or event.key == '?':
+        elif event.key == 'h':
+            self.show_histogram()
+        elif event.key == '?':
             self.print_help()
             draw = False
         else:
@@ -308,6 +312,19 @@ class Plotter(object):
 
     def goto_end(self):
         self.tstart = self.total_samples - self.ntimes
+
+    def show_histogram(self):
+        if self.histfig is None:
+            self.histfig = self.mkfig('histfig', 'Histograms', 'S/N','Number',1,1)
+
+        #fig, ax = self.getfig('histfig', 0)
+        fig,ax = pylab.subplots(1,1)
+        beams = self.beams
+        bi = beams[:, 0, :]
+        bif = bi.flatten()
+        ntimes, nfreq = bi.shape
+        ax.hist(bif, bins=100)
+        fig.show()
 
     def squeeze_zrange(self, mul):
         zmin, zmax = self.imzrange
@@ -333,6 +350,7 @@ class Plotter(object):
         c - Increase colormap zoom
         C - Decrease colormap zoom
         r - Toggle rescaling
+        k - Show histogram'
         h or ? - Print this help
         Ctrl-C - quit'''
         print s
@@ -473,7 +491,6 @@ class Plotter(object):
             fig3, ax3 = self.getfig('std', i)
             fig6, ax6 = self.getfig('kurt', i)
             bi = beams[:, i, :]
-            print 'bi', bi.shape
             ntimes, nfreq = bi.shape
         
             ax1.imshow(bi.T, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none')
@@ -490,6 +507,9 @@ class Plotter(object):
             ax2.plot(freqs, beam_mean)
             ax3.plot(freqs, beam_std)
             ax6.plot(freqs, beam_kurtosis)
+
+            fig7,ax7 = self.getfig('time',i)
+            ax7.plot(bi.mean(axis=1))
             
             if self.fft:
                 dm0 = bi.mean(axis=1)
