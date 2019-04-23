@@ -32,6 +32,7 @@ void runtest_usage() {
 //			"   -G N - Channel flag channel growing (flags N channels either side of a bad channel)\n"
 			"   -z Z - Zap times with 0 DM above threshold Z\n"
 			"   -C C - Zap time/frequency cells with S/N above threshold C\n"
+			"   -F FILE - Flag frequencies contained in this file\n"
 			"   -u   - Subtract DM0 time series from spectrum\n"
 			"   -p   - Sum polarisations\n"
 			"   -n ncand - Maximum mumber of candidates to write per block\n"
@@ -62,7 +63,7 @@ void FreddaParams::parse(int _argc, char* _argv[]) {
 	}
 	printf("\n");
 	int ch;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:DRg:M:T:U:K:G:C:n:m:b:z:N:X:uhp")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:DRg:M:T:U:K:G:C:F:n:m:b:z:N:X:uhp")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -108,6 +109,9 @@ void FreddaParams::parse(int _argc, char* _argv[]) {
 			break;
 		case 'C':
 			cell_thresh = atof(optarg);
+			break;
+		case 'F':
+			flag_file = optarg;
 			break;
 		case 'n':
 			max_ncand_per_block = atoi(optarg);

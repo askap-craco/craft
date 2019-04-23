@@ -81,6 +81,8 @@ public:
 			*/
 	Rescaler(RescaleOptions& _options, FreddaParams& params);
 
+
+
 	virtual ~Rescaler();
 
 	void reset(array4d_t& rescale_buf); // Set output buffer to zero to start accumulating again
@@ -88,6 +90,9 @@ public:
 	void set_scaleoffset(float s_scale, float s_offset);
 	void update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream=0);
 	void flag_channel(int channel); // Set weights to zero for all beams/antennas fo rthis channel
+	int flag_frequencies_from_file(const char* filename); // Flag all frequencies in given file
+	bool flag_frequency(float freq); // flag the channel with frequency nearst the given frequency. Ignored it out of band
+
 	void dump(); // Dump rescaler data to disk
 private:
 

@@ -1,0 +1,22 @@
+# FREDDA Flag file
+# Must be supplied to FREDDA with -F flags.txt
+# Each line is a frequency (In MHz)  to flag
+# Frequencies not in the observing band are ignored
+# Typical values for ASKAP are below
+840
+841
+842
+843
+844
+845
+1024
+1025
+1026
+1027
+1028
+1029
+1030
+1031
+1032
+1111
+1144

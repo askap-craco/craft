@@ -209,18 +209,6 @@ int main(int argc, char* argv[])
 	Rescaler* rescaler = new Rescaler(rescale, params);
 	rescaler->set_scaleoffset(1.0f, 0.0f); // Just pass it straight through without rescaling
 
-	float flag_freqs_mhz[] = {1111.0f, 1144.0f};
-	int num_flag_freqs = sizeof(flag_freqs_mhz) / sizeof(float);
-	for (int flagi = 0; flagi < num_flag_freqs; flagi++) {
-		//float freq = source->fch1() + c * source->foff();
-		float freq = flag_freqs_mhz[flagi];
-		int channel = int(roundf((freq - source->fch1())/source->foff()));
-		if (channel >= 0 && channel < nf) {
-			printf("Flagging channel %d at frequency %f\n", channel, freq);
-			rescaler->flag_channel(channel);
-		}
-	}
-
 	// Create fdmt
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d nbeams_alloc=%d\n",

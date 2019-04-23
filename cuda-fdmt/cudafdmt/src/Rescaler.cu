@@ -6,6 +6,8 @@
  */
 
 #include "Rescaler.h"
+#include <fstream> // Learning C++ good boy KB!
+#include <sstream>
 
 Rescaler::Rescaler(RescaleOptions& _options, FreddaParams& _params) : params(_params), options(_options)
 {
@@ -77,6 +79,9 @@ Rescaler::Rescaler(RescaleOptions& _options, FreddaParams& _params) : params(_pa
 		dumpers.push_back(new Array4dDumper(dm0count, "dm0count", params));
 		dumpers.push_back(new Array4dDumper(dm0stats, "dm0stats", params));
 	}
+	if (params.flag_file != NULL) {
+		flag_frequencies_from_file(params.flag_file);
+	}
 }
 
 Rescaler::~Rescaler() {
@@ -137,6 +142,49 @@ void Rescaler::set_scaleoffset(float s_scale, float s_offset) {
 	array4d_set(&scale, s_scale);
 	array4d_set(&offset, s_offset);
 }
+
+int Rescaler::flag_frequencies_from_file(const char* filename) {
+	std::ifstream infile(filename);
+	std::string line;
+	float freq;
+	int num_flagged = 0;
+	if (infile.is_open()) {
+		while(std::getline(infile, line)) {
+			if (line[0] == '#') {
+				continue;
+			}
+			std::istringstream iss(line);
+			if (iss >> freq) {
+				bool was_flagged = flag_frequency(freq);
+				if (was_flagged) {
+					num_flagged += 1;
+				}
+			}
+		}
+	} else {
+		perror("Could not open flag file file");
+		exit(EXIT_FAILURE);
+	}
+
+	printf("Flagged %d channels from flagfile %s\n", num_flagged, filename);
+
+	return num_flagged;
+}
+
+bool Rescaler::flag_frequency(float freq) {
+	const float fch1 = params.source->fch1();
+	const float foff = params.source->foff();
+	int channel = int(roundf((freq - fch1)/foff));
+	bool flagged = false;
+	if (channel >= 0 && channel < params.nf) {
+		printf("Flagging channel %d at frequency %f\n", channel, freq);
+		flag_channel(channel);
+		flagged = true;
+	}
+
+	return flagged;
+}
+
 
 void Rescaler::flag_channel(int channel) {
 	assert(channel > 0 && channel < options.nf);

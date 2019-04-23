@@ -20,6 +20,7 @@ public:
 	char ch;
 	float thresh = 10.0;
 	const char* out_filename = "fredda.cand";
+	const char* flag_file = NULL;
 	bool dump_data = false;
 	bool do_dump_rescaler = false;
 	int cuda_device = 0;
