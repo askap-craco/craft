@@ -48,6 +48,9 @@ class FreddaRescaleData(object):
         self.path = path
 
         dada_file_paths = glob.glob(os.path.join(self.path, '*.dada'))
+        if len(dada_file_paths) == 0:
+            raise RuntimeError('No dada files')
+
         self.dada_files = [dada.DadaFile(f) for f in dada_file_paths]
         hdr = self.dada_files[0].hdr
         self.hdr = hdr

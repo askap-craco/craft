@@ -39,11 +39,18 @@ class DadaFile(object):
 
         assert 0 <= blockid < self.nblocks
 
-        self.fin.seek(self.hdr_size + blockid*self.block_size_bytes)
+        offset = self.hdr_size + blockid*self.block_size_bytes
         count = np.prod(self.shape)
-        d = np.fromfile(self.fin, count=count, dtype=self.dtype)
-        d.shape = self.shape
-        return d
+        #print "reading {} block {} of {} from offset {} count={}".format(self.fin, blockid, self.nblocks, offset, count)
+        self.fin.seek(offset)
+        v = np.fromfile(self.fin, count=count, dtype=self.dtype)
+        v.shape = self.shape
+        print self.filename, v.shape, len(v), 'All zeros?', np.all(v == 0), \
+            'max/min/mean/sum/nz {}/{}/{}/{}/{}'.format(v.max(), v.min(), v.mean(), v.sum(), (v.flatten() == 0).sum()), \
+            'max at', \
+            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
+
+        return v
 
     def blocks(self, step=1):
         '''

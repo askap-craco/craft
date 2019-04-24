@@ -23,11 +23,12 @@ def plot(f, values):
     print d.dada_files
     print d.dada_files[0].nblocks
     print d.nblocks
+    print d.antennas
 
     fig, ax = pylab.subplots(3,3)
     ax = ax.flatten()
-    blkidx = 4
-    iant = 1
+    blkidx = values.blkidx
+    iant = values.iant
     bd = d[blkidx]
     iax = 0
 
@@ -36,7 +37,7 @@ def plot(f, values):
         bdn = bd[name][iant, :, :]
         print name, bdn.shape
         ax[iax].plot(d.freqs, bdn.T)
-        ax[iax].set_title(name)
+        ax[iax].set_ylabel(name)
         iax += 1
 
     axstart = iname + 1
@@ -44,7 +45,7 @@ def plot(f, values):
         bdn = bd[name][iant, :, :]
         print name, bdn.shape
         ax[iax].plot(bdn.T)
-        ax[iax].set_title(name)
+        ax[iax].set_ylabel(name)
         iax += 1
 
 
@@ -57,6 +58,9 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument(dest='files', nargs='+')
+    #parser.add_argument('-b','--beam', type=int, antenna='bea
+    parser.add_argument('-a','--iant', type=int, help='Antenna number', default=0)
+    parser.add_argument('-i','--blkidx', type=int, help='Block index', default=0)
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
     if values.verbose:

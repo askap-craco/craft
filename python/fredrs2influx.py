@@ -56,17 +56,29 @@ class Stats(object):
     def __iadd__(self, v):
         statname, d, summary = v
         assert d.shape == (len(self.antennas), self.nbeams), 'INvalid shape:{}'.format(d.shape)
-        self.data[statname + '_' + summary] = d
+        statkey = statname + '_' + summary
+        self.data[statkey] = d
+        print statkey, d[0,0], d[1,0]
+        if statkey == 'mean_max':
+            pylab.imshow(d)
+            pylab.title(statkey)
+            pylab.show()
+        
         return self
         
 
 def plot(f, values):
-    d = FreddaRescaleData(f)
+    try :
+        d = FreddaRescaleData(f)
+    except:
+        logging.exception('Could not parse data')
+        return
+    
     client = InfluxDBClient(database='craft', host='akingest01', username='craftwriter', password='craft')
     print 'ANT', d.antennas
     print 'NBEAM', d.nbeams
     
-    for block in d.blocks():
+    for block in d.blocks(step=values.step):
         t = Time(block.mjd, format='mjd')
         print 'TIME', t.isot, block.mjd, block.rsdata.tstart, block.rsdata.tsamp
         stat = Stats(d.antennas, d.nbeams_per_antenna, t.isot)
@@ -74,12 +86,13 @@ def plot(f, values):
         names = ['mean', 'std','kurt', 'scale', 'offset']
         for iname, name in enumerate(names):
             bdn = block[name] # shape = [nant, nbeam, nchan] nbeam includes both pols
+            nzero = (bdn == 0).sum(axis=2)
             stat += name, bdn.max(axis=2), 'max'
             stat += name, bdn.min(axis=2), 'min'
             stat += name, bdn.mean(axis=2), 'mean'
             stat += name, bdn.std(axis=2), 'std'
             stat += name, np.median(bdn, axis=2), 'med'
-            stat += name, (bdn == 0).sum(axis=2), 'nzero'
+            stat += name, nzero, 'nzero'
 
             # if this axis is the frequency axis - just guessing
             if bdn.shape[2] == len(d.freqs):
@@ -96,6 +109,7 @@ def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
+    parser.add_argument('-s','--step', type=int, default=1, help='Skip this many blocks per write')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
