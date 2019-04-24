@@ -187,7 +187,7 @@ bool Rescaler::flag_frequency(float freq) {
 
 
 void Rescaler::flag_channel(int channel) {
-	assert(channel > 0 && channel < options.nf);
+	assert(channel >= 0 && channel < options.nf);
 	for (int iant = 0 ;iant < options.nants; iant++) {
 		for (int ibeam = 0; ibeam < options.nbeams_per_ant; ibeam++) {
 			int idx = array4d_idx(&weights, 0, iant, ibeam, channel);

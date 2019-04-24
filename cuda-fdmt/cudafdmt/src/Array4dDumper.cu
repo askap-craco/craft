@@ -66,12 +66,5 @@ void Array4dDumper::dump() {
 	if (m_auto_copy) {
 		array4d_copy_to_host(&m_target);
 	}
-	int nzero = 0;
-	for(int i = 0; i < m_num_elements; ++i) {
-		if (m_target.d[i] == 0.0f) {
-			nzero += 1;
-		}
-	}
-	printf("%s contained %d zeros\n", m_name.c_str(), nzero);
 	_fwrite(m_target.d, sizeof(float), m_num_elements);
 }
