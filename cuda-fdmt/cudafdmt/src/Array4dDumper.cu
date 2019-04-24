@@ -18,6 +18,7 @@ Array4dDumper::Array4dDumper(array4d_t& target, const char* name, FreddaParams& 
 	std::string fname(name);
 	fname += ".dada";
 	m_num_elements = target.nw*target.nx*target.ny*target.nz;
+	assert(m_num_elements > 0);
 	m_fout = fopen(fname.c_str(), "w+");
 	if (m_fout == NULL) {
 		perror("Error opening dumpfile:");
@@ -56,6 +57,7 @@ void Array4dDumper::_fwrite(const void* ptr, size_t size, size_t count) {
 	size_t nelements = fwrite(ptr, size, count, m_fout);
 	if (nelements != count) {
 		perror("Error writing to dumpfile");
+		exit(EXIT_FAILURE);
 		// Now what do we do? Keep going? Or fail? or close?
 	}
 }
