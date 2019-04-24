@@ -310,12 +310,6 @@ int main(int argc, char* argv[])
 
 				// update scale and offset
 				rescaler->update_scaleoffset(rescaler->noflag_options, iant, streams[iant]);
-
-				if (params.do_dump_rescaler) {
-					tdump.start();
-					rescaler->dump();
-					tdump.stop();
-				}
 			}
 
 			// this time we rescale with the flagging turned on
@@ -325,6 +319,12 @@ int main(int argc, char* argv[])
 		}
 		gpuErrchk(cudaDeviceSynchronize()); // Synchonize after doing all those asynchronous, multistream things
 		fdmt.t_copy_in.stop();
+
+		if (params.do_dump_rescaler) {
+			tdump.start();
+			rescaler->dump();
+			tdump.stop();
+		}
 
 		if (stopped) {// if we've run out of samples
 			printf("Run out of samples\n");
