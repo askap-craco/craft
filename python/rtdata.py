@@ -39,15 +39,18 @@ class FreddaRescaleBlock(dict):
             data = data[0,:,:,:]
             self[name] = data
 
-        self.mjd = rsdata.tstart + blkid*rsdata.tsamp
+        self.mjd = rsdata.tstart + blkid*rsdata.tsamp/86400.
         self.rsdata = rsdata
         self.blkid = blkid
 
 class FreddaRescaleData(object):
     def __init__(self, path):
         self.path = path
+        fpath = os.path.join(self.path, '*.dada')
+        dada_file_paths = glob.glob(fpath)
+        if len(dada_file_paths) == 0:
+            raise RuntimeError('No dada files in {} = {}'.format(self.path, fpath))
 
-        dada_file_paths = glob.glob(os.path.join(self.path, '*.dada'))
         self.dada_files = [dada.DadaFile(f) for f in dada_file_paths]
         hdr = self.dada_files[0].hdr
         self.hdr = hdr
@@ -81,11 +84,12 @@ class FreddaRescaleData(object):
     def __getitem__(self, blkid):
         return self.get_block(blkid)
 
-    def blocks(self):
+    def blocks(self, step=1):
+        assert step >= 1
         blkid = 0
         while blkid < self.nblocks:
             yield self[blkid]
-            blkid += 1
+            blkid += step
 
 
 class DataDir(object):
