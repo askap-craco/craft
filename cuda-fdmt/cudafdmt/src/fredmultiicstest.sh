@@ -7,10 +7,6 @@ function remove_db {
 }
 
 trap 'kill $(jobs -p) ; remove_db' EXIT
-infile=`ls *.dada`
-hdr=`ls co*.hdr`
-echo Infile $infile hdr=$hdr
-#cat $hdr
 export DADA=$HOME/psrdada-install
 export PATH=$DADA/bin:$PATH
 export LD_LIBRARY_PATH=$DADA/lib:$LD_LIBRARY_PATH
@@ -65,7 +61,9 @@ fredda_cand_file=/tmp/fredda.cand
 DADA_KEYS=$all_keys
 icsdir=/tmp/
 
-numactl --cpunodebind 1 chrt -r 18 cudafdmt -s 0.1 -S 0.0 -t $BLOCK_CYCLES -d 3072 -p -U localhost:$UDP_PORT  -g $CUDA_DEVICE -n 16384 -r 1 -T 2  -M 2 -K 2 -C 6 -x 10 -R -o $fredda_cand_file $fredda_extra $DADA_KEYS &> $icsdir/fredda.log &
+echo "DADA KEYS $DADA_KEYS"
+
+#cudafdmt -s 0.1 -S 0.0 -t $BLOCK_CYCLES -d 3072 -p -U localhost:$UDP_PORT  -g $CUDA_DEVICE -n 16384 -r 1 -T 2  -M 2 -K 2 -C 6 -x 10 -R -o $fredda_cand_file $fredda_extra $DADA_KEYS 
 
 cudapid=$!
 #cuda-gdb --args $cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1 -D -r 1 -K 30 -s 0
