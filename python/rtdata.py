@@ -46,10 +46,10 @@ class FreddaRescaleBlock(dict):
 class FreddaRescaleData(object):
     def __init__(self, path):
         self.path = path
-
-        dada_file_paths = glob.glob(os.path.join(self.path, '*.dada'))
+        fpath = os.path.join(self.path, '*.dada')
+        dada_file_paths = glob.glob(fpath)
         if len(dada_file_paths) == 0:
-            raise RuntimeError('No dada files')
+            raise RuntimeError('No dada files in {} = {}'.format(self.path, fpath))
 
         self.dada_files = [dada.DadaFile(f) for f in dada_file_paths]
         hdr = self.dada_files[0].hdr

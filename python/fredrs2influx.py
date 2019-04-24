@@ -28,11 +28,12 @@ def isok(v):
     return not np.isnan(v)
 
 class Stats(object):
-    def __init__(self, antennas, nbeams, time):
+    def __init__(self, antennas, nbeams, time, values):
         self.antennas = antennas
         self.nbeams = nbeams
         self.data = {}
         self.time = time
+        self.values = values
 
     def to_influx(self):
         s = ''
@@ -58,8 +59,7 @@ class Stats(object):
         assert d.shape == (len(self.antennas), self.nbeams), 'INvalid shape:{}'.format(d.shape)
         statkey = statname + '_' + summary
         self.data[statkey] = d
-        print statkey, d[0,0], d[1,0]
-        if statkey == 'mean_max':
+        if statkey == 'mean_max' and self.values.plot:
             pylab.imshow(d)
             pylab.title(statkey)
             pylab.show()
@@ -81,7 +81,7 @@ def plot(f, values):
     for block in d.blocks(step=values.step):
         t = Time(block.mjd, format='mjd')
         print 'TIME', t.isot, block.mjd, block.rsdata.tstart, block.rsdata.tsamp
-        stat = Stats(d.antennas, d.nbeams_per_antenna, t.isot)
+        stat = Stats(d.antennas, d.nbeams_per_antenna, t.isot, values)
         names = ['mean','std','kurt','scale','offset', 'decay_offset', 'nsamps', 'dm0']
         names = ['mean', 'std','kurt', 'scale', 'offset']
         for iname, name in enumerate(names):
@@ -110,6 +110,7 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s','--step', type=int, default=1, help='Skip this many blocks per write')
+    parser.add_argument('-p','--plot', action='store_true', help='Do plot', default=False)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
