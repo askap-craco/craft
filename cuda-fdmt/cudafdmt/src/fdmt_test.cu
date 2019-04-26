@@ -280,7 +280,7 @@ int main(int argc, char* argv[])
 			break;
 		}
 
-		rescaler->reset(rescale_buf); // set output buffer to zero - each rescale update will add the result into the buffer
+		rescaler->reset_output(rescale_buf); // set output buffer to zero - each rescale update will add the result into the buffer
 
 		fdmt.t_copy_in.start();
 
@@ -294,37 +294,35 @@ int main(int argc, char* argv[])
 				stopped = true;
 				break;
 			}
-			// File is in TBF order
-			// Output needs to be BFT order
-			// Do transpose and cast to float on the way through using GPU
+
 			uint8_t* this_ant_buffer = in_buffer_device + iant*in_buffer_bytes_per_ant;
+
+			// Asynchronous copy goes onto the stream for that antenna - each antenna stream also has update and scaleoffset kernes
 			gpuErrchk(cudaMemcpyAsync(this_ant_buffer,
 					read_buf, in_buffer_bytes_per_ant*sizeof(uint8_t), cudaMemcpyHostToDevice, streams[iant]));
-			//tproc.start();
-			//trescale.start();
+
 			if (blocknum == 0 && params.num_rescale_blocks > 0) { // if first block rescale and update with no
 				// flagging so we can work out roughly what the scales are
 				// Send output to junk buffer - silly but will fix later
 				// TODO: Remove junk buffer to save memory
-				rescaler->update_and_transpose(rescale_junk_buf, this_ant_buffer, rescaler->noflag_options, iant, streams[iant]);
+				rescaler->process_ant_block(rescale_junk_buf, this_ant_buffer, rescaler->noflag_options, iant, streams[iant]);
 
 				// update scale and offset
 				rescaler->update_scaleoffset(rescaler->noflag_options, iant, streams[iant]);
+
+				// Reset rescale stats for this antenna only
+				rescaler->reset_ant_stats(iant);
+
 			}
 
 			// this time we rescale with the flagging turned on
-			rescaler->update_and_transpose(rescale_buf, this_ant_buffer, rescaler->options, iant, streams[iant]);
-			//trescale.stop();
-			//tproc.stop();
+			rescaler->process_ant_block(rescale_buf, this_ant_buffer, rescaler->options, iant, streams[iant]);
+
 		}
 		gpuErrchk(cudaDeviceSynchronize()); // Synchonize after doing all those asynchronous, multistream things
-		fdmt.t_copy_in.stop();
+		rescaler->finish_all_ants();
 
-		if (params.do_dump_rescaler) {
-			tdump.start();
-			rescaler->dump();
-			tdump.stop();
-		}
+		fdmt.t_copy_in.stop();
 
 		if (stopped) {// if we've run out of samples
 			printf("Run out of samples\n");
@@ -334,6 +332,7 @@ int main(int argc, char* argv[])
 		if (dump_data) {
 			dumparr("inbuf", iblock, &rescale_buf);
 		}
+
 		// Do asynchronous copy to dada output using the copy stream for antenna 0
 		if (dada_sink != NULL) {
 			void* outptr = dada_sink->open_block();
@@ -344,51 +343,11 @@ int main(int argc, char* argv[])
 					streams[0]));
 		}
 
-		// Count how many times were flagged
-		assert(params.num_rescale_blocks >= 0);
-		array4d_copy_to_host(&rescaler->nsamps); // must do this before updaing scaleoffset, which resets nsamps to zero
-		tproc.start();
 
-		for(int i = 0; i < nf*params.nbeams_in_total; ++i) {
-			int nsamps = (int)rescaler->nsamps.d[i]; // nsamps is the number of unflagged samples from this block
-			int nflagged = rescaler->sampnum - nsamps;
-			// rescale.sampnum is the total number of samples that has gone into the rescaler since resetting
-			assert (nflagged >= 0);
-			num_flagged_times += nflagged;
-		}
 
 		// do rescaling if required
-		if (params.num_rescale_blocks > 0 && blocknum % params.num_rescale_blocks == 0) {
-			for(int iant = 0; iant < source->nants(); ++iant) {
-				rescaler->update_scaleoffset(rescaler->options, iant);
-			}
-
-			// Count how many  channels have been flagged for this whole block
-			// by looking at how many channels have scale==0
-			array4d_copy_to_host(&rescaler->scale);
-			for(int i = 0; i < nf*params.nbeams_in_total; ++i) {
-				if (rescaler->scale.d[i] == 0) {
-					// that channel will stay flagged for num_rescale_blocks
-					num_flagged_beam_chans += params.num_rescale_blocks;
-				}
-
-				// it looks here like I'm counting twice, as we increment num_flagged_times outside the rescale_blocks_guard
-				// but I'm a bit wary here, bcasue of teh danger, danger
-//				// Count how many times have been flagged for this block
-//				// TODO: DANGER DANGER! This doesn't count flagged times if num_rescale_blocks = 0
-//				// This gave me a long headache at LAX when I set -s 1e30 stupidly.
-//				int nsamps = (int)rescaler->nsamps.d[i];
-//				// nsamps is the number of unflagged samples in nt*num_rescale_blocks samples
-//				int nflagged = nt*num_rescale_blocks - nsamps;
-//				assert (nflagged >= 0);
-//				num_flagged_times += nflagged;
-			}
-
-			if (params.do_dump_rescaler) {
-				tdump.start();
-				rescaler->dump();
-				tdump.stop();
-			}
+		if (params.num_rescale_blocks > 0 && blocknum % params.num_rescale_blocks == params.num_rescale_blocks - 1) {
+			rescaler->update_rescale_statistics();
 		}
 
 		if (blocknum >= params.num_rescale_blocks) {

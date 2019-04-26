@@ -260,7 +260,6 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && fabs(dm0sum) < block_dm0thresh;
 		bool this_sample_ok = fabs(dm0z) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
 		bool beam_ok = ibeam != 71;
-		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh;
 		int outidx = t + nt*(outc + nf*outbeam);
 
 		if (this_sample_ok && last_sample_ok && beam_ok) {
@@ -350,11 +349,11 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_calc_dm0_
 	int nwords = nf/nsamps_per_word;
 
 	for(int t = threadIdx.x; t < nt; t += blockDim.x) {
-		rescale_dtype dm0sum = 0.0;
+		rescale_dtype dm0sum = 0.0f;
 		int nsamp = 0;
 		for (int w = 0; w < nwords; w++) {
-		        int wordidx;
-		        if (in_order == DataOrder::TFBP) {
+		    int wordidx;
+		    if (in_order == DataOrder::TFBP) {
 			  // TFB order - only works for nsamps_per_word==1!
 			  wordidx = ibeam + nbeams*(w + nf*t);
 			} else { // BTF order
@@ -365,7 +364,7 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_calc_dm0_
 			wordT word = inarr[wordidx];
 
 			for (int s = 0; s < nsamps_per_word; ++s) {
-				int c = w*nwords + s; // channel number
+				int c = w*nsamps_per_word + s; // channel number
 				int rsidx = c + nf*rsbeam; // rescale index BF order
 				// all these reads are nice and coalesced
 				rescale_dtype offset = offsetarr[rsidx]; // read from global
@@ -380,7 +379,6 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_calc_dm0_
 				} else {
 					//printf("Flagged ibeam %d rsbeam %d c %d nsamp %d dm0sum %f\n", ibeam, rsbeam, c, nsamp, dm0sum);
 				}
-
 			}
 		}
 

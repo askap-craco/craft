@@ -433,7 +433,7 @@ __global__ void boxcar_do_kernel2 (
 }
 
 /* Use warp shuffle for history, shared memory for input */
-__launch_bounds__(32, 32)
+__launch_bounds__(336)
 __global__ void boxcar_do_kernel3 (
 		const __restrict__ fdmt_dtype* indata,
 		fdmt_dtype* __restrict__ outdata,

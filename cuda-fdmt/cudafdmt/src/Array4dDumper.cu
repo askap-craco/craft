@@ -13,7 +13,7 @@
 using std::string;
 const int HDR_SIZE = 16384;
 
-Array4dDumper::Array4dDumper(array4d_t& target, const char* name, FreddaParams& params, bool auto_copy)
+Array4dDumper::Array4dDumper(array4d_t& target, const char* name, FreddaParams& params, int tsamp_mult, bool auto_copy)
 : m_target(target), m_name(name), m_auto_copy(auto_copy) {
 	std::string fname(name);
 	fname += ".dada";
@@ -40,7 +40,7 @@ Array4dDumper::Array4dDumper(array4d_t& target, const char* name, FreddaParams& 
 	ascii_header_set(header_buf, "FILE_NAME", "%s", fname.c_str());
 	ascii_header_set(header_buf, "SHAPE", "%d,%d,%d,%d", target.nw,target.nx,target.ny,target.nz);
 	ascii_header_set(header_buf, "DTYPE", "%s", "<f4"); // 32 bit little endian floats
-	ascii_header_set(header_buf, "TSAMP", "%0.12f", params.source->tsamp()*params.nt*params.num_rescale_blocks); // tsamp unchanged from source
+	ascii_header_set(header_buf, "TSAMP", "%0.12f", params.source->tsamp()*tsamp_mult); // tsamp unchanged from source
 	params.to_dada(header_buf);
 	_fwrite(header_buf, sizeof(char), HDR_SIZE);
 	fflush(m_fout);

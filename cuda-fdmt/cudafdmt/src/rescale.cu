@@ -443,8 +443,11 @@ __global__ void rescale_update_scaleoffset_kernel (
 	// numerator = E[X**4] - 4E[X][E[X**3] + 6 E[X**2]E[X]**2 - 3E[X]**4
 	//rescale_dtype kurt = (mean4 - 4*mean*mean3 + 6*mean2*mean*mean - 3*mean*mean*mean*mean)/(variance*variance) -3
 	// from here: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+	// These still overflow, in the calculation of kurtosis so I'm going to divide by variance squared to make them smaller
+	rescale_dtype m4i = m4[i]/(variance*variance);
+	rescale_dtype m2i = m2[i]/(variance);
 
-    rescale_dtype kurt = (nsamp*m4[i]) / (m2[i]*m2[i]) - 3.0f;
+    rescale_dtype kurt = rescale_dtype(nsamp)*(m4i / (m2i*m2i)) - rescale_dtype(3);
 	if (!isfinite(kurt)) {
 		kurt = 0;
 	}
@@ -502,12 +505,19 @@ __global__ void rescale_update_scaleoffset_kernel (
 			scale = scalearr[i];
 		} else if (variance == 0.0) {
 			scale = 1.0*weight;
-			offset = -mean + target_mean/scale;
+			if (scale == 0.0f) {
+				offset = 0.0f;
+			} else {
+				offset = -mean + target_mean/scale;
+			}
 			//decayoffsetarr[i] = 0.0f;
-
 		} else {
 			scale = (target_stdev / sqrtf(variance))*weight;
-			offset = -mean + target_mean/scale;
+			if (scale == 0.0f) {
+				offset = 0.0f;
+			} else {
+				offset = -mean + target_mean/scale;
+			}
 			//decayoffsetarr[i] = 0.0f;
 
 		}
@@ -522,7 +532,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 	m2[i] = 0.0;
 	m3[i] = 0.0;
 	m4[i] = 0.0;
-	nsamparr[i] = 0;
+	//nsamparr[i] = 0;
 }
 void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale, int iant)
 {

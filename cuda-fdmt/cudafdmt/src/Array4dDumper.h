@@ -28,7 +28,7 @@ class Array4dDumper {
 	bool m_auto_copy;
 
 public:
-	Array4dDumper(array4d_t& target, const char* name, FreddaParams& params, bool auto_copy=true);
+	Array4dDumper(array4d_t& target, const char* name, FreddaParams& params, int tsamp_mult, bool auto_copy=true);
 	virtual ~Array4dDumper();
 	void dump();
 

@@ -14,6 +14,8 @@
 #include "DataOrder.h"
 #include "FreddaParams.h"
 #include "Array4dDumper.h"
+#include "cuda_utils.h"
+#include "CudaTimer.h"
 
 using std::vector;
 
@@ -68,8 +70,12 @@ public:
 	RescaleOptions options;
 	FreddaParams& params;
 	RescaleOptions noflag_options;
+	uint64_t num_flagged_times = 0;
+	uint64_t num_flagged_beam_chans = 0;
 
-	std::vector<Array4dDumper* > dumpers;
+	std::vector<Array4dDumper* > rescale_dumpers; // Dumpers that get updated per rescale interval
+	std::vector<Array4dDumper* > block_dumpers; // Dumpers taht get updated per block
+
 
 	// Parameters
 	/* I put so much effort into this I'm scared of deleting it now
@@ -81,23 +87,36 @@ public:
 			*/
 	Rescaler(RescaleOptions& _options, FreddaParams& params);
 
-
-
 	virtual ~Rescaler();
 
-	void reset(array4d_t& rescale_buf); // Set output buffer to zero to start accumulating again
+	void reset_output(array4d_t& rescale_buf); // Set output buffer to zero to start accumulating again
+
+	// Need to separate this out for the first integration by antenna and don't write stats
 	void update_scaleoffset(RescaleOptions& options, int iant, cudaStream_t stream = 0);
+
+	// Call after updatescaleoffset in the first run to reset to the beginning
+	void reset_ant_stats(int iant);
+
+	// Does full update for all antennas
+	void update_rescale_statistics();
+
+
+	void process_ant_block(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream=0);
+	void finish_all_ants(); // Needs to be called after a cudaDeviceSynchronize
+
 	void set_scaleoffset(float s_scale, float s_offset);
-	void update_and_transpose(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream=0);
+
 	void flag_channel(int channel); // Set weights to zero for all beams/antennas fo rthis channel
 	int flag_frequencies_from_file(const char* filename); // Flag all frequencies in given file
 	bool flag_frequency(float freq); // flag the channel with frequency nearst the given frequency. Ignored it out of band
 
-	void dump(); // Dump rescaler data to disk
-private:
 
+private:
+	void dump_rescale_data(); // Dump rescaler data to disk
+	void dump_block_data(); // Dump block data to disk
 	template <int nsamps_per_word, typename wordT>
 	void do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream = 0);
+	CudaTimer tdump;
 };
 
 template <int nsamps_per_word, typename wordT>
@@ -158,6 +177,8 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 			options.polsum,
 			options.in_order,
 			boff);
+
+	gpuErrchk(cudaPeekAtLastError());
 
 
 	if (iant == 0) {
