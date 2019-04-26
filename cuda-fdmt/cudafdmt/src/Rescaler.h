@@ -140,6 +140,8 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 			options.cell_thresh,
 			options.in_order,
 			boff);
+	gpuErrchk(cudaPeekAtLastError());
+
 
 	// Take the mean all the dm0 times into one big number per beam - this is the how we flag
 	// short dropouts see ACES-209
@@ -151,6 +153,10 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 			dm0stats.d_device,
 			nt,
 			boff);
+	gpuErrchk(cudaPeekAtLastError());
+
+
+
 
 	dim3 blockdim(nsamps_per_word, nwords);
 
