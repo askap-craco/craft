@@ -18,7 +18,7 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 def showplot(ax, d, values, name, x=None):
     if values.image:
-        ax.imshow(d, aspect='auto')
+        ax.imshow(d.T, aspect='auto')
     else:
         if x is None:
             ax.plot(d)
