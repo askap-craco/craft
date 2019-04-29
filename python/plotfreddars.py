@@ -16,6 +16,16 @@ from rtdata import FreddaRescaleData
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+def showplot(ax, d, values, name, x=None):
+    if values.image:
+        ax.imshow(d, aspect='auto')
+    else:
+        if x is None:
+            ax.plot(d)
+        else:
+            ax.plot(x, d)
+
+    ax.set_ylabel(name)
 
 def plot(f, values):
     d = FreddaRescaleData(f)
@@ -43,26 +53,22 @@ def plot(f, values):
 
     for iname, name in enumerate(['mean','std','kurt','scale','offset', 'decay_offset', 'nsamps']):
 
-        bdname = bd[name]
-        bdn = bdname[iant, :, :]
+        bdn = bd[name]
+        if values.log:
+            bdn= 10*np.log10(bdn)
+        
         print name, bdn.shape # shape is (ant, beam, chan)
-        ax[iax].plot(d.freqs, bdn.T)
-        ax[iax].set_ylabel(name)
-        ax2[iax].imshow(bdname[:,:, ichan], aspect='auto')
-        ax2[iax].set_title(name)
-        ax3[iax].imshow(bdname[:,ibeam, :], aspect='auto')
-        ax3[iax].set_title(name)
+        showplot(ax[iax],  bdn[iant, :, :].T, values, name, x=d.freqs)
+        showplot(ax2[iax], bdn[:,:,ichan], values, name)
+        showplot(ax3[iax], bdn[:, ibeam, :].T, values, name, x=d.freqs)
+
         iax += 1
 
     for iname, name in enumerate(['dm0','dm0count']):
-        bdn = bd[name][iant, :, :]
-        print name, bdn.shape
-        ax[iax].plot(bdn.T)
-        ax[iax].set_ylabel(name)
-        ax2[iax].imshow(bdname[:, :,ichan], aspect='auto')
-        ax2[iax].set_title(name)
-        ax3[iax].imshow(bdname[:, ibeam,:], aspect='auto')
-        ax3[iax].set_title(name)
+        bdn = bd[name]
+        showplot(ax[iax],  bdn[iant, :, :].T, values, name)
+        showplot(ax2[iax], bdn[:,:,ichan] , values, name)
+        showplot(ax3[iax], bdn[:,ibeam,:].T, values, name)
         iax += 1
 
     iax -= 1
@@ -91,6 +97,8 @@ def _main():
     parser.add_argument('-c','--ichan', type=int, help='Channel number', default=0)
     parser.add_argument('-b','--ibeam', type=int, help='Beam number', default=0)
     parser.add_argument('-i','--blkidx', type=int, help='Block index', default=0)
+    parser.add_argument('-l','--log', action='store_true', default=False, help='do log on imshow')
+    parser.add_argument('--image', action='store_true', default=False, help='Show images rathe rthan lines')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
     if values.verbose:
