@@ -9,6 +9,7 @@ __author__ = 'Keith Bannister <keith.bannister@csiro.au>'
 import logging
 import numpy as np
 from crafthdr import DadaHeader
+import os
 
 class DadaFile(object):
     def __init__(self, filename):
@@ -19,6 +20,7 @@ class DadaFile(object):
         self.shape = self.hdr.get_value('SHAPE') # throws exception if not defined
         self.shape = np.array(map(int, self.shape.split(',')))
         self.dtype = np.dtype(self.hdr.get_value('DTYPE', '<f4'))
+        self.data_name = self.hdr.get_value('DATA_NAME')
         self.block_size_bytes = np.prod(self.shape)*self.dtype.itemsize
         self.fin = open(self.filename, 'r')
 
@@ -26,6 +28,7 @@ class DadaFile(object):
     def nblocks(self):
         nbytes = os.path.getsize(self.filename)
         nblocks = (nbytes - self.hdr_size) // self.block_size_bytes # truncated
+        return nblocks
 
     def get_block(self, blockid):
         if blockid < 0:
@@ -36,27 +39,41 @@ class DadaFile(object):
 
         assert 0 <= blockid < self.nblocks
 
-        self.fin.seek(self.hdr_size + blockid*self.block_size_bytes)
+        offset = self.hdr_size + blockid*self.block_size_bytes
         count = np.prod(self.shape)
-        d = np.fromfile(self.fine, count=count, dtype=self.dtype)
-        d.shape = self.shape
-        return d
+        #print "reading {} block {} of {} from offset {} count={}".format(self.fin, blockid, self.nblocks, offset, count)
+        self.fin.seek(offset)
+        v = np.fromfile(self.fin, count=count, dtype=self.dtype)
+        v.shape = self.shape
+        print self.filename, v.shape, len(v), 'All zeros?', np.all(v == 0), \
+            'max/min/mean/sum/nz {}/{}/{}/{}/{}'.format(v.max(), v.min(), v.mean(), v.sum(), (v.flatten() == 0).sum()), \
+            'max at', \
+            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
 
-    def blocks(self):
+        return v
+
+    def blocks(self, step=1):
         '''
         Iterates over blocks in the data
         '''
+        assert step >= 1
         blockid = 0
         # check number of blocks on every interation in case someone has written
         # to the file since we last looked.
         while blockid < self.nblocks:
             yield self[blockid]
+            blockid += step
 
     def __getitem__(self, index):
         return self.get_block(index)
 
     def __len__(self):
         return self.nblocks
+
+    def __str__(self):
+        return 'DadaFile name={} shape={} dtype={} {}'.format(self.data_name, self.shape, self.dtype, self.filename)
+
+    __repr__ = __str__
 
 def _main():
     from argparse import ArgumentParser

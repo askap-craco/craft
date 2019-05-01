@@ -28,50 +28,69 @@ def type_of_file(p):
 
 class FreddaRescaleBlock(dict):
     def __init__(self, rsdata, blkid):
+        # confuse the user
         for df in rsdata.dada_files:
-            name = df.hdr.get_value('DATA_NAME')
+            name = df.data_name
             data = df[blkid]
+            # most data types are size [1,nant,nbeams,nf] except dm0 and dm0count which is [1,nant,nbeams,nt] and dm0stats which is [1,nant,nbeams,4]
+            # in all cases, we can remove the first dimension so as not to
+
+            assert data.shape[0] == 1
+            data = data[0,:,:,:]
             self[name] = data
 
-        self.mjd = rsdata.tstart + blkid*rsdata.tsamp
+        self.mjd = rsdata.tstart + blkid*rsdata.tsamp/86400.
         self.rsdata = rsdata
         self.blkid = blkid
 
 class FreddaRescaleData(object):
     def __init__(self, path):
         self.path = path
+        fpath = os.path.join(self.path, '*.dada')
+        dada_file_paths = glob.glob(fpath)
+        if len(dada_file_paths) == 0:
+            raise RuntimeError('No dada files in {} = {}'.format(self.path, fpath))
 
-        dada_file_paths = glob.glob(os.path.join(self.path, '*.dada'))
         self.dada_files = [dada.DadaFile(f) for f in dada_file_paths]
         hdr = self.dada_files[0].hdr
         self.hdr = hdr
         
-        f1 = float(hdr.get_value('OUT_FREQ'))
-        foff = float(hdr.get_value('OUT_FOFF'))
+        f1 = float(hdr.get_value('SOURCE_FCH1'))
+        foff = float(hdr.get_value('SOURCE_FOFF'))
+        nant = int(hdr.get_value('SOURCE_NANTS'))
         nchan = int(hdr.get_value('NF'))
         self.freqs = np.arange(nchan)*foff + f1
         self.nbeams_per_antenna = int(self.hdr.get_value['NBEAMS_PER_ANTENNA'])
+        self.nbeams = int(hdr.get_value('NBEAMS_OUT'))
+        self.nbeams_per_antenna = int(self.hdr.get_value('NBEAMS_PER_ANTENNA'))
         self.npol = int(self.hdr.get_value('NPOLS_IN'))
         self.nbteams_in_total = int(self.hdr.get_value('NBEAMS_IN_TOTAL'))
         self.nt = int(self.hdr.get_value('NT'))
         self.nd = int(self.hdr.get_value('ND'))
         self.tstart = float(self.hdr.get_value('SOURCE_TSTART'))
         self.tsamp = float(self.hdr.get_value('TSAMP')) # tsamp fo rrescaling different from source tsamp
+        self.antennas = self.hdr.get_value('SOURCE_ANTENNA_NAME','')
+        if self.antennas.strip() == '':
+            self.antennas = ['ia{:02d}'.format(ia) for ia in xrange(nant)]
+        else:
+            self.antennas = self.antennas.split(',')
 
     @property
     def nblocks(self):
         return min(map(len, self.dada_files))
 
     def get_block(self, blkid):
-        return FreddaRescaleBlock(blkid)
+        return FreddaRescaleBlock(self, blkid)
 
     def __getitem__(self, blkid):
         return self.get_block(blkid)
 
-    def blocks(self):
+    def blocks(self, step=1):
+        assert step >= 1
         blkid = 0
         while blkid < self.nblocks:
-            return self[blkid]
+            yield self[blkid]
+            blkid += step
 
 
 class DataDir(object):

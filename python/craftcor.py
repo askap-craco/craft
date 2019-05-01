@@ -695,8 +695,8 @@ class MiriadGainSolutions(object):
         self.g_real = g_real
         self.g_imag = g_imag
         # arrays indexed by antenna index
-        print self.freqs.shape#, bp_real.shape
-
+        self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant]) for iant in xrange(nant)]
+        self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant]) for iant in xrange(nant)]
 
     def get_solution(self, iant, time, freq_ghz):
         '''

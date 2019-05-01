@@ -117,7 +117,10 @@ def plot(f, values, mjd=None, dm=None):
         lbl = 'Offset (samples) from %0.9f'%mjd
         
     ax[1].set_xlabel(lbl)
-    fig.savefig(f.replace('.fil','.png'))
+    try:
+        fig.savefig(f.replace('.fil','.png'))
+    except:
+        logging.exception('Could not save figure')
 
     if values.show:
         pylab.show()

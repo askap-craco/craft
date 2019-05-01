@@ -256,9 +256,14 @@ def plot_polys_range(rfile, mjdstart, tmax):
         
     polynames = ('DELAY (us)','U (m)', 'V (m)', 'W (m)')
     fig, (ax1, ax2, ax3, ax4, ax5, ax6) = pylab.subplots(6,1, sharex=True)
+    lines = []
+    labels = []
+    print 'At MJD', mjdstart
     
     for ia1, a1 in enumerate(rfile.telnames):
         for ia2, a2 in enumerate(rfile.telnames[ia1:]):
+            lbl = '{}-{}'.format(a1, a2)
+            labels.append(lbl)
             u = [val[a1]['U (m)'] - val[a2]['U (m)'] for val in values]
             v = [val[a1]['V (m)'] - val[a2]['V (m)'] for val in values]
             w = [val[a1]['W (m)'] - val[a2]['W (m)'] for val in values]
@@ -266,6 +271,7 @@ def plot_polys_range(rfile, mjdstart, tmax):
             secoffs = [val['secoff'] for val in values]
             delays = [val[a1]['DELAY (us)'] - val[a2]['DELAY (us)']for val in values]
             u,v,w,secoffs, delays = map(np.array, (u,v,w, secoffs, delays))
+            print '{} u={} v={} w={} el={} secoff={} delay={:0.9f}us'.format(lbl, u[0], v[0], w[0], el[0], secoffs[0], float(delays[0]))
             if np.any(abs(u) > 1e5):
                 bad_times = np.where(abs(u) > 1e5)[0]
                 print 'BAD TIMES',bad_times, mjds[bad_times]
@@ -280,7 +286,8 @@ def plot_polys_range(rfile, mjdstart, tmax):
             ax3.plot(toff, w)
             ax4.plot(toff, secoffs)
             ax5.plot(toff, el)
-            ax6.plot(toff, delays)
+            l, = ax6.plot(toff, delays)
+            lines.append(l)
 
 
 
@@ -289,12 +296,16 @@ def plot_polys_range(rfile, mjdstart, tmax):
     ax3.set_ylabel('W (m)')
     ax4.set_ylabel('Secoff')
     ax5.set_ylabel('Elevation')
-    ax5.set_xlabel('Seconds from MJD {:.5f}'.format(mjdstart))
+    ax6.set_ylabel('Delay (us)')
+    ax6.set_xlabel('Seconds from MJD {:.5f}'.format(mjdstart))
+    fig.legend(lines, labels, 'upper right')
+
     fig.savefig(rfile.fname + '.uvt.png')
     pylab.xlabel('U (m)')
     pylab.ylabel('V (m)')
     pylab.grid(True)
     pylab.savefig(rfile.fname + '.uv.png')
+    pylab.figlegend(lines, labels, 'upper right')
     pylab.show()
 
     
