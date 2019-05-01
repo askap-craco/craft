@@ -28,13 +28,14 @@ def type_of_file(p):
 
 class FreddaRescaleBlock(dict):
     def __init__(self, rsdata, blkid):
-        # confuse the user
+
         for df in rsdata.dada_files:
             name = df.data_name
             data = df[blkid]
             # most data types are size [1,nant,nbeams,nf] except dm0 and dm0count which is [1,nant,nbeams,nt] and dm0stats which is [1,nant,nbeams,4]
             # in all cases, we can remove the first dimension so as not to
-
+            # confuse the user
+            
             assert data.shape[0] == 1
             data = data[0,:,:,:]
             self[name] = data
@@ -46,11 +47,8 @@ class FreddaRescaleBlock(dict):
 class FreddaRescaleData(object):
     def __init__(self, path):
         self.path = path
-        fpath = os.path.join(self.path, '*.dada')
-        dada_file_paths = glob.glob(fpath)
-        if len(dada_file_paths) == 0:
-            raise RuntimeError('No dada files in {} = {}'.format(self.path, fpath))
 
+        dada_file_paths = glob.glob(os.path.join(self.path, '*.dada'))
         self.dada_files = [dada.DadaFile(f) for f in dada_file_paths]
         hdr = self.dada_files[0].hdr
         self.hdr = hdr

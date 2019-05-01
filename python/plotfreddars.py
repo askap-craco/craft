@@ -56,7 +56,6 @@ def plot(f, values):
 
     for iname, name in enumerate(['dm0','dm0count']):
         bdn = bd[name][iant, :, :]
-        print name, bdn.shape
         ax[iax].plot(bdn.T)
         ax[iax].set_ylabel(name)
         ax2[iax].imshow(bdname[:, :,ichan], aspect='auto')

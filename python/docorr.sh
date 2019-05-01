@@ -47,7 +47,7 @@ for f in $@ ; do
 	b=`basename $b`
 	echo "beam is $b"
 	#tsp craftcor.py --parset $fcm --calcfile $calcfile  -i ${ismall} -o $outdir/${dlname}_c1_f1_${b}_i${ismall}.fits $dlname/ak??/$b/*c1_f1.vcraft --fft-size=1
-	itime=1
+	itime=4096
 	fscrunch=9
 	tsp craftcor.py --parset $fcm --calcfile $calcfile  -i $itime -o $outdir/${dlname}_call_${b}_i${itime}_f${fscrunch}.fits $dlname/ak??/$b/*c*.vcraft --fft-size=1 -f $fscrunch
 
