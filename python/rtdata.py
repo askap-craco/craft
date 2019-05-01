@@ -50,7 +50,6 @@ class FreddaRescaleData(object):
         foff = float(hdr.get_value('OUT_FOFF'))
         nchan = int(hdr.get_value('NF'))
         self.freqs = np.arange(nchan)*foff + f1
-        self.nbeams = int(hdr.get_value('NB'))
         self.nbeams_per_antenna = int(self.hdr.get_value['NBEAMS_PER_ANTENNA'])
         self.npol = int(self.hdr.get_value('NPOLS_IN'))
         self.nbteams_in_total = int(self.hdr.get_value('NBEAMS_IN_TOTAL'))
