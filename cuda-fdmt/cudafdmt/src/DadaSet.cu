@@ -101,6 +101,7 @@ size_t DadaSet::read_samples_ant(void** output, int iant)
 
 const char* DadaSet::antenna_name()
 {
+	m_antenna_name.clear();
 	for (auto& src : m_sources)
 	{
 		m_antenna_name.append(src->antenna_name());
