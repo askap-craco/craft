@@ -59,8 +59,9 @@ class Stats(object):
         assert d.shape == (len(self.antennas), self.nbeams), 'INvalid shape:{}'.format(d.shape)
         statkey = statname + '_' + summary
         self.data[statkey] = d
-        if statkey == 'mean_max' and self.values.plot:
-            pylab.imshow(d)
+        if statkey == 'mean_std' and self.values.plot:
+            #pylab.imshow(d)
+            pylab.plot(d)
             pylab.title(statkey)
             pylab.show()
         
