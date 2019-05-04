@@ -394,7 +394,9 @@ class Correlator(object):
                 self.parset[name] = value
 
     def parse_mir(self):
-        self.mir = MiriadGainSolutions(self.values.mirsolutions,self.values.aips_c)
+        self.mir = None
+        if self.values.mirsolutions is not None:
+            self.mir = MiriadGainSolutions(self.values.mirsolutions,self.values.aips_c)
                 
 
     def get_ant_location(self, antno):
@@ -583,9 +585,12 @@ class Correlator(object):
             phasor = np.exp(np.pi*2j*phases, dtype=np.complex64)
             freq_ghz = (cfreq+freqs)/1e3
             #print('ref ant iant: '+str(self.refant.antno))
-            mir_cor = np.array([self.mir.get_solution(0, 0, f) for f in freq_ghz])
-            mir_cor[np.where(mir_cor==0)] = np.nan
-            phasor /= mir_cor
+            # Apply phase corrections, if available:
+            if self.mir:
+                mir_cor = np.array([self.mir.get_solution(0, 0, f) for f in freq_ghz])
+                mir_cor[np.where(mir_cor==0)] = np.nan
+                phasor /= mir_cor
+                
             phasor_allchan[c,:] = phasor
         return phasor_allchan
 
@@ -596,7 +601,7 @@ def parse_delays(values):
 	delayfile = values.hwfile
 	#print(delayfile)
     delays = {}
-    if os.path.exists(delayfile):
+    if delayfile is not None and os.path.exists(delayfile):
         with open(delayfile, 'rU') as dfile:
             for line in dfile:
                 bits = line.split()

@@ -12,13 +12,17 @@ from crafthdr import DadaHeader
 import os
 
 class DadaFile(object):
-    def __init__(self, filename):
+    def __init__(self, filename, shape=None):
         self.filename = filename
         assert os.path.isfile(self.filename)
         self.hdr = DadaHeader.fromfile(self.filename)
         self.hdr_size = int(self.hdr.get_value('HDR_SIZE'))
-        self.shape = self.hdr.get_value('SHAPE') # throws exception if not defined
-        self.shape = np.array(map(int, self.shape.split(',')))
+        if shape is None:
+            self.shape = self.hdr.get_value('SHAPE') # throws exception if not defined
+            self.shape = np.array(map(int, self.shape.split(',')))
+        else:
+            self.shape = shape
+
         self.dtype = np.dtype(self.hdr.get_value('DTYPE', '<f4'))
         self.data_name = self.hdr.get_value('DATA_NAME')
         self.block_size_bytes = np.prod(self.shape)*self.dtype.itemsize

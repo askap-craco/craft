@@ -18,7 +18,7 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 def showplot(ax, x, d, values, name, label=None, **kwargs):
     if values.image:
-        r = ax.imshow(d.T, aspect='auto')
+        r = ax.imshow(d.T, aspect='auto', interpolation='nearest')
     else:
         (nrow, ncol) = d.shape
         # need to plot one at a time fo rlabelling. Grrr.
@@ -95,8 +95,13 @@ class RescalePlot(object):
                 bdn = 10*np.log10(bdn - bdn.min() + 1) # scalethe log so you dont log0
             if prevbd:
                 bdn /= prevbd[name]
-            
+
+            nant, nbeam, nchan = bdn.shape
+            if values.antmerge:
+                bdn.shape = (1, nant*nbeam, -1)
+
             print name, bdn.shape # shape is (ant, beam, chan)
+
             lines1 = showplot(ax[iax],d.freqs, bdn[iant, :, :].T, values, name,label=beam_labels)
             lines2 = showplot(ax2[iax], xbeams, bdn[:,:,ichan].T, values, name,label=ant_labels)
             lines3 = showplot(ax3[iax], d.freqs, bdn[:, ibeam, :].T, values, name,label=ant_labels)
@@ -147,6 +152,7 @@ def _main():
     parser.add_argument('-z','--lognz', action='store_true', default=False, help='do non-zero log before plotting')
     parser.add_argument('--image', action='store_true', default=False, help='Show images rathe rthan lines')
     parser.add_argument('-r','--ratio', action='store_true', default=False, help='Plot ratio between this integration and the previous one')
+    parser.add_argument('--antmerge', action='store_true', help='Merge antennas with beams so you see everything')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
     if values.verbose:

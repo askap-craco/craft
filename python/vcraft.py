@@ -14,6 +14,7 @@ import itertools
 from crafthdr import DadaHeader
 import freqconfig
 import warnings
+import unpack_vcraft
 log = logging.getLogger(__name__)
 
 bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
@@ -181,13 +182,7 @@ class VcraftFile(object):
             dwords.shape = nwords, nchan
             nsamps = nwords*2
             d = np.empty((nsamps, nchan, 2), dtype=np.int8)
-            for samp in xrange(2):
-                # convert from 8-bit two's complement to int8
-                d[samp::2, :, 0] = (dwords & 0xff) - (dwords & 0x80)*2 # real
-                dwords >>= 8
-                d[samp::2, :, 1] = (dwords & 0xff) - (dwords & 0x80)*2 # imag
-                dwords >>= 8
-
+            unpack_vcraft.unpack_mode2_jit_v2(dwords, d)
             d = d[sampoff:sampoff+nsamp, :, :]
             nsamps = nsamp
 
@@ -304,10 +299,10 @@ class VcraftMux(object):
         self.trigger_frameids = np.array(map(int, self.allhdr('TRIGGER_FRAMEID')))
         self.trigger_mjds = np.array(map(float, self.allhdr('TRIGGER_MJD')))
         
-        self.start_mjds = np.array([f.start_mjd for f in vcraft_files])
+        self.start_mjds = np.array([f.start_mjd for f in self._files])
         self.start_mjd = max(self.start_mjds)
 
-        self.start_frameids = np.array([f.start_frameid for f in vcraft_files]) - self.file_delays
+        self.start_frameids = np.array([f.start_frameid for f in self._files]) - self.file_delays
         self.start_frameid = max(self.start_frameids)
         # BUG! Start MJDs don't account for sample offsets
         self.sample_offsets = self.start_frameid - self.start_frameids 
