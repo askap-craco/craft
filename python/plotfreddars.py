@@ -40,8 +40,10 @@ class Formatter(object):
         return s
 
 def showplot(ax, x, d, values, name, label=None, **kwargs):
+    im = np.ma.masked_equal(d, 0)
+    
     if values.image:
-        r = ax.imshow(d.T, aspect='auto', interpolation='nearest')
+        r = ax.imshow(im.T, aspect='auto', interpolation='nearest')
         ax.format_coord = Formatter(ax, x, d, values, name, label)
     else:
         (nrow, ncol) = d.shape
@@ -52,7 +54,7 @@ def showplot(ax, x, d, values, name, label=None, **kwargs):
             if label is not None:
                 lbl = label[n]
                 
-            l = ax.plot(x, d[:, n], picker=3, label=lbl, **kwargs)
+            l = ax.plot(x, im[:, n], picker=3, label=lbl, **kwargs)
             r.append(l)
             
             
@@ -96,7 +98,6 @@ class RescalePlot(object):
         ax, ax2, ax3,ax4,ax5 = self.axs
     
         blkidx = values.blkidx
-        iant = values.iant
         ichan = values.ichan
         ibeam = values.ibeam
         bd = d[blkidx]
@@ -111,11 +112,15 @@ class RescalePlot(object):
 
         ant_beam_labels = []
         ant_labels = d.antennas
+        antnumbers = map(int, [a[2:] for a in d.antennas])
+        if values.ant is None:
+            iant = 0
+        else:
+            iant = antnumbers.index(values.ant)
 
         # if merging antennas we get way more labels
         if values.antmerge:
             beam_labels = []
-            values.iant = 0
             iant = 0
             for a in d.antennas:
                 beam_labels.extend(['{} b{}'.format(a, b) for b in xrange(nbeams)])
@@ -190,7 +195,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument(dest='files', nargs='+')
     #parser.add_argument('-b','--beam', type=int, antenna='bea
-    parser.add_argument('-a','--iant', type=int, help='Antenna number', default=0)
+    parser.add_argument('-a','--ant', type=int, help='Antenna number', default=None)
     parser.add_argument('-c','--ichan', type=int, help='Channel number', default=0)
     parser.add_argument('-t','--sample', type=int, help='Sample number', default=0)
     parser.add_argument('-b','--ibeam', type=int, help='Beam number', default=0)
