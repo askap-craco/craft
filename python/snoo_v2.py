@@ -11,6 +11,7 @@ import os
 import sys
 import logging
 import socket
+import struct
 from astropy.time import Time
 from pyclustering.cluster.dbscan import dbscan
 
@@ -40,6 +41,10 @@ def _main():
         port = int(port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((host, port))
+	# add to multicast group # https://stackoverflow.com/questions/603852/how-do-you-udp-multicast-in-python
+        mreq = struct.pack('4sl', socket.inet_aton(host), socket.INADDR_ANY)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        
         while True:
             data, addr = sock.recvfrom(1500)
             npdata = np.fromstring(data, sep=' ')
