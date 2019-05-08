@@ -9,6 +9,7 @@ import os
 import sys
 import logging
 import socket
+import struct
 from astropy.time import Time
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -30,11 +31,18 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
 
+
     for p in values.hostport:
         host, port = p.split(':')
         port = int(port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Ryan's addition
+        sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
         sock.bind((host, port))
+
+        # add to multicast group # https://stackoverflow.com/questions/603852/how-do-you-udp-multicast-in-python
+        mreq = struct.pack('4sl', socket.inet_aton(host), socket.INADDR_ANY)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         while True:
             data, addr = sock.recvfrom(1500)
             npdata = np.fromstring(data, sep=' ')
@@ -46,7 +54,7 @@ def _main():
             idt = npdata[:, 4]
             dm = npdata[:, 5]
             beamno = npdata[:, 6]
-            mask = (sn > values.min_sn) & (width < values.max_boxcar) & (dm > values.min_dm) & (beamno != 35) & (tsec > 15.)
+            mask = (sn > values.min_sn) & (width < values.max_boxcar) & (dm > values.min_dm) & (beamno != 35) & (tsec > 10.)
             if np.any(mask):
                 goodat = npdata[mask, :]
                 good_sn = goodat[:, 0]
