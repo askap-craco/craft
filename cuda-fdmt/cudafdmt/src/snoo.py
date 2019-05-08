@@ -43,10 +43,12 @@ def _main():
         # add to multicast group # https://stackoverflow.com/questions/603852/how-do-you-udp-multicast-in-python
         mreq = struct.pack('4sl', socket.inet_aton(host), socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        total_cand = 0
         while True:
             data, addr = sock.recvfrom(1500)
             npdata = np.fromstring(data, sep=' ')
             npdata.shape = (-1, 8)
+            total_cand += npdata.shape[0]
             sn = npdata[:, 0]
             sampnum = npdata[:, 1]
             tsec = npdata[:, 2]
@@ -65,7 +67,7 @@ def _main():
                 now = Time.now()
                 latency_ms = (now.mjd - cand_mjd)*86400.0*1e3
                 best_beam = int(beamno)
-                s = 'Found CANDIDATE: sn={} width={} dm={} mjd={} latency={}ms beam={}'.format(sn, width, dm, cand_mjd, latency_ms, best_beam)
+                s = 'Found CANDIDATE: sn={} width={} dm={} mjd={} latency={}ms beam={} total_cands={}'.format(sn, width, dm, cand_mjd, latency_ms, best_beam, total_cand)
                 print s
                 cand_list = list(best_cand)
                 cand_list.append(latency_ms)
@@ -74,6 +76,7 @@ def _main():
                 if outf:
                     outf.write('# S/N, sampno, secs from file start, boxcar, idt, dm, beamno, mjd, latency_ms\n')
                     outf.write('{:0.2f} {:0.0f} {:0.4f} {:0.0f} {:0.0f} {:0.2f} {:0.0f} {:0.10f} {:0.2f}\n'.format(*cand_list))
+                    outf.write('# total_cand: {}\n'.format(total_cand))
                     outf.flush()
                     outf.close()
                     
