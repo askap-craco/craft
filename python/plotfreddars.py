@@ -16,9 +16,35 @@ from rtdata import FreddaRescaleData
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+class Formatter(object):
+    def __init__(self, ax, xdata, d, values, name, label):
+        self.ax = ax
+        self.xdata = xdata
+        self.d = d
+        self.values = values
+        self.name = name
+        self.label = label
+
+    def __call__(self, x, y):
+        x = min(int(np.round(x)), self.d.shape[0])
+        y = min(int(np.round(y)), self.d.shape[1])
+        
+        z = self.d[x,y] # actually d.T is plotted
+        lbl = ''
+        if self.label is not None:
+            if y >= 0 and y < len(self.label):
+                lbl = self.label[int(y)]
+
+        s = 'x={:0.1f} y={:0.1f} z={:0.1e} {}'.format(x, y, z, lbl)
+        
+        return s
+
 def showplot(ax, x, d, values, name, label=None, **kwargs):
+    im = np.ma.masked_equal(d, 0)
+    
     if values.image:
-        r = ax.imshow(d.T, aspect='auto', interpolation='nearest')
+        r = ax.imshow(im.T, aspect='auto', interpolation='nearest')
+        ax.format_coord = Formatter(ax, x, d, values, name, label)
     else:
         (nrow, ncol) = d.shape
         # need to plot one at a time fo rlabelling. Grrr.
@@ -28,11 +54,13 @@ def showplot(ax, x, d, values, name, label=None, **kwargs):
             if label is not None:
                 lbl = label[n]
                 
-            l = ax.plot(x, d[:, n], picker=3, label=lbl, **kwargs)
+            l = ax.plot(x, im[:, n], picker=3, label=lbl, **kwargs)
             r.append(l)
             
             
     ax.text(0.05, 1, name, ha='left', va='top', transform=ax.transAxes)
+
+
     return r
 
 class RescalePlot(object):
@@ -42,7 +70,7 @@ class RescalePlot(object):
         self.values = values
         self.figs = []
         self.axs = []
-        for i in xrange(3):
+        for i in xrange(5):
             fig, ax = pylab.subplots(3,3)
             self.figs.append(fig)
             self.axs.append(ax.flatten())
@@ -66,11 +94,10 @@ class RescalePlot(object):
         print d.nblocks
         print d.antennas
         print d.nbeams
-        fig, fig2, fig3 = self.figs
-        ax, ax2, ax3 = self.axs
+        fig, fig2, fig3,fig4,fig5 = self.figs
+        ax, ax2, ax3,ax4,ax5 = self.axs
     
         blkidx = values.blkidx
-        iant = values.iant
         ichan = values.ichan
         ibeam = values.ibeam
         bd = d[blkidx]
@@ -79,10 +106,28 @@ class RescalePlot(object):
             prevbd = d[blkidx-1]
             
         iax = 0
-        ant_labels = d.antennas
+
         chan_labels = ['chan={}={} MHz'.format(c, freq) for (c, freq) in enumerate(d.freqs)]
         nbeams = d.nbeams_per_antenna
-        beam_labels = ['beam={}'.format(b) for b in xrange(nbeams)]
+
+        ant_beam_labels = []
+        ant_labels = d.antennas
+        antnumbers = map(int, [a[2:] for a in d.antennas])
+        if values.ant is None:
+            iant = 0
+        else:
+            iant = antnumbers.index(values.ant)
+
+        # if merging antennas we get way more labels
+        if values.antmerge:
+            beam_labels = []
+            iant = 0
+            for a in d.antennas:
+                beam_labels.extend(['{} b{}'.format(a, b) for b in xrange(nbeams)])
+        else:
+            beam_labels = ['beam={}'.format(b) for b in xrange(nbeams)]
+                
+
         xbeams = np.arange(nbeams)
         xant = np.arange(len(d.antennas))
 
@@ -102,9 +147,11 @@ class RescalePlot(object):
 
             print name, bdn.shape # shape is (ant, beam, chan)
 
-            lines1 = showplot(ax[iax],d.freqs, bdn[iant, :, :].T, values, name,label=beam_labels)
-            lines2 = showplot(ax2[iax], xbeams, bdn[:,:,ichan].T, values, name,label=ant_labels)
-            lines3 = showplot(ax3[iax], d.freqs, bdn[:, ibeam, :].T, values, name,label=ant_labels)
+            lines1 = showplot(ax[iax],d.freqs, bdn[iant, :, :].T, values, name, beam_labels)
+            lines2 = showplot(ax2[iax], xbeams, bdn[:,:,ichan].T, values, name, ant_labels)
+            lines3 = showplot(ax3[iax], d.freqs, bdn[:, ibeam, :].T, values, name, ant_labels)
+            lines4 = showplot(ax4[iax], xbeams, bdn.mean(axis=2).T, values, name, ant_labels)
+            lines5 = showplot(ax5[iax], xbeams, bdn.std(axis=2).T, values, name, ant_labels)
             
             iax += 1
 
@@ -121,11 +168,16 @@ class RescalePlot(object):
         fig.suptitle('Antenna = {}={}'.format(iant, d.antennas[iant]))
         fig2.suptitle('Channel = {}={} MHz'.format(ichan, d.freqs[ichan]))
         fig3.suptitle('Beam = {}'.format(ibeam))
+        fig4.suptitle('Mean over spectrum vs ant/beam')
+        fig5.suptitle('Std over spectrum vs ant/beam')
         #fig2.legend(lines2, ant_labels)
 
         ax[6].set_xlabel('Channel')
         ax2[6].set_xlabel('Beam')
         ax3[6].set_xlabel('Channel')
+        ax4[6].set_xlabel('Beam')
+        ax5[6].set_xlabel('Beam')
+        
 
         if values.image:
             ax[6].set_ylabel('beam')
@@ -143,7 +195,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument(dest='files', nargs='+')
     #parser.add_argument('-b','--beam', type=int, antenna='bea
-    parser.add_argument('-a','--iant', type=int, help='Antenna number', default=0)
+    parser.add_argument('-a','--ant', type=int, help='Antenna number', default=None)
     parser.add_argument('-c','--ichan', type=int, help='Channel number', default=0)
     parser.add_argument('-t','--sample', type=int, help='Sample number', default=0)
     parser.add_argument('-b','--ibeam', type=int, help='Beam number', default=0)
