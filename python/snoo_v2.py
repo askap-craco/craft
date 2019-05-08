@@ -40,6 +40,8 @@ def _main():
         host, port = p.split(':')
         port = int(port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Ryan's addition
+        sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
         sock.bind((host, port))
 	# add to multicast group # https://stackoverflow.com/questions/603852/how-do-you-udp-multicast-in-python
         mreq = struct.pack('4sl', socket.inet_aton(host), socket.INADDR_ANY)
