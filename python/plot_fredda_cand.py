@@ -45,8 +45,6 @@ def _main():
     parser.add_argument('-w','--max-boxcar', help='max width to plot', default=32, type=int)
     parser.add_argument('-d','--min-dm', help='minimum dm to plot', default=0, type=float)
     parser.add_argument('-b','--min-sn', help='minimum S/N to plot', default=0, type=float)
-    
-
     parser.add_argument('--detail', action='store_true', help='Plot detail')
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False, show=False)
@@ -67,9 +65,14 @@ def _main():
         if values.show:
             pylab.show()
 
+        if values.outfile:
+            print('Saving to  {}'.format(values.outfile))
+            pylab.savefig(values.outfile)
 
-    pylab.show()
+            
 
+# This is old code. Should chuck it.
+def old_code(self):
     if consol:
         candlist = find_files_filelist(values.files)
         
