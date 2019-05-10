@@ -311,7 +311,7 @@ int main(int argc, char* argv[])
 				rescaler->update_scaleoffset(rescaler->noflag_options, iant, streams[iant]);
 
 				// Reset rescale stats for this antenna only
-				rescaler->reset_ant_stats(iant);
+				rescaler->reset_ant_stats_for_first_block(iant);
 
 			}
 

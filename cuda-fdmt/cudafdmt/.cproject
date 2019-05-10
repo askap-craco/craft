@@ -42,6 +42,8 @@
 								</option>
 								<option id="nvcc.compiler.cpp11option.341242026" name="Enable C++11 support (-std=c++11)" superClass="nvcc.compiler.cpp11option" value="true" valueType="boolean"/>
 								<option id="nvcc.compiler.usefastmath.1011605558" name="Make use of fast math library (-use_fast_math)" superClass="nvcc.compiler.usefastmath" value="true" valueType="boolean"/>
+								<option id="nvcc.compiler.option.lineinfo.76742741" name="Generate line-number information for device code (-lineinfo)" superClass="nvcc.compiler.option.lineinfo" value="true" valueType="boolean"/>
+								<option id="nvcc.compiler.option.gprof.677408930" name="Generate gprof information (-pg)" superClass="nvcc.compiler.option.gprof" value="false" valueType="boolean"/>
 								<inputType id="nvcc.compiler.input.cu.1420155174" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.195188185" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.260365939" superClass="nvcc.compiler.input.c"/>
@@ -66,11 +68,17 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
-					<fileInfo id="com.nvidia.cuda.ide.seven_five.configuration.debug.1134832286.90492777" name="fftbench.cu" rcbsApplicability="disable" resourcePath="src/fftbench.cu" toolsToInvoke="nvcc.compiler.base.1896988810.1745521646">
-						<tool id="nvcc.compiler.base.1896988810.1745521646" name="NVCC Compiler" superClass="nvcc.compiler.base.1896988810"/>
+					<fileInfo id="com.nvidia.cuda.ide.seven_five.configuration.debug.1134832286.234350666" name="fftbench_multi.cu" rcbsApplicability="disable" resourcePath="src/fftbench_multi.cu" toolsToInvoke="nvcc.compiler.base.1896988810.1237425965">
+						<tool id="nvcc.compiler.base.1896988810.1237425965" name="NVCC Compiler" superClass="nvcc.compiler.base.1896988810"/>
+						<tool customBuildStep="true" id="org.eclipse.cdt.managedbuilder.ui.rcbs.294701574" name="Resource Custom Build Step">
+							<inputType id="org.eclipse.cdt.managedbuilder.ui.rcbs.inputtype.1127836366" name="Resource Custom Build Step Input Type">
+								<additionalInput kind="additionalinputdependency" paths=""/>
+							</inputType>
+							<outputType id="org.eclipse.cdt.managedbuilder.ui.rcbs.outputtype.452712791" name="Resource Custom Build Step Output Type"/>
+						</tool>
 					</fileInfo>
 					<sourceEntries>
-						<entry excluding="fftbench.cu|fredda.cu" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
+						<entry excluding="fftbench_multi.cu|fftbench.cu|fredda.cu" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -249,9 +257,12 @@
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
 	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="O3"/>
+		<configuration configurationName="Debugtest_cuda"/>
 		<configuration configurationName="Debug fredda">
 			<resource resourceType="PROJECT" workspacePath="/cudafdmt"/>
 		</configuration>
+		<configuration configurationName="03 with debug"/>
 		<configuration configurationName="Debug test_cuda">
 			<resource resourceType="PROJECT" workspacePath="/cudafdmt"/>
 		</configuration>

@@ -95,7 +95,7 @@ public:
 	void update_scaleoffset(RescaleOptions& options, int iant, cudaStream_t stream = 0);
 
 	// Call after updatescaleoffset in the first run to reset to the beginning
-	void reset_ant_stats(int iant);
+	void reset_ant_stats_for_first_block(int iant);
 
 	// Does full update for all antennas
 	void update_rescale_statistics();

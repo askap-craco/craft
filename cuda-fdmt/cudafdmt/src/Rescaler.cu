@@ -159,7 +159,7 @@ void Rescaler::dump_block_data() {
 	tdump.stop();
 }
 
-void Rescaler::reset_ant_stats(int iant) {
+void Rescaler::reset_ant_stats_for_first_block(int iant) {
 	// reset a single antenna - dont dump or count flags
 	// This is a bit hacky, but it'll do fo rnow
 	assert(iant >= 0 && iant < options.nants);
@@ -169,6 +169,9 @@ void Rescaler::reset_ant_stats(int iant) {
 	size_t idx = array4d_idx(&nsamps, 0, iant, 0, 0);
 	assert(nsamps.d_device != NULL);
 	gpuErrchk(cudaMemset(&nsamps.d_device[idx], 0, size * sizeof(fdmt_dtype)));
+
+	// Copy block mean to rescaler mean so it starts near the right place when we decode this block
+	gpuErrchk(cudaMemcpy(&decay_offset.d_device[idx], &mean.d_device[idx], size*sizeof(fdmt_dtype), cudaMemcpyDeviceToDevice));
 }
 
 void Rescaler::finish_all_ants() {
