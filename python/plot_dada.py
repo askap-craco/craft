@@ -49,6 +49,8 @@ def _main():
     nint = int(hdr.get_value('NT', nint))
     transpose = None
 
+
+
     if order == 'TFBP':
         shape = (nint, nchan, nbeam, npol)
     elif order == 'TBPF':
@@ -61,6 +63,8 @@ def _main():
         raise ValueError('Unknown order {}'.format(order))
 
 
+    print nbeam, nchan, npol, tstart, nint, dtype, order, nint, shape, transpose
+    
     f = dada.DadaFile(values.files[0], shape=shape)
     for b in f.blocks():
         plot(b, nint, nbeam, nchan, npol, transpose, values)
