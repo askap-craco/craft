@@ -159,9 +159,9 @@ class RescalePlot(object):
             bdn = bd[name]
             (nant, nbeams, nsamp) = bdn.shape
             xsamp = np.arange(nsamp)
-            showplot(ax[iax], xsamp, bdn[iant, :, :].T, values, name)
-            showplot(ax2[iax], xbeams, bdn[:,:,values.sample].T , values, name)
-            showplot(ax3[iax], xsamp, bdn[:,ibeam,:].T, values, name)
+            showplot(ax[iax], xsamp, bdn[iant, :, :].T, values, name, beam_labels)
+            showplot(ax2[iax], xbeams, bdn[:,:,values.sample].T , values, name, ant_labels)
+            showplot(ax3[iax], xsamp, bdn[:,ibeam,:].T, values, name, ant_labels)
             iax += 1
 
         iax -= 1
