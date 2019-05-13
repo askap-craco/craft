@@ -130,10 +130,16 @@ class RescalePlot(object):
 
         xbeams = np.arange(nbeams)
         xant = np.arange(len(d.antennas))
+        #plotnames = ['mean','std','kurt','scale','offset', 'decay_offset', 'nsamps', 'gtest']
+        plotnames = ['mean','std','kurt','scale','offset', 'decay_offset', 'gtest']
+        
+        for iname, name in enumerate(plotnames):
 
-        for iname, name in enumerate(['mean','std','kurt','scale','offset', 'decay_offset', 'nsamps']):
-
-            bdn = bd[name]
+            if name == 'gtest':
+                tsamp = 2047.
+                bdn = bd['mean']**2/bd['std']**2 / tsamp - 1.0
+            else:
+                bdn = bd[name]
             if values.log:
                 bdn= 10*np.log10(bdn)
             elif values.lognz:
