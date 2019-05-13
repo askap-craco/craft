@@ -109,6 +109,7 @@ public:
 	void flag_channel(int channel); // Set weights to zero for all beams/antennas fo rthis channel
 	int flag_frequencies_from_file(const char* filename); // Flag all frequencies in given file
 	bool flag_frequency(float freq); // flag the channel with frequency nearst the given frequency. Ignored it out of band
+	void flag_beam(int beamno);
 
 
 private:

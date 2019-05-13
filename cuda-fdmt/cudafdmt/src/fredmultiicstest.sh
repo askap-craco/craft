@@ -70,6 +70,12 @@ ls -l `which cudafdmt`
 cudapid=$!
 #cuda-gdb --args $cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1 -D -r 1 -K 30 -s 0
 
+# Setup export buffer
+#DADA_KEY=1234
+#all_keys="$all_keys $DADA_KEY"
+#dada_db -a 32768 -b 24772608 -n 2 -k $DADA_KEY  -l -p
+#dada_dbdisk -k 1234 -z -D . &
+#dada_dbmonitor -k $DADA_KEY &
 #wait $cudapid
 wait
 #dada_db -d -k $DADA_KEY

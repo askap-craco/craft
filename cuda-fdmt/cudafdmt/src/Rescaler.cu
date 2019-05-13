@@ -278,6 +278,17 @@ void Rescaler::flag_channel(int channel) {
 	array4d_copy_to_device(&weights);
 }
 
+void Rescaler::flag_beam(int beam) {
+	assert(beam >=0 && beam < options.nbeams_per_ant);
+	for (int iant = 0; iant < options.nants; iant++) {
+		for(int ichan = 0; ichan < options.nf; ichan++) {
+			int idx = array4d_idx(&weights, 0, iant, beam, ichan);
+			weights.d[idx] = 0.0f;
+		}
+	}
+	array4d_copy_to_device(&weights);
+}
+
 void Rescaler::process_ant_block(array4d_t& rescale_buf, void* read_buf_device,
 		RescaleOptions &options, int iant, cudaStream_t stream) {
 	int nbits = options.nbits;

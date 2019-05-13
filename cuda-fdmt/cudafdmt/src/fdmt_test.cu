@@ -210,6 +210,9 @@ int main(int argc, char* argv[])
 	Rescaler* rescaler = new Rescaler(rescale, params);
 	rescaler->set_scaleoffset(1.0f, 0.0f); // Just pass it straight through without rescaling
 
+	// HACK! - ASKAP beam71 is useless CRAFT-25
+	rescaler->flag_beam(71);
+
 	// Create fdmt
 	fdmt_t fdmt;
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d nbeams_alloc=%d\n",

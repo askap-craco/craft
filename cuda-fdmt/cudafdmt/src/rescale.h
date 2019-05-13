@@ -259,10 +259,9 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 		}
 		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && fabs(dm0sum) < block_dm0thresh;
 		bool this_sample_ok = fabs(dm0z) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
-		bool beam_ok = ibeam != 71;
 		int outidx = t + nt*(outc + nf*outbeam);
 
-		if (this_sample_ok && last_sample_ok && beam_ok) {
+		if (this_sample_ok && last_sample_ok) {
 			// Calculate higher order modments using a numerically stable approach.
 			// See: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
 			// https://people.xiph.org/~tterribe/notes/homs.html

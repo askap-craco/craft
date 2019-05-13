@@ -470,22 +470,26 @@ __global__ void rescale_update_scaleoffset_kernel (
 	if (prev_mean == 0) {
 		meanoff = 0;
 	} else {
-		meanoff = fabs(mean - prev_mean)/prev_mean;
+		meanoff = fabs(mean/prev_mean - 1.0f);
 	}
 	if (prev_std == 0) {
 		stdoff = 0;
 	} else {
-		stdoff = fabs(std - prev_std)/prev_std;
+		stdoff = fabs(std/prev_std - 1.0f);
 	}
 	kurtoff = fabs(kurt);
 
-	rescale_dtype integration_nsamp =  1024;
-	rescale_dtype gtest =fabs( mean*mean/(std*std)/integration_nsamp - 1.0f);
+
+	// The gaussiannity test (GTEST) never seems to pick up anything useful. SEe CRAFT-259
+	// And we'd have to get the integration_nsamp from the ingest, which ais a bunch of work.
+	// So chuck it for now.
+	//rescale_dtype integration_nsamp =  1024;
+	//rescale_dtype gtest =fabs( mean*mean/(std*std)/integration_nsamp - 1.0f);
 
 	// some of these divisions can be by 0, and the thresholds can be inf - this handles all that.
 
 	 bool thresh_ok = (meanoff <= mean_thresh) &&
-			(gtest<= std_thresh) &&
+			(stdoff <= std_thresh) &&
 			(kurtoff <= kurt_thresh);
 
 	if (! thresh_ok) {
@@ -503,13 +507,9 @@ __global__ void rescale_update_scaleoffset_kernel (
 		if (nsamp == 0) { // Don't update the scale and offset if everything has been flagged
 			offset = offsetarr[i];
 			scale = scalearr[i];
-		} else if (variance == 0.0) {
-			scale = 1.0*weight;
-			if (scale == 0.0f) {
-				offset = 0.0f;
-			} else {
-				offset = -mean + target_mean/scale;
-			}
+		} else if (variance == 0.0) { // In what possible circumstance, KB, would you expect this to be valid data?
+			scale = 0.0f;
+			offset = 0.0f;
 			//decayoffsetarr[i] = 0.0f;
 		} else {
 			scale = (target_stdev / sqrtf(variance))*weight;
