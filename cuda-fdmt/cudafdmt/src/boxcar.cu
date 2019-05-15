@@ -27,9 +27,11 @@ __host__ __device__ fdmt_dtype mymax(fdmt_dtype a, fdmt_dtype b)
 	return a > b ? a : b;
 }
 
+// These inline compile options used all to be #if(CUDART_VERSION >= 9000) but that didn't work
+// and got me introuble - so just upgrade your CUDART OK.
 __inline__ __device__ int shfl_xor(int val, int mask)
 {
-#if (CUDART_VERSION >= 9000)
+#if (1)
 	return __shfl_xor_sync(FULL_MASK, val, mask);
 #else
 	return __shfl_xor(val, mask);
@@ -39,7 +41,7 @@ __inline__ __device__ int shfl_xor(int val, int mask)
 
 __inline__ __device__ int shfl(int val, int leader)
 {
-#if (CUDART_VERSION >= 9000)
+#if (1)
 	return __shfl_sync(FULL_MASK, val, leader);
 #else
 	return __shfl(val, leader);
@@ -49,7 +51,7 @@ __inline__ __device__ int shfl(int val, int leader)
 
 __inline__ __device__ fdmt_dtype shfl_up(fdmt_dtype var, unsigned int delta, int width)
 {
-#if (CUDART_VERSION >= 9000)
+#if (1)
 	return __shfl_up_sync(FULL_MASK, var, delta, width);
 #else
 	return __shfl_up(var, delta, width);
@@ -58,7 +60,7 @@ __inline__ __device__ fdmt_dtype shfl_up(fdmt_dtype var, unsigned int delta, int
 
 __inline__ __device__ int ballot(int predicate)
 {
-#if (CUDART_VERSION >= 9000)
+#if (1)
 	return __ballot_sync(FULL_MASK, predicate);
 #else
 	return __ballot(predicate);
@@ -67,7 +69,7 @@ __inline__ __device__ int ballot(int predicate)
 
 __inline__ __device__ int any(int predicate)
 {
-#if (CUDART_VERSION >= 9000)
+#if (1)
 	return __any_sync(FULL_MASK, predicate);
 #else
 	return __any(predicate);
@@ -76,34 +78,31 @@ __inline__ __device__ int any(int predicate)
 
 __inline__ __device__ int all(int predicate)
 {
-#if (CUDART_VERSION >= 9000)
+#if (1)
 	return __all_sync(FULL_MASK, predicate);
 #else
 	return __all(predicate);
 #endif
 }
 
-
-
-
 __device__ inline int lane_id(void) { return threadIdx.x % WARP_SZ; }
-__device__ int warp_bcast(int v, int leader) { return __shfl(FULL_MASK, v, leader); }
-
-
+__device__ int warp_bcast(int v, int leader) { return __shfl_sync(FULL_MASK, v, leader); }
 
 // One of my favourite things ever
 // From here: https://devblogs.nvidia.com/parallelforall/faster-parallel-reductions-kepler/
 __inline__ __device__
 int warpAllReduceSum(int val) {
 	for (int mask = warpSize/2; mask > 0; mask /= 2)
-	  val += shfl_xor(val, mask);
+	  val += __shfl_xor_sync(FULL_MASK, val, mask);
 	return val;
 }
 
 __inline__ __device__
 fdmt_dtype warpAllReduceMax(fdmt_dtype val) {
-	for (int mask = warpSize/2; mask > 0; mask /= 2)
-	  val = max(val, (fdmt_dtype)shfl_xor(val, mask));
+	for (int mask = warpSize/2; mask > 0; mask /= 2) {
+		//val = max(val, (fdmt_dtype)shfl_xor(val, mask));
+		val = max(val, __shfl_xor_sync(FULL_MASK, val, mask));
+	}
 	return val;
 }
 
@@ -233,10 +232,6 @@ __global__ void boxcar_do_kernel (
 		// scale output value to have constant variance per boxcar size
 		fdmt_dtype vout = state/(sqrtf((float) (ibc + 1)));
 
-		if (idt == 0) {
-			//pri	ntf("ibc=%d hist_index = %d vin=%f state=%f vout=%f\n", ibc, history_index, vin, state, vout);
-		}
-
 		// write state into output
 		if (outdata != NULL) {
 			optr[ibc] = vout;
@@ -250,11 +245,11 @@ __global__ void boxcar_do_kernel (
 		// if in a detection:
 		if (cand.t >= 0) {
 			// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
-		  if (all(vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
+		  if (__all_sync(FULL_MASK, vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
 				// find maximum across all boxcars
 				fdmt_dtype best_sn_for_ibc = warpAllReduceMax(cand.sn);
 				// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
-				int boxcar_mask = ballot(best_sn_for_ibc == cand.sn);
+				int boxcar_mask = __ballot_sync(FULL_MASK, best_sn_for_ibc == cand.sn);
 				int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
 
 				//				printf("End of candidate. t=%d sn=%f idt=%d bestsn %f mask=0x%x ibc=%d best_ibc=%d got best? %d m_ncand %d\n",
@@ -276,7 +271,7 @@ __global__ void boxcar_do_kernel (
 			}
 		} else { // not currently in a detection
 			// do warp vote to see if any boxcars exceed threshold
-		  if (any(vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
+		  if (__any_sync(FULL_MASK, vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
 				cand.sn = vout;
 				cand.t = t;
 			}
@@ -389,16 +384,15 @@ __global__ void boxcar_do_kernel2 (
 		}
 
 		// here is the fun bit. Find best detection over all times and boxcars
-
 		// if in a detection:
 		if (cand.t >= 0) {
 			// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
-		  if (all(vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
+		  if (__all_sync(FULL_MASK, vout < threshold) || t == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
 				// find maximum across all boxcars
 				fdmt_dtype scaled_sn = cand.sn/ibc_scale; // scale by boxcar width, so all boxcars have the same variance
 				fdmt_dtype best_sn_for_ibc = warpAllReduceMax(scaled_sn);
 				// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
-				int boxcar_mask = ballot(best_sn_for_ibc == scaled_sn);
+				int boxcar_mask = __ballot_sync(FULL_MASK, best_sn_for_ibc == scaled_sn);
 				int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
 
 				// if you're the winner, you get to write to memory. Lucky you!
@@ -419,7 +413,7 @@ __global__ void boxcar_do_kernel2 (
 			}
 		} else { // not currently in a detection
 			// do warp vote to see if any boxcars exceed threshold
-		  if (any(vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
+		  if (__any_sync(FULL_MASK, vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
 				cand.sn = vout;
 				cand.t = t;
 			}
@@ -549,20 +543,21 @@ __global__ void boxcar_do_kernel3 (
 			// here is the fun bit. Find best detection over all times and boxcars
 			// if in a detection:
 			if (cand.t >= 0) {
-
 				if (vout > cand.sn) { // keep best value for this boxcar. Put here in case the final sample (next if statement) is true
 					cand.sn = vout;
 					cand.t = fullt;
 				}
 				// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
-				if (all(vout < threshold) || fullt == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
+				if (__all_sync(FULL_MASK, vout < threshold) || fullt == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
 					// find maximum across all boxcars
 					fdmt_dtype scaled_sn = cand.sn/ibc_scale; // scale by boxcar width, so all boxcars have the same variance
 					fdmt_dtype best_sn_for_ibc = warpAllReduceMax(scaled_sn);
 					// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
-					int boxcar_mask = ballot(best_sn_for_ibc == scaled_sn);
+					int boxcar_mask = __ballot_sync(FULL_MASK, best_sn_for_ibc == scaled_sn);
 					int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
-
+					if (idt == 20 && ibeam == 16) {
+						printf("cand.t=%d sn=%f idt=%d ibc=%d sn=%f best sn=%f mask=0x%x ibc=%d\n", cand.t, cand.sn, cand.idt, cand.ibc, scaled_sn, best_sn_for_ibc, boxcar_mask, best_ibc);
+					}
 					// if you're the winner, you get to write to memory. Lucky you!
 					if (ibc == best_ibc) {
 						if (ibc <= maxbc) {
@@ -584,7 +579,7 @@ __global__ void boxcar_do_kernel3 (
 				}
 			} else { // not currently in a detection
 				// do warp vote to see if any boxcars exceed threshold
-			  if (any(vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
+			  if (__any_sync(FULL_MASK, vout >= threshold)) { // one of the boxcars has a detection that beats the threshold
 					cand.sn = vout;
 					cand.t = fullt;
 				}
