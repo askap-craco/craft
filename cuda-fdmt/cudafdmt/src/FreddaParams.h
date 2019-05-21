@@ -32,7 +32,7 @@ public:
 	float gtest_thresh = INFINITY;
 	int nsamps_per_int = -1;
 	int flag_grow = 3;
-	int max_ncand_per_block = 4096;
+	int max_ncand_per_block = 1024*32;
 	int mindm = 0;
 	int maxbc = 32;
 	int max_nblocks = INT_MAX;

@@ -133,11 +133,12 @@ void Rescaler::update_scaleoffset(RescaleOptions& options, int iant,
 		cudaStream_t stream) {
 	assert(options.interval_samps > 0);
 	int nf = options.nf;
-	int nthreads = nf;
+	int nthreads = 128;
 	assert(num_elements_per_ant % nthreads == 0);
 	int nblocks = num_elements_per_ant / nthreads;
 	int boff = iant * options.nbeams_per_ant;
 	assert(options.nsamps_per_int != 0); // If it's not specified, it's negative - but that's OK.
+	assert(nblocks * nthreads == num_elements_per_ant);
 	rescale_update_scaleoffset_kernel<<<nblocks, nthreads, 0, stream>>>(
 			sum.d_device, sum2.d_device, sum3.d_device, sum4.d_device,
 			decay_offset.d_device, mean.d_device, std.d_device, kurt.d_device,

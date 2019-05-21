@@ -157,11 +157,15 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 	gpuErrchk(cudaPeekAtLastError());
 
 
+	int nthread = 128/nsamps_per_word; // Tuneable  -- needed if nf > 1024 which is a commmon limitiation for the number of threads.
+	dim3 griddim(nbeams_in, nwords/nthread);
+	dim3 blockdim(nsamps_per_word, nthread);
 
+	assert(griddim.y * blockdim.y == nwords);
+	assert(blockdim.x == nsamps_per_word);
+	assert(griddim.x == nbeams_in);
 
-	dim3 blockdim(nsamps_per_word, nwords);
-
-	rescale_update_and_transpose_float_kernel< nsamps_per_word, wordT ><<<nbeams_in, blockdim, 0, stream>>>(
+	rescale_update_and_transpose_float_kernel< nsamps_per_word, wordT ><<<griddim, blockdim, 0, stream>>>(
 			read_buf_device,
 			sum.d_device,
 			sum2.d_device,

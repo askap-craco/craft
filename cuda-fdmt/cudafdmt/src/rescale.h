@@ -171,9 +171,9 @@ template <int nsamps_per_word, typename wordT> __global__ void rescale_update_an
 	int ibeam = blockIdx.x;
 	int rsbeam = ibeam + boff;
 	int nbeams = gridDim.x;
+	int nwords = blockDim.y * gridDim.y;
+	int w = threadIdx.y + blockDim.y*blockIdx.y; // word index - partly thread, and partly block
 	int s = threadIdx.x; // sample index within a word
-	int w = threadIdx.y; // word index
-	int nwords = blockDim.y;
 	const int nf = nwords * nsamps_per_word;
 	const int c = w*nsamps_per_word + s; // channel number
 	const rescale_dtype k = decay_constant;
@@ -434,9 +434,18 @@ template <int nsamps_per_word, typename wordT> void
 //			rescale.dm0stats.d_device,
 //			nt);
 
-	dim3 blockdim(nsamps_per_word, nwords);
+	// We're spreading the channels over multiple blocks, which is ugly but the easiest way to support > 1024 channels
+	// without adding an extra loop in the kernel
 
-	rescale_update_and_transpose_float_kernel< nsamps_per_word, wordT ><<<nbeams, blockdim>>>(
+	int nthread = 128/nsamps_per_word; // Tuneable  -- needed if nf > 1024 which is a commmon limitiation for the number of threads.
+	dim3 griddim(nbeams, nwords/nthread);
+	dim3 blockdim(nsamps_per_word, nthread);
+
+	assert(griddim.y * blockdim.y == nwords);
+	assert(blockdim.x == nsamps_per_word);
+	assert(griddim.x == nbeams);
+
+	rescale_update_and_transpose_float_kernel< nsamps_per_word, wordT ><<<griddim, blockdim>>>(
 			read_buf,
 			rescale.sum.d_device,
 			rescale.sum2.d_device,
