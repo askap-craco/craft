@@ -29,7 +29,7 @@ void runtest_usage() {
 			"   -M M - Channel Mean relative change threshold. e.g. 1% is -M 0.01 \n"
 			"   -T T - Channel StdDev relative changed flagging threshold. e.g. 30% is -T 0.3 \n"
 			"   -K K - Channel Kurtosis threshold (3 is pretty good)\n"
-			"   -G G - GTEST threshold - Also must specify -I\n"
+			"   -G G - GTEST threshold - 0.25 is good. - Also must specify -I\n"
 			"   -I I - Number of samples per integration - required if -G is specified\n"
 			"   -z Z - Zap times with 0 DM above threshold Z\n"
 			"   -C C - Zap time/frequency cells with S/N above threshold C\n"
