@@ -496,10 +496,6 @@ __global__ void rescale_update_scaleoffset_kernel (
 			(kurtoff <= kurt_thresh) &&
 			(gtest <= gtest_thresh);
 
-	 if (gtest > gtest_thresh) {
-		 printf("Gtest failed %f %f rsbeam=%d c=%d\n", gtest, gtest_thresh, rsbeam, c);
-	 }
-
 	if (! thresh_ok) {
 //			printf("Rescale ibeam %d ic=%d meanoff=%f prev_mean=%f meanarr=%f mean_thresh=%f stdoff=%f prev_std=%f stdarr=%f kurtoff=%f thresh OK? %d\n",
 //							ibeam, ic, meanoff, prev_mean, meanarr[ic], mean_thresh, stdoff, prev_std, stdarr[ic], kurtoff, thresh_ok);
