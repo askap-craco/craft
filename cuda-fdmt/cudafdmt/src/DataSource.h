@@ -28,6 +28,7 @@ public:
 	virtual int npols() = 0;
 	virtual int nchans() = 0;
 	virtual int nbits() = 0;
+	virtual int nsamps_per_int() { return 1 ; }; // Number of samples per integration - needed for GTEST
 	virtual DataOrder data_order() = 0;
 
 	virtual size_t read_samples(void** output) = 0;

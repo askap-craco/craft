@@ -19,8 +19,6 @@
 
 using std::vector;
 
-//const rescale_dtype RESINFINITY = 1.0f/0.0f;
-
 struct RescaleOptions {
 public:
 	float target_mean;
@@ -31,6 +29,7 @@ public:
 	float kurt_thresh;
 	float dm0_thresh;
 	float cell_thresh;
+	float gtest_thresh; // Threshold as far as the user is concerned - around 0.3
 	int flag_grow;
 	bool invert_freq;
 	bool subtract_dm0;
@@ -40,6 +39,7 @@ public:
 	int nbeams_per_ant; // number of beams*number of polarisations per antenna
 	int nants; // number of antennas
 	int nbits;
+	int nsamps_per_int;
 	bool polsum;
 	DataOrder in_order;
 	rescale_dtype global_scale;

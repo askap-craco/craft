@@ -81,6 +81,7 @@ DadaSource::DadaSource(int nt, const char* keyname, bool lock) {
 	m_nbeams = get_header_int("NBEAM");
 	m_nchans = get_header_int("NCHAN");
 	m_nbits = get_header_int("NBIT");
+	m_nsamps_per_int = get_header_int("INT_TIME");
 	m_tsamp = get_header_double("TSAMP");
 	m_fch1 = get_header_double("FREQ");
 	m_foff = get_header_double("BW");

@@ -29,7 +29,8 @@ void runtest_usage() {
 			"   -M M - Channel Mean relative change threshold. e.g. 1% is -M 0.01 \n"
 			"   -T T - Channel StdDev relative changed flagging threshold. e.g. 30% is -T 0.3 \n"
 			"   -K K - Channel Kurtosis threshold (3 is pretty good)\n"
-//			"   -G N - Channel flag channel growing (flags N channels either side of a bad channel)\n"
+			"   -G G - GTEST threshold - Also must specify -I\n"
+			"   -I I - Number of samples per integration - required if -G is specified\n"
 			"   -z Z - Zap times with 0 DM above threshold Z\n"
 			"   -C C - Zap time/frequency cells with S/N above threshold C\n"
 			"   -F FILE - Flag frequencies contained in this file\n"
@@ -63,7 +64,7 @@ void FreddaParams::parse(int _argc, char* _argv[]) {
 	}
 	printf("\n");
 	int ch;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:DRg:M:T:U:K:G:C:F:n:m:b:z:N:X:uhp")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:DRg:M:T:U:K:G:I:C:F:n:m:b:z:N:X:uhp")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -105,7 +106,11 @@ void FreddaParams::parse(int _argc, char* _argv[]) {
 			mean_thresh = atof(optarg);
 			break;
 		case 'G':
-			flag_grow = atoi(optarg);
+			//flag_grow = atoi(optarg);
+			gtest_thresh = atof(optarg);
+			break;
+		case 'I':
+			nsamps_per_int = atoi(optarg);
 			break;
 		case 'C':
 			cell_thresh = atof(optarg);
@@ -166,6 +171,13 @@ void FreddaParams::parse(int _argc, char* _argv[]) {
 		exit(EXIT_FAILURE);
 	}
 	assert(seek_seconds >= 0);
+	assert(gtest_thresh > 0);
+
+	// Either INFINITY, -1 or non-infinity and defined are OK - this is exclusive or
+	if ((gtest_thresh != INFINITY) && nsamps_per_int == -1) {
+		printf("If you specify -G, you also need to specify -I\n");
+		exit(EXIT_FAILURE);
+	}
 }
 
 void FreddaParams::set_source(DataSource& _source) {
@@ -256,9 +268,9 @@ void FreddaParams::to_dada(char header_buf[])
 	ascii_header_set(header_buf, "SOURCE_NPOLS", "%d", source->npols());
 	ascii_header_set(header_buf, "SOURCE_NCHANS", "%d", source->nchans());
 	ascii_header_set(header_buf, "SOURCE_NBITS", "%d", source->nbits());
+	ascii_header_set(header_buf, "SOURCE_NSAMPS_PER_INT", "%d", source->nsamps_per_int());
 	ascii_header_set(header_buf, "SOURCE_DATA_ORDER", "%d", source->data_order());
 	ascii_header_set(header_buf, "SOURCE_NAME", "%s", source->name());
 	ascii_header_set(header_buf, "SOURCE_ANTENNA_NAME", "%s", source->antenna_name());
-
 }
 

@@ -51,6 +51,7 @@ typedef struct _rescale_gpu_t {
 	float std_thresh;
 	float dm0_thresh;
 	float cell_thresh;
+	float gtest_thresh;
 	int flag_grow;
 	uint64_t nf;
 	uint64_t nt;
@@ -103,6 +104,8 @@ __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype mean_thresh,
 		rescale_dtype std_thresh,
 		rescale_dtype kurt_thresh,
+		rescale_dtype gtest_thresh,
+		rescale_dtype nsamps_per_int,
 		int flag_grow,
 		int iant);
 

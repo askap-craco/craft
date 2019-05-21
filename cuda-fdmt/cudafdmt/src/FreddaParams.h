@@ -29,6 +29,8 @@ public:
 	float mean_thresh = INFINITY;
 	float dm0_thresh = INFINITY;
 	float cell_thresh = INFINITY;
+	float gtest_thresh = INFINITY;
+	int nsamps_per_int = -1;
 	int flag_grow = 3;
 	int max_ncand_per_block = 4096;
 	int mindm = 0;

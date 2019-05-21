@@ -45,6 +45,9 @@ Rescaler::Rescaler(RescaleOptions& _options, FreddaParams& _params) :
 
 	array4d_set(&scale, 1.0);
 
+	//_options.nsamps_per_int = _params.source->nsamps_per_int();
+	options.nsamps_per_int = _params.nsamps_per_int; // Get from command line, not from source
+
 	// set up the options to use if we don't want to do flagging
 	noflag_options = options; // make a copy
 	// For not flagging, we set the thresholds to max value
@@ -53,8 +56,11 @@ Rescaler::Rescaler(RescaleOptions& _options, FreddaParams& _params) :
 	noflag_options.kurt_thresh = INFINITY;
 	noflag_options.dm0_thresh = INFINITY;
 	noflag_options.cell_thresh = INFINITY;
+	noflag_options.gtest_thresh = INFINITY;
 	noflag_options.decay_constant = 0;
 	noflag_options.flag_grow = 1;
+
+
 	switch (options.in_order) {
 	case DataOrder::BPTF:
 		break; // supported for all values of NBITS
@@ -131,12 +137,16 @@ void Rescaler::update_scaleoffset(RescaleOptions& options, int iant,
 	assert(num_elements_per_ant % nthreads == 0);
 	int nblocks = num_elements_per_ant / nthreads;
 	int boff = iant * options.nbeams_per_ant;
+	assert(options.nsamps_per_int > 0);
 	rescale_update_scaleoffset_kernel<<<nblocks, nthreads, 0, stream>>>(
 			sum.d_device, sum2.d_device, sum3.d_device, sum4.d_device,
 			decay_offset.d_device, mean.d_device, std.d_device, kurt.d_device,
 			offset.d_device, scale.d_device, weights.d_device, nsamps.d_device,
 			options.target_stdev, options.target_mean, options.mean_thresh,
-			options.std_thresh, options.kurt_thresh, options.flag_grow, boff);
+			options.std_thresh, options.kurt_thresh, options.gtest_thresh,
+			options.nsamps_per_int,
+			options.flag_grow,
+			boff);
 	gpuErrchk(cudaPeekAtLastError());
 	if (iant == 0) {
 		sampnum = 0;

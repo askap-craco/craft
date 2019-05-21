@@ -36,6 +36,9 @@ public:
 	int nbits() {
 		return m_nbits;
 	}
+	int nsamps_per_int() {
+		return m_nsamps_per_int;
+	}
 	int nants() {
 		return 1;
 	}
@@ -88,6 +91,7 @@ private:
     int m_nchans;
     int m_nbits;
     int m_nt;
+    int m_nsamps_per_int;
     double m_tsamp;
     double m_fch1;
     double m_foff;

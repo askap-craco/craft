@@ -420,6 +420,8 @@ __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype mean_thresh,
 		rescale_dtype std_thresh,
 		rescale_dtype kurt_thresh,
+		rescale_dtype gtest_thresh,
+		rescale_dtype nsamps_per_int,
 		int flag_grow,
 		int boff)
 {
@@ -483,14 +485,20 @@ __global__ void rescale_update_scaleoffset_kernel (
 	// The gaussiannity test (GTEST) never seems to pick up anything useful. SEe CRAFT-259
 	// And we'd have to get the integration_nsamp from the ingest, which ais a bunch of work.
 	// So chuck it for now.
-	//rescale_dtype integration_nsamp =  1024;
-	//rescale_dtype gtest =fabs( mean*mean/(std*std)/integration_nsamp - 1.0f);
+	// But aaaah, on the contrary, it does find some things, so we will use it after all.
+
+	rescale_dtype gtest =fabs(mean*mean/variance/nsamps_per_int - rescale_dtype(1));
 
 	// some of these divisions can be by 0, and the thresholds can be inf - this handles all that.
 
 	 bool thresh_ok = (meanoff <= mean_thresh) &&
 			(stdoff <= std_thresh) &&
-			(kurtoff <= kurt_thresh);
+			(kurtoff <= kurt_thresh) &&
+			(gtest <= gtest_thresh);
+
+	 if (gtest > gtest_thresh) {
+		 printf("Gtest failed %f %f rsbeam=%d c=%d\n", gtest, gtest_thresh, rsbeam, c);
+	 }
 
 	if (! thresh_ok) {
 //			printf("Rescale ibeam %d ic=%d meanoff=%f prev_mean=%f meanarr=%f mean_thresh=%f stdoff=%f prev_std=%f stdarr=%f kurtoff=%f thresh OK? %d\n",
@@ -559,6 +567,8 @@ void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale, int iant)
 			rescale.mean_thresh,
 			rescale.std_thresh,
 			rescale.kurt_thresh,
+			rescale.gtest_thresh,
+			1.0f,
 			rescale.flag_grow,
 			boff);
 	// zero decay offsets after updating block offsets - otherwise you get big steps. CRAFT-206

@@ -191,6 +191,7 @@ int main(int argc, char* argv[])
 	rescale.flag_grow = params.flag_grow;
 	rescale.dm0_thresh = params.dm0_thresh;
 	rescale.cell_thresh = params.cell_thresh;
+	rescale.gtest_thresh = params.gtest_thresh;
 	rescale.invert_freq = (params.foff < 0);
 	rescale.subtract_dm0 = params.subtract_dm0;
 	rescale.nt = nt;
@@ -201,11 +202,11 @@ int main(int argc, char* argv[])
 	rescale.nbits = source->nbits();
 	rescale.in_order = source->data_order();
 	// set guess of initial scale and offset to dm0 thresholding works
-	printf("Rescaling to mean=%f stdev=%f decay constant=%f mean/std/kurtosis/dm0/Cell thresholds: %0.1f/%0.1f/%0.1f/%0.1f/%0.1f grow flags by %d channels\n",
+	printf("Rescaling to mean=%f stdev=%f decay constant=%f mean/std/kurtosis/dm0/Cell/gtest thresholds: %0.1f/%0.1f/%0.1f/%0.1f/%0.1f/%0.1f grow flags by %d channels\n",
 			rescale.target_mean,rescale.target_stdev,
 			rescale.decay_constant,
 			rescale.mean_thresh, rescale.std_thresh, rescale.kurt_thresh,
-			rescale.dm0_thresh, rescale.cell_thresh,
+			rescale.dm0_thresh, rescale.cell_thresh, rescale.gtest_thresh,
 			rescale.flag_grow);
 	Rescaler* rescaler = new Rescaler(rescale, params);
 	rescaler->set_scaleoffset(1.0f, 0.0f); // Just pass it straight through without rescaling

@@ -44,6 +44,9 @@ public:
 	int npols() {
 		return first_source->npols();
 	}
+	int nsamps_per_int() {
+		return first_source->nsamps_per_int();
+	}
 	int nants() {
 		return m_sources.size();
 	}
