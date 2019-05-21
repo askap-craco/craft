@@ -555,9 +555,6 @@ __global__ void boxcar_do_kernel3 (
 					// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
 					int boxcar_mask = __ballot_sync(FULL_MASK, best_sn_for_ibc == scaled_sn);
 					int best_ibc = __ffs(boxcar_mask) - 1; // __ffs finds first set bit = lowsest ibc that had the all tiem best vout
-					if (idt == 20 && ibeam == 16) {
-						printf("cand.t=%d sn=%f idt=%d ibc=%d sn=%f best sn=%f mask=0x%x ibc=%d\n", cand.t, cand.sn, cand.idt, cand.ibc, scaled_sn, best_sn_for_ibc, boxcar_mask, best_ibc);
-					}
 					// if you're the winner, you get to write to memory. Lucky you!
 					if (ibc == best_ibc) {
 						if (ibc <= maxbc) {
