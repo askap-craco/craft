@@ -153,8 +153,16 @@ void Rescaler::reset_output(array4d_t& rescale_buf) {
 void Rescaler::update_rescale_parameters(RescaleOptions& options, int iant,
 		cudaStream_t stream) {
 	assert(options.interval_samps > 0);
-	int nthreads = 128;
-	assert(num_elements_per_ant % nthreads == 0);
+	//int nthreads = 128;
+	//assert(num_elements_per_ant % nthreads == 0);
+	int nf = options.nf;
+	int nthreads;
+	if (nf < 512) {
+		nthreads = nf;
+	} else{
+		assert(nf % 128 == 0);
+		nthreads = nf/128;
+	}
 	int nblocks = num_elements_per_ant / nthreads;
 	int boff = iant * options.nbeams_per_ant;
 	assert(options.nsamps_per_int != 0); // If it's not specified, it's negative - but that's OK.

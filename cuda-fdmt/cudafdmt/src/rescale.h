@@ -313,7 +313,7 @@ __global__ void rescale_calc_stats (
 	sum3arr[rsidx] = m3;
 	sum4arr[rsidx] = m4;
 	//decay_offsetarr[rsidx] = decay_offset;
-	//nsampsarr[rsidx] = (float)nsamps;
+	nsampsarr[rsidx] = (float)nsamps;
 }
 
 template <int nsamps_per_word, typename wordT>
