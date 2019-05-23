@@ -25,7 +25,7 @@ def convert(v):
         return v
 
 def isok(v):
-    return not np.isnan(v)
+    return np.isfinite(v)
 
 class Stats(object):
     def __init__(self, antennas, nbeams, time, values):
