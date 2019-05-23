@@ -13,7 +13,6 @@ import sys
 import logging
 from rtdata import FreddaRescaleData
 
-
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 class Formatter(object):
