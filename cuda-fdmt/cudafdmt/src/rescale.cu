@@ -465,7 +465,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 //		kurt = 0;
 	//}
 
-	rescale_dtype skew = sqrtf(nsamp)*m3[i]/powf(m2[i], 1.5f);
+	//rescale_dtype skew = sqrtf(nsamp)*m3[i]/powf(m2[i], 1.5f);
 
 	// save flag inputs
 
@@ -514,6 +514,14 @@ __global__ void rescale_update_scaleoffset_kernel (
 
 		flag = true;
 
+	}
+
+	// OOOH, OK, it's hacky but coudl be useful. This channel if any channel in the current block of 32 is flagged
+	int flag_ballot = __ballot_sync(0xffffffff, flag);
+	int lane_id = threadIdx.x % 32;
+	int mask = ((1 << flag_grow) - 1) << (lane_id - flag_grow/2);
+	if (mask & flag_ballot) {
+		flag = true;
 	}
 
 	if (flag) {

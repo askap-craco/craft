@@ -33,6 +33,7 @@ void runtest_usage() {
 			"   -I I - Number of samples per integration - required if -G is specified\n"
 			"   -z Z - Zap times with 0 DM above threshold Z\n"
 			"   -C C - Zap time/frequency cells with S/N above threshold C\n"
+			"   -W W - Grow frequency flags by W channels\n"
 			"   -F FILE - Flag frequencies contained in this file\n"
 			"   -u   - Subtract DM0 time series from spectrum\n"
 			"   -p   - Sum polarisations\n"
@@ -64,7 +65,7 @@ void FreddaParams::parse(int _argc, char* _argv[]) {
 	}
 	printf("\n");
 	int ch;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:DRg:M:T:U:K:G:I:C:F:n:m:b:z:N:X:uhp")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:DRg:M:T:U:K:G:I:C:F:W:n:m:b:z:N:X:uhp")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -106,8 +107,10 @@ void FreddaParams::parse(int _argc, char* _argv[]) {
 			mean_thresh = atof(optarg);
 			break;
 		case 'G':
-			//flag_grow = atoi(optarg);
 			gtest_thresh = atof(optarg);
+			break;
+		case 'W':
+			flag_grow = atoi(optarg);
 			break;
 		case 'I':
 			nsamps_per_int = atoi(optarg);
