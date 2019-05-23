@@ -460,10 +460,10 @@ __global__ void rescale_update_scaleoffset_kernel (
 	rescale_dtype m4i = m4[i]/(variance*variance);
 	rescale_dtype m2i = m2[i]/(variance);
 
-    rescale_dtype kurt = rescale_dtype(nsamp)*(m4i / (m2i*m2i)) - rescale_dtype(3);
-	if (!isfinite(kurt)) {
-		kurt = 0;
-	}
+    rescale_dtype kurt = rescale_dtype(nsamp)*(m4i / m2i / m2i) - rescale_dtype(3);
+	//if (!isfinite(kurt)) {
+//		kurt = 0;
+	//}
 
 	rescale_dtype skew = sqrtf(nsamp)*m3[i]/powf(m2[i], 1.5f);
 
