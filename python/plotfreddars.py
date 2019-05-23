@@ -96,9 +96,16 @@ class RescalePlot(object):
         print d.nbeams
         fig, fig2, fig3,fig4,fig5 = self.figs
         ax, ax2, ax3,ax4,ax5 = self.axs
-    
-        blkidx = values.blkidx
-        ichan = values.ichan
+
+        if values.blkidx >= 0:
+            blkidx = values.blkidx
+        else:
+            blkidx = d.nblocks + values.blkidx
+
+        if values.freq:
+            ichan = np.argmin(abs(d.freqs - values.freq))
+        else:
+            ichan = values.ichan
         ibeam = values.ibeam
         bd = d[blkidx]
         prevbd = None
@@ -124,6 +131,7 @@ class RescalePlot(object):
             iant = 0
             for a in d.antennas:
                 beam_labels.extend(['{} b{}'.format(a, b) for b in xrange(nbeams)])
+            ant_labels = beam_labels
         else:
             beam_labels = ['beam={}'.format(b) for b in xrange(nbeams)]
                 
@@ -138,15 +146,26 @@ class RescalePlot(object):
             if name == 'gtest':
                 tsamp = 2047.
                 bdn = bd['mean']**2/bd['std']**2 / tsamp - 1.0
+                if prevbd:
+                    prevbd['gtest'] = prevbd['mean']**2/prevbd['std']**2 / tsamp - 1.0
             else:
                 bdn = bd[name]
+                
             if values.log:
                 bdn= 10*np.log10(bdn)
             elif values.lognz:
                 bdn = 10*np.log10(bdn - bdn.min() + 1) # scalethe log so you dont log0
             if prevbd:
                 bdn /= prevbd[name]
+                bdn -= 1.
 
+            if values.normant is not None:
+                normant = antnumbers.index(values.normant)
+                bdn /= bdn[normant, :, :]
+
+            if values.normchan is not None:
+                bdn /= bdn[:, :, values.normchan][:,:,np.newaxis]
+                
             nant, nbeam, nchan = bdn.shape
             if values.antmerge:
                 bdn.shape = (1, nant*nbeam, -1)
@@ -203,6 +222,7 @@ def _main():
     #parser.add_argument('-b','--beam', type=int, antenna='bea
     parser.add_argument('-a','--ant', type=int, help='Antenna number', default=None)
     parser.add_argument('-c','--ichan', type=int, help='Channel number', default=0)
+    parser.add_argument('-f','--freq', type=float, help='Frequency', default=None)
     parser.add_argument('-t','--sample', type=int, help='Sample number', default=0)
     parser.add_argument('-b','--ibeam', type=int, help='Beam number', default=0)
     parser.add_argument('-i','--blkidx', type=int, help='Block index', default=0)
@@ -211,6 +231,8 @@ def _main():
     parser.add_argument('--image', action='store_true', default=False, help='Show images rathe rthan lines')
     parser.add_argument('-r','--ratio', action='store_true', default=False, help='Plot ratio between this integration and the previous one')
     parser.add_argument('--antmerge', action='store_true', help='Merge antennas with beams so you see everything')
+    parser.add_argument('--normant', type=int, help='Normalise by this antenna number')
+    parser.add_argument('--normchan', type=int, help='Normalise by this channel')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
     if values.verbose:
