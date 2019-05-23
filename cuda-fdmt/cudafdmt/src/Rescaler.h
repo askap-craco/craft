@@ -71,9 +71,9 @@ public:
 
 	void reset_output(array4d_t& rescale_buf); // Set output buffer to zero to start accumulating again
 
-	void process_ant_block(void* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream=0);
+	void process_ant_block(void* read_buf, int iant, cudaStream_t stream=0);
 
-	void finish_all_ants(); // Needs to be called after a cudaDeviceSynchronize
+	void finish_all_ants(array4d_t& outbuf); // Needs to be called after a cudaDeviceSynchronize
 
 	void set_scaleoffset(float s_scale, float s_offset);
 
@@ -102,6 +102,10 @@ private:
 	array4d_t decay_offset;
 	array4d_t weights; // weights for antennas/beams.
 	uint64_t sampnum;
+
+	size_t in_buffer_bytes_per_ant;
+	uint8_t* in_buffer_device;
+
 	int num_elements;
 	int num_elements_per_ant;
 
@@ -122,7 +126,7 @@ private:
 	void dump_rescale_data(); // Dump rescaler data to disk
 	void dump_block_data(); // Dump block data to disk
 
-	void apply_flags_and_sum(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream=0);
+	void apply_flags_and_sum(array4d_t& rescale_buf, RescaleOptions& options, int iant, cudaStream_t stream=0);
 
 	template <int nsamps_per_word, typename wordT>
 	void do_apply_flags_and_sum(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream);

@@ -42,8 +42,13 @@ Rescaler::Rescaler(RescaleOptions& _options, FreddaParams& _params) :
 	weights.nz = nf;
 	array4d_malloc(&weights, true, true);
 	array4d_set(&weights, 1.0);
-
 	array4d_set(&scale, 1.0);
+
+	//rescale input buffer - is a unit8_t type, so probably shouldn't do with an array4d_t
+	in_buffer_bytes_per_ant = params.nbeams_per_antenna*nf*nt*params.nbits/8;
+	printf("Copy in buffer size = %d MB per ant = %d MB TOTAL \n", in_buffer_bytes_per_ant/(1024l*1024l), in_buffer_bytes_per_ant*options.nants/(1024l*1024l));
+	gpuErrchk( cudaMalloc((void**) &in_buffer_device, in_buffer_bytes_per_ant*options.nants));
+
 
 	//_options.nsamps_per_int = _params.source->nsamps_per_int();
 	options.nsamps_per_int = _params.nsamps_per_int; // Get from command line, not from source
@@ -121,6 +126,22 @@ Rescaler::~Rescaler() {
 		delete d;
 	}
 	block_dumpers.clear();
+
+	cudaFree(in_buffer_device);
+	rescale_arrayfree(sum);
+	rescale_arrayfree(sum2);
+	rescale_arrayfree(sum3);
+	rescale_arrayfree(sum4);
+	rescale_arrayfree(mean);
+	rescale_arrayfree(std);
+	rescale_arrayfree(kurt);
+	rescale_arrayfree(dm0);
+	rescale_arrayfree(dm0count);
+	rescale_arrayfree(dm0stats);
+	rescale_arrayfree(nsamps);
+	rescale_arrayfree(scale);
+	rescale_arrayfree(offset);
+	rescale_arrayfree(decay_offset);
 
 }
 
@@ -254,7 +275,10 @@ void Rescaler::reset_block_stats_for_first_block(int iant) {
 	gpuErrchk(cudaMemcpy(&decay_offset.d_device[idx], &mean.d_device[idx], size*sizeof(fdmt_dtype), cudaMemcpyDeviceToDevice));
 }
 
-void Rescaler::finish_all_ants() {
+void Rescaler::finish_all_ants(array4d_t& outbuf) {
+	for (int iant = 0; iant < options.nants; iant++) {
+		apply_flags_and_sum(outbuf, options, iant, 0);
+	}
 	// needs to be called once all blocks have finished. e.g. after a cudaDeviceSynchronize()
 
 	if (params.do_dump_rescaler) {
@@ -270,9 +294,17 @@ void Rescaler::finish_all_ants() {
 }
 
 
-void Rescaler::process_ant_block(void* this_ant_buffer, RescaleOptions& options, int iant, cudaStream_t stream)
+void Rescaler::process_ant_block(void* read_buf, int iant, cudaStream_t stream)
 {
 	assert(iant >= 0 && iant < options.nants);
+
+	// copy to GPU
+	void* this_ant_buffer = in_buffer_device + iant*in_buffer_bytes_per_ant;
+
+	// Asynchronous copy goes onto the stream for that antenna - each antenna stream also has update and scaleoffset kernes
+	gpuErrchk(cudaMemcpyAsync(this_ant_buffer,
+			read_buf, in_buffer_bytes_per_ant*sizeof(uint8_t), cudaMemcpyHostToDevice, stream));
+
 
 	// Do special treatment of first block - calculate and apply statistics *WITHOUT FLAGGING* to get a starting point
 	if (blocknum == 0 && params.num_rescale_blocks > 0) { // if first block rescale and update with no
@@ -379,10 +411,10 @@ void Rescaler::calculate_block_stats(void* read_buf_device,
 	}
 }
 
-
-void Rescaler::apply_flags_and_sum(array4d_t& rescale_buf, void* read_buf_device,
+void Rescaler::apply_flags_and_sum(array4d_t& rescale_buf,
 		RescaleOptions &options, int iant, cudaStream_t stream) {
 	int nbits = options.nbits;
+	uint8_t* read_buf_device = in_buffer_device + iant*in_buffer_bytes_per_ant;
 	switch (nbits) {
 	case 1:
 		do_apply_flags_and_sum<32, uint32_t>(rescale_buf,

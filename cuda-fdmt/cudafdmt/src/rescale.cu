@@ -277,6 +277,17 @@ void rescale_arraymalloc(array4d_t* arr, uint64_t nant, uint64_t nbeams, uint64_
 	array4d_zero(arr);
 }
 
+void rescale_arrayfree(array4d_t& arr)
+{
+	if (arr.d) {
+		free(arr.d);
+	}
+	if (arr.d_device) {
+		gpuErrchk(cudaFree(arr.d_device));
+	}
+
+}
+
 rescale_gpu_t* rescale_allocate_gpu(rescale_gpu_t* rescale, uint64_t nbeams, uint64_t nf, uint64_t nt, bool alloc_host)
 {
 	uint64_t nelements = nbeams*nf;

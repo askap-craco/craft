@@ -122,11 +122,6 @@ int main(int argc, char* argv[])
 			<< source->nchans() << " foff " << source->foff() << endl;
 
 	printf("S/N Threshold %f Max ncand per block %d mindm %d \n", params.thresh, params.max_ncand_per_block, params.mindm);
-	//rescale input buffer
-	size_t in_buffer_bytes_per_ant = params.nbeams_per_antenna*nf*nt*params.nbits/8;
-	uint8_t* in_buffer_device;
-	printf("Copy in buffer size = %d MB per ant = %d MB TOTAL \n", in_buffer_bytes_per_ant/(1024l*1024l), in_buffer_bytes_per_ant*source->nants()/(1024l*1024l));
-	gpuErrchk( cudaMalloc((void**) &in_buffer_device, in_buffer_bytes_per_ant*source->nants() ));
 
 
 	DadaSink* dada_sink = NULL;
@@ -284,18 +279,12 @@ int main(int argc, char* argv[])
 				break;
 			}
 
-			uint8_t* this_ant_buffer = in_buffer_device + iant*in_buffer_bytes_per_ant;
-
-			// Asynchronous copy goes onto the stream for that antenna - each antenna stream also has update and scaleoffset kernes
-			gpuErrchk(cudaMemcpyAsync(this_ant_buffer,
-					read_buf, in_buffer_bytes_per_ant*sizeof(uint8_t), cudaMemcpyHostToDevice, streams[iant]));
-
 			// this time we rescale with the flagging turned on
-			rescaler->process_ant_block(this_ant_buffer, rescaler->options, iant, streams[iant]);
+			rescaler->process_ant_block(read_buf, iant, streams[iant]);
 
 		}
 		gpuErrchk(cudaDeviceSynchronize()); // Synchonize after doing all those asynchronous, multistream things
-		rescaler->finish_all_ants();
+		rescaler->finish_all_ants(rescale_buf);
 
 		fdmt.t_copy_in.stop();
 
