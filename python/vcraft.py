@@ -60,7 +60,7 @@ def unpack_craft(fin, nsamp_per_word):
         dwords >> 4
 
 class VcraftFile(object):
-    def __init__(self, fname, mode=None):
+    def __init__(self, fname, mode=None, read_ahead=128):
         self.fname = fname
         f = fname
         hdr = DadaHeader.fromfile(f+'.hdr')
@@ -93,6 +93,12 @@ class VcraftFile(object):
         self.bat0_40 = self.bat0 & 0xffffffffff
         self.beam = int(hdr['BEAM'][0])
         self.pol = hdr.get('POL', (None, None))[0]
+        self._read_ahead_nsamp = int(read_ahead) # number of samples to read ahead
+        self._cache_startsamp = None
+        self._cache_requested_nsamp = None
+        self._cache_data = None
+        self._cache_hits = 0
+
         if self.pol is None:
             if self.beam % 2 == 0:
                 self.pol = 'X'
@@ -130,7 +136,33 @@ class VcraftFile(object):
         # lowest 32 bits of bat from the time the file was written
         print 'FRAMES duration', (frames[0] - frames[1])/infsamp,'offset', (frames[2] - frames[0])/infsamp
 
-    def read(self, startsamp=0, nsamp=None):
+    def _cache_put(self, startsamp, requested_nsamp, d):
+        log.debug('Putting cache %s %s %s', startsamp, requested_nsamp, d.shape)
+        self._cache_startsamp = startsamp
+        self._cache_requested_nsamp = requested_nsamp
+        self._cache_data = d
+
+    def _cache_get(self, startsamp, requested_nsamp):
+
+        if self._cache_data is None:
+            log.debug('No cache data {}'.format(self.fname))
+            return None
+
+        cstart = self._cache_startsamp
+        cend = cstart + self._cache_data.shape[0]
+        if cstart <= startsamp < cend and cstart <= startsamp + requested_nsamp < cend:
+            dstart = startsamp - cstart
+            dend = dstart + requested_nsamp
+            retd = self._cache_data[dstart:dend, :]
+            self._cache_hits += 1
+            log.debug('Cache hit %s %s %s %s', self._cache_hits, self.fname, dstart, dend)
+        else:
+            log.debug('Cache miss %s %s %s %s %s', startsamp, requested_nsamp, cstart, cend, self.fname)
+            retd = None
+
+        return retd
+
+    def read(self, startsamp=0, requested_nsamp=None):
         ''' Reads everything and returns a numpy array
         with shape dtype=(nsamps,nchan) and dtype=np.complex64
         '''
@@ -138,12 +170,28 @@ class VcraftFile(object):
         mode = self.mode
         fin = self.fin
         nchan = len(self.freqs)
-        self.fin.seek(self.hdrsize)
-        assert startsamp >= 0, 'Invalid startsamp {} {}'.format(startsamp, self.fname)
-        if nsamp is None:
-            nsamp = self.nsamps - startsamp
 
-        assert startsamp + nsamp <= self.nsamps, 'Asked for too many samples. startsamp {} nsamp {} nsamps {}'.format(startsamp, nsamp, self.nsamps)
+        assert startsamp >= 0, 'Invalid startsamp {} {}'.format(startsamp, self.fname)
+        if requested_nsamp is None:
+            requested_nsamp = self.nsamps - startsamp
+
+        if requested_nsamp < 0:
+            raise ValueError('Invalid request')
+
+        assert startsamp + requested_nsamp <= self.nsamps, 'Asked for too many samples. startsamp {} nsamp {} nsamps {}'.format(startsamp, nsamp, self.nsamps)
+
+        cached = self._cache_get(startsamp, requested_nsamp)
+        if cached is not None:
+            return cached
+
+        # Adjust number of samples to read to include read ahead
+        nsamp = requested_nsamp + self._read_ahead_nsamp
+
+        # This time, make sure we don't go past the end
+        nsamp = min(nsamp, self.nsamps - startsamp)
+
+        assert startsamp + nsamp <= self.nsamps, 'Incorrect read ahead calculation'
+        self.fin.seek(self.hdrsize)
 
         if mode == 0: # 16b+16b
             offset_bytes = startsamp*nchan*4 # each sample is 4 bytes
@@ -182,7 +230,7 @@ class VcraftFile(object):
             dwords.shape = nwords, nchan
             nsamps = nwords*2
             d = np.empty((nsamps, nchan, 2), dtype=np.int8)
-            unpack_vcraft.unpack_mode2_jit_v2(dwords, d)
+            raise ValueError('KB has stuff this up - need to get the new unpacker')
             d = d[sampoff:sampoff+nsamp, :, :]
             nsamps = nsamp
 
@@ -202,12 +250,15 @@ class VcraftFile(object):
             dwords.shape = (nwords, nchan)
             d = np.empty((nsamps, nchan, 2), dtype=np.int8)
             nsamps = nsamp
+            unpack_vcraft.unpack_mode2_jit_v2(dwords, d)
+            '''
             for samp in xrange(4):
                 # convert from 4-bit two's complement to int8
                 d[samp::4, :, 0] = (dwords & 0xf) - (dwords & 0x8)*2 # real
                 dwords >>= 4
                 d[samp::4, :, 1] = (dwords & 0xf) - (dwords & 0x8)*2 # imag
                 dwords >>= 4
+            '''
 
             d = d[sampoff:sampoff+nsamp, :, :]
 
@@ -238,11 +289,13 @@ class VcraftFile(object):
         else:
             raise ValueError('Unsupported mode (yet) {}'.format(mode))
 
-
         df = np.empty((nsamps, nchan), dtype=np.complex64)
         df.real = d[:, :, 0]
         df.imag = d[:, :, 1]
-        return df
+        dfout = df[:requested_nsamp, :]
+        self._cache_put(startsamp, requested_nsamp, df)
+
+        return dfout
 
     def print_summary(self):
         bats = np.array([int(self.hdr[b][0], base=16) for b in bat_cards])
@@ -316,8 +369,8 @@ class VcraftMux(object):
         self.start_mjd = self.start_mjds[np.argmin(self.sample_offsets)]
         assert np.all(abs(self.start_mjds - self.trigger_mjds) < 1), 'MJD adjustment should be << 1 day'
 
-        beam_ra = np.array(map(float, self.allhdr('BEAM_RA'))).mean() # TODO: make craft_vdump write same BEAM_RA for all card/fpgas
-        beam_dec = np.array(map(float, self.allhdr('BEAM_DEC'))).mean()
+        beam_ra = np.array(map(float, self.allhdr('BEAM_RA', -99))).mean() # TODO: make craft_vdump write same BEAM_RA for all card/fpgas
+        beam_dec = np.array(map(float, self.allhdr('BEAM_DEC',-99))).mean()
         #self.beam_pos = SkyCoord(beam_ra, beam_dec, frame='icrs', unit=('deg','deg'))
         self.beam_pos = (beam_ra, beam_dec)
         self.hdr = self._files[0].hdr
@@ -363,15 +416,15 @@ class VcraftMux(object):
             try:
                 d[:, out_chans] = f.read(fsamp_start, nsamp)
             except:
-                warnings.warn('File read at funny time. Setting to zero')
+                logging.exception('File read at funny time. Setting to zero')
 
         return d
 
-def mux_by_pol(filenames, delays=None):
+def mux_by_pol(filenames, delays=None, **kwargs):
     '''
     :return: Dictionary keyened by 'X' or "Y
     '''
-    all_files = [VcraftFile(f) for f in filenames]
+    all_files = [VcraftFile(f, **kwargs) for f in filenames]
     all_files.sort(key=lambda f:f.pol)
     mux_by_pol = itertools.groupby(all_files, lambda f:f.pol)
     muxes = {pol:VcraftMux(list(files), delays) for pol, files in mux_by_pol}
@@ -379,8 +432,8 @@ def mux_by_pol(filenames, delays=None):
     return muxes
     
 
-def mux_by_antenna(filenames, delays=None):
-    all_files = [VcraftFile(f) for f in filenames]
+def mux_by_antenna(filenames, delays=None, **kwargs):
+    all_files = [VcraftFile(f, **kwargs) for f in filenames]
     all_files.sort(key=lambda f:f.hdr['ANT'][0])
     ants = [f.hdr['ANT'][0] for f in all_files]
     mux_by_ant = itertools.groupby(all_files, lambda f:f.hdr['ANT'][0])
