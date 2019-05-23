@@ -67,20 +67,6 @@ void dumparr(const char* prefix, const int blocknum, array4d_t* arr, bool copy=t
 	array4d_dump(arr, fbuf);
 }
 
-void dump_rescaler(int iblock, Rescaler* rescaler)
-{
-	dumparr("mean", iblock, &rescaler->mean);
-	dumparr("std", iblock, &rescaler->std);
-	dumparr("kurt", iblock, &rescaler->kurt);
-	dumparr("nsamps", iblock, &rescaler->nsamps);
-	dumparr("dm0", iblock, &rescaler->dm0);
-	dumparr("dm0count", iblock, &rescaler->dm0count);
-	dumparr("dm0stats", iblock, &rescaler->dm0stats);
-	dumparr("scale", iblock, &rescaler->scale);
-	dumparr("offset", iblock, &rescaler->offset);
-	dumparr("decay_offset", iblock, &rescaler->decay_offset);
-}
-
 int main(int argc, char* argv[])
 {
 	FreddaParams params; // this is new - I haven't finished refactoring everything to take advantage of FreddaParams
@@ -287,10 +273,7 @@ int main(int argc, char* argv[])
 		}
 
 		rescaler->reset_output(rescale_buf); // set output buffer to zero - each rescale update will add the result into the buffer
-
 		fdmt.t_copy_in.start();
-
-//#pragma omp parallel
 		for(int iant = 0; iant < source->nants(); iant++) {
 			// read samples from input - one antenna at a time.
 			void* read_buf;
@@ -307,22 +290,8 @@ int main(int argc, char* argv[])
 			gpuErrchk(cudaMemcpyAsync(this_ant_buffer,
 					read_buf, in_buffer_bytes_per_ant*sizeof(uint8_t), cudaMemcpyHostToDevice, streams[iant]));
 
-			if (blocknum == 0 && params.num_rescale_blocks > 0) { // if first block rescale and update with no
-				// flagging so we can work out roughly what the scales are
-				// Send output to junk buffer - silly but will fix later
-				// TODO: Remove junk buffer to save memory
-				rescaler->process_ant_block(rescale_junk_buf, this_ant_buffer, rescaler->noflag_options, iant, streams[iant]);
-
-				// update scale and offset
-				rescaler->update_scaleoffset(rescaler->noflag_options, iant, streams[iant]);
-
-				// Reset rescale stats for this antenna only
-				rescaler->reset_ant_stats_for_first_block(iant);
-
-			}
-
 			// this time we rescale with the flagging turned on
-			rescaler->process_ant_block(rescale_buf, this_ant_buffer, rescaler->options, iant, streams[iant]);
+			rescaler->process_ant_block(this_ant_buffer, rescaler->options, iant, streams[iant]);
 
 		}
 		gpuErrchk(cudaDeviceSynchronize()); // Synchonize after doing all those asynchronous, multistream things
@@ -347,13 +316,6 @@ int main(int argc, char* argv[])
 					array4d_size(&rescale_buf)*sizeof(rescale_dtype),
 					cudaMemcpyDeviceToHost,
 					streams[0]));
-		}
-
-
-
-		// do rescaling if required
-		if (params.num_rescale_blocks > 0 && blocknum % params.num_rescale_blocks == params.num_rescale_blocks - 1) {
-			rescaler->update_rescale_statistics();
 		}
 
 		if (blocknum >= params.num_rescale_blocks) {

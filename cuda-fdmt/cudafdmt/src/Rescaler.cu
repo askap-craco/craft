@@ -129,10 +129,9 @@ void Rescaler::reset_output(array4d_t& rescale_buf) {
 	array4d_cuda_memset(&rescale_buf, 0);
 }
 
-void Rescaler::update_scaleoffset(RescaleOptions& options, int iant,
+void Rescaler::update_rescale_parameters(RescaleOptions& options, int iant,
 		cudaStream_t stream) {
 	assert(options.interval_samps > 0);
-	int nf = options.nf;
 	int nthreads = 128;
 	assert(num_elements_per_ant % nthreads == 0);
 	int nblocks = num_elements_per_ant / nthreads;
@@ -170,66 +169,6 @@ void Rescaler::dump_block_data() {
 	tdump.stop();
 }
 
-void Rescaler::reset_ant_stats_for_first_block(int iant) {
-	// reset a single antenna - dont dump or count flags
-	// This is a bit hacky, but it'll do fo rnow
-	assert(iant >= 0 && iant < options.nants);
-
-	// Set nsamps array for this antenna only to zero
-	size_t size =  nsamps.ny * nsamps.nz;
-	size_t idx = array4d_idx(&nsamps, 0, iant, 0, 0);
-	assert(nsamps.d_device != NULL);
-	gpuErrchk(cudaMemset(&nsamps.d_device[idx], 0, size * sizeof(fdmt_dtype)));
-
-	// Copy block mean to rescaler mean so it starts near the right place when we decode this block
-	gpuErrchk(cudaMemcpy(&decay_offset.d_device[idx], &mean.d_device[idx], size*sizeof(fdmt_dtype), cudaMemcpyDeviceToDevice));
-}
-
-void Rescaler::finish_all_ants() {
-	// needs to be called once all blocks have finished. e.g. after a cudaDeviceSynchronize()
-
-	if (params.do_dump_rescaler) {
-		dump_block_data(); // Run this every block
-	}
-}
-
-void Rescaler::update_rescale_statistics() {
-	for (int iant = 0; iant < params.source->nants(); ++iant) {
-		update_scaleoffset(options, iant);
-	}
-
-	// Count how many  channels have been flagged for this whole block
-	// by looking at how many channels have scale==0
-	array4d_copy_to_host(&scale);
-	for (int i = 0; i < params.nf * params.nbeams_in_total; ++i) {
-		if (scale.d[i] == 0) {
-			// that channel will stay flagged for num_rescale_blocks
-			num_flagged_beam_chans += params.num_rescale_blocks;
-		}
-	}
-
-	// Count how many times were flagged
-	//assert(params.num_rescale_blocks >= 0);
-	array4d_copy_to_host(&nsamps); // must do this before updating scaleoffset, which resets nsamps to zero
-
-	// Calculate number of DM0 times that were flagged
-	for (int i = 0; i < params.nf * params.nbeams_in_total; ++i) {
-		int ns = (int) nsamps.d[i]; // nsamps is the number of unflagged samples from this block
-		int nflagged = params.nt*params.num_rescale_blocks - ns;
-		// rescale.sampnum is the total number of samples that has gone into the rescaler since resetting
-		assert(nflagged >= 0);
-		num_flagged_times += nflagged;
-	}
-
-
-	if (params.do_dump_rescaler) {
-		dump_rescale_data();
-	}
-
-	// reset nsamps
-	array4d_cuda_memset(&nsamps, 0);
-
-}
 
 void Rescaler::set_scaleoffset(float s_scale, float s_offset) {
 	array4d_set(&scale, s_scale);
@@ -300,37 +239,178 @@ void Rescaler::flag_beam(int beam) {
 	array4d_copy_to_device(&weights);
 }
 
-void Rescaler::process_ant_block(array4d_t& rescale_buf, void* read_buf_device,
+void Rescaler::reset_block_stats_for_first_block(int iant) {
+	// reset a single antenna - dont dump or count flags
+	// This is a bit hacky, but it'll do fo rnow
+	assert(iant >= 0 && iant < options.nants);
+
+	// Set nsamps array for this antenna only to zero
+	size_t size =  nsamps.ny * nsamps.nz;
+	size_t idx = array4d_idx(&nsamps, 0, iant, 0, 0);
+	assert(nsamps.d_device != NULL);
+	gpuErrchk(cudaMemset(&nsamps.d_device[idx], 0, size * sizeof(fdmt_dtype)));
+
+	// Copy block mean to rescaler mean so it starts near the right place when we decode this block
+	gpuErrchk(cudaMemcpy(&decay_offset.d_device[idx], &mean.d_device[idx], size*sizeof(fdmt_dtype), cudaMemcpyDeviceToDevice));
+}
+
+void Rescaler::finish_all_ants() {
+	// needs to be called once all blocks have finished. e.g. after a cudaDeviceSynchronize()
+
+	if (params.do_dump_rescaler) {
+		dump_block_data(); // Run this every block
+	}
+
+	// do rescaling if required
+	if (params.num_rescale_blocks > 0 && blocknum % params.num_rescale_blocks == params.num_rescale_blocks - 1) {
+		update_flagging_statisics();
+	}
+
+	blocknum++;
+}
+
+
+void Rescaler::process_ant_block(void* this_ant_buffer, RescaleOptions& options, int iant, cudaStream_t stream)
+{
+	assert(iant >= 0 && iant < options.nants);
+
+	// Do special treatment of first block - calculate and apply statistics *WITHOUT FLAGGING* to get a starting point
+	if (blocknum == 0 && params.num_rescale_blocks > 0) { // if first block rescale and update with no
+
+		calculate_block_stats(this_ant_buffer, noflag_options, iant, stream);
+
+		// update scale and offset
+		update_rescale_parameters(noflag_options, iant, stream);
+
+		// Reset rescale stats for this antenna only
+		reset_block_stats_for_first_block(iant);
+
+	}
+
+	// Calculate statistics for this block/antenna
+	calculate_block_stats(this_ant_buffer, options, iant, stream);
+
+	// Update rescale and the end of this rescale epoch (if we're doing rescaling)
+	if (params.num_rescale_blocks > 0 && blocknum % params.num_rescale_blocks == params.num_rescale_blocks - 1) {
+		update_rescale_parameters(options, iant, stream);
+	}
+
+}
+
+
+void Rescaler::update_flagging_statisics() {
+
+	//. Update now happens per antenna.
+//	for (int iant = 0; iant < params.source->nants(); ++iant) {
+//		update_rescale_parameters(options, iant);
+//	}
+
+	// Count how many  channels have been flagged for this whole block
+	// by looking at how many channels have scale==0
+	array4d_copy_to_host(&scale);
+	for (int i = 0; i < params.nf * params.nbeams_in_total; ++i) {
+		if (scale.d[i] == 0) {
+			// that channel will stay flagged for num_rescale_blocks
+			num_flagged_beam_chans += params.num_rescale_blocks;
+		}
+	}
+
+	// Count how many times were flagged
+	//assert(params.num_rescale_blocks >= 0);
+	array4d_copy_to_host(&nsamps); // must do this before updating scaleoffset, which resets nsamps to zero
+
+	// Calculate number of DM0 times that were flagged
+	for (int i = 0; i < params.nf * params.nbeams_in_total; ++i) {
+		int ns = (int) nsamps.d[i]; // nsamps is the number of unflagged samples from this block
+		int nflagged = params.nt*params.num_rescale_blocks - ns;
+		// rescale.sampnum is the total number of samples that has gone into the rescaler since resetting
+		assert(nflagged >= 0);
+		num_flagged_times += nflagged;
+	}
+
+
+	if (params.do_dump_rescaler) {
+		dump_rescale_data();
+	}
+
+	// reset nsamps
+	array4d_cuda_memset(&nsamps, 0);
+
+}
+
+void Rescaler::calculate_block_stats(void* read_buf_device,
 		RescaleOptions &options, int iant, cudaStream_t stream) {
 	int nbits = options.nbits;
 	switch (nbits) {
 	case 1:
-		do_update_and_transpose<32, uint32_t>(rescale_buf,
+		do_calculate_block_stats<32, uint32_t>(
 				(uint32_t*) read_buf_device, options, iant, stream);
 		break;
 
 	case 2:
-		do_update_and_transpose<16, uint32_t>(rescale_buf,
+		do_calculate_block_stats<16, uint32_t>(
 				(uint32_t*) read_buf_device, options, iant, stream);
 		break;
 
 	case 4:
-		do_update_and_transpose<8, uint32_t>(rescale_buf,
+		do_calculate_block_stats<8, uint32_t>(
 				(uint32_t*) read_buf_device, options, iant, stream);
 		break;
 
 	case 8:
-		do_update_and_transpose<4, uint32_t>(rescale_buf,
+		do_calculate_block_stats<4, uint32_t>(
 				(uint32_t*) read_buf_device, options, iant, stream);
 		break;
 
 	case 16:
-		do_update_and_transpose<2, uint32_t>(rescale_buf,
+		do_calculate_block_stats<2, uint32_t>(
 				(uint32_t*) read_buf_device, options, iant, stream);
 		break;
 
 	case 32:
-		do_update_and_transpose<1, float>(rescale_buf, (float*) read_buf_device,
+		do_calculate_block_stats<1, float>( (float*) read_buf_device,
+				options, iant, stream);
+		break;
+
+	default:
+		printf("Invalid nbits %d for rescaler: %d\n");
+		exit(1);
+
+	}
+}
+
+
+void Rescaler::apply_flags_and_sum(array4d_t& rescale_buf, void* read_buf_device,
+		RescaleOptions &options, int iant, cudaStream_t stream) {
+	int nbits = options.nbits;
+	switch (nbits) {
+	case 1:
+		do_apply_flags_and_sum<32, uint32_t>(rescale_buf,
+				(uint32_t*) read_buf_device, options, iant, stream);
+		break;
+
+	case 2:
+		do_apply_flags_and_sum<16, uint32_t>(rescale_buf,
+				(uint32_t*) read_buf_device, options, iant, stream);
+		break;
+
+	case 4:
+		do_apply_flags_and_sum<8, uint32_t>(rescale_buf,
+				(uint32_t*) read_buf_device, options, iant, stream);
+		break;
+
+	case 8:
+		do_apply_flags_and_sum<4, uint32_t>(rescale_buf,
+				(uint32_t*) read_buf_device, options, iant, stream);
+		break;
+
+	case 16:
+		do_apply_flags_and_sum<2, uint32_t>(rescale_buf,
+				(uint32_t*) read_buf_device, options, iant, stream);
+		break;
+
+	case 32:
+		do_apply_flags_and_sum<1, float>(rescale_buf, (float*) read_buf_device,
 				options, iant, stream);
 		break;
 

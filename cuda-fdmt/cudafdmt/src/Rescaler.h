@@ -48,6 +48,43 @@ public:
 class Rescaler {
 
 public:
+
+	RescaleOptions options;
+	FreddaParams& params;
+	RescaleOptions noflag_options;
+	uint64_t num_flagged_times = 0;
+	uint64_t num_flagged_beam_chans = 0;
+
+
+
+	// Parameters
+	/* I put so much effort into this I'm scared of deleting it now
+	Rescaler(int _nbeams, int _nf, int _nt,
+			float _target_mean, float _target_stdev, float _decay_constant,
+			float _mean_thresh, float _std_thresh, float _kurt_thresh,
+			float _dm0_thresh, float _cell_thresh,
+			int _flag_grow, bool _invert_freq, bool _subtract_dm0);
+			*/
+	Rescaler(RescaleOptions& _options, FreddaParams& params);
+
+	virtual ~Rescaler();
+
+	void reset_output(array4d_t& rescale_buf); // Set output buffer to zero to start accumulating again
+
+	void process_ant_block(void* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream=0);
+
+	void finish_all_ants(); // Needs to be called after a cudaDeviceSynchronize
+
+	void set_scaleoffset(float s_scale, float s_offset);
+
+	void flag_channel(int channel); // Set weights to zero for all beams/antennas fo rthis channel
+	int flag_frequencies_from_file(const char* filename); // Flag all frequencies in given file
+	bool flag_frequency(float freq); // flag the channel with frequency nearst the given frequency. Ignored it out of band
+	void flag_beam(int beamno);
+
+
+private:
+
 	/* stuff for rescaling */
 	array4d_t sum;
 	array4d_t sum2; // sum v**2
@@ -67,61 +104,40 @@ public:
 	uint64_t sampnum;
 	int num_elements;
 	int num_elements_per_ant;
-	RescaleOptions options;
-	FreddaParams& params;
-	RescaleOptions noflag_options;
-	uint64_t num_flagged_times = 0;
-	uint64_t num_flagged_beam_chans = 0;
+
+	CudaTimer tdump;
+	int blocknum = 0;
 
 	std::vector<Array4dDumper* > rescale_dumpers; // Dumpers that get updated per rescale interval
 	std::vector<Array4dDumper* > block_dumpers; // Dumpers taht get updated per block
 
-
-	// Parameters
-	/* I put so much effort into this I'm scared of deleting it now
-	Rescaler(int _nbeams, int _nf, int _nt,
-			float _target_mean, float _target_stdev, float _decay_constant,
-			float _mean_thresh, float _std_thresh, float _kurt_thresh,
-			float _dm0_thresh, float _cell_thresh,
-			int _flag_grow, bool _invert_freq, bool _subtract_dm0);
-			*/
-	Rescaler(RescaleOptions& _options, FreddaParams& params);
-
-	virtual ~Rescaler();
-
-	void reset_output(array4d_t& rescale_buf); // Set output buffer to zero to start accumulating again
-
 	// Need to separate this out for the first integration by antenna and don't write stats
-	void update_scaleoffset(RescaleOptions& options, int iant, cudaStream_t stream = 0);
+	void update_rescale_parameters(RescaleOptions& options, int iant, cudaStream_t stream = 0);
 
 	// Call after updatescaleoffset in the first run to reset to the beginning
-	void reset_ant_stats_for_first_block(int iant);
+	void reset_block_stats_for_first_block(int iant);
 
-	// Does full update for all antennas
-	void update_rescale_statistics();
-
-
-	void process_ant_block(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream=0);
-	void finish_all_ants(); // Needs to be called after a cudaDeviceSynchronize
-
-	void set_scaleoffset(float s_scale, float s_offset);
-
-	void flag_channel(int channel); // Set weights to zero for all beams/antennas fo rthis channel
-	int flag_frequencies_from_file(const char* filename); // Flag all frequencies in given file
-	bool flag_frequency(float freq); // flag the channel with frequency nearst the given frequency. Ignored it out of band
-	void flag_beam(int beamno);
-
-
-private:
+	// Update flagging statistics based on current block
+	void update_flagging_statisics();
 	void dump_rescale_data(); // Dump rescaler data to disk
 	void dump_block_data(); // Dump block data to disk
+
+	void apply_flags_and_sum(array4d_t& rescale_buf, void* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream=0);
+
 	template <int nsamps_per_word, typename wordT>
-	void do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream = 0);
-	CudaTimer tdump;
+	void do_apply_flags_and_sum(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream);
+
+
+	void calculate_block_stats(void* read_buf_device, RescaleOptions &options, int iant, cudaStream_t stream=0);
+
+	template <int nsamps_per_word, typename wordT>
+	void do_calculate_block_stats(wordT* read_buf_device, RescaleOptions &options, int iant, cudaStream_t stream=0);
+
+
 };
 
 template <int nsamps_per_word, typename wordT>
-void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream)
+void Rescaler::do_apply_flags_and_sum(array4d_t& rescale_buf, wordT* read_buf_device, RescaleOptions& options, int iant, cudaStream_t stream)
 {
 	int nbeams_in = options.nbeams_per_ant;
 	int nf = rescale_buf.nx;
@@ -157,7 +173,14 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 	gpuErrchk(cudaPeekAtLastError());
 
 
-	int nthread = 128/nsamps_per_word; // Tuneable  -- needed if nf > 1024 which is a commmon limitiation for the number of threads.
+	int nthread;
+	if (nwords % (128/nsamps_per_word) == 0) {
+		nthread = 128/nsamps_per_word; // Tuneable  -- needed if nf > 1024 which is a commmon limitiation for the number of threads.
+	} else {
+		nthread = nwords;
+	}
+
+	// TODO: CHECK blockdim doesn't exceed GPU capability
 	dim3 griddim(nbeams_in, nwords/nthread);
 	dim3 blockdim(nsamps_per_word, nthread);
 
@@ -165,7 +188,7 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 	assert(blockdim.x == nsamps_per_word);
 	assert(griddim.x == nbeams_in);
 
-	rescale_update_and_transpose_float_kernel< nsamps_per_word, wordT ><<<griddim, blockdim, 0, stream>>>(
+	rescale_apply_flags_and_add< nsamps_per_word, wordT ><<<griddim, blockdim, 0, stream>>>(
 			read_buf_device,
 			sum.d_device,
 			sum2.d_device,
@@ -191,10 +214,88 @@ void Rescaler::do_update_and_transpose(array4d_t& rescale_buf, wordT* read_buf_d
 
 	gpuErrchk(cudaPeekAtLastError());
 
+	sampnum += nt;
 
-	if (iant == 0) {
-		sampnum += nt;
+}
+
+
+template <int nsamps_per_word, typename wordT>
+void Rescaler::do_calculate_block_stats(wordT* read_buf_device, RescaleOptions &options, int iant, cudaStream_t stream)
+{
+	int nbeams_in = options.nbeams_per_ant;
+	int nf = params.nf;
+	int nt = params.nt;
+	int nwords = nf / nsamps_per_word;
+	assert(nf % nsamps_per_word == 0);
+	int boff = iant*options.nbeams_per_ant;
+	assert(options.in_order == DataOrder::TFBP || options.in_order == DataOrder::BPTF);
+
+	rescale_calc_dm0_kernel< nsamps_per_word, wordT > <<<nbeams_in, 256, 0, stream>>>(
+			read_buf_device,
+			offset.d_device,
+			scale.d_device,
+			dm0.d_device,
+			dm0count.d_device,
+			nf, nt,
+			options.cell_thresh,
+			options.in_order,
+			boff);
+	gpuErrchk(cudaPeekAtLastError());
+
+
+	// Take the mean all the dm0 times into one big number per beam - this is the how we flag
+	// short dropouts see ACES-209
+	// probably could do this in rescale_calc_dm0_kernel after yu've done it
+	// But i Haven't got htere yet.
+	rescale_calc_dm0stats_kernel<<<1, nbeams_in, 0, stream>>>(
+			dm0.d_device,
+			dm0count.d_device,
+			dm0stats.d_device,
+			nt,
+			boff);
+	gpuErrchk(cudaPeekAtLastError());
+
+
+	int nthread;
+	if (nwords % (128/nsamps_per_word) == 0) {
+		nthread = 128/nsamps_per_word; // Tuneable  -- needed if nf > 1024 which is a commmon limitiation for the number of threads.
+	} else {
+		nthread = nwords;
 	}
+
+	// TODO: CHECK blockdim doesn't exceed GPU capability
+	dim3 griddim(nbeams_in, nwords/nthread);
+	dim3 blockdim(nsamps_per_word, nthread);
+
+	assert(griddim.y * blockdim.y == nwords);
+	assert(blockdim.x == nsamps_per_word);
+	assert(griddim.x == nbeams_in);
+
+	rescale_calc_stats< nsamps_per_word, wordT ><<<griddim, blockdim, 0, stream>>>(
+			read_buf_device,
+			sum.d_device,
+			sum2.d_device,
+			sum3.d_device,
+			sum4.d_device,
+			decay_offset.d_device,
+			nsamps.d_device,
+			offset.d_device,
+			scale.d_device,
+			dm0.d_device,
+			dm0count.d_device,
+			dm0stats.d_device,
+			NULL, //rescale_buf.d_device,
+			options.decay_constant,
+			options.dm0_thresh,
+			options.cell_thresh*options.target_stdev,
+			nt,
+			options.invert_freq,
+			options.subtract_dm0,
+			options.polsum,
+			options.in_order,
+			boff);
+
+	gpuErrchk(cudaPeekAtLastError());
 }
 
 
