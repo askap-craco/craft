@@ -230,7 +230,7 @@ class VcraftFile(object):
             dwords.shape = nwords, nchan
             nsamps = nwords*2
             d = np.empty((nsamps, nchan, 2), dtype=np.int8)
-            unpack_vcraft.unpack_mode2_jit_v2(dwords, d)
+            raise ValueError('KB has stuff this up - need to get the new unpacker')
             d = d[sampoff:sampoff+nsamp, :, :]
             nsamps = nsamp
 
@@ -250,12 +250,15 @@ class VcraftFile(object):
             dwords.shape = (nwords, nchan)
             d = np.empty((nsamps, nchan, 2), dtype=np.int8)
             nsamps = nsamp
+            unpack_vcraft.unpack_mode2_jit_v2(dwords, d)
+            '''
             for samp in xrange(4):
                 # convert from 4-bit two's complement to int8
                 d[samp::4, :, 0] = (dwords & 0xf) - (dwords & 0x8)*2 # real
                 dwords >>= 4
                 d[samp::4, :, 1] = (dwords & 0xf) - (dwords & 0x8)*2 # imag
                 dwords >>= 4
+            '''
 
             d = d[sampoff:sampoff+nsamp, :, :]
 
