@@ -13,7 +13,6 @@ import sys
 import logging
 from rtdata import FreddaRescaleData
 
-
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 class Formatter(object):
@@ -138,8 +137,11 @@ class RescalePlot(object):
             if name == 'gtest':
                 tsamp = 2047.
                 bdn = bd['mean']**2/bd['std']**2 / tsamp - 1.0
+                if prevbd:
+                    prevbd['gtest'] = prevbd['mean']**2/prevbd['std']**2 / tsamp - 1.0
             else:
                 bdn = bd[name]
+                
             if values.log:
                 bdn= 10*np.log10(bdn)
             elif values.lognz:

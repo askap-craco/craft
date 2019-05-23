@@ -39,7 +39,7 @@ class DadaFile(object):
             raise ValueError('Invalid blockid {}'.format(blockid))
         
         if blockid >= self.nblocks:
-            raise ValueError('BlockID {} past the end of file'.format(blockid))
+            raise ValueError('BlockID {} past the end of file {}'.format(blockid, self.filename))
 
         assert 0 <= blockid < self.nblocks
 
@@ -54,7 +54,7 @@ class DadaFile(object):
             'max at', \
             np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
 
-        return v
+        return np.ma.masked_invalid(v)
 
     def blocks(self, step=1):
         '''
