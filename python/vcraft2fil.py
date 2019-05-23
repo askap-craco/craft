@@ -44,7 +44,7 @@ frame_cards = ('START_WRITE_FRAMEID','STOP_WRITE_FRAMEID','TRIGGER_FRAMEID')
 def detect(files, values):
     #vfiles = [vcraft.VcraftFile(f) for f in files]
     #mux = vcraft.VcraftMux(vfiles)
-    all_muxes = vcraft.mux_by_pol(files)
+    all_muxes = vcraft.mux_by_pol(files, read_ahead=values.nsamps*16)
     npolin = len(all_muxes)
     if npolin == 1:
         npolout = 1
