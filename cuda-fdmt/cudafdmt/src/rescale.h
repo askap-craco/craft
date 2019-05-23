@@ -200,13 +200,6 @@ __global__ void rescale_calc_stats (
 	rescale_dtype scale = scalearr[rsidx]; // read from global
 	rescale_dtype nsamps = nsampsarr[rsidx]; // read from global
 
-	int outc;
-	if (invert_freq) {
-		outc = nf - 1 - c;
-	} else {
-		outc = c;
-	}
-
 	// Easy way of expanding the time flagging by 1. Useful for killing dropouts. ACES-209
 	bool last_sample_ok = true;
 	float block_dm0thresh = dm0_thresh/sqrtf((float) nt);
@@ -378,10 +371,6 @@ __global__ void rescale_apply_flags_and_add (
 
 	int rsidx = c + nf*rsbeam; // rescale index: BF order
 	// all these reads are nice and coalesced
-	rescale_dtype mean = sumarr[rsidx]; // read from global memory
-	rescale_dtype m2 = sum2arr[rsidx]; // read from global
-	rescale_dtype m3 = sum3arr[rsidx];
-	rescale_dtype m4 = sum4arr[rsidx];
 	rescale_dtype decay_offset = decay_offsetarr[rsidx];  // read from global
 	rescale_dtype offset = offsetarr[rsidx]; // read from global
 	rescale_dtype scale = scalearr[rsidx]; // read from global
