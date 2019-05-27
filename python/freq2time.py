@@ -82,6 +82,7 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-f', '--fn', help="FFFF file directory", default=None)
     parser.add_argument('-d', '--DM', type=float, help='Dispersion measure', default=None)
+    parser.add_argument('--f0', type=float, help='Central frequency', default=1320.5)
     parser.add_argument('-o', '--outfile', help="Output time series file directory")
     parser.add_argument('-l', '--fftlength', type=int, help="FFT length", default=1048576)
     parser.add_argument('--no_dr', help="Don't deripple", action='store_true', default=False)
@@ -98,7 +99,7 @@ def _main():
         elif values.no_dr:
             print('No derippling')
             FFFF= FFFF[0,:,0]
-            FFFF = coh_dedisp(FFFF,values.DM, quiet=values.q)
+            FFFF = coh_dedisp(FFFF,values.DM,f_mid=values.f0, quiet=values.q)
         else:
             print('No dedispersing')
             FFFF = deripple(FFFF,values.fftlength, quiet=values.q)
@@ -109,7 +110,7 @@ def _main():
             t_series = ifft_long(FFFF,quiet=values.q)
     else:
         print('Reconstructing...')
-        t_series = reconstruct(values.fn, values.fftlength, values.DM, quiet=values.q)
+        t_series = reconstruct(values.fn, values.fftlength, values.DM, f0=values.f0, quiet=values.q)
     
     if values.outfile is not None:
         print('output saved to: '+values.outfile)
