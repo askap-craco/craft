@@ -111,6 +111,7 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s','--step', type=int, default=1, help='Skip this many blocks per write')
+    parser.add_argument('-i','--start', type=int, default=0, help='Start block number')
     parser.add_argument('-p','--plot', action='store_true', help='Do plot', default=False)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
