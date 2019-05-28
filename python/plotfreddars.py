@@ -143,7 +143,7 @@ class RescalePlot(object):
         for iname, name in enumerate(plotnames):
 
             if name == 'gtest':
-                tsamp = 2047.
+                tsamp = float(values.nsamps_per_int)
                 bdn = bd['mean']**2/bd['std']**2 / tsamp - 1.0
                 if prevbd:
                     prevbd['gtest'] = prevbd['mean']**2/prevbd['std']**2 / tsamp - 1.0
@@ -211,8 +211,6 @@ class RescalePlot(object):
     def show(self):
         pylab.show()
 
-    
-
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
@@ -225,6 +223,7 @@ def _main():
     parser.add_argument('-t','--sample', type=int, help='Sample number', default=0)
     parser.add_argument('-b','--ibeam', type=int, help='Beam number', default=0)
     parser.add_argument('-i','--blkidx', type=int, help='Block index', default=0)
+    parser.add_argument('-t','--time', type=Stime, help='time to show (UT, MJD, or sample number')
     parser.add_argument('-l','--log', action='store_true', default=False, help='do log on imshow')
     parser.add_argument('-z','--lognz', action='store_true', default=False, help='do non-zero log before plotting')
     parser.add_argument('--image', action='store_true', default=False, help='Show images rathe rthan lines')
@@ -232,6 +231,7 @@ def _main():
     parser.add_argument('--antmerge', action='store_true', help='Merge antennas with beams so you see everything')
     parser.add_argument('--normant', type=int, help='Normalise by this antenna number')
     parser.add_argument('--normchan', type=int, help='Normalise by this channel')
+    parser.add_argument('-I','--nsamps-per-int', type=int, help='Number of samples per integration - for GTEST', default=1)
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
     if values.verbose:
