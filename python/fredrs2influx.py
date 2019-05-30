@@ -88,12 +88,16 @@ def plot(f, values):
         for iname, name in enumerate(names):
             bdn = block[name] # shape = [nant, nbeam, nchan] nbeam includes both pols
             nzero = (bdn == 0).sum(axis=2)
+            ninf = np.isinf(bdn).sum(axis=2)
+            nnan = np.isnan(bdn).sum(axis=2)
             stat += name, bdn.max(axis=2), 'max'
             stat += name, bdn.min(axis=2), 'min'
             stat += name, bdn.mean(axis=2), 'mean'
             stat += name, bdn.std(axis=2), 'std'
             stat += name, np.median(bdn, axis=2), 'med'
             stat += name, nzero, 'nzero'
+            stat += name, ninf, 'ninf'
+            sate += name, nnan, 'nnan'
 
             # if this axis is the frequency axis - just guessing
             if bdn.shape[2] == len(d.freqs):
@@ -111,6 +115,7 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s','--step', type=int, default=1, help='Skip this many blocks per write')
+    parser.add_argument('-i','--start', type=int, default=0, help='Start block number')
     parser.add_argument('-p','--plot', action='store_true', help='Do plot', default=False)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)

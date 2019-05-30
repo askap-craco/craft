@@ -153,7 +153,7 @@ class RescalePlot(object):
             if values.log:
                 bdn= 10*np.log10(bdn)
             elif values.lognz:
-                bdn = 10*np.log10(bdn - bdn.min() + 1) # scalethe log so you dont log0
+                bdn = 10*np.log10(bdn - bdn.min() + 2) # scalethe log so you dont log0
             if prevbd:
                 bdn /= prevbd[name]
                 bdn -= 1.
