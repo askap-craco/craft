@@ -184,7 +184,7 @@ size_t DadaSource::read_samples(void** output)
 {
     size_t nt;
     void* ptr = get_next_buffer(nt);
-	assert(m_in_data_order == DataOrder::TFBP);
+	//assert(m_in_data_order == DataOrder::TFBP);
 	m_transpose_timer.start();
 	if (m_in_data_order == m_out_data_order) {
 		*output = ptr;
@@ -227,8 +227,27 @@ size_t DadaSource::read_samples(void** output)
 				}
 			}
 		}
+	} else if (m_in_data_order == DataOrder::BPFT && m_out_data_order == DataOrder::TFBP) {
+			*output = m_reorder_buffer;
+			assert(nbits() == 32);
+			float *inp, *outp;
+			inp = (float*) ptr;
+			outp = (float*) *output;
+			for (int b = 0; b < nbeams(); ++b) {
+				for(int p = 0; p < 	npols(); ++p) {
+					for (int f = 0;	f < nchans(); ++f) {
+						for(int t = 0; t < nt; ++t) {
+							int outidx = t + nt*(f + nchans()*(b + nbeams()*p));
+							assert(outidx >= 0);
+							assert(outidx < nchans()*npols()*nbeams()*nt);
+							outp[outidx] = *inp;
+							++inp;
+						}
+					}
+				}
+			}
 	} else {
-		printf("Invalid ordering\n");
+		printf("Invalid ordering %d %d\n", m_in_data_order, m_out_data_order);
 		assert(1==0);
 		exit(EXIT_FAILURE);
 	}

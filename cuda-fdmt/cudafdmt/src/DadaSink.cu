@@ -52,6 +52,7 @@ DadaSink::DadaSink(int key, char* hdr, FreddaParams& params) {
 	ascii_header_set(header_buf, "BW", "%0.12f", params.out_foff); // Frequency offset - different from source as rescaler sets first frequency to bottom always
 	ascii_header_set(header_buf, "MJD_START", "%0.12f", params.source->current_mjd()); // mjd of first sample
 	ascii_header_set(header_buf, "DORDER", "%s", "BPFT");
+	ascii_header_set(header_buf, "ORDER", "%s", "SFT"); // needed for Wael's SVD code
 	ascii_header_set(header_buf, "HDR_SIZE", "%d", header_size);
 	ascii_header_set(header_buf, "DATA_TYPE", "%s", "CRAFT_SEARCH");
 

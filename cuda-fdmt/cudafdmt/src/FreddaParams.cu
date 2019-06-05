@@ -208,9 +208,17 @@ void FreddaParams::set_source(DataSource& _source) {
 	nbeams_summed = (float(nbeams_in_total)/float(nbeams_out));
 	nf = source->nchans();
 	nbits = source->nbits();
-	foff =  (float) source->foff();
-	fmax = (float) source->fch1() - foff; // The FDMT seems to want this offset to make sense of the world. Not sure why.
-	fmin = fmax + nf*foff;
+	foff = (float) source->foff();
+	if (foff > 0) {
+		//fmin = (float) source->fch1() - foff; // The FDMT seems to want this offset to make sense of the world. Not sure why.
+		fmin = (float)source->fch1();
+		fmax = fmin + nf*foff;
+	} else {
+		//fmax = (float) source->fch1() - foff; // The FDMT seems to want this offset to make sense of the world. Not sure why.
+		fmax = (float) source->fch1();
+		fmin = fmax + nf*foff;
+	}
+	assert(fmin < fmax);
 
 	if (nd < 0) { // Flip the band to calculate negative DMs
 		nd = -nd; // make nd positive -otherwise array sizes get confuddled

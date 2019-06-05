@@ -7,9 +7,11 @@ function remove_db {
 }
 
 trap 'kill $(jobs -p) ; remove_db' EXIT
+export MKL_DIR=/data/FRIGG_2/ban115/install/mkl/mkl/
+
 export DADA=$HOME/psrdada-install
 export PATH=$DADA/bin:$PATH
-export LD_LIBRARY_PATH=$DADA/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$DADA/lib:$MKL_DIR/lib/intel64:$LD_LIBRARY_PATH
 
 #export DADA=/home/craftop/askap/trunk/3rdParty/psrdada/psrdata
 export DADA=/home/craftop/askap/trunk/3rdParty/psrdada/psrdada-537159/install/
@@ -17,7 +19,8 @@ export PATH=$DADA/bin:$PATH
 export LD_LIBRARY_PATH=$DADA/lib:$LD_LIBRARY_PATH
 #cudafdmt=$HOME/craftdev/craft/cuda-fdmt/cudafdmt/src/cudafdmt
 #cudafdmt=$HOME/craftdev/craft/cuda-fdmt/cudafdmt/Debugtest_cuda/cudafdmt
-export PATH=$HOME/git/craft/cuda-fdmt/cudafdmt/Debugtest_cuda:$PATH
+export SVD=/data/FRIGG_2/ban115/SpectralSVD
+export PATH=$HOME/git/craft/cuda-fdmt/cudafdmt/Debugtest_cuda:$SVD:$PATH
 #cudafdmt=$HOME/git/craft/cuda-fdmt/cudafdmt/src/cudafdmt
 cudafdmt=`which cudafdmt`
 
@@ -28,6 +31,7 @@ ls -l $cudafdmt
 # 512 samples/block
 BLOCK_CYCLES=512
 let block_size=72*336*4*${BLOCK_CYCLES}
+let polsum_block_size=36*336*4*${BLOCK_CYCLES}
 
 all_keys=""
 DADA_KEY="1000"
@@ -45,7 +49,7 @@ for i in $(seq $ncount) ; do
 	#echo dada_diskdb -k $DADA_KEY  -z -f $indir/*.dada
 	dada_diskdb -k $DADA_KEY -z -f $indir/*00000.dada &
 	if [[ $DADA_KEY == "1100" ]] ; then
-	    dada_dbmonitor -k $DADA_KEY &
+	    echo dada_dbmonitor -k $DADA_KEY &
 	fi
     done
 done
@@ -70,13 +74,43 @@ ls -l `which cudafdmt`
 cudapid=$!
 #cuda-gdb --args $cudafdmt -t 512 -d 512 $DADA_KEY -p -r 1 -D -r 1 -K 30 -s 0
 
+input_keys=$all_keys
 # Setup export buffer
-DADA_KEY=1234
-all_keys="$all_keys $DADA_KEY"
-dada_db -a 32768 -b 24772608 -n 2 -k $DADA_KEY  -l -p
+ICS_EXPORT_KEY=1230
+SVD_EXPORT_KEY=1240
+FINAL_EXPORT_KEY=1250
+
+all_keys="$input_keys $SVD_EXPORT_KEY $ICS_EXPORT_KEY $FINAL_EXPORT_KEY"
+echo "BLOCK SIZE IS $block_size and polsum block size is $polsum_block_size"
+#dada_db -d -k $ICS_EXPORT_KEY
+#dada_db -d -k $SVD_EXPORT_KEY
+#dada_db -d -k $FINAL_EXPORT_KEY
+dada_db -a 32768 -b $polsum_block_size -n 2 -k $ICS_EXPORT_KEY  -l -p -r 2
+dada_db -a 32768 -b $polsum_block_size -n 2 -k $SVD_EXPORT_KEY  -l -p -r 2 
+dada_db -a 32768 -b $polsum_block_size -n 2 -k $FINAL_EXPORT_KEY  -l -p
 rm -f 2*.dada
-dada_dbdisk -k 1234 -z -D . &
-#dada_dbmonitor -k $DADA_KEY &
+
+rm -f icsout/*.dada svdout/*.dada finalout/*.dada
+mkdir icsout svdout finalout
+
+dada_dbdisk -k $FINAL_EXPORT_KEY -z -D finalout &
+dada_dbdisk -k $SVD_EXPORT_KEY -z -D svdout &
+dada_dbdisk -k $ICS_EXPORT_KEY -z -D icsout &
+
+mkdir fredda_ics
+pushd fredda_ics
+$cudafdmt -t $BLOCK_CYCLES -d 2048 -p -r 1  -x 10 -o fredda_ics.cand -X $ICS_EXPORT_KEY $input_keys -R &
+popd
+
+
+dbsvddb  $ICS_EXPORT_KEY $SVD_EXPORT_KEY &
+
+mkdir fredda_svd
+pushd fredda_svd
+$cudafdmt -t $BLOCK_CYCLES -d 2048  -r 1 -K 3  -x 10 -X $FINAL_EXPORT_KEY -R -o fredda_svd.cand $SVD_EXPORT_KEY &
+popd
+
+dada_dbmonitor -k $ICS_EXPORT_KEY &
 #wait $cudapid
 wait
 #dada_db -d -k $DADA_KEY

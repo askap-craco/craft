@@ -199,9 +199,10 @@ int main(int argc, char* argv[])
 
 	// Create fdmt
 	fdmt_t fdmt;
+	// OFFSET BY FMAX by FOFF - I'm not sure this is right anymore -I needed it a while ago and I don't remember why.
 	printf("Creating FDMT fmin=%f fmax=%f nf=%d nd=%d nt=%d nbeams=%d nbeams_alloc=%d\n",
-			params.fmin, params.fmax, nf, nd, nt, nbeams_out, params.nbeams_alloc);
-	fdmt_create(&fdmt, params.fmin, params.fmax, nf, nd, nt, nbeams_out, params.nbeams_alloc, dump_data);
+			params.fmin, params.fmax-params.foff, nf, nd, nt, nbeams_out, params.nbeams_alloc);
+	fdmt_create(&fdmt, params.fmin, params.fmax-params.foff, nf, nd, nt, nbeams_out, params.nbeams_alloc, dump_data);
 
 	int blocknum = 0;
 	int iblock = num_skip_blocks;
