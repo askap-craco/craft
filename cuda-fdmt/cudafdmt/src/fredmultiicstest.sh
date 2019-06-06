@@ -72,10 +72,12 @@ cudapid=$!
 
 # Setup export buffer
 DADA_KEY=1234
+cudafdmt -t 512 -d 512 -X $DADA_KEY  $all_keys  -p -r 1 -R &
 all_keys="$all_keys $DADA_KEY"
 dada_db -a 32768 -b 24772608 -n 2 -k $DADA_KEY  -l -p
 rm -f 2*.dada
 dada_dbdisk -k 1234 -z -D . &
+
 #dada_dbmonitor -k $DADA_KEY &
 #wait $cudapid
 wait

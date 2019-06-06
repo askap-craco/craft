@@ -55,6 +55,9 @@ DadaSink::DadaSink(int key, char* hdr, FreddaParams& params) {
 	ascii_header_set(header_buf, "ORDER", "%s", "SFT"); // needed for Wael's SVD code
 	ascii_header_set(header_buf, "HDR_SIZE", "%d", header_size);
 	ascii_header_set(header_buf, "DATA_TYPE", "%s", "CRAFT_SEARCH");
+	ascii_header_set(header_buf, "SHAPE", "1,%d,%d,%d",  params.nbeams_out, params.source->nchans(), params.nt); // for downnstream parsing
+	ascii_header_set(header_buf, "DTYPE", "<f4"); //for downstream parsing
+
 
 	if (ipcbuf_mark_filled(m_hdu->header_block, header_size) < 0) {
 		printf("Could not mark filled dada sink header block\n");
