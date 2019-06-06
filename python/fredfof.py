@@ -17,17 +17,18 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 # Indeces of the center, min and max columns for time and dm
 snidx =0
 t0 = 1
-t1 = 7
-t2 = 8
+bno=6
+t1 = 8
+t2 = 9
 d0 = 4
-d1 = 9
-d2 = 10
-count = 11
+d1 = 10
+d2 = 11
+count = 12
 
-header = 'S/N, sampno, secs from file start, boxcar, idt, dm, beamno, sampno_start, sampno_end, idt_start, idt_end, ncands'
+header = 'S/N, sampno, secs from file start, boxcar, idt, dm, beamno,mjd, sampno_start, sampno_end, idt_start, idt_end, ncands'
 intf = '%d'
 floatf = '%0.3f'
-formats = (floatf, intf, floatf, intf, intf, floatf, intf, intf, intf, intf, intf, intf)
+formats = (floatf, intf, floatf, intf, intf, floatf, intf,'%0.15f', intf, intf, intf, intf, intf)
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -97,7 +98,7 @@ def find_friends_mask(myd, d, values):
     mysamp1, mysamp2, myidt1, myidt2 = myd[t1], myd[t2], myd[d1], myd[d2]
     mysamp = myd[t0]
     myidt = myd[d0]
-    assert mysamp1 <= mysamp <= mysamp2
+    assert mysamp1 <= mysamp <= mysamp2, 'Invalid mmysamp {} <= {} <= {}'.format(mysamp1, mysamp, mysamp2)
     assert myidt1 <= myidt <= myidt2
     tmask1 = mysamp1 - values.tdist <= d[:, t2]
     tmask2 = mysamp2 + values.tdist >= d[:, t1]
