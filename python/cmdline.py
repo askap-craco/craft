@@ -46,7 +46,8 @@ def strrange(rangestr):
     return fullrange
 
 
-class Stime(self):
+class Stime(object):
+    
     def __init__(self, s):
         dt = None
         tint = None

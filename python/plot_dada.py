@@ -67,31 +67,32 @@ def _main():
     
     f = dada.DadaFile(values.files[0], shape=shape)
     for b in f.blocks():
-        plot(b, nint, nbeam, nchan, npol, transpose, values)
+        orig_shape = b.shape
+        if transpose is not None:
+            b = b.transpose(transpose)
+
+        print b.shape, shape, transpose, orig_shape
+        plot(b, nint, nbeam, nchan, npol, values)
 
 
-def plot(v, nint, nbeam, nchan, npol, transpose, values):
-
-    if transpose is not None:
-        v.transpose(transpose)
-
-
+def plot(v, nint, nbeam, nchan, npol, values):
     fig, axes = pylab.subplots(*map(int, values.nxy.split(',')), sharex=True, sharey=True)
     if values.imrange:
         vmin, vmax = map(float, values.imrange.split(','))
     else:
         vmin = None
         vmax = None
-    
-    for iax, ax in enumerate(axes.flat):
-        assert v.shape == (nint, nchan, nbeam, npol) # assume ordering TFBP
+
+    nbeampol = nbeam*npol
+    for iax, ax in enumerate(axes.flatten()[:nbeampol]):
+        assert v.shape == (nint, nchan, nbeam, npol), 'Invalid shape {} expected ({},{},{},{})'.format(v.shape, nint, nchan, nbeam, npol) # assume ordering TFBP
         pol = iax / nbeam
         beam = iax % nbeam
         if pol > npol or beam > nbeam:
             break
         
         img = v[:, :, beam,pol]
-        print 'beam', beam, 'pol', pol,'max/min/mean/rms {}/{}/{}/{}'.format(img.max(), img.min(), img.mean(), img.std()), img.shape
+
         if values.rescale:
             img -= img.mean(axis=0)
             img /= img.std(axis=0)

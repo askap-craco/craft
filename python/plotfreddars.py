@@ -223,7 +223,7 @@ def _main():
     parser.add_argument('-t','--sample', type=int, help='Sample number', default=0)
     parser.add_argument('-b','--ibeam', type=int, help='Beam number', default=0)
     parser.add_argument('-i','--blkidx', type=int, help='Block index', default=0)
-    parser.add_argument('-t','--time', type=Stime, help='time to show (UT, MJD, or sample number')
+#    parser.add_argument('-t','--time', type=Stime, help='time to show (UT, MJD, or sample number')
     parser.add_argument('-l','--log', action='store_true', default=False, help='do log on imshow')
     parser.add_argument('-z','--lognz', action='store_true', default=False, help='do non-zero log before plotting')
     parser.add_argument('--image', action='store_true', default=False, help='Show images rathe rthan lines')
