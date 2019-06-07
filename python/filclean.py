@@ -150,7 +150,7 @@ def eigenflag_dm0(d, values):
         
     if values.show:
         # find most correlated beams - peak off diagonal element
-        maxidx = np.argmax(np.triu(thecov, k=1))
+        maxidx = np.argmax(abs(np.triu(thecov, k=1)))
         maxbeams = np.unravel_index(maxidx, thecov.shape)
         fig, ax = pylab.subplots(2,5)
         fig.suptitle('DM0 subtraction largest beam correlation {}'.format(maxbeams))
@@ -160,7 +160,10 @@ def eigenflag_dm0(d, values):
         #ax[0,1].plot(opt_dm0.T)
         ax[0,0].plot(dm0.T[:, maxbeams])
         ax[0,0].set_title('DM0 before cleaning')
-        ax[0,1].plot(dout[maxbeams, :, :].mean(axis=1).T)
+
+        newdm0 = dout.mean(axis=2)
+        ax[0,1].plot(newdm0.T[:, maxbeams])
+        print 'Have I subtracted everything', dm0.T[:, maxbeams].max(), newdm0.T[:, maxbeams].max()
         ax[0,1].set_title('DM0 after cleaning')
 
         ax[0,2].plot(v)
@@ -168,7 +171,7 @@ def eigenflag_dm0(d, values):
         ax[1,0].imshow(d[values.plot_beam,:,:].T, aspect='auto')
         ax[1,1].imshow(dout[values.plot_beam,:,:].T, aspect='auto')
         ax[1,2].imshow(u)
-        ax[1,3].plot(u[:,0:3])# first eigenvector
+        ax[1,3].plot(u[:,:3])# first eigenvector
 
         #ax[0,4].scatter(dm0[maxbeams[0],:], dm0[maxbeams[1],:])
 
