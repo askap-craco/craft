@@ -153,12 +153,15 @@ def eigenflag_dm0(d, values):
         maxidx = np.argmax(np.triu(thecov, k=1))
         maxbeams = np.unravel_index(maxidx, thecov.shape)
         fig, ax = pylab.subplots(2,5)
+        fig.suptitle('DM0 subtraction largest beam correlation {}'.format(maxbeams))
         #ax[0].imshow(dm0.T, aspect='auto')
         #ax[1].imshow(opt_dm0.T, aspect='auto')
         #ax[0,0].plot(dm0.T)
         #ax[0,1].plot(opt_dm0.T)
         ax[0,0].plot(dm0.T[:, maxbeams])
-        ax[0,1].plot(opt_dm0.T[:, maxbeams])
+        ax[0,0].set_title('DM0 before cleaning')
+        ax[0,1].plot(dout[maxbeams, :, :].mean(axis=1).T)
+        ax[0,1].set_title('DM0 after cleaning')
 
         ax[0,2].plot(v)
         ax[0,3].imshow(thecov)
@@ -167,7 +170,11 @@ def eigenflag_dm0(d, values):
         ax[1,2].imshow(u)
         ax[1,3].plot(u[:,0:3])# first eigenvector
 
-        ax[0,4].scatter(dm0[maxbeams[0],:], dm0[maxbeams[1],:])
+        #ax[0,4].scatter(dm0[maxbeams[0],:], dm0[maxbeams[1],:])
+
+        ax[0,4].plot(opt_dm0.T[:, maxbeams])
+        ax[0,4].set_title('The DM0 RFI')
+
         ax[1,4].plot(dm0.std(axis=1), 'o')
         ax[1,4].plot(opt_dm0.std(axis=1), 'o')
         pylab.show()
@@ -306,11 +313,13 @@ def _main():
     nblock = values.nblock
 
     if values.nblock is None:
-        endblock = reader.nblocks
+        endblock = reader.nblock
     else:
-        endblock = startblock + values.nblocks
+        endblock = startblock + values.nblock
     
     k = values.nsub
+
+    print startblock, endblock
 
     for b in xrange(startblock, endblock):
         d = reader.read(b)
@@ -343,7 +352,7 @@ def _main():
 
         for iout, sout in enumerate(outsfs):
             dout = d[iout, :, :].astype(dtype).flatten()
-            if hasattr(dout, 'data'): # if it's a masked array
+            if isinstance(dout, np.ma.MaskedArray):
                 dout = dout.data
             
             dout.tofile(sout.fin)
