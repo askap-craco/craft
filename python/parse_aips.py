@@ -27,7 +27,7 @@ class aipscor(object):
             self.get_basic_info()
         
         
-    def get_basic_info(self,vcraft_dr):
+    def get_basic_info(self):
         # self.nant : total number of antennas
         # self.npol : total number of polarizations (should be either 1 or 2)
         # self.pol2beam : map of polarization to beam numbers
@@ -39,7 +39,7 @@ class aipscor(object):
         # self.nfreq : number of total frequency channels
         
         # number of antennas
-        antennas = glob.glob(vcraft_dr+'/*')
+        antennas = glob.glob(self.vcraft_dr+'/*/')
         self.nant = len(antennas)
         
         # number of polarizations
@@ -60,7 +60,7 @@ class aipscor(object):
                 self.pol2beam['y'] = beam
         
         # sort all vcraft files into different polarizations
-        all_vfiles=glob.glob(vcraft_dr+'/*/*/*.vcraft')
+        all_vfiles=glob.glob(self.vcraft_dr+'/*/*/*.vcraft')
         #nfiles_per_pol = int(len(all_vfiles)/self.npol/self.nant)
         if self.npol == 1:
             self.vfiles = all_vfiles
@@ -84,7 +84,10 @@ class aipscor(object):
         # get all antenna names for antenna index
         self.an_name = [np.nan]*self.nant
         for n in range(self.nant):
-            self.an_name[n] = self.map_an_name(n)
+            try:
+                self.an_name[n] = self.map_an_name(n)
+            except:
+                print('Error in maping names for iant',n)
             
         # frequency information for vcraft files
         self.freqs = {}
@@ -110,15 +113,18 @@ class aipscor(object):
                     an_name = line.split()[-1]
         return an_name
     
-    def get_hwdelay(self, an_ind, pol, an_check=0):
+    def get_hwdelay(self, an_ind, pol, an_check=0, incards=False):
         #%% DELAY 0: FPGA HARDWARE DELAY
         
         # hwdelay = delays in samples (CLK OFFSET (microsec), frequency dependent)
 
         search_keyword = "CLOCK COEFF "+str(an_ind)+"/0"
 
-        delays_offset = np.full((self.nfreq),np.nan,dtype=[('frequency',int),('hwdelay', int)])
-
+        
+        if not incards:
+            delays_offset = np.full((self.nfreq),np.nan,dtype=[('frequency',int),('hwdelay', int)])
+        else:
+            hwdelays = {}
 
         for c in range(1,8):
             for f in range(6):
@@ -174,9 +180,17 @@ class aipscor(object):
                                         bool_continue = False
                         #delays_offset[((c-1)*6+f)*8+nu,0] = freqs[nu]
                         delay_t = float(data.split()[-1])
-                        delays_offset[((c-1)*6+f)*8+nu] = (freqs[nu], 8* np.round((delay_t*32/27)/8))
-
-        hwdelays = np.sort(np.copy(delays_offset), order='frequency')
+                        if nu == 0:
+                            ref_hwdelay = 8* np.round((delay_t*32/27)/8)
+                        hwdelay = 8* int(np.round((delay_t*32/27)/8))
+                        if hwdelay != ref_hwdelay:
+                            print('WARNING: same fpga has different hwdelay?')
+                        if incards:
+                            hwdelays[card_name] = hwdelay
+                        else:
+                            delays_offset[((c-1)*6+f)*8+nu] = (freqs[nu], hwdelay)
+        if not incards:
+            hwdelays = np.sort(np.copy(delays_offset), order='frequency')
         return hwdelays
     
     
@@ -246,7 +260,7 @@ class aipscor(object):
                     delays_fring = float(data.split()[delay_ind]) # FRING fine time delay
 
         polfringfile = self.fringfile.replace('delays.sn.txt','xpolfring_xpol.sn')
-        if os.path.exists(polfringfile)==True:
+        if 0: #os.path.exists(polfringfile)==True: # DONT USE THIS NOW. It has been shown that AIPS polarization delay information is not enough. You also need phase offset.
             print('Polarization fring file exists, adding this delay to the fring delay')
             with open(polfringfile, 'r') as fl:
                 fl.seek(0)
