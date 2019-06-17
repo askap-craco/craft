@@ -9,6 +9,7 @@
 # NOTE : i=1, n=16384 takes a long time, so it is recommended to run parallel for each antenna and then sum up the time series at the very last step
 # (for each antenna: max. time ~ 9 hrs, max. memory ~ 30g)
 # TODO: maybe consider overlap-save method in the future
+# Please refer to the google docs README for more information: https://docs.google.com/document/d/1uSbsudW5tkjy-GbJaCduERS36AgCEgWox-V8vY-YdA8/edit?usp=sharing
 # ---------------------------------------------------------------------------------
 
 
