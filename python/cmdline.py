@@ -44,4 +44,22 @@ def strrange(rangestr):
             raise argparse.ArgumentTypeErrror("Invalid range string %s" % (rangestr))
     
     return fullrange
+
+
+class Stime(object):
+    
+    def __init__(self, s):
+        dt = None
+        tint = None
+        tfloat = None
+        try:
+            dt = dateutil.parser.parse(s)
+        except ValueError: # Invalid date
+            try:
+                tint = int(s)
+            except ValueError: # Not an int
+                try:
+                    tfloat = float(s)
+                except ValueError: # not a float either
+                    raise ValueError('Invalid time {}'.format(s))
     

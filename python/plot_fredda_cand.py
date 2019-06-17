@@ -35,6 +35,8 @@ def find_files(rootd, pattern):
 
 markers = mpl.markers.MarkerStyle().filled_markers
 
+candidate_map = {}
+
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Plot fredda candidates', formatter_class=ArgumentDefaultsHelpFormatter)
@@ -183,7 +185,9 @@ def find_files_filelist(files):
 
 def onpick(event):
     thisline = event.artist
-    print event, dir(event), event.artist
+    cand = candidate_map[thisline.get_label()][event.ind,:][0, :]
+    print 'S/N={:0.1f} sampno={:0.0f} secoff={:0.2f} bc={:0.0f} idx={:0.0f} dm={:0.2f} beamno={:0.0f} mjd={:0.10f} lbl={label}'.format(*(cand[0:8]), label=thisline.get_label())
+    
 
 def loadfile(fin):
     f = open(fin, 'rU')
@@ -247,8 +251,11 @@ def plot_file(fin, values, ax=None, title=None, labels=True, subtitle=None, scma
 
     for ib, b in enumerate(sorted(ubeams)):
         bmask = beamno == b
-        ax.scatter(time[bmask], 1+dm[bmask], s=sn[bmask]**2, marker=markers[ib % len(markers)], c=boxcar[bmask], cmap=scmap, label='Beam %d' %b, picker=3, edgecolors='face', alpha=0.4, norm=mpl.colors.Normalize(1., 32.))
         lbl = 'Beam {:d}'.format(int(b))
+        ax.scatter(time[bmask], 1+dm[bmask], s=sn[bmask]**2, marker=markers[ib % len(markers)], c=boxcar[bmask], cmap=scmap, label=lbl, picker=3, edgecolors='face', alpha=0.4, norm=mpl.colors.Normalize(1., 32.))
+        
+        candidate_map[lbl] = vin[bmask,:]
+        
         
         if ax2 is not None:
             ax2.hist(dm[bmask], label=lbl)

@@ -71,7 +71,7 @@ int createCODIFHeader(codif_header *header, int dataarraylength, uint16_t thread
   header->totalsamples = totalsamples;
   setCODIFSampleblockLength(header, sampleblocklength);
   header->frame=0;
-  header->sync = 0xABADDEED;
+  header->sync = 0xADEADBEE;
   
 
   return(CODIF_NOERROR);
@@ -93,7 +93,7 @@ int getCODIFEpochMJD(const codif_header *header)
 
 int setCODIFNumChannels(codif_header *header, int numchannels)
 {
-  header->nchan = numchannels;
+  header->nchan = numchannels-1;
   return(CODIF_NOERROR);
 }
 
