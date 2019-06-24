@@ -52,7 +52,7 @@ namespace               // Anonymous namespace for internal helpers.
     constexpr int      iMaxPacketSize_c            = 9000;   // Maximum bytes for network transport.
     constexpr int      iBitsPerByte_c              = 8;      // Number of bits in a byte.
     constexpr int      iTimeForIntegerSamples_c    = 27;     // Period in seconds, for a whole number of samples.
-    constexpr double   dTolerance_c                = 0.001;  // Tolerance for floating point calculations.
+  //    constexpr double   dTolerance_c                = 0.001;  // Tolerance for floating point calculations.
     constexpr int     DUTC                         = 37;
 
 }                       // End anonymous namespace.
@@ -428,7 +428,7 @@ namespace NCodec        // Part of the Codec namespace.
             // 32/27 MHz, this means that in 27s there should be 32 x 10^6 samples.
 
             uint64_t uiSampleIntervalsPerPeriod = llrint( m_dSampleRate * iTimeForIntegerSamples_c );
-            assert( fabs( ( uiSampleIntervalsPerPeriod / 1.0e+6 ) - 32.0 ) < dTolerance_c );
+            assert(uiSampleIntervalsPerPeriod==32000000);
 
 	    // Maximum number of samples/frame given the max frame size
 	    int samplesPerFrame = iMaxPacketSize_c / m_iSampleBlockSize;
@@ -524,7 +524,11 @@ namespace NCodec        // Part of the Codec namespace.
             // Figure out the "previous" Period restart
 
 	    unsigned long long bufferSamples = voltage_samples(m_iMode);
-	    printf("DEBUG: Assuming %lld samples per voltage dump\n", bufferSamples);
+	    if (m_iNsampsRequest==0) {
+	      printf("Warning: Assuming %lld samples per voltage dump\n", bufferSamples);
+	    } else {
+	      bufferSamples = m_iNsampsRequest;
+	    }
 
 	    unsigned long long startFrameId = m_ullTriggerFrameId - bufferSamples + m_iSamplesPerWord;
 	    // StopFrameId is the time of the last word, so need to allow for the number of samples/32bit word

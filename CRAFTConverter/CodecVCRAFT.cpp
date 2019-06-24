@@ -308,6 +308,11 @@ namespace NCodec
             RetrieveParameter( "CARD_NO",               m_iCardNumber );
             RetrieveParameter( "ANTENNA_NO",            m_iAntennaNumber );
             RetrieveParameter( "NCHANS",                m_iNumberOfChannels );
+	    try { // NSAMPS_REQUEST not in older VCRAFT files
+	      RetrieveParameter( "NSAMPS_REQUEST",        m_iNsampsRequest );
+	    } catch (...) {
+	      m_iNsampsRequest = 0;
+	    }
             RetrieveParameter( "NOW_MJD",               m_dMJDNow );
             RetrieveParameter( "NOW_BAT",               m_ullNowBAT );
             RetrieveParameter( "START_WRITE_FRAMEID",   m_ullStartWriteFrameId );
@@ -318,7 +323,6 @@ namespace NCodec
             RetrieveParameter( "TRIGGER_BAT",           m_ullTriggerWriteBAT );
 
             m_iBitsPerSample /= 2;
-            //printf("Warning: Forcing NPOL==1\n");  m_iNumberofPol = 1;
 
             // UTC string (ISO formatted) verbatim from the VCRAFT header.
 

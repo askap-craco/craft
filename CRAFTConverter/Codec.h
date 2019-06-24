@@ -45,6 +45,7 @@ namespace NCodec
             int                 m_iFPGAId;
             int                 m_iCardNumber;
             int                 m_iAntennaNumber;
+	    int                 m_iNsampsRequest;
 
             double              m_dSampleRate;
             double              m_dMJDNow;
