@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+no warnings 'portable';
 
 my $gotbat = 0;
 my $gotframeid = 0;
