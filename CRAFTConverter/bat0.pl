@@ -6,10 +6,7 @@ no warnings 'portable';
 
 my $gotbat = 0;
 my $gotframeid = 0;
-my $gotnsamp = 0;
-my ($triggerFrameId, $nsamps, $triggerBAT);
-
-my $samplesPerWord = 4; # Should set
+my ($triggerFrameId, $triggerBAT);
 
 while (<>) {
 
@@ -19,21 +16,21 @@ while (<>) {
   } elsif (/\s*TRIGGER_FRAMEID\s+(\d+)/) {
     $gotframeid = 1;
     $triggerFrameId = $1;
-  } elsif (/\s*NSAMPS_REQUEST\s+(\d+)/) {
-    $gotnsamp = 1;
-    $nsamps = $1;
   }
-  last if ($gotbat and $gotframeid and $gotnsamp);
+  last if ($gotbat and $gotframeid);
 }
 
-if (! ($gotbat and $gotframeid and $gotnsamp)) {
-  die "Did not find TRIGGER_BAT, TRIGGER_FRAMEID and NSAMPS_REQUEST\n";
+if (! ($gotbat and $gotframeid)) {
+  die "Did not find TRIGGER_BAT and TRIGGER_FRAMEID\n";
 }
 
-my $startFrameId = $triggerFrameId - $nsamps + $samplesPerWord;
+my $startBAT = int ($triggerBAT - ($triggerFrameId * (27.0/32.0)));
+my $BAT0 = int(($startBAT + 999999)/1e6); # Round to nearest uSec
+$BAT0 *= 1e6;
 
-print "startFrameID=$startFrameId\n";
+my $frame0 = int(($BAT0-$startBAT)*(32.0/27.0));
 
-my $BAT0 = $triggerBAT - ($triggerFrameId * (27.0/32.0));
-printf("BAT0= 0x%X\n", $BAT0);
-      
+open(BAT0, '>', '.bat0') || die "Could not open .bat0 for writing\n";
+printf(BAT0 "0x%llx %d\n", $BAT0, $frame0);
+close(BAT0);
+ 
