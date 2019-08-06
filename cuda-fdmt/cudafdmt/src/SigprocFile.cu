@@ -149,12 +149,14 @@ size_t SigprocFile::read_samples_uint8(size_t nt, uint8_t* output)
 {
 	// RETURNS TBF ordering. WARNING: This will deeply confuse the output if nbeams != 1
 	assert(nifs() == 1); // Otherwise users will be confused. TODO: get sources to tell user what data order is
-	size_t nelements = nt*m_nifs*m_nchans;
-	size_t nreq_bytes = nelements*m_nbits/8;
+	size_t bytes_per_element = m_nifs*m_nchans *m_nbits/8;
+	size_t nreq_bytes = nt*bytes_per_element;
+	long int file_pos_bytes = ftell(m_file) - m_hdr_nbytes;
+	m_current_sample = file_pos_bytes /bytes_per_element; // sample number of the first sample in this block
 	size_t nbytes_read = fread(output, sizeof(uint8_t), nreq_bytes, m_file);
 	size_t output_nsamp = nbytes_read * 8 / m_nbits / m_nifs / m_nchans;
 	m_samples_read += output_nsamp;
-	m_current_sample += nt;
+
 	advise_block(sizeof(uint8_t)*nreq_bytes);
 	return output_nsamp;
 }
