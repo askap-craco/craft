@@ -19,7 +19,6 @@
 #include "cuda_utils.h"
 #include "cufft_utils.h"
 
-
 void usage()
 {
   fprintf(stdout,
@@ -34,13 +33,28 @@ void usage()
 	  );
 }
 
+/* A kernel to unpack from char to given type */
+template <class intype>
+__global__ void unpack_kernel(char *dbuf_in, intype *dbuf_out)
+{
+  uint64_t loc_out = blockIdx.x * gridDim.y * blockDim.x +
+    blockIdx.y * blockDim.x +
+    threadIdx.x;
+  uint64_t loc_in = 2 * loc_out;
+
+  dbuf_out[loc_out].x = dbuf_in[loc_in];
+  dbuf_out[loc_out].y = dbuf_in[loc_in + 1];  
+}
+
 template <class intype>
 int timefft(int n, int batch, bool inplace, int option)
 {
   CudaTimer t;
-  intype *data, *out_data, *data_host, *out_data_host;
+  intype *dbuf_rt, *dbuf_out;
+  char *dbuf_in, *hbuf;
   cufftHandle plan;
-  size_t data_size=sizeof(intype)*n*(n/2 + 1)*batch;
+  size_t dbufrt_size=sizeof(intype)*n*(n/2 + 1)*batch;
+  size_t buf_size=2*sizeof(char)*n*(n/2 + 1)*batch;
   cudaDataType itype, etype, otype;
   
   if(sizeof(intype) == sizeof(cufftComplex))
@@ -57,24 +71,21 @@ int timefft(int n, int batch, bool inplace, int option)
     }
  
   /* Get memory on device */
-  gpuErrchk(cudaMalloc((void**) &data, data_size));
+  gpuErrchk(cudaMalloc((void**) &dbuf_rt, dbufrt_size));
   if (inplace)
-    out_data = data;
+    dbuf_out = dbuf_rt;
   else
-    gpuErrchk(cudaMalloc((void**) &out_data, data_size));
+    gpuErrchk(cudaMalloc((void**) &dbuf_out, dbufrt_size));
 
   /* Get memory on host */
   if(option != 0)
     {
-      gpuErrchk(cudaMallocHost((void**) &data_host, data_size));
-      if (inplace)
-	out_data_host = data_host;
-      else
-	gpuErrchk(cudaMallocHost((void**) &out_data_host, data_size));
+      gpuErrchk(cudaMalloc((void**) &dbuf_in, buf_size));
+      gpuErrchk(cudaMallocHost((void**) &hbuf, buf_size));
     }
   long long int nsize[] = {n,n };
 
-  /* Create the FFT plan for multiple data types */
+  /* Create the FFT plan for multiple dbuf types */
   size_t worksize;
   cufftSafeCall(cufftCreate(&plan));
   cufftSafeCall(cufftXtMakePlanMany(plan, 2, nsize,
@@ -84,39 +95,48 @@ int timefft(int n, int batch, bool inplace, int option)
 				    ));
   
   /* Warm up and do the real thing */
-  cufftSafeCall(cufftXtExec(plan, data, out_data, CUFFT_INVERSE));
-  int i, niter = 1000;
+  int i, niter = 100;
+  dim3 gridSize, blockSize;
+  blockSize.x = n;
+  blockSize.y = 1;
+  blockSize.z = 1;
+  gridSize.x = n/2 + 1;
+  gridSize.y = 1;
+  gridSize.z = 1;
+  if(option == 1)
+    {
+      gpuErrchk(cudaMemcpy(dbuf_in, hbuf, buf_size, cudaMemcpyHostToDevice));
+      
+      unpack_kernel<intype><<<gridSize, blockSize, 0>>>(dbuf_in, dbuf_rt);
+    }
+  cufftSafeCall(cufftXtExec(plan, dbuf_rt, dbuf_out, CUFFT_INVERSE));
   for (i = 0; i < niter; ++i)
     {
       t.start();
-      //cufftSafeCall(cufftExecC2R(plan, data, (outtype*) data));
       if(option == 1)
-	gpuErrchk(cudaMemcpy(data, data_host, data_size, cudaMemcpyHostToDevice));
-      cufftSafeCall(cufftXtExec(plan, data, out_data, CUFFT_INVERSE));
-      if(option == 1)
-	gpuErrchk(cudaMemcpy(out_data_host, out_data, data_size, cudaMemcpyDeviceToHost));
+	gpuErrchk(cudaMemcpy(dbuf_rt, hbuf, buf_size, cudaMemcpyHostToDevice));
+      cufftSafeCall(cufftXtExec(plan, dbuf_rt, dbuf_out, CUFFT_INVERSE));
       t.stop(); 
     }
 
   /* Check the timer and display */
   float tavg_us = t.get_average_time() / float(batch) * 1e3f;
-  fprintf(stdout, "%dx%d FFT batch=%d data=%d MB in-place=%d type=%d-> %d. Worksize=%d MB: %f microseconds/FFT= %f k FFTs/sec total=%0.2fs\n",
-	  n,n,batch,data_size/1024/1024, inplace, itype,otype, worksize/1024/1024, tavg_us, 1./tavg_us*1e6f/1e3f);
+  fprintf(stdout, "%dx%d FFT batch=%d dbuf=%d MB in-place=%d type=%d-> %d. Worksize=%d MB: %f microseconds/FFT= %f k FFTs/sec total=%0.2fs\n",
+	  n,n,batch,dbufrt_size/1024/1024, inplace, itype,otype, worksize/1024/1024, tavg_us, 1./tavg_us*1e6f/1e3f);
 
   /* Destroy FFT plan */
   cufftSafeCall(cufftDestroy(plan));
 
   /* Free device memory */
-  gpuErrchk(cudaFree(data));
+  gpuErrchk(cudaFree(dbuf_rt));
   if (! inplace)
-    gpuErrchk(cudaFree(out_data));
+    gpuErrchk(cudaFree(dbuf_out));
 
   /* Free host memory */
   if(option != 0)
     {
-      gpuErrchk(cudaFreeHost(data_host));
-      if (! inplace)
-	gpuErrchk(cudaFreeHost(out_data_host));
+      gpuErrchk(cudaFreeHost(hbuf));
+      gpuErrchk(cudaFree(dbuf_in));
     }
   
   return EXIT_SUCCESS;
