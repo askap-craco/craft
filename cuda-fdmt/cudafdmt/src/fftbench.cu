@@ -26,6 +26,30 @@
 //typedef cufftReal outtype;
 //typedef cufftComplex ftype;
 
+__device__ cufftComplex CB_Load_Zero (
+    void *dataIn,
+    size_t offset,
+    void *callerInfo,
+    void *sharedPtr)
+{
+	cufftComplex ret = {0.0f, 0.0f};
+    return ret;
+}
+
+__device__ cufftComplex CB_Load_Passthrough (
+    void *dataIn,
+    size_t offset,
+    void *callerInfo,
+    void *sharedPtr)
+{
+    return ((cufftComplex*)dataIn)[offset];
+}
+
+
+__device__
+cufftCallbackLoadC d_loadCallbackPtr = CB_Load_Zero;
+
+
 template <class intype>
 void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataType otype, bool inplace)
 {
@@ -61,6 +85,19 @@ void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataT
 			NULL, 1, 0, otype,
 			batch, &worksize, etype
 			));
+
+	// copy callback pointer from device to host
+	cufftCallbackLoadC h_loadCallbackPtr;
+	gpuErrchk(cudaMemcpyFromSymbol(
+	                         &h_loadCallbackPtr,
+	                         d_loadCallbackPtr,
+	                         sizeof(h_loadCallbackPtr)));
+
+	cufftSafeCall(cufftXtSetCallback(plan,
+	                             (void **)&h_loadCallbackPtr,
+	                             CUFFT_CB_LD_COMPLEX,
+	                             0));
+
 
 	// warm up
 	cufftSafeCall(cufftXtExec(plan, data, out_data, CUFFT_INVERSE));

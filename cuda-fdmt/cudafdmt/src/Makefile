@@ -15,9 +15,9 @@ NVCC=$(CUDA_PATH)/bin/nvcc
 # See http://stackoverflow.com/questions/1704907/how-can-i-get-my-c-code-to-automatically-print-out-its-git-version-hash
 GIT_VERSION := $(shell git describe --dirty --always --tags)
 
-NVCCFLAGS=-g -O3  -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler --compile --relocatable-device-code=true -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE)  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH) -I$(DADA_PATH)/include 
+NVCCFLAGS=-g -O3  -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler --compile --relocatable-device-code=true -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE)  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH) -I$(DADA_PATH)/include  --std=c++11
 
-NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE) -link -Xcompiler -L$(DADA_PATH)/lib -lpsrdada -lgomp -lcufft -g 
+NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE) -link -Xcompiler -L$(DADA_PATH)/lib -lpsrdada -lgomp -lcufft -g --std=c++11 -lcufft_static
 
 
 # Force rebuild on git change:http://stackoverflow.com/questions/3236145/force-gnu-make-to-rebuild-objects-affected-by-compiler-definition
