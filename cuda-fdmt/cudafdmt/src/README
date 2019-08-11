@@ -1,0 +1,5 @@
+1. cp fredda.mk.template to fredda.mk
+2. iiinstall psrdada
+   a. git clone https://github.com/xinpingdeng/psrdada.git
+   b. 
+3. install cub
