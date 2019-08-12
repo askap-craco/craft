@@ -16,7 +16,8 @@ C_FLAGS      += -g
 #  -gencode=arch=compute_70,code=compute_70 \
 #  -O2
 
-CU_FLAGS     = -dc -ccbin g++ -m64 -gencode=arch=compute_50,code=sm_50 \
+CU_FLAGS     = -dc -ccbin g++ -m64   -gencode=arch=compute_30,code=sm_30 \
+-gencode=arch=compute_50,code=sm_50 \
   -gencode=arch=compute_52,code=sm_52 \
   -gencode=arch=compute_60,code=sm_60 \
   -gencode=arch=compute_61,code=sm_61 \
@@ -26,22 +27,32 @@ CU_FLAGS     = -dc -ccbin g++ -m64 -gencode=arch=compute_50,code=sm_50 \
 
 include fredda.mk
 
-NVCC         = $(CUDA_PATH)/bin/nvcc
+#NVCC         = $(CUDA_PATH)/bin/nvcc
+NVCC         = nvcc
 SRC_DIR      = .
 OBJ_DIR      = .
 
 #LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread 
+#LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lpthread -lcufft_static -lculibos
+#LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib -L$(DADA_PATH)/lib -L$/usr/lib/x86_64-linux-gnu/ 
+#INCLUDE_DIRS = -I/usr/local/include -I$(CUB_PATH) -I$(DADA_PATH)/include
 LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lpthread -lcufft_static -lculibos
-LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib -L$(DADA_PATH)/lib -L$/usr/lib/x86_64-linux-gnu/ 
-INCLUDE_DIRS = -I/usr/local/include -I$(CUB_PATH) -I$(DADA_PATH)/include
+LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib 
+INCLUDE_DIRS = -I/usr/local/include  -L/usr/local/cuda/include
 
-all: fftbench_callback
+all: fftbench_callback fftbench
 
 fftbench_callback:fftbench_callback.o CudaTimer.o CpuTimer.o
 	$(NVCC) -ccbin g++ -m64 -o fftbench_callback fftbench_callback.o CudaTimer.o CpuTimer.o $(LIB_DIRS) $(LIBS)
 
 fftbench_callback.o:fftbench_callback.cu
 	$(NVCC) -c fftbench_callback.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+fftbench:fftbench.o CudaTimer.o CpuTimer.o
+	$(NVCC) -ccbin g++ -m64 -o fftbench fftbench.o CudaTimer.o CpuTimer.o $(LIB_DIRS) $(LIBS)
+
+fftbench.o:fftbench.cu
+	$(NVCC) -c fftbench.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 CudaTimer.o:CudaTimer.cu
 	$(NVCC) -c CudaTimer.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}

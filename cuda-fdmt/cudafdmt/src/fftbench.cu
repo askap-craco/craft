@@ -156,16 +156,15 @@ int main(int argc, char* argv[])
   etype = CUDA_C_16F;
   otype = CUDA_R_16F;
 
-  for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
-    int batch = 1 << batch2;
-    timefft<half2>(n,batch,itype, etype, otype, false);
-  }
-
-  for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
-    int batch = 1 << batch2;
-    timefft<half2>(n,batch,itype, etype, otype, true);
-  }
-
+  //for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
+  //  int batch = 1 << batch2;
+  //  timefft<half2>(n,batch,itype, etype, otype, false);
+  //}
+  //
+  //for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
+  //  int batch = 1 << batch2;
+  //  timefft<half2>(n,batch,itype, etype, otype, true);
+  //}
 
   printf("Benchmark finished\n");
 }
