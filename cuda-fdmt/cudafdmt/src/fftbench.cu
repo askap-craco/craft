@@ -26,15 +26,6 @@
 //typedef cufftReal outtype;
 //typedef cufftComplex ftype;
 
-//__device__ cufftComplex load_callback(void *dataIn,
-//					 size_t offset,
-//					 void *callerInfo,
-//					 void *sharedPtr) {
-//  cufftComplex value = {0.0f, 0.0f};
-//  return value;
-//}
-//__device__ cufftCallbackLoadC d_loadCallbackPtr = load_callback;
-
 template <class intype>
 void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataType otype, bool inplace)
 {
@@ -70,26 +61,6 @@ void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataT
 				    NULL, 1, 0, otype,
 				    batch, &worksize, etype
 				    ));
-
-  ///*
-  // * Retrieve address of callback functions on the device
-  // */                              
-  //cufftCallbackLoadR h_loadCallbackPtr;
-  //gpuErrchk(cudaMemcpyFromSymbol(&h_loadCallbackPtr,
-  //				 d_loadCallbackPtr, 
-  //				 sizeof(h_loadCallbackPtr)));
-  //// Now associate the callbacks with the plan.
-  //cufftResult status = cufftXtSetCallback(plan, 
-  //					  (void **)&h_loadCallbackPtr, 
-  //					  CUFFT_CB_LD_COMPLEX,
-  //					  0);
-  //if (status == CUFFT_LICENSE_ERROR) {
-  //  fprintf(stdout, "This sample requires a valid license file.\n");
-  //  fprintf(stdout, "The file was either not found, out of date, or otherwise invalid.\n");
-  //  exit(EXIT_FAILURE);
-  //} else {
-  //  cufftSafeCall(status);
-  //}
   
   // warm up
   cufftSafeCall(cufftXtExec(plan, data, out_data, CUFFT_INVERSE));

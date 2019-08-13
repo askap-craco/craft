@@ -28,6 +28,15 @@ __device__ cufftComplex load_callback(void *dataIn,
 }
 __device__ cufftCallbackLoadC d_loadCallbackPtr = load_callback;
 
+__device__ void store_callback(void *dataOut,
+			       size_t offset,
+			       cufftReal element,
+			       void *callerInfo,
+			       void *sharedPtr) {
+}
+__device__ cufftCallbackStoreR d_storeCallbackPtr = store_callback;
+
+
 template <class intype>
 void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataType otype, bool inplace)
 {
@@ -54,11 +63,16 @@ void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataT
 
   /*
    * Retrieve address of callback functions on the device
-   */                              
+   */
   cufftCallbackLoadR h_loadCallbackPtr;
+  cufftCallbackStoreR h_storeCallbackPtr;
   gpuErrchk(cudaMemcpyFromSymbol(&h_loadCallbackPtr,
   				 d_loadCallbackPtr, 
   				 sizeof(h_loadCallbackPtr)));
+  gpuErrchk(cudaMemcpyFromSymbol(&h_storeCallbackPtr,
+				 d_storeCallbackPtr,
+				 sizeof(h_storeCallbackPtr)));
+  
   // Now associate the callbacks with the plan.
   cufftResult status = cufftXtSetCallback(plan, 
   					  (void **)&h_loadCallbackPtr, 
@@ -71,6 +85,10 @@ void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataT
   } else {
     cufftSafeCall(status);
   }
+  cufftSafeCall(cufftXtSetCallback(plan,
+  				   (void **)&h_storeCallbackPtr,
+  				   CUFFT_CB_ST_REAL,
+  				   NULL));
   
   // warm up
   cufftSafeCall(cufftXtExec(plan, data, out_data, CUFFT_INVERSE));
