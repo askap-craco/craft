@@ -44,6 +44,7 @@ void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataT
   intype *data, *out_data;
   cufftHandle plan;
   size_t data_size=sizeof(intype)*n*(n/2 + 1)*batch;
+  //size_t data_size=sizeof(intype)*n*n*batch;
   gpuErrchk(cudaMalloc((void**) &data, data_size));
   if (inplace) {
     out_data = data;
