@@ -30,11 +30,8 @@ git_version:
 cudafdmt: $(objects) fdmt_test.o git_version
 	$(NVCC) $(NVLDFLAGS) -o cudafdmt $(objects) fdmt_test.o 
 
-#fftbenchapp:  cufft_utils.h $(fftbench_objects)
-#	$(NVCC) $(NVLDFLAGS) -o fftbench $(fftbench_objects) 
-
 fftbenchapp:  cufft_utils.h $(fftbench_objects)
-	$(NVCC) $(NVCCFLAGS) -o fftbench $(fftbench_objects) $(NVLDFLAGS)
+	$(NVCC) $(NVLDFLAGS) -o fftbench $(fftbench_objects) 
 
 $(all_objects): %o  : %cu
 	$(NVCC) $(NVCCFLAGS) -o $@ -c $<
