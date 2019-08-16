@@ -32,19 +32,15 @@ NVCC         = nvcc
 SRC_DIR      = .
 OBJ_DIR      = .
 
-#LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread 
-LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lpthread -lcufft_static -lculibos
+LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread 
+LIBS_STATIC  = -lpsrdada -lcudart -lcuda -lm -lrt -lpthread -lcufft_static -lculibos
 LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib -L$(DADA_PATH)/lib -L$/usr/lib/x86_64-linux-gnu/ 
 INCLUDE_DIRS = -I/usr/local/include -I$(CUB_PATH) -I$(DADA_PATH)/include -I/usr/include
-#LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lpthread -lcufft_static -lculibos
-#LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib 
-#INCLUDE_DIRS = -I/usr/local/include  -I/usr/local/cuda/include
 
-#all: fftbench fftbench_1d 
-all: fftbench_callback 
+all: fftbench fftbench_1d fftbench_callback 
 
 fftbench_callback:fftbench_callback.o CudaTimer.o CpuTimer.o
-	$(NVCC) -ccbin g++ -m64 -o fftbench_callback fftbench_callback.o CudaTimer.o CpuTimer.o $(LIB_DIRS) $(LIBS)
+	$(NVCC) -ccbin g++ -m64 -o fftbench_callback fftbench_callback.o CudaTimer.o CpuTimer.o $(LIB_DIRS) $(LIBS_STATIC)
 
 fftbench_callback.o:fftbench_callback.cu
 	$(NVCC) -c fftbench_callback.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
