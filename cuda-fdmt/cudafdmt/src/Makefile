@@ -16,19 +16,19 @@ NVCC=$(CUDA_PATH)/bin/nvcc
 GIT_VERSION := $(shell git describe --dirty --always --tags)
 
 NVCCFLAGS=-g -O3  -Xcompiler -fopenmp -Xcompiler -fPIC -Xcompiler --compile --relocatable-device-code=true -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE)  -x cu -DVERSION=\"$(GIT_VERSION)\" -I$(CUB_PATH) -I$(DADA_PATH)/include
-NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE) -link -Xcompiler -L$(DADA_PATH)/lib -lpsrdada -lgomp -lcufft -g 
+NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=$(CUDA_ARCH),code=$(CUDA_CODE) -link -Xcompiler -L$(DADA_PATH)/lib -lpsrdada -lgomp -lcufft -g
 
 # Force rebuild on git change:http://stackoverflow.com/questions/3236145/force-gnu-make-to-rebuild-objects-affected-by-compiler-definition
 
-all: git_version cudafdmt fftbenchapp 
+all: git_version fftbenchapp cudafdmt 
 
 .PHONY: all
 
 git_version: 
 	echo '$(GIT_VERSION)' | cmp -s - $@ || echo '$(GIT_VERSION)' > $@
 
-cudafdmt: $(objects) fdmt_test.o git_version
-	$(NVCC) $(NVLDFLAGS) -o cudafdmt $(objects) fdmt_test.o 
+cudafdmt: $(objects) git_version fdmt_test.o
+	$(NVCC) $(NVLDFLAGS) -o cudafdmt $(objects) fdmt_test.o
 
 fftbenchapp:  cufft_utils.h $(fftbench_objects)
 	$(NVCC) $(NVLDFLAGS) -o fftbench $(fftbench_objects) 
