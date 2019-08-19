@@ -74,18 +74,18 @@ void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataT
 				 d_storeCallbackPtr,
 				 sizeof(h_storeCallbackPtr)));
   
-  // Now associate the callbacks with the plan.
-  cufftResult status = cufftXtSetCallback(plan, 
-  					  (void **)&h_loadCallbackPtr, 
-  					  CUFFT_CB_LD_COMPLEX,
-  					  0);
-  if (status == CUFFT_LICENSE_ERROR) {
-    fprintf(stdout, "This sample requires a valid license file.\n");
-    fprintf(stdout, "The file was either not found, out of date, or otherwise invalid.\n");
-    exit(EXIT_FAILURE);
-  } else {
-    cufftSafeCall(status);
-  }
+  //// Now associate the callbacks with the plan.
+  //cufftResult status = cufftXtSetCallback(plan, 
+  //					  (void **)&h_loadCallbackPtr, 
+  //					  CUFFT_CB_LD_COMPLEX,
+  //					  0);
+  //if (status == CUFFT_LICENSE_ERROR) {
+  //  fprintf(stdout, "This sample requires a valid license file.\n");
+  //  fprintf(stdout, "The file was either not found, out of date, or otherwise invalid.\n");
+  //  exit(EXIT_FAILURE);
+  //} else {
+  //  cufftSafeCall(status);
+  //}
   cufftSafeCall(cufftXtSetCallback(plan,
   				   (void **)&h_storeCallbackPtr,
   				   CUFFT_CB_ST_REAL,
