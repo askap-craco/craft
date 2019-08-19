@@ -3,7 +3,8 @@
  *
  *  Created on: 17 Sep 2018
  *      Author: ban115
-
+ *  Modified by Xinping Deng at August 2019
+ *
  */
 
 
@@ -19,15 +20,25 @@
 #include "cuda_utils.h"
 #include "cufft_utils.h"
 
-//typedef half2 intype;
-//typedef half outtype;
+__device__ cufftComplex load_callback(void *dataIn,
+				      size_t offset,
+				      void *callerInfo,
+				      void *sharedPtr) {
+  cufftComplex value = {0.0f, 0.0f};
+  return value;
+}
+__device__ cufftCallbackLoadC d_loadCallbackPtr = load_callback;
 
-//typedef cufftComplex intype;
-//typedef cufftReal outtype;
-//typedef cufftComplex ftype;
+__device__ void store_callback(void *dataOut,
+			       size_t offset,
+			       cufftReal element,
+			       void *callerInfo,
+			       void *sharedPtr) {
+}
+__device__ cufftCallbackStoreR d_storeCallbackPtr = store_callback;
 
 template <class intype>
-void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataType otype, bool inplace)
+int timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataType otype, int option, bool inplace)
 {
   CudaTimer t;
   intype *data, *out_data;
@@ -39,36 +50,79 @@ void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataT
   } else {
     gpuErrchk(cudaMalloc((void**) &out_data, data_size));
   }
-
-  long long int nsize[] = {n,n };
-
-  /*cufftSafeCall(cufftPlanMany(&plan, 2, n,
-    NULL, 1, 0, // Simple input layout
-    NULL, 1, 0, // Simple output layout
-    CUFFT_C2R, BATCH));
-  */
   size_t worksize;
   cufftSafeCall(cufftCreate(&plan));
-  //int gpus[]  = { cuda_device };
-  //cufftSafeCall(cufftXtSetGPUs(plan, 1, gpus));
-  //cufftSafeCall(cufftSetAutoAllocation());
-
-  //cudaDataType itype = CUDA_C_16F;
-  //cudaDataType etype = CUDA_C_16F;
-  //cudaDataType otype = CUDA_R_16F;
-  cufftSafeCall(cufftXtMakePlanMany(plan, 2, nsize,
-				    NULL, 1, 0, itype,
-				    NULL, 1, 0, otype,
-				    batch, &worksize, etype
-				    ));
   
+  if(option != 1)
+    {
+      long long int nsize[] = {n,n };
+      
+      cufftSafeCall(cufftXtMakePlanMany(plan, 2, nsize,
+					NULL, 1, 0, itype,
+					NULL, 1, 0, otype,
+					batch, &worksize, etype
+					));
+    }
+  else
+    {
+      long long int nsize = n;
+      cufftSafeCall(cufftXtMakePlanMany(plan, 1, &nsize,
+					NULL, 1, 0, itype,
+					NULL, 1, 0, otype,
+					batch * n, &worksize, etype
+					));
+    }
+
+  if(((option == 2) || (option == 3) || (option == 4)) && (sizeof(intype) != 8))
+    {
+      printf("%dx%d FFT batch=%d data=%d MB in-place=%d type=%d-> %d. cuFFT callback only support single precision\n",
+	     n,n,batch,data_size/1024/1024, inplace, itype,otype);
+      
+      cufftSafeCall(cufftDestroy(plan));
+      gpuErrchk(cudaFree(data));
+      if (! inplace) {
+	gpuErrchk(cudaFree(out_data));
+      }
+      return EXIT_SUCCESS;
+    }
+  
+  if((option == 2) || (option == 4))
+    {
+      cufftCallbackLoadR h_loadCallbackPtr;
+      gpuErrchk(cudaMemcpyFromSymbol(&h_loadCallbackPtr,
+  				 d_loadCallbackPtr, 
+  				 sizeof(h_loadCallbackPtr)));
+      // Now associate the callbacks with the plan.
+      cufftResult status = cufftXtSetCallback(plan, 
+					      (void **)&h_loadCallbackPtr, 
+					      CUFFT_CB_LD_COMPLEX,
+					      0);
+      if (status == CUFFT_LICENSE_ERROR) {
+	fprintf(stdout, "This sample requires a valid license file.\n");
+	fprintf(stdout, "The file was either not found, out of date, or otherwise invalid.\n");
+	exit(EXIT_FAILURE);
+      } else {
+	cufftSafeCall(status);
+      }
+    }
+  if((option == 3) || (option == 4))
+    {
+      cufftCallbackStoreR h_storeCallbackPtr;
+      gpuErrchk(cudaMemcpyFromSymbol(&h_storeCallbackPtr,
+				 d_storeCallbackPtr,
+				 sizeof(h_storeCallbackPtr)));
+      cufftSafeCall(cufftXtSetCallback(plan,
+				       (void **)&h_storeCallbackPtr,
+				       CUFFT_CB_ST_REAL,
+				       NULL));
+    }
+
   // warm up
   cufftSafeCall(cufftXtExec(plan, data, out_data, CUFFT_INVERSE));
 
   int niter = 100;
   for (int i = 0; i < niter; ++i) {
     t.start();
-    //cufftSafeCall(cufftExecC2R(plan, data, (outtype*) data));
     cufftSafeCall(cufftXtExec(plan, data, out_data, CUFFT_INVERSE));
     t.stop();
   }
@@ -77,27 +131,48 @@ void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataT
 
   printf("%dx%d FFT batch=%d data=%d MB in-place=%d type=%d-> %d. Worksize=%d MB: %f microseconds/FFT= %f k FFTs/sec total=%0.2fs\n",
 	 n,n,batch,data_size/1024/1024, inplace, itype,otype, worksize/1024/1024, tavg_us, 1./tavg_us*1e6f/1e3f);
-  //	cout << t << endl;
   cufftSafeCall(cufftDestroy(plan));
   gpuErrchk(cudaFree(data));
   if (! inplace) {
     gpuErrchk(cudaFree(out_data));
   }
+
+  return EXIT_SUCCESS;
 }
 
 int main(int argc, char* argv[])
 {
 
-  if (argc != 5) {
+  if (argc != 6) {
     printf("%s Usage: gpuid N batchmin batchmax\n", argv[0]);
     return EXIT_FAILURE;
   }
+
+  int n = atoi(argv[2]);
+  int batchmin = atoi(argv[3]);
+  int batchmax = atoi(argv[4]);
+  int option   = atoi(argv[5]);
 
   int cuda_device = atoi(argv[1]);
   cudaDeviceProp p;
   gpuErrchk(cudaGetDeviceProperties(&p, cuda_device));
 
-  printf("FFT Benchmark \n");
+  if(option == 0)
+    printf("Benchmark with original 2D FFT \n");
+  else if(option == 1)
+    printf("Benchmark with 1D FFT \n");
+  else if(option == 2)
+    printf("Benchmark with 2D FFT using load callback \n");
+  else if(option == 3)
+    printf("Benchmark with 2D FFT using store callback \n");
+  else if(option == 4)
+    printf("Benchmark with 2D FFT using load and store callback \n");
+  else
+    {
+      printf("The option can only be 0 to 4\n");
+      return EXIT_FAILURE;
+    }
+    
   printf("Device[%d]=%s v%d.%d Mem=%d GB shmem/block=%d constmem=%d Warp=%d Clock=%d MHz %d multiprocessors\n",
 	 cuda_device, p.name, p.major, p.minor, p.totalGlobalMem/1024/1024/1024, p.sharedMemPerBlock,
 	 p.totalConstMem, p.warpSize, p.clockRate/1000, p.multiProcessorCount
@@ -105,37 +180,33 @@ int main(int argc, char* argv[])
 
   gpuErrchk( cudaSetDevice(cuda_device));
 
-  int n = atoi(argv[2]);
-  int batchmin = atoi(argv[3]);
-  int batchmax = atoi(argv[4]);
+  /* 32 bits complex */
   cudaDataType itype = CUDA_C_32F;
   cudaDataType etype = CUDA_C_32F;
   cudaDataType otype = CUDA_R_32F;
 
   for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
     int batch = 1 << batch2;
-    timefft<cufftComplex>(n,batch,itype, etype, otype, false);
+    timefft<cufftComplex>(n,batch,itype, etype, otype, option, false);
   }
-
   for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
     int batch = 1 << batch2;
-    timefft<cufftComplex>(n,batch,itype, etype, otype, true);
+    timefft<cufftComplex>(n,batch,itype, etype, otype, option, true);
   }
 
-
+  /* Half complex */
   itype = CUDA_C_16F;
   etype = CUDA_C_16F;
   otype = CUDA_R_16F;
 
-  //for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
-  //  int batch = 1 << batch2;
-  //  timefft<half2>(n,batch,itype, etype, otype, false);
-  //}
-  //
-  //for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
-  //  int batch = 1 << batch2;
-  //  timefft<half2>(n,batch,itype, etype, otype, true);
-  //}
+  for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
+    int batch = 1 << batch2;
+    timefft<half2>(n,batch,itype, etype, otype, option, false);
+  }  
+  for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
+    int batch = 1 << batch2;
+    timefft<half2>(n,batch,itype, etype, otype, option, true);
+  }
 
   printf("Benchmark finished\n");
 }

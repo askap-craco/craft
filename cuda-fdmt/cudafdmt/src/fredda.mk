@@ -3,10 +3,10 @@
 CUDA_PATH=/usr/local/cuda-10.1
 
 # target cuda architecture e.g. compute_60
-CUDA_ARCH=compute_70
+CUDA_ARCH=compute_60
 
 # target cuda code = e.g. sm_60
-CUDA_CODE=sm_70
+CUDA_CODE=sm_60
 
 
 # path to cub.h from cub-1.6.4 https://nvlabs.github.io/cub/

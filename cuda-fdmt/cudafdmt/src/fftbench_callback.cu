@@ -44,7 +44,6 @@ void timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataT
   intype *data, *out_data;
   cufftHandle plan;
   size_t data_size=sizeof(intype)*n*(n/2 + 1)*batch;
-  //size_t data_size=sizeof(intype)*n*n*batch;
   gpuErrchk(cudaMalloc((void**) &data, data_size));
   if (inplace) {
     out_data = data;
@@ -149,19 +148,5 @@ int main(int argc, char* argv[])
     timefft<cufftComplex>(n,batch,itype, etype, otype, true);
   }
   
-  //itype = CUDA_C_16F;
-  //etype = CUDA_C_16F;
-  //otype = CUDA_R_16F;
-  //
-  //for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
-  //  int batch = 1 << batch2;
-  //  timefft<half2>(n,batch,itype, etype, otype, false);
-  //}
-  //
-  //for (int batch2 = batchmin; batch2 < batchmax; batch2++) {
-  //  int batch = 1 << batch2;
-  //  timefft<half2>(n,batch,itype, etype, otype, true);
-  //}
-
   printf("Benchmark finished\n");
 }
