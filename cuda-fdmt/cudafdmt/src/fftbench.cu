@@ -41,9 +41,10 @@ template <class intype>
 int timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataType otype, int option, bool inplace)
 {
   CudaTimer t;
-  intype *data, *out_data;
+  intype *data, *out_data, *data_host;
   cufftHandle plan;
   size_t data_size=sizeof(intype)*n*(n/2 + 1)*batch;
+
   gpuErrchk(cudaMalloc((void**) &data, data_size));
   if (inplace) {
     out_data = data;
@@ -52,6 +53,16 @@ int timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataTy
   }
   size_t worksize;
   cufftSafeCall(cufftCreate(&plan));
+  
+  /* To get numbers in the array */
+  srand(time(NULL));
+  gpuErrchk(cudaMallocHost((void **)&data_host, data_size));
+  for(int i = 0; i < n*(n/2+1); i++)
+    {
+      data_host[i].x = (float)rand();
+      data_host[i].y = (float)rand();
+    }
+  gpuErrchk(cudaMemcpy(data, data_host, data_size, cudaMemcpyHostToDevice));
   
   if(option != 1)
     {
@@ -80,6 +91,7 @@ int timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataTy
       
       cufftSafeCall(cufftDestroy(plan));
       gpuErrchk(cudaFree(data));
+      gpuErrchk(cudaFreeHost(data_host));
       if (! inplace) {
 	gpuErrchk(cudaFree(out_data));
       }
@@ -133,6 +145,7 @@ int timefft(int n, int batch, cudaDataType itype, cudaDataType etype, cudaDataTy
 	 n,n,batch,data_size/1024/1024, inplace, itype,otype, worksize/1024/1024, tavg_us, 1./tavg_us*1e6f/1e3f);
   cufftSafeCall(cufftDestroy(plan));
   gpuErrchk(cudaFree(data));
+  gpuErrchk(cudaFreeHost(data_host));
   if (! inplace) {
     gpuErrchk(cudaFree(out_data));
   }
