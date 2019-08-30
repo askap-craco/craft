@@ -16,26 +16,29 @@ def cff(f1_start, f1_end, f2_start, f2_end):
     return (isquare(f1_start) - isquare(f1_end))/(isquare(f2_start) - isquare(f2_end))
 
 class Fdmt(object):
-    def __init__(self, f_min, f_max, n_f, max_dt, n_t):
+    def __init__(self, f_min, f_off, n_f, max_dt, n_t):
         '''
         :f_min: minimum frequency in MHz
-        :f_max: Maximum frequency in MHz
+        :f_off: Maximum frequency in MHz
         :n_f: Numberof channels
         :max_dt: Number of DM trials
         :n_t: Number of samples in input block
         '''
         self.f_min = float(f_min)
-        self.f_max = float(f_max)
-        assert(self.f_min < self.f_max)
-        self.bw = self.f_max - self.f_min
+        #self.d_f = self.bw / float(self.n_f)
+        self.d_f = f_off
+        #self.bw = self.f_max - self.f_min
         self.n_f = int(n_f)
-        self.d_f = self.bw / float(self.n_f)
+        assert n_f > 0
+        self.bw = self.n_f * f_off
+        self.f_max = self.f_min + self.bw
+        assert(self.f_min < self.f_max)
         self.niter = int(np.ceil(np.log2(n_f)))
         self.max_dt = int(max_dt)
         self.n_t = int(n_t)
         freqs = np.arange(n_f)*self.d_f + self.f_min
         self.init_delta_t = self.calc_delta_t(self.f_min, self.f_min + self.d_f)
-        self._state_shape = np.array([self.n_f, self.init_delta_t, self.max_dt])
+        self._state_shape = np.array([self.n_f, self.init_delta_t, self.n_t])
         self.hist_delta_t = []
         self.hist_state_shape = [self._state_shape]
         self.hist_nf_data = []
@@ -45,6 +48,7 @@ class Fdmt(object):
         self.hist_bws = np.ones(len(freqs))*self.d_f
 
         # channel width of top (copied) and bottom (i.e. all remaining) channels
+        
         self._df_top = self.d_f
         self._df_bot = self.d_f
         self._ndt_top = self.init_delta_t
@@ -66,22 +70,26 @@ class Fdmt(object):
         nf = nf_in//2 + nf_in % 2 # output number of channels - Includes copied channel, if required
         do_copy = nf_in % 2 == 1 # True if we have an odd number of input channels and the top one will be copied
         fjumps = float(nf) # output number of subbands
-        state_shape = np.array([nf, delta_t + 1, n_t])
+    
         if do_copy:
             pass # top channel width unchanged
         else:
-            self._df_bot += self._df_bot # Top channel will be wider by the new channel
+            self._df_top += self._df_bot # Top channel will be wider by the new channel
 
         self._df_bot *= 2.0 # Bottom channels will be added together
 
         if nf == 1: # if this is the last iteration
-            delta_f = self._df_top
+            fres = self._df_top
         else:
-            delta_f = self._df_bot
+            fres = self._df_bot
 
-        fres = self._df_bot
+        print 'Iteration', intnum, fres, self._df_bot, self._df_top, do_copy
+
         # delta_f = 2**(intnum)*self.d_f # channel width in MHz - of the normal channels
-        delta_t = self.calc_delta_t(self.f_min, self.f_min + delta_f) # Max IDT for this iteration
+        delta_t = self.calc_delta_t(self.f_min, self.f_min + fres) # Max IDT for this iteration
+        ndt = delta_t + 1
+
+        state_shape = np.array([nf, delta_t + 1, n_t + ndt])
         
         correction = 0.0
         if intnum > 0: # this is always invoked - it's a leftover from Barak's code
@@ -100,7 +108,7 @@ class Fdmt(object):
         # for each ouput subband
         for iif in xrange(nf):
             is_top_subband = iif == nf - 1 # True if it's the final subband
-            f_start = frange/fjumps * float(iif) + self.f_min # frequency at the bottom of the subband
+            f_start = fres * float(iif) + self.f_min # frequency at the bottom of the subband
             if not is_top_subband: # if it's one of the bottom channels
                 f_end = f_start + fres
                 f_middle = f_start + fres/2.0 - correction # Middle freq of subband less 0.5x resolution
@@ -112,8 +120,8 @@ class Fdmt(object):
                     copy_subband = True
                     delta_t_local = self._ndt_top
                 else: # there are 2 subbands available in the input data. The width of the output subband is the sum fo the input width (which is fres/2.0 plus the subband width)
-                    f_end = self.f_min + self._df_top # frequency of the top of the subband
-                    f_middle = f_start + fres/2.0 - correciton
+                    f_end = f_start + self._df_top # frequency of the top of the subband
+                    f_middle = f_start + fres/2.0 - correction
                     delta_t_local = self.calc_delta_t(f_start, f_end) + 1
                     self._ndt_top = delta_t_local
 
@@ -121,8 +129,8 @@ class Fdmt(object):
             f_middle_larger = f_middle + 2*correction # Middle freq of subband + 0.5x resolution
 
             # Fix detla_t_local if we've made a mistake. Gross but it happens for some parameters
-            if delta_t_local > self.ndt:
-                delta_t_local = self.ndt
+            if delta_t_local > self.max_dt:
+                delta_t_local = self.max_dt
             
 
             # save per-subband info for posterity
@@ -131,9 +139,9 @@ class Fdmt(object):
             
             # for each DM in this subband
             for idt in xrange(delta_t_local):
-                dt_middle = np.round(idt * cff(f_middle, f_start, f_end, f_start)) # DM of the middle
+                dt_middle = int(np.round(idt * cff(f_middle, f_start, f_end, f_start))) # DM of the middle
                 dt_middle_index = dt_middle + shift_input # same as dt_middle
-                dt_middle_larger = np.round(idt*cff(f_middle_larger, f_start, f_end, f_start)) # dt at slightly larger freq
+                dt_middle_larger = int(np.round(idt*cff(f_middle_larger, f_start, f_end, f_start))) # dt at slightly larger freq
                 dt_rest = idt - dt_middle_larger # remaining dt
                 dt_rest_index = dt_rest + shift_input # same as dt_rest
 
@@ -143,7 +151,33 @@ class Fdmt(object):
                 sum_src1_start = (2*iif, dt_middle_index, dt_middle_larger) # lower channel of input
                 sum_src2_start = (2*iif + 1, dt_rest_index, 0) # upper channel of input
 
+                # dt_middle_larger is also known as mint
                 idt_data.append((dt_middle, dt_middle_index, dt_middle_larger, dt_rest_index, sum_dst_start, sum_src1_start, sum_src2_start))
+
+
+    def execute_iteration(self, iterno, din):
+        nfd = self.nf_data[iterno]
+        assert din.shape == self.hist_state_shape[iterno-1]
+        shape = self.hist_state_shape[iterno]
+        dout = np.ones(shape, dtype=din.dtype)*np.nan # Set to NaN so we can check aftwards that we've filled everything in correctly - but this can be empty
+        
+        nchan, ndt, nt = shape
+        for ichan in xrange(nchan):
+            tend = nt
+            maxt = min(nt + ndt, nt) # TODOO: FIX THIS
+            ns = maxt - mint
+            
+            for idt in xrange(ndt):
+                dt_middle, id1, id2, mint, sd, s1, s2 = dft[ichan][idt]
+                outv = dout[ichan, idt, :]
+                in1 = din[2*ichan, id1, :]
+                in2 = din[2*ichan+1, id2, :]
+                dout[ichan, idt, 0:mint] = in1[0:mint] # copy the first input over where there's no overlap
+                dout[ichan, idt, mint:maxt] = in1[mint:maxt] + in2[0:ns]
+                dout[ichan, idt, maxt:endt] = in2[ns:end]
+                dout[ichan, idt, endt:] = 0
+                       
+                
 
 
 def _main():
