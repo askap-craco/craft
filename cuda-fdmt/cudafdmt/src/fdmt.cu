@@ -471,8 +471,8 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 
 	// Do partial sums initialisation recursively (Equation 20.)
 	for (int idt = 1; idt < delta_t; ++idt) {
-		int outidx = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, idt, 0);
-		int iidx   = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, idt-1, 0);
+		int outidx = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, idt, idt);
+		int iidx   = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, idt-1, idt);
 		int imidx  = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0 );
 
 		// The state for dt=d = the state for dt=(d-1) + the time-reversed input sample
@@ -482,11 +482,11 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 		t = threadIdx.x; // reset t
 		fdmt_dtype c1 = (fdmt_dtype(idt));
 		fdmt_dtype c2 = (fdmt_dtype(idt+1));
-		//c1 = 1.;
-		//c2 = 1.;
-		while (t < nt) {
+		c1 = 1.;
+		c2 = 1.;
+		while (t < nt - delta_t) {
 			if (count) {
-				state[outidx + t] = fdmt_dtype(idt + 1);
+				state[outidx + t] = fdmt_dtype(idt+1);
 			} else {
 				state[outidx + t] = (state[iidx + t]*c1 + indata[imidx + t])/c2;
 			}
@@ -1072,7 +1072,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 
 __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 										const fdmt_dtype* __restrict__ indata,
-										const fdmt_dtype weight,
+										const fdmt_dtype* __restrict__ weights,
 										int nt,
 										int ostate_ibeam,
 										int ostate_nbeams)
@@ -1094,6 +1094,8 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 
 	int in_off = array4d_idx(1, in_nbeams, max_dt, max_dt+nt, 0, in_ibeam, idt, 0);
 	const fdmt_dtype* iptr = indata + in_off;
+	const fdmt_dtype weight = weights[idt];
+	//const fdmt_dtype weight = 1.0;
 
 	int ostate_off = array4d_idx(1, ostate_nbeams, max_dt, max_dt+nt,
 			0, ostate_ibeam+in_ibeam, idt, 0);
@@ -1134,7 +1136,7 @@ __host__ void fdmt_update_ostate(fdmt_t* fdmt, int ibeam, int nbeams)
 
 	dim3 grid_shape(nbeams, fdmt->max_dt);
 	cuda_fdmt_update_ostate<<<grid_shape, 256>>>(fdmt->ostate.d_device,
-			currstate->d_device, rsqrtf(fdmt->nf), fdmt->nt, ibeam, fdmt->nbeams);
+			currstate->d_device, fdmt->weights.d_device, fdmt->nt, ibeam, fdmt->nbeams);
 
 	//gpuErrchk(cudaDeviceSynchronize());
 }
