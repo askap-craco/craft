@@ -5,4 +5,5 @@ test.out
 cudafdmt
 fftbench
 git_version
+fredda.mk
 
