@@ -69,7 +69,11 @@
 						</toolChain>
 					</folderInfo>
 					<fileInfo id="com.nvidia.cuda.ide.seven_five.configuration.debug.1134832286.234350666" name="fftbench_multi.cu" rcbsApplicability="disable" resourcePath="src/fftbench_multi.cu" toolsToInvoke="nvcc.compiler.base.1896988810.1237425965">
-						<tool id="nvcc.compiler.base.1896988810.1237425965" name="NVCC Compiler" superClass="nvcc.compiler.base.1896988810"/>
+						<tool id="nvcc.compiler.base.1896988810.1237425965" name="NVCC Compiler" superClass="nvcc.compiler.base.1896988810">
+							<inputType id="nvcc.compiler.input.cu.1803035976" superClass="nvcc.compiler.input.cu"/>
+							<inputType id="nvcc.compiler.input.cpp.297029257" superClass="nvcc.compiler.input.cpp"/>
+							<inputType id="nvcc.compiler.input.c.329576132" superClass="nvcc.compiler.input.c"/>
+						</tool>
 						<tool customBuildStep="true" id="org.eclipse.cdt.managedbuilder.ui.rcbs.294701574" name="Resource Custom Build Step">
 							<inputType id="org.eclipse.cdt.managedbuilder.ui.rcbs.inputtype.1127836366" name="Resource Custom Build Step Input Type">
 								<additionalInput kind="additionalinputdependency" paths=""/>
@@ -77,8 +81,17 @@
 							<outputType id="org.eclipse.cdt.managedbuilder.ui.rcbs.outputtype.452712791" name="Resource Custom Build Step Output Type"/>
 						</tool>
 					</fileInfo>
+					<fileInfo id="com.nvidia.cuda.ide.seven_five.configuration.debug.1134832286.1964501408" name="quickfftbench.cu" rcbsApplicability="disable" resourcePath="src/quickfftbench.cu" toolsToInvoke="nvcc.compiler.base.1896988810.926348904">
+						<tool id="nvcc.compiler.base.1896988810.926348904" name="NVCC Compiler" superClass="nvcc.compiler.base.1896988810"/>
+						<tool customBuildStep="true" id="org.eclipse.cdt.managedbuilder.ui.rcbs.682221778" name="Resource Custom Build Step">
+							<inputType id="org.eclipse.cdt.managedbuilder.ui.rcbs.inputtype.461949285" name="Resource Custom Build Step Input Type">
+								<additionalInput kind="additionalinputdependency" paths=""/>
+							</inputType>
+							<outputType id="org.eclipse.cdt.managedbuilder.ui.rcbs.outputtype.354918714" name="Resource Custom Build Step Output Type"/>
+						</tool>
+					</fileInfo>
 					<sourceEntries>
-						<entry excluding="fftbench_multi.cu|fftbench.cu|fredda.cu" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
+						<entry excluding="quickfftbench.cu|fftbench_multi.cu|fftbench.cu|fredda.cu" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

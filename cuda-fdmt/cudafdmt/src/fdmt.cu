@@ -217,7 +217,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			int mint = dt_middle_larger;
 
 			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
-			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0) - mint; // src2 offset is by mint because it only starts adding after mint samples
+			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0);
 			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
 			if (copy_subband) {
 				src1_offset = array4d_idx(indata, 0, 2*iif, idt, 0);
@@ -286,9 +286,11 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 		fdmt->states[s].nw = fdmt->nbeams_alloc;
 		fdmt->states[s].nx = fdmt->nf;
 		fdmt->states[s].ny = fdmt->delta_t;
-		fdmt->states[s].nz = fdmt->delta_t + nt;
 		//array4d_malloc(&fdmt->states[s], host_alloc, true);
 	}
+
+	fdmt->states[0].nz =  nt;
+	fdmt->states[1].nz =  nt + fdmt->delta_t;
 
 	// save iteration setup
 	int s = 0;
@@ -456,7 +458,7 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 	int t = threadIdx.x; // sample number
 
 	// Assign initial data to the state at delta_t=0
-	int outidx = array4d_idx(nbeams, nf, delta_t, delta_t + nt, ibeam, c, 0, 0);
+	int outidx = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, 0, 0);
 	int imidx = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0);
 	while (t < nt) {
 		if (count) {
@@ -469,8 +471,8 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 
 	// Do partial sums initialisation recursively (Equation 20.)
 	for (int idt = 1; idt < delta_t; ++idt) {
-		int outidx = array4d_idx(nbeams, nf, delta_t, delta_t + nt, ibeam, c, idt, 0);
-		int iidx   = array4d_idx(nbeams, nf, delta_t, delta_t + nt, ibeam, c, idt-1, 0);
+		int outidx = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, idt, 0);
+		int iidx   = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, idt-1, 0);
 		int imidx  = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0 );
 
 		// The state for dt=d = the state for dt=(d-1) + the time-reversed input sample
@@ -512,7 +514,7 @@ int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* 
 	//state->nw = nbeams; // nbeams in this batch
 	state->nx = fdmt->nf;
 	state->ny = fdmt->delta_t;
-	state->nz = fdmt->nt + fdmt->delta_t;
+	state->nz = fdmt->nt;
 
 	// zero off the state
 	array4d_cuda_memset(state, 0);
@@ -870,6 +872,8 @@ __global__ void cuda_fdmt_iteration_kernel5_sum (
 		int src2_offset = ts_ptr[1];
 		int out_offset = ts_ptr[2];
 		int mint = ts_ptr[3];
+		int tend1 = min(tend, tmax + mint);
+
 		while(t < mint) {
 			outp[out_offset] = inp[src1_offset];
 			t += nt;
@@ -877,17 +881,17 @@ __global__ void cuda_fdmt_iteration_kernel5_sum (
 			inp += nt;
 		}
 
+
 		while(t < tmax) {
-			outp[out_offset] = inp[src1_offset] + inp[src2_offset];
+			outp[out_offset] = inp[src1_offset] + inp[src2_offset-mint];
 			t += nt;
 			outp += nt;
 			inp += nt;
 		}
 
-		int tend1 = min(tend, tmax + mint);
 
 		while(t < tend1) {
-			outp[out_offset] = inp[src2_offset];
+			outp[out_offset] = inp[src2_offset-mint];
 			t += nt;
 			outp += nt;
 			inp += nt;
@@ -920,6 +924,7 @@ __global__ void cuda_fdmt_iteration_kernel5_copy (
 		int delta_t_local,
 		int iif,
 		int nchanout,
+		int tmax,
 		int tend,
 		const int* __restrict__ ts_data)
 
@@ -937,11 +942,17 @@ __global__ void cuda_fdmt_iteration_kernel5_copy (
 		int src1_offset = ts_ptr[0];
 		int out_offset = ts_ptr[2];
 
-		while(t < tend) {
+		while(t < tmax) {
 			outp[out_offset] = inp[src1_offset];
 			t += nt;
 			outp += nt;
 			inp += nt;
+		}
+
+		while(t < tend) {
+			outp[out_offset] = fdmt_dtype(0.0);
+			t += nt;
+			outp += nt;
 		}
 	} else {
 		int offset = t + tend*(idt + ndt*(iif + nchanout*beamno));
@@ -1049,7 +1060,7 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 								dst_beam_stride,
 								delta_t_local,
 								iif, nchanout,
-								tend, ts_data);
+								tmax, tend, ts_data);
 
 			//gpuErrchk(cudaPeekAtLastError());
 		}
@@ -1088,19 +1099,19 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 			0, ostate_ibeam+in_ibeam, idt, 0);
 	fdmt_dtype* optr = ostate + ostate_off;
 	// Add the new state for all but the last block
-	for (int t = threadIdx.x; t < max_dt + nt; t += blockt) {
+	for (int t = threadIdx.x; t < idt + nt; t += blockt) {
 		// makign this optr[t] = iptr[t+-1] + optr[t + nt] makes the DC RMS worse
 		// optr[t] = iptr[t] + optr[t + nt +- 1]; also worse
 		// So 		optr[t] = iptr[t] + optr[t + nt];
-		// It's just weird that we have such a noisy response to DC input
 
+		fdmt_dtype ind = iptr[t];
 		if (t < nt) {
 			// Weight only the last block by the weights
-			optr[t] = (iptr[t] + optr[t + nt])*weight;
+			optr[t] = (ind + optr[t + nt])*weight;
 		} else if (t >= max_dt) {
-			optr[t] = iptr[t];
+			optr[t] = ind;
 		} else {
-			optr[t] = (iptr[t] + optr[t + nt]);
+			optr[t] = (ind + optr[t + nt]);
 		}
 
 		// sync threads before doing the next block otherwise we don't copy the ostate correctly
@@ -1191,20 +1202,36 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 
 	// Start that puppy up
 	int s = 0;
+#ifdef DUMP_STATE
+	{
+		char buf[128];
+		sprintf(buf, "state_s%d.dat", 0);
+		array4d_t* currstate = &fdmt->states[s];
+		array4d_copy_to_host(currstate);
+		array4d_dump(currstate, buf);
+	}
+#endif
+
+
 	fdmt->t_iterations.start();
 	for (int iter = 1; iter < fdmt->order+1; iter++) {
 		array4d_t* currstate = &fdmt->states[s];
 		s = (s + 1) % 2;
 		array4d_t* newstate = &fdmt->states[s];
 		cuda_fdmt_iteration4(fdmt, iter, currstate, newstate);
+
+#ifdef DUMP_STATE
+		{
+			char buf[128];
+			array4d_copy_to_host(newstate);
+			sprintf(buf, "state_s%d.dat", iter);
+			array4d_dump(newstate, buf);
+		}
+
+#endif
 		//gpuErrchk(cudaPeekAtLastError());
 		//gpuErrchk(cudaDeviceSynchronize());
-#ifdef DUMP_STATE
-		char buf[128];
-		array4d_copy_to_host(newstate);
-		sprintf(buf, "state_s%d.dat", iter);
-		array4d_dump(newstate, buf);
-#endif
+
 	}
 	fdmt->t_iterations.stop();
 	//cout << "FDMT Iterations only took " << t << endl;
