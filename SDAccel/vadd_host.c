@@ -3,7 +3,7 @@
 *******************************************************************************/
 
 #include "vadd_host.h"
-#include "sdaccel_util.h"
+#include "util_sdaccel.h"
 
 #include <iostream>
 

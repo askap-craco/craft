@@ -3,6 +3,7 @@
 *******************************************************************************/
 
 #include "prepare_host.h"
+#include "util_sdaccel.h"
 
 #include <time.h>
 #include <stdio.h>
