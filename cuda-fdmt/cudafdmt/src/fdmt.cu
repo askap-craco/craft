@@ -480,15 +480,11 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 		// (TODO: Not including a missing overlap with the previous block here)
 		// originally this was j=idt, rather than j=0. But that just meant that 0<=j<idt were zero, which seems weird.
 		t = threadIdx.x; // reset t
-		fdmt_dtype c1 = (fdmt_dtype(idt));
-		fdmt_dtype c2 = (fdmt_dtype(idt+1));
-		c1 = 1.;
-		c2 = 1.;
 		while (t < nt - delta_t) {
 			if (count) {
 				state[outidx + t] = fdmt_dtype(idt+1);
 			} else {
-				state[outidx + t] = (state[iidx + t]*c1 + indata[imidx + t])/c2;
+				state[outidx + t] = state[iidx + t]+ indata[imidx + t];
 			}
 			t += tblock;
 		}
