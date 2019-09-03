@@ -19,27 +19,12 @@
 #include <stdbool.h>
 #include <CL/opencl.h>
 #include <CL/cl_ext.h>
+
 #define MAX_LENGTH 4096
 #define MEM_ALIGNMENT 4096
 
- 
-cl_uint load_file_to_memory(const char *filename, char **result)
-{
-    cl_uint size = 0;
-    FILE *f = fopen(filename, "rb");
-    if (f == NULL) {
-        *result = NULL;
-        return -1; // -1 means file opening fail
-    }
-    fseek(f, 0, SEEK_END);
-    size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    *result = (char *)malloc(size+1);
-    if (size != fread(*result, sizeof(char), size, f)) {
-        free(*result);
-        return -2; // -2 means file reading fail
-    }
-    fclose(f);
-    (*result)[size] = 0;
-    return size;
-}
+#define CHANNELS  288       // possible numbers: 288, 288, 672
+#define BASELINEs 276       // possible numbers: 276, 435, 435
+#define SAMPLES_PER_BUF_BLOCK 256  // configurable number, depends the available memory
+#define BUF_BLOCKS_PER_MODEL  8192 // Possible numbers: 32, 32, 64
+#define MODELS 2            // number of models, defines the length of the try

@@ -2,7 +2,8 @@
 ** HOST Code
 *******************************************************************************/
 
-#include "host.h"
+#include "vadd_host.h"
+#include "sdaccel_util.h"
 
 #include <iostream>
 
