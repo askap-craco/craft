@@ -7,10 +7,10 @@ for f in $@ ; do
 	fits in=$f.fits out=$f.mir op=uvin
 	prthd in=$f.mir
 	uvflag vis=$f.mir flagval=unflag select=-auto
-	uvspec vis=$f.mir select=ant\(1\) interval=1 axis=freq,real log=$f.uvspec.real
-	uvspec vis=$f.mir select=ant\(1\) interval=1 axis=freq,imag log=$f.uvspec.imag
+	uvflag vis=$f.mir flagval=flag select=amp\(0,0.00001\)
+	uvspec vis=$f.mir select=ant\(1\) interval=1 axis=freq,real log=$f.uvspec.real device=/null
+	uvspec vis=$f.mir select=ant\(1\) interval=1 axis=freq,imag log=$f.uvspec.imag device=/null
 	calibrate.sh $f.mir
-	
     fi
 
     if [[ ! -e $f.uvaver ]] ; then

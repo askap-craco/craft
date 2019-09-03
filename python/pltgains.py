@@ -62,8 +62,6 @@ def load_gains(f):
     g = np.array(reald).astype(float) + 1j*np.array(imagd).astype(float)
     return g
 
-fig, ax = pylab.subplots(5,6)
-ax = ax.flatten()
 
 def load_file(f, values):
     g = load_gains(f)
@@ -89,6 +87,10 @@ def load_all(files, values):
 def plot(data, values):
     lines = []
     labels = []
+    size = map(int, values.nxy.split(','))
+    fig, ax = pylab.subplots(size[0],size[1], sharex=True, sharey=True)
+    ax = ax.flatten()
+
     plt.locator_params(axis='x', nbins=3)
     for card, beam in data.keys():
         alld = data[(card, beam)]
@@ -119,6 +121,7 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
     parser.add_argument(dest='files', nargs='+')
+    parser.add_argument('--nxy', help='Number of subplots x,y', default='5,6')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
     if values.verbose:

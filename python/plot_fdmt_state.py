@@ -13,8 +13,6 @@ import os
 import sys
 import logging
 import subprocess
-from craftsim import dispersed_voltage, dispersed_stft
-from FDMT import *
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -54,8 +52,8 @@ def load4d(fname, dtype=np.float32):
     print 'load4d', fname, d.shape
     return d
 
-def file_series(prefix):
-    i = 0
+def file_series(prefix, start=0):
+    i = start
     while True:
         fname = prefix % i
         if os.path.exists(fname):
@@ -127,21 +125,26 @@ def _main():
     if os.path.exists('fdmtweights.dat'):
         weights = load4d('fdmtweights.dat')
         pylab.figure()
-        pylab.plot(weights[0,0,0,:])
+        w = weights[0,0,0,:]
+        pylab.plot(w)
         pylab.xlabel('idt')
         pylab.ylabel('Weight')
+        ax = pylab.gca().twinx()
+        nhits = 1./(w*w)
+        ax.plot(nhits)
         
 
-    plot_stats()
+    #plot_stats()
 
-    for i, fname in enumerate(file_series('state_s%d.dat')):
+
+    for i, fname in enumerate(file_series('state_s%d.dat', start=0)):
         #if 0 < i < 8:
 #            continue
 
         d = load4d(fname)
         fig, ax = pylab.subplots(1,4)
         nbeams, nchan, ndt, nt = d.shape
-        dt = min(values.dt, ndt-1)
+        dt = min(values.dt, ndt-2)
         chan = min(values.chan, nchan-1)
 
         myimshow(ax[0], d[beam, :, dt, :], aspect='auto', origin='lower')

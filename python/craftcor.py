@@ -209,8 +209,8 @@ class AntennaSource(object):
         framediff_samp = corr.refant.trigger_frame - self.trigger_frame
         framediff_us = framediff_samp / corr.fs
         (geom_delay_us, geom_delay_rate_us) = corr.get_geometric_delay_delayrate_us(self)
-        self.all_geom_delays.append(geom_delay_us)
-        self.all_mjds.append(corr.curr_mjd_mid)
+        #self.all_geom_delays.append(geom_delay_us)
+        #self.all_mjds.append(corr.curr_mjd_mid)
 
         #logging.debug'ALL GEOM DELAYS', self.all_geom_delays, type(geom_delay_us)
         #print 'ALL MJDs', self.all_mjds
@@ -369,7 +369,7 @@ class Correlator(object):
         self.fmid = self.freqs.mean()
         self.inttime_secs = float(self.nint*self.nfft)/(self.fs*1e6)
         self.inttime_days = self.inttime_secs/86400.
-        self.curr_intno = 0
+        self.curr_intno = values.start_intno
         self.curr_samp = self.curr_intno*self.nint + 1000
         self.prodout = PlotOut(self)
         self.calcmjd()
@@ -807,12 +807,14 @@ def _main():
     parser.add_argument('--show', help='Show plot', action='store_true', default=False)
     parser.add_argument('-i','--nint', help='Number of fine spectra to average', type=int, default=128)
     parser.add_argument('-f','--fscrunch', help='Frequency average by this factor', default=1, type=int)
+    parser.add_argument('-s','--start-intno', help='Starting integration number to skip to', default=0, type=int)
     parser.add_argument('--rfidelay', type=int, help='Delay in fine samples to add to second component to make an RFI data set', default=0)
     parser.add_argument('--mirsolutions', help='Root file name for miriad gain solutions')
     parser.add_argument('--aips_c', help='AIPS banpass polynomial fit coeffs',default=None)
     parser.add_argument('--an', type=int, help='Specific antenna', default=None)
     parser.add_argument('--offset', type=int, help='FFT offset to add', default=0)
     parser.add_argument('--tab', help='Do tied-array beamforming', action='store_true', default=False)
+    parser.add_argument('--freqoff', help='Apply frequency offset', type=float, default=-1.0)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -832,7 +834,7 @@ def _main():
         
     # hacking delays
     delaymap = parse_delays(values)
-    antennas = [AntennaSource(mux) for mux in vcraft.mux_by_antenna(values.files, delaymap)]
+    antennas = [AntennaSource(mux) for mux in vcraft.mux_by_antenna(values.files, delaymap, default_freq_offset=values.freqoff)]
     #antennas = [AntennaSource(vcraft.VcraftFile(f)) for f in values.files]
     given_offset = values.offset
     corr = Correlator(antennas, sources, values, abs_delay=given_offset)

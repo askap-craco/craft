@@ -49,12 +49,12 @@ for f in $@ ; do
 	#tsp craftcor.py --parset $fcm --calcfile $calcfile  -i ${ismall} -o $outdir/${dlname}_c1_f1_${b}_i${ismall}.fits $dlname/ak??/$b/*c1_f1.vcraft --fft-size=1
 	itime=4096
 	fscrunch=9
-	tsp craftcor.py --parset $fcm --calcfile $calcfile  -i $itime -o $outdir/${dlname}_call_${b}_i${itime}_f${fscrunch}.fits $dlname/ak??/$b/*c*.vcraft --fft-size=1 -f $fscrunch
+	#tsp craftcor.py --parset $fcm --calcfile $calcfile  -i $itime -o $outdir/${dlname}_call_${b}_i${itime}_f${fscrunch}.fits $dlname/ak??/$b/*c*.vcraft --fft-size=1 -f $fscrunch
 
 	#tsp craftcor.py --parset $fcm --calcfile $calcfile  -i $itime -o $outdir/${dlname}_call_${b}_i${itime}_f${fscrunch}_rfi1.fits $dlname/ak??/$b/*c*.vcraft --fft-size=1 -f $fscrunch --rfidelay 1
 	
-	for c in {1..7} ; do
-	    echo tsp craftcor.py --parset $fcm --calcfile $calcfile  -i $itime -o $outdir/${dlname}_c${c}_${b}_i${itime}_f${fscrunch}.fits $dlname/ak??/$b/*c${c}*.vcraft --fft-size=1 -f $fscrunch
+	for c in {5..7} ; do
+	    tsp craftcor.py --parset $fcm --calcfile $calcfile  -i $itime -o $outdir/${dlname}_c${c}_${b}_i${itime}_f${fscrunch}.fits $dlname/ak??/$b/*c${c}*.vcraft --fft-size=1 -f $fscrunch 
 	done
     done
 done

@@ -25,6 +25,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s', '--show', action='store_true', help='show plots')
     parser.add_argument('--weight', action='store_true', help='Multiply output by weight')
+    parser.add_argument('--no-cross', action='store_false', dest='do_cross', default=True)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
