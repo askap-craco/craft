@@ -12,13 +12,17 @@ from crafthdr import DadaHeader
 import os
 
 class DadaFile(object):
-    def __init__(self, filename):
+    def __init__(self, filename, shape=None):
         self.filename = filename
         assert os.path.isfile(self.filename)
         self.hdr = DadaHeader.fromfile(self.filename)
         self.hdr_size = int(self.hdr.get_value('HDR_SIZE'))
-        self.shape = self.hdr.get_value('SHAPE') # throws exception if not defined
-        self.shape = np.array(map(int, self.shape.split(',')))
+        if shape is None:
+            self.shape = self.hdr.get_value('SHAPE') # throws exception if not defined
+            self.shape = np.array(map(int, self.shape.split(',')))
+        else:
+            self.shape = shape
+
         self.dtype = np.dtype(self.hdr.get_value('DTYPE', '<f4'))
         self.data_name = self.hdr.get_value('DATA_NAME')
         self.block_size_bytes = np.prod(self.shape)*self.dtype.itemsize
@@ -35,7 +39,7 @@ class DadaFile(object):
             raise ValueError('Invalid blockid {}'.format(blockid))
         
         if blockid >= self.nblocks:
-            raise ValueError('BlockID {} past the end of file'.format(blockid))
+            raise ValueError('BlockID {} past the end of file {}'.format(blockid, self.filename))
 
         assert 0 <= blockid < self.nblocks
 
@@ -50,7 +54,7 @@ class DadaFile(object):
             'max at', \
             np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
 
-        return v
+        return np.ma.masked_invalid(v)
 
     def blocks(self, step=1):
         '''

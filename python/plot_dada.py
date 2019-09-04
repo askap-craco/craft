@@ -11,6 +11,7 @@ import dada
 import pylab
 import numpy as np
 from cmdline import strrange
+from crafthdr import DadaHeader
 
 class Formatter(object):
     def __init__(self, im):
@@ -28,6 +29,7 @@ def _main():
     parser.add_argument('-b', '--bmax', help='Maximum beam to plot', type=int, default=2)
     parser.add_argument('--imrange', help='Imavge vertical plot range')
     parser.add_argument('--nxy', help='nxy', default='6,12')
+    parser.add_argument('-r','--rescale', action='store_true', help='Rescale data', default=False)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -36,56 +38,67 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    f = dada.DadaFile(values.files[0])
-    nbeam = int(f.hdr['NBEAM'])
-    nchan = int(f.hdr['NCHAN'])
-    npol = int(f.hdr['NPOL'])
+    #f = DadaFile(values.files[0])
+    hdr = DadaHeader.fromfile(values.files[0])
+    nbeam = int(hdr['NBEAM'][0])
+    nchan = int(hdr['NCHAN'][0])
+    npol = int(hdr['NPOL'][0])
     tstart, nint = map(int, values.time.split(','))
-    dtype = np.dtype(f.hdr.get('DTYPE', '<f4'))
-    order = f.hdr.get('DORDER', 'TFBP')
-    nint = int(f.hdr.get('NT', nint))
-    sz = dtype.itemsize
-    byteoff = 4*nchan*nbeam*npol*tstart
-    f.fin.seek(byteoff + f.header_size)
-    while True:
-        plot(f, dtype, nint, nbeam, nchan, npol, order, values)
+    dtype = np.dtype(hdr.get_value('DTYPE', '<f4'))
+    order = hdr.get_value('DORDER', 'TFBP')
+    nint = int(hdr.get_value('NT', nint))
+    transpose = None
 
 
-def plot(f, dtype, nint, nbeam, nchan, npol, order, values):
-    nelements = nbeam*nchan*nint*npol
-    v = np.fromfile(f.fin, dtype=dtype, count=nelements)
-    # make output order TFBP if it isn't already
+
     if order == 'TFBP':
-        v.shape = (nint, nchan, nbeam, npol)
+        shape = (nint, nchan, nbeam, npol)
     elif order == 'TBPF':
-        v.shape = (nint, nbeam, npol, nchan)
-        v = v.transpose([0, 3, 1, 2])
+        shape = (nint, nbeam, npol, nchan)
+        transpose = [0, 3, 1, 2]
     elif order == 'BPFT':
-        v.shape = (nbeam, npol, nchan, nint)
-        v = v.transpose([3, 2, 0, 1])
+        shape = (nbeam, npol, nchan, nint)
+        transpose = [3, 2, 0, 1]
     else:
-        raise ValueError('Unknown order %s' % order)
+        raise ValueError('Unknown order {}'.format(order))
 
 
-    print 'Got dtypes', dtype, 'ORDER', order, 'shape', v.shape
+    print nbeam, nchan, npol, tstart, nint, dtype, order, nint, shape, transpose
+    
+    f = dada.DadaFile(values.files[0], shape=shape)
+    for b in f.blocks():
+        orig_shape = b.shape
+        if transpose is not None:
+            b = b.transpose(transpose)
 
+        print b.shape, shape, transpose, orig_shape
+        plot(b, nint, nbeam, nchan, npol, values)
+
+
+def plot(v, nint, nbeam, nchan, npol, values):
     fig, axes = pylab.subplots(*map(int, values.nxy.split(',')), sharex=True, sharey=True)
     if values.imrange:
         vmin, vmax = map(float, values.imrange.split(','))
     else:
         vmin = None
         vmax = None
-    
-    for iax, ax in enumerate(axes.flat):
-        assert v.shape == (nint, nchan, nbeam, npol) # assume ordering TFBP
+
+    nbeampol = nbeam*npol
+    for iax, ax in enumerate(axes.flatten()[:nbeampol]):
+        assert v.shape == (nint, nchan, nbeam, npol), 'Invalid shape {} expected ({},{},{},{})'.format(v.shape, nint, nchan, nbeam, npol) # assume ordering TFBP
         pol = iax / nbeam
         beam = iax % nbeam
         if pol > npol or beam > nbeam:
             break
         
-        img = v[:, :, beam,pol].T
-        print 'beam', beam, 'pol', pol,'max/min/mean/rms {}/{}/{}/{}'.format(img.max(), img.min(), img.mean(), img.std())
-        im = ax.imshow(img, aspect='auto', vmin=vmin, vmax=vmax, interpolation='none', origin='lower')
+        img = v[:, :, beam,pol]
+
+        if values.rescale:
+            img -= img.mean(axis=0)
+            img /= img.std(axis=0)
+            print 'RESCALED beam', beam, 'pol', pol,'max/min/mean/rms {}/{}/{}/{}'.format(img.max(), img.min(), img.mean(), img.std()), img.shape
+            
+        im = ax.imshow(img.T, aspect='auto', vmin=vmin, vmax=vmax, interpolation='none', origin='lower')
         ax.text(0, 0, 'beam %d pol %d' % (beam, pol), va='top', ha='left') 
         ax.format_coord = Formatter(im)
 

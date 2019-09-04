@@ -124,6 +124,7 @@ class AntennaSource(object):
         self.init_geom_delay_us = None
         self.all_geom_delays = []
         self.all_mjds = []
+        self.pol = self.vfile.pol.lower()
         print 'antenna {} {}'.format(self.antname, self.vfile.freqconfig)
 
     def do_f(self, corr):
@@ -274,9 +275,11 @@ class AntennaSource(object):
             phasor = np.exp(np.pi*2j*phases, dtype=np.complex64)
             freq_ghz = (cfreq+freqs)/1e3
             mir_cor = np.array([corr.mir.get_solution(iant, 0, f) for f in freq_ghz])
-            mir_cor[np.where(mir_cor==0)] = np.nan
-            phasor /= mir_cor
-            phasor /= corr.refphasor[c,:] # apply phase ramp relative to the reference antenna
+            #mir_cor[np.where(mir_cor==0)] = np.nan
+            if mir_cor[0] == 0: # if correction is 0, flag data
+                phasor *= 0
+            else:
+                phasor /= mir_cor
             '''
             pylab.figure(10)
             pylab.plot(np.angle(phasor[0, :]))
@@ -371,8 +374,8 @@ class Correlator(object):
         self.prodout = PlotOut(self)
         self.calcmjd()
         self.get_fr_data()
+        self.pol = self.ants[0].pol
         self.parse_mir()
-        self.refphasor = self.set_ref_phasor()
         self.fileout = CorrUvFitsFile(values.outfile, self.fmid, self.sideband*self.out_chanbw, \
                                       self.nfine_out_chan, self.npol_out, self.mjd0, sources, ants, self.sideband)
 
@@ -394,7 +397,9 @@ class Correlator(object):
                 self.parset[name] = value
 
     def parse_mir(self):
-        self.mir = MiriadGainSolutions(self.values.mirsolutions,self.values.aips_c)
+        self.mir = None
+        if self.values.mirsolutions is not None or self.values.aips_c is not None:
+            self.mir = MiriadGainSolutions(self.values.mirsolutions,self.values.aips_c, self.pol, self.freqs)
                 
 
     def get_ant_location(self, antno):
@@ -519,7 +524,7 @@ class Correlator(object):
         sum_aligned = np.zeros((nsamp, nchan, self.npol_in), dtype=np.complex64)
         
         if an == None: # add all antennas
-            print('## Summing up all 24 antennas')
+            print('## Summing up all '+str(len(self.ants))+' antennas')
             for iant, ant in enumerate(self.ants):
                 if not self.running:
                     raise KeyboardInterrupt()
@@ -547,47 +552,6 @@ class Correlator(object):
         self.fileout.put_data(uvw, self.curr_mjd_mid, a1.ia, a2.ia,
             self.inttime_secs, xx)
 
-    def set_ref_phasor(self): # added by hyerin
-        # calculate sample start
-        framediff_samp = 0
-        
-        (geom_delay_us, geom_delay_rate_us) = self.get_geometric_delay_delayrate_us(self.refant)
-        
-        geom_delay_samp = geom_delay_us * self.fs
-        fixed_delay_us = self.get_fixed_delay_usec(self.refant.antno)
-        fixed_delay_samp = fixed_delay_us*self.fs
-        total_delay_samp = framediff_samp
-        whole_delay = int(np.round(total_delay_samp))
-        total_delay_us = total_delay_samp / self.fs
-        whole_delay_us = whole_delay / self.fs
-
-        frac_delay_samp = (total_delay_samp - whole_delay)
-        frac_delay_us = frac_delay_samp *self.fs
-
-        # get data
-        nsamp = self.nint*self.nfft
-        sampoff = whole_delay + self.abs_delay
-        
-        phasor_allchan = np.full((self.ncoarse_chan,self.nfine_per_coarse),np.nan,dtype=np.complex64)
-        for c in xrange(self.ncoarse_chan):
-            cfreq = self.freqs[c]
-            freqs = (np.arange(self.nfine_per_coarse, dtype=np.float) - float(self.nfine_per_coarse)/2.0)*self.fine_chanbw
-            if self.sideband == -1:
-                freqs = -freqs
-            delta_t = -fixed_delay_us + geom_delay_us
-            phases = delta_t * (freqs + cfreq)
-
-            # If you plot the phases you're about to correct, after adding a artificial
-            # 1 sample delay ad tryig to get rid of it with a phase ramp, it becaomes
-            # blatetly clear what you should do
-            phasor = np.exp(np.pi*2j*phases, dtype=np.complex64)
-            freq_ghz = (cfreq+freqs)/1e3
-            #print('ref ant iant: '+str(self.refant.antno))
-            mir_cor = np.array([self.mir.get_solution(0, 0, f) for f in freq_ghz])
-            mir_cor[np.where(mir_cor==0)] = np.nan
-            phasor /= mir_cor
-            phasor_allchan[c,:] = phasor
-        return phasor_allchan
 
 
 def parse_delays(values):
@@ -596,7 +560,7 @@ def parse_delays(values):
 	delayfile = values.hwfile
 	#print(delayfile)
     delays = {}
-    if os.path.exists(delayfile):
+    if delayfile is not None and os.path.exists(delayfile):
         with open(delayfile, 'rU') as dfile:
             for line in dfile:
                 bits = line.split()
@@ -650,7 +614,7 @@ def parse_gpplt(fin):
     return np.array(x), v
 
 class MiriadGainSolutions(object):
-    def __init__(self, file_root, bp_c_root=None):
+    def __init__(self, file_root, bp_c_root=None, pol=None, freqs=None):
         '''Loads gpplt exported bandpass and gain calibration solutions.
         Expects 4 files at the following names, produced by miriad gpplt
         with the given options
@@ -662,41 +626,99 @@ class MiriadGainSolutions(object):
         $file_root.bandpass.imag - options=bandpass, yaxis=imag
         
         '''
-        times1, g_real = parse_gpplt(file_root+'.gains.real')
-        times2, g_imag = parse_gpplt(file_root+'.gains.imag')
+        
 
-        assert all(times1 == times2), 'Times in gains real/imag dont match'
-        assert g_real.shape == g_imag.shape, 'Unequal shapes of gain files'
+        if bp_c_root == None and file_root == None:
+            print("No bandpass solutions are given")
+            # temporary
+            g_real = np.full((1,36),1,dtype=np.complex64)
+            g_imag = np.full((1,36),0,dtype=np.complex64)
+            self.bp_real = None
+        elif bp_c_root == None:
+            print('Using MIRIAD bandpass solutions')
+            times1, g_real = parse_gpplt(file_root+'.gains.real')
+            times2, g_imag = parse_gpplt(file_root+'.gains.imag')
+            if 1: # should take complex conjugate, and inverse of gain
+                g = g_real + 1j * g_imag
+                g = 1/np.conj(g)
+                g_real = np.real(g)
+                g_imag = np.imag(g)
 
-        freqs1, bp_real = parse_gpplt(file_root+'.bandpass.real')
-        freqs2, bp_imag = parse_gpplt(file_root+'.bandpass.imag')
-        assert all(freqs1 == freqs2), 'Freqs in bandpass real/imag dont match'
+            assert all(times1 == times2), 'Times in gains real/imag dont match'
+            assert g_real.shape == g_imag.shape, 'Unequal shapes of gain files'
 
-        assert bp_real.shape == bp_imag.shape, 'Unequal shapes of bandpass files'
-        nant = g_real.shape[1]
-        assert bp_real.shape[1] == nant, 'Unequal number of antennas in gain and bandpass files'
-        self.nant = nant
-        self.freqs = np.array(freqs1).astype(np.float) # convert to float
-        self.times = times1 # TODO: Parse times.
-        if len(times1) > 1:
-            warnings.warn('MiriadSolution can only handle 1 time step')
-            
-        if bp_c_root == None:
-            print('Using MIR bandpass solutions')
+            freqs1, bp_real = parse_gpplt(file_root+'.bandpass.real')
+            freqs2, bp_imag = parse_gpplt(file_root+'.bandpass.imag')
+            assert all(freqs1 == freqs2), 'Freqs in bandpass real/imag dont match'
+
+            assert bp_real.shape == bp_imag.shape, 'Unequal shapes of bandpass files'
+            nant = g_real.shape[1]
+            assert bp_real.shape[1] == nant, 'Unequal number of antennas in gain and bandpass files'
+            self.nant = nant
+            self.freqs = np.array(freqs1).astype(np.float) # convert to float
+            self.times = times1 # TODO: Parse times.
+            if len(times1) > 1:
+                warnings.warn('MiriadSolution can only handle 1 time step')
             self.bp_real = bp_real
+            bp_imag *= -1  # complex conjugate of bandpass
             self.bp_imag = bp_imag
             self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant]) for iant in xrange(nant)]
             self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant]) for iant in xrange(nant)]
-            self.bool_aips = 0
+            self.bp_coeff = None
         else:
             print('Using AIPS bandpass solutions')
-            self.bp_coeff = np.load(bp_c_root)
-            self.bool_aips = 1
+            if "polyfit_coeff" in bp_c_root: # AIPS polyfit coefficient
+                self.bp_coeff = np.load(bp_c_root)
+            else:
+                from parse_aips import aipscor
+                nant = None
+                nfreq = None
+                with open(bp_c_root,'r') as fl:
+                    for line in fl:
+                        if 'NAXIS2' in line:
+                            nant = int(line.split()[2])
+                        if 'TFDIM11' in line:
+                            nfreq = int(line.split()[2])
+                if nant is None or nfreq is None:
+                    print('WARNING! nant or nfreq not assigned while parsing AIPS bandpass')
+                fmax = freqs[0]+0.5 # in MHz
+                bw = len(freqs) # in MHz
+                self.freqs = (-np.arange(float(nfreq))/nfreq*bw+fmax-float(bw)/nfreq/2)/1e3 # reassign freqs in GHz
+                self.bp_real = np.full((nfreq,nant),np.nan,dtype=np.complex64)
+                self.bp_imag = np.full((nfreq,nant),np.nan,dtype=np.complex64)
+                g_real = np.full((1,nant),np.nan,dtype=np.complex64)
+                g_imag = np.full((1,nant),np.nan,dtype=np.complex64)
+                fring_f = bp_c_root.replace(bp_c_root.split('/')[-1],"delays.sn.txt")
+                sc_f = bp_c_root.replace(bp_c_root.split('/')[-1],"selfcal.sn.txt")
+                aips_cor = aipscor(fring_f,sc_f,bp_c_root)
+                for iant in range(nant):
+                    bp = aips_cor.get_phase_bandpass(iant,pol)
+                    bp = np.fliplr([bp])[0] # decreasing order
+                    
+
+                    # fring delay
+                    delta_t_fring_ns = aips_cor.get_delay_fring(iant,pol)*1e9 
+                    phases = delta_t_fring_ns * self.freqs
+                    phases -= phases[int(len(phases)/2)] # TODO! READ THE REFERENCE FREQUENCY AND SET TO THAT REFERENCE
+                    bp *= np.exp(np.pi*2j*phases, dtype=np.complex64)
+                    try:
+                        g = aips_cor.get_phase_fring(iant,pol)*aips_cor.get_phase_selfcal(iant,pol)
+                        g = 1/g # inverse of gain
+                    except:
+                        g = 0
+                    bp = np.conj(bp) # complex conjugate of bandpass
+                    self.bp_real[:,iant] = np.real(bp)
+                    self.bp_imag[:,iant] = np.imag(bp)
+                    g_real[0,iant] = np.real(g)
+                    g_imag[0,iant] = np.imag(g)
+                self.bp_real_interp = [interp1d(self.freqs, self.bp_real[:, iant]) for iant in xrange(nant)]
+                self.bp_imag_interp = [interp1d(self.freqs, self.bp_imag[:, iant]) for iant in xrange(nant)]
+                self.bp_coeff = None
+
         self.g_real = g_real
         self.g_imag = g_imag
         # arrays indexed by antenna index
-        self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant]) for iant in xrange(nant)]
-        self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant]) for iant in xrange(nant)]
+
 
     def get_solution(self, iant, time, freq_ghz):
         '''
@@ -705,26 +727,27 @@ class MiriadGainSolutions(object):
         time - some version of time. Ignored for now
         freq_ghz - frequency float in Ghz
         '''
-
-        if self.bool_aips: # Use AIPS polyfit coefficient
+        if self.bp_real is None: # this means no bandpass/gain solution was passed
+            bp_value = 1
+        elif self.bp_coeff is not None: # Use AIPS polyfit coefficient
             bp_fit = np.poly1d(self.bp_coeff[iant,0,:])+1j*np.poly1d(self.bp_coeff[iant,1,:])
             bp_value = bp_fit(freq_ghz*1e3)
-        else: # AIPS polyfit coefficient doesn't exist. Use Miriad bandpass correction
+        else: # AIPS polyfit coefficient doesn't exist. Use Miriad/AIPS bandpass interpolation
             try:
                 f_real = self.bp_real_interp[iant](freq_ghz)
                 f_imag = self.bp_imag_interp[iant](freq_ghz)
             except:
                 #print('interpolation out of range at '+str(freq_ghz)+'GHz')
-                if freq_ghz > 1.485:#1.488:
+                if freq_ghz > self.freqs[int(len(self.freqs)/3)]:
                     f_real = self.bp_real[0,iant]
                     f_imag = self.bp_imag[0,iant]
-                elif freq_ghz < 1.156:#1.153:
+                elif freq_ghz < self.freqs[int(len(self.freqs)/3*2)]:
                     f_real = self.bp_real[-1,iant]
                     f_imag = self.bp_imag[-1,iant]
                     #print(f_real,f_imag)
                 else:
-                    print('ERROR IN INTERPOLATING MIR FILE')
-                    #print(f_real, f_imag)
+                    print('ERROR IN INTERPOLATING BANDPASS')
+                    print('interpolation out of range at '+str(freq_ghz)+'GHz')
             bp_value = f_real + 1j*f_imag
 
         g_value = self.g_real[0,iant] + 1j*self.g_imag[0,iant]
