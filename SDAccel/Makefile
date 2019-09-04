@@ -19,10 +19,12 @@ TARGET := sw_emu
 DEVICE := xilinx_u280_xdma_201910_1
 XCLBIN := ./xclbin
 KERNEL_VADD := vadd
+KERNEL_PREPARE := prepare
 
 DSA := $(call device2sandsa, $(DEVICE))
 BUILD_DIR := ./_x.$(TARGET)
 BUILD_DIR_vadd = $(BUILD_DIR)/$(KERNEL_VADD)
+BUILD_DIR_prepare = $(BUILD_DIR)/$(KERNEL_PREPARE)
 
 SRC_DIR := .
 
@@ -73,6 +75,9 @@ EMCONFIG_DIR = $(XCLBIN)
 BINARY_CONTAINERS += $(XCLBIN)/$(KERNEL_VADD).$(TARGET).$(DEVICE).xclbin
 BINARY_CONTAINER_vadd_OBJS += $(XCLBIN)/$(KERNEL_VADD).$(TARGET).$(DEVICE).xo
 
+BINARY_CONTAINERS += $(XCLBIN)/$(KERNEL_PREPARE).$(TARGET).$(DEVICE).xclbin
+BINARY_CONTAINER_prepare_OBJS += $(XCLBIN)/$(KERNEL_PREPARE).$(TARGET).$(DEVICE).xo
+
 CP = cp -rf
 
 .PHONY: exe
@@ -88,6 +93,13 @@ $(XCLBIN)/$(KERNEL_VADD).$(TARGET).$(DEVICE).xo: $(SRC_DIR)/vadd.cpp
 $(XCLBIN)/$(KERNEL_VADD).$(TARGET).$(DEVICE).xclbin: $(BINARY_CONTAINER_vadd_OBJS)
 	mkdir -p $(XCLBIN)
 	$(XOCC) $(CLFLAGS) --temp_dir $(BUILD_DIR_vadd) -l $(LDCLFLAGS) --nk $(KERNEL_VADD):1 -o'$@' $(+)
+
+$(XCLBIN)/$(KERNEL_PREPARE).$(TARGET).$(DEVICE).xo: $(SRC_DIR)/prepare.cpp
+	mkdir -p $(XCLBIN)
+	$(XOCC) $(CLFLAGS) --temp_dir $(BUILD_DIR_prepare) -c -g -k $(KERNEL_PREPARE) -I'$(<D)' -o'$@' '$<'
+$(XCLBIN)/$(KERNEL_PREPARE).$(TARGET).$(DEVICE).xclbin: $(BINARY_CONTAINER_prepare_OBJS)
+	mkdir -p $(XCLBIN)
+	$(XOCC) $(CLFLAGS) --temp_dir $(BUILD_DIR_prepare) -l $(LDCLFLAGS) --nk $(KERNEL_PREPARE):1 -o'$@' $(+)
 
 $(VADD): $(VADD).o $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(VADD).o $(OBJECTS) -o $(VADD)

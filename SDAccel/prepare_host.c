@@ -12,13 +12,13 @@ int main(int argc, char* argv[])
   cl_uint nsamp_raw, npol_in, npol_out, ndata_in, ndata_out;
   cl_uint nsamp_average, npol_average, npol_sky, npol_cal, ndata_average, ndata_sky, ndata_cal;
   
-  nsamp_raw = NTIME_PER_BUFBLOCK * NCHAN * NBASELINE;
+  nsamp_raw = NTIME_PER_BUFBLOCK * NSAMP_PER_TIME;
   npol_in = nsamp_raw * 2;
   npol_out = nsamp_raw;
   ndata_in = npol_in * 2;
   ndata_out = npol_out * 2;
 
-  nsamp_average = NCHAN * NBASELINE;
+  nsamp_average = NSAMP_PER_TIME;
   npol_average = nsamp_average * 2;
   ndata_average = npol_average * 2;
 
@@ -39,9 +39,20 @@ int main(int argc, char* argv[])
   cal = (cl_float *)malloc(ndata_cal * sizeof(cl_float));
   sky = (cl_float *)malloc(ndata_sky * sizeof(cl_float));
   average = (cl_float *)malloc(ndata_average * sizeof(cl_float));
-  fprintf(stdout, "We are using %f MB memory\n",
+  fprintf(stdout, "%f MB memory used in total\n",
 	  (ndata_in + ndata_out + ndata_cal + ndata_sky + ndata_average) *
 	  sizeof(cl_float)/(1024.*1024.));
+  fprintf(stdout, "%f MB memory used for raw input\n",
+	  ndata_in * sizeof(cl_float)/(1024.*1024.));  
+  fprintf(stdout, "%f MB memory used for raw output\n",
+	  ndata_out * sizeof(cl_float)/(1024.*1024.));  
+  fprintf(stdout, "%f MB memory used for average output\n",
+	  ndata_average * sizeof(cl_float)/(1024.*1024.));  
+  fprintf(stdout, "%f MB memory used for calibration input\n",
+	  ndata_cal * sizeof(cl_float)/(1024.*1024.));
+  fprintf(stdout, "%f MB memory used for sky model\n",
+	  ndata_sky * sizeof(cl_float)/(1024.*1024.));
+  
   fflush(stdout);
   
   /* Do the calculation */
