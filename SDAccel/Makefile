@@ -40,19 +40,19 @@ opencl_LDFLAGS += -L$(XILINX_XRT)/lib -lOpenCL -lpthread
 CXXFLAGS += $(opencl_CXXFLAGS)
 LDFLAGS += $(opencl_LDFLAGS)
 
-OBJECTS=util_sdaccel.o
+OBJECTS=util_sdaccel.o prepare.o
 
 # VADD host CPP FILE
 VADD_SRCS += $(SRC_DIR)/vadd_host.c $(SRC_DIR)/util_sdaccel.c
 # VADD host Header FILE		    
-VADD_HDRS += $(SRC_DIR)/vadd_host.h $(SRC_DIR)/util_sdaccel.c
+VADD_HDRS += $(SRC_DIR)/vadd_host.h $(SRC_DIR)/util_sdaccel.h
 # VADD executable name
 VADD = vadd_host
 EXECUTABLE += $(VADD)
 
 # Other executable, which are for test of kernels
-PREPARE_SRCS += $(SRC_DIR)/prepare_host.c $(SRC_DIR)/util_sdaccel.c
-PREPARE_HDRS += $(SRC_DIR)/prepare_host.h $(SRC_DIR)/util_sdaccel.c
+PREPARE_SRCS += $(SRC_DIR)/prepare_host.c $(SRC_DIR)/util_sdaccel.c $(SRC_DIR)/prepare.c
+PREPARE_HDRS += $(SRC_DIR)/prepare_host.h $(SRC_DIR)/util_sdaccel.h $(SRC_DIR)/prepare.h
 PREPARE = prepare_host
 EXECUTABLE += $(PREPARE)
 

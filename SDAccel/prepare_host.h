@@ -22,9 +22,4 @@
 
 #define MAX_LENGTH 4096
 #define MEM_ALIGNMENT 4096
-
-#define CHANNELS  288       // possible numbers: 288, 288, 672
-#define BASELINEs 276       // possible numbers: 276, 435, 435
-#define SAMPLES_PER_BUF_BLOCK 256  // configurable number, depends the available memory
-#define BUF_BLOCKS_PER_MODEL  8192 // Possible numbers: 32, 32, 64
-#define MODELS 2            // number of models, defines the length of the try
+#define DATA_SIZE 4096
