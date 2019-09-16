@@ -37,8 +37,6 @@ Description:
 
 #include "prepare.h"
 
-#define BUFFER_SIZE 1024
-
 /*
     Prepare Kernel Implementation 
     Arguments:
@@ -85,7 +83,8 @@ void prepare(
   float in_buf[NSAMP_PER_TIME*4];
   float out_buf[NSAMP_PER_TIME*2];
   float average_buf[NSAMP_PER_TIME*2]={0};
-  unsigned int i, j;
+  unsigned int i;
+  unsigned int j;
   unsigned int loc_raw;
   
   //Burst read in calibration 

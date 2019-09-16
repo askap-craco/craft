@@ -7,12 +7,15 @@
 
 int prepare(float *in, float *cal, float *sky, float *out, float *average)
 {
-  cl_uint i, j, k;
-  cl_uint loc_raw, loc_average;
-    
-  for(i = 0; i < NTIME_PER_BUFBLOCK; i++){
-    for(j = 0; j < NCHAN; j++){
-      for(k = 0; k < NBASELINE; k++){
+  cl_uint i;
+  cl_uint j;
+  cl_uint k;
+  cl_uint loc_raw;
+  cl_uint loc_average;
+  
+  for(i=0; i<NTIME_PER_BUFBLOCK; i++){
+    for(j=0; j<NCHAN; j++){
+      for(k=0; k<NBASELINE; k++){
 	loc_raw = i * NCHAN * NBASELINE + j * NBASELINE + k;
 	loc_average = j * NBASELINE + k;
 
