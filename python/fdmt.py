@@ -322,6 +322,59 @@ class Fdmt(object):
         return self.execute(din)
 
 
+class OverlapAndSum(object):
+    '''
+    Implements an overlap and sum operation so you can get full S/N
+    on FRBs with DMS that are larger than the block size
+
+    It keeps an (nd, nd+nt) sized history buffer which it uses to maintain the state. About half of the buffer is unused. Future versions could fix this.
+
+    
+    '''
+    def __init__(self, nd, nt, dtype=None):
+        '''
+        Creates a new overlap and sum buffer - the history size is
+        (nd, nd+nt). The output is stored in the first nt samples
+        
+        :nd: number of dispersion trials must be >= nt
+        :nt: block size in samples > 0
+        '''
+        self.nd = nd
+        self.nt = nt
+        assert nd > 0
+        assert nt > 0
+        assert nd >= nt
+        self.history = np.zeros((nd, nd + nt), dtype)
+        
+    def process(self, block):
+        '''
+        Processes the given block of data and returns the most recent block
+        
+        :block: input data - shape=(nd, nt)
+        '''
+        
+        nd, nt = self.nd, self.nt
+        assert block.shape == (nd, nd+nt), 'Invalid block shape {}'.format(block.shape)
+        
+        # Update history - left most (lowest time index values) get updated to the previous history
+        # shifted by nt plus the input block
+        self.history[:, 0:nd] = self.history[:, nt:nd+nt] + block[:, 0:nd]
+        
+        # for times > nd, we just copy the input block in - we have nothing to add to it
+        # We'll explicit with the slice boundaries here, for clarity
+        self.history[:, nd:nd+nt] = block[:, nd:nd+nt]
+        
+        # THe output block is the first nt samples of the history
+        output = self.history[:, 0:nt]
+        
+        return output
+    
+
+    def __call__(self, block):
+        return self.process(block)
+        
+
+
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
