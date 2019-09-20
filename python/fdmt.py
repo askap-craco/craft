@@ -146,9 +146,6 @@ class Fdmt(object):
         fjumps = float(nf) # output number of subbands
 
         if do_copy:
-            raise NotImplementedError('Havnt finished non-power-of-2 nchannels yet')
-    
-        if do_copy:
             pass # top channel width unchanged
         else:
             self._df_top += self._df_bot # Top channel will be wider by the new channel
@@ -160,7 +157,7 @@ class Fdmt(object):
         else:
             fres = self._df_bot
 
-        print 'Iteration', intnum, fres, self._df_bot, self._df_top, do_copy
+        print 'Iteration = {} output bottom channel bandwidth = {} bottom channel output  bandwidth={} top channel input bandwidth{} copy? {}'.format(intnum, fres, self._df_bot, self._df_top, do_copy)
 
         # delta_f = 2**(intnum)*self.d_f # channel width in MHz - of the normal channels
         delta_t = self._calc_delta_t(self.f_min, self.f_min + fres) # Max IDT for this iteration
