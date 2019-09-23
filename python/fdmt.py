@@ -146,9 +146,6 @@ class Fdmt(object):
         fjumps = float(nf) # output number of subbands
 
         if do_copy:
-            raise NotImplementedError('Havnt finished non-power-of-2 nchannels yet')
-    
-        if do_copy:
             pass # top channel width unchanged
         else:
             self._df_top += self._df_bot # Top channel will be wider by the new channel
@@ -160,7 +157,7 @@ class Fdmt(object):
         else:
             fres = self._df_bot
 
-        print 'Iteration', intnum, fres, self._df_bot, self._df_top, do_copy
+        print 'Iteration = {} output bottom channel bandwidth = {} bottom channel output  bandwidth={} top channel input bandwidth{} copy? {}'.format(intnum, fres, self._df_bot, self._df_top, do_copy)
 
         # delta_f = 2**(intnum)*self.d_f # channel width in MHz - of the normal channels
         delta_t = self._calc_delta_t(self.f_min, self.f_min + fres) # Max IDT for this iteration
@@ -320,6 +317,59 @@ class Fdmt(object):
     
     def __call__(self, din):
         return self.execute(din)
+
+
+class OverlapAndSum(object):
+    '''
+    Implements an overlap and sum operation so you can get full S/N
+    on FRBs with DMS that are larger than the block size
+
+    It keeps an (nd, nd+nt) sized history buffer which it uses to maintain the state. About half of the buffer is unused. Future versions could fix this.
+
+    
+    '''
+    def __init__(self, nd, nt, dtype=None):
+        '''
+        Creates a new overlap and sum buffer - the history size is
+        (nd, nd+nt). The output is stored in the first nt samples
+        
+        :nd: number of dispersion trials must be >= nt
+        :nt: block size in samples > 0
+        '''
+        self.nd = nd
+        self.nt = nt
+        assert nd > 0
+        assert nt > 0
+        assert nd >= nt
+        self.history = np.zeros((nd, nd + nt), dtype)
+        
+    def process(self, block):
+        '''
+        Processes the given block of data and returns the most recent block
+        
+        :block: input data - shape=(nd, nt)
+        '''
+        
+        nd, nt = self.nd, self.nt
+        assert block.shape == (nd, nd+nt), 'Invalid block shape {}'.format(block.shape)
+        
+        # Update history - left most (lowest time index values) get updated to the previous history
+        # shifted by nt plus the input block
+        self.history[:, 0:nd] = self.history[:, nt:nd+nt] + block[:, 0:nd]
+        
+        # for times > nd, we just copy the input block in - we have nothing to add to it
+        # We'll explicit with the slice boundaries here, for clarity
+        self.history[:, nd:nd+nt] = block[:, nd:nd+nt]
+        
+        # THe output block is the first nt samples of the history
+        output = self.history[:, 0:nt]
+        
+        return output
+    
+
+    def __call__(self, block):
+        return self.process(block)
+        
 
 
 def _main():
