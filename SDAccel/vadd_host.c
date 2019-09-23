@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
   // Step 2: Create Buffers in Global Memory to store data
   //             o) buffer_in1 - stores source_in1
   //             o) buffer_in2 - stores source_in2
-  //             o) buffer_ouput - stores Results
+  //             o) buffer_output - stores Results
   // ------------------------------------------------------------------
   
   // .......................................................
@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
 	
   buffer_output = clCreateBuffer(context,  CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR,  sizeof(cl_uint) * DATA_SIZE,source_hw_results , &err);
   if (err != CL_SUCCESS) {
-    std::cout << "Return code for clCreateBuffer -ouput" << err << std::endl;
+    std::cout << "Return code for clCreateBuffer -output" << err << std::endl;
   }
 
 

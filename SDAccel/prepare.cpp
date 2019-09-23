@@ -45,7 +45,6 @@ Description:
 	sky   (input)     --> Input sky model
         out   (output)    --> Output RAW data
         average  (output) --> Output of average 
-	size   (input)    --> Number of sample per buffer block
    */
 extern "C" {
 void prepare(
@@ -53,8 +52,7 @@ void prepare(
         const float *cal, // Read-Only input calibration 
         const float *sky, // Read-Only input sky model
 	float *out,       // Output raw data
-	float *average,   // Output average data, lives with multiple kernel instances
-        unsigned int size                   // Size in integer
+	float *average   // Output average data, lives with multiple kernel instances
         )
 {
 // SDAccel kernel must have one and only one s_axilite interface which will be used by host application to configure the kernel.
@@ -75,9 +73,8 @@ void prepare(
 #pragma HLS INTERFACE s_axilite port=sky bundle=control
 #pragma HLS INTERFACE s_axilite port=out bundle=control
 #pragma HLS INTERFACE s_axilite port=average bundle=control
-#pragma HLS INTERFACE s_axilite port=size bundle=control
 #pragma HLS INTERFACE s_axilite port=return bundle=control
-
+  
   float cal_buf[NSAMP_PER_TIME*4];
   float sky_buffer[NSAMP_PER_TIME*2];
   float in_buf[NSAMP_PER_TIME*4];
@@ -100,7 +97,7 @@ void prepare(
     sky_buffer[2*i] = sky[2*i];
     sky_buffer[2*i + 1] = sky[2*i + 1];
   }
-  
+
   for(i = 0; i < NTIME_PER_BUFBLOCK; i++) {
     // Burst read in input raw data
   read_in: for(j = 0; j < NSAMP_PER_TIME; j++){
@@ -126,17 +123,16 @@ void prepare(
 	in[j*4 + 2]*cal[j*4 + 3] + in[j*4 + 3]*cal[j*4 + 2] - // Image of pol 2 after cal
 	sky[j*2 + 1];// Image of sky	  
     }
-
+    //fprintf(stdout, "HERE prepare\t%d\n", NSAMP_PER_TIME);
+    
     // Burst output raw data
   write_out: for(j = 0; j < NSAMP_PER_TIME; j++){
       loc_raw = i*NSAMP_PER_TIME + j;      
-      out[loc_raw*4] = out_buf[j*4];
-      out[loc_raw*4 + 1] = out_buf[j*4 + 1];
-      out[loc_raw*4 + 2] = out_buf[j*4 + 2];
-      out[loc_raw*4 + 3] = out_buf[j*4 + 3];     
+      out[loc_raw*2] = out_buf[j*2];
+      out[loc_raw*2 + 1] = out_buf[j*2 + 1];
     }    
   }
-
+  
   // Burst output average data
  write_average: for(i = 0; i < NSAMP_PER_TIME; i++) {
     average[4*i] = average_buf[4*i];
