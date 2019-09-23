@@ -15,7 +15,8 @@ help::
 	$(ECHO) "      Command to run application in emulation."
 	$(ECHO) ""
 
-TARGET := sw_emu
+#TARGET := sw_emu
+TARGET := hw_emu
 DEVICE := xilinx_u280_xdma_201910_1
 XCLBIN := ./xclbin
 KERNEL_VADD := vadd
@@ -117,15 +118,15 @@ $(EMCONFIG_DIR)/emconfig.json:
 check: all
 ifeq ($(TARGET),$(filter $(TARGET),sw_emu hw_emu))
 	$(CP) $(EMCONFIG_DIR)/emconfig.json .
-	XCL_EMULATION_MODE=$(TARGET) ./$(VADD) $(XCLBIN)/$(KERNEL_VADD).$(TARGET).$(DEVICE).xclbin $(DEVICE)
+	#XCL_EMULATION_MODE=$(TARGET) ./$(VADD) $(XCLBIN)/$(KERNEL_VADD).$(TARGET).$(DEVICE).xclbin $(DEVICE)
+	XCL_EMULATION_MODE=$(TARGET) ./$(PREPARE) $(XCLBIN)/$(KERNEL_PREPARE).$(TARGET).$(DEVICE).xclbin $(DEVICE)
 else
-	 ./$(VADD) $(XCLBIN)/$(KERNEL_VADD).$(TARGET).$(DEVICE).xclbin $(DEVICE)
+	#./$(VADD) $(XCLBIN)/$(KERNEL_VADD).$(TARGET).$(DEVICE).xclbin $(DEVICE)
+	./$(PREPARE) $(XCLBIN)/$(KERNEL_PREPARE).$(TARGET).$(DEVICE).xclbin $(DEVICE)
 endif
-#	sdx_analyze profile -i profile_summary.csv -f html
-#	sdx_analyze trace timeline_trace.csv
-#	sdx -workspace workspace -report *.wdb
-#
-
+	sdx_analyze profile -i profile_summary.csv -f html
+	sdx_analyze trace timeline_trace.csv
+	sdx -workspace workspace -report *.wdb
 
 # Cleaning stuff
 RMDIR = rm -rf 

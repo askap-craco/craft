@@ -39,16 +39,20 @@ int main(int argc, char* argv[])
   ndata_cal = npol_cal * 2;
   
   cl_float *source_in = NULL;
-  cl_float *source_out = NULL; 
+  cl_float *source_sw_out = NULL;
+  cl_float *source_hw_out = NULL; 
   cl_float *source_cal = NULL;
   cl_float *source_sky = NULL;
-  cl_float *source_average = NULL;
+  cl_float *source_sw_average = NULL;
+  cl_float *source_hw_average = NULL;
 
   source_in = (cl_float *)aligned_alloc(MEM_ALIGNMENT, ndata_in * sizeof(cl_float));
-  source_out = (cl_float *)aligned_alloc(MEM_ALIGNMENT, ndata_out * sizeof(cl_float));
+  source_sw_out = (cl_float *)aligned_alloc(MEM_ALIGNMENT, ndata_out * sizeof(cl_float));
+  source_hw_out = (cl_float *)aligned_alloc(MEM_ALIGNMENT, ndata_out * sizeof(cl_float));
   source_cal = (cl_float *)aligned_alloc(MEM_ALIGNMENT, ndata_cal * sizeof(cl_float));
   source_sky = (cl_float *)aligned_alloc(MEM_ALIGNMENT, ndata_sky * sizeof(cl_float));
-  source_average = (cl_float *)aligned_alloc(MEM_ALIGNMENT, ndata_average * sizeof(cl_float));
+  source_sw_average = (cl_float *)aligned_alloc(MEM_ALIGNMENT, ndata_average * sizeof(cl_float));
+  source_hw_average = (cl_float *)aligned_alloc(MEM_ALIGNMENT, ndata_average * sizeof(cl_float));
   printf("INFO: %f MB memory used in total\n",
 	  (ndata_in + ndata_out + ndata_cal + ndata_sky + ndata_average) *
 	  sizeof(cl_float)/(1024.*1024.));
@@ -66,51 +70,30 @@ int main(int argc, char* argv[])
   /* Do the calculation */
   srand(time(NULL));
   cl_uint i;
-  cl_uint j;
-  cl_uint k;
   cl_float elapsed_time;
-  struct timespec start_average;
-  struct timespec stop_average;
-  struct timespec start_loop;
-  struct timespec stop_loop;
-  for(i=0; i<NAVERAGE; i++){
-    memset(source_average, 0x00, ndata_average * sizeof(cl_float)); // Get memory reset for the average 
+  struct timespec start_host;
+  struct timespec stop_host;
     
-    /* Prepare the sky model and calibration data */
-    for(j=0; j<nsamp_average; j++){
-      source_sky[2*j] = rand() % DATA_SIZE;
-      source_sky[2*j + 1] = rand() % DATA_SIZE;
+  /* Prepare the sky model and calibration data */
+  for(i=0; i<ndata_sky; i++)
+    source_sky[i] = (float)(rand() % DATA_SIZE);
+  for(i=0; i<ndata_cal; i++)
+    source_cal[i] = (float)(rand() % DATA_SIZE);
+  //source_cal[i] = 0.0;
   
-      source_cal[4*j] = rand() % DATA_SIZE;
-      source_cal[4*j + 1] = rand() % DATA_SIZE;
-      source_cal[4*j + 2] = rand() % DATA_SIZE;
-      source_cal[4*j + 3] = rand() % DATA_SIZE;
-    }
-    
-    clock_gettime(CLOCK_REALTIME, &start_average);
-    for(j=0; j<NBUFBLOCK_AVERAGE; j++){
-      clock_gettime(CLOCK_REALTIME, &start_loop);
-      /* Prepare the input raw data */
-      printf("INFO: Running the %d average and %d loop, ", i, j);
-      for(k=0; k<nsamp_raw; k++){
-  	source_in[4*j] = rand() % DATA_SIZE;
-  	source_in[4*j + 1] = rand() % DATA_SIZE;
-  	source_in[4*j + 2] = rand() % DATA_SIZE;
-  	source_in[4*j + 3] = rand() % DATA_SIZE;
-      }
-      
-      /* Calculate on host */
-      prepare(source_in, source_cal, source_sky, source_out, source_average);
-      
-      clock_gettime(CLOCK_REALTIME, &stop_loop);
-      elapsed_time = (stop_loop.tv_sec - start_loop.tv_sec) + (stop_loop.tv_nsec - start_loop.tv_nsec)/1.0E9L;
-      printf("INFO: elapsed_time of one loop is %f seconds\n", elapsed_time);
-    }
-    clock_gettime(CLOCK_REALTIME, &stop_average);
-    elapsed_time = (stop_average.tv_sec - start_average.tv_sec) + (stop_average.tv_nsec - start_average.tv_nsec)/1.0E9L;
-    printf("INFO: elapsed_time of one average is %f seconds\n", elapsed_time);
-  }
-
+  /* Prepare the input raw data */
+  for(i=0; i<ndata_in; i++)
+    source_in[i] = (float)(rand() % DATA_SIZE);
+  
+  /* Calculate on host */
+  memset(source_sw_average, 0x00, ndata_average * sizeof(cl_float)); // Get memory reset for the average
+  memset(source_hw_average, 0x00, ndata_average * sizeof(cl_float)); // Get memory reset for the average
+  clock_gettime(CLOCK_REALTIME, &start_host);
+  prepare(source_in, source_cal, source_sky, source_sw_out, source_sw_average);
+  clock_gettime(CLOCK_REALTIME, &stop_host);
+  elapsed_time = (stop_host.tv_sec - start_host.tv_sec) + (stop_host.tv_nsec - start_host.tv_nsec)/1.0E9L;
+  printf("INFO: elapsed_time of one loop is %f seconds\n", elapsed_time);
+  
   /* Do the calculation on card */
   if (argc != 3) {
     printf("Usage: %s xclbin\n", argv[0]);
@@ -157,7 +140,7 @@ int main(int argc, char* argv[])
     printf("Test failed\n");
     return EXIT_FAILURE;
   }
-
+  
   size_t n0 = n_i0;
   program = clCreateProgramWithBinary(context, 1, &device_id, &n0,
 				      (const unsigned char **) &kernelbinary, &status, &err);
@@ -200,11 +183,11 @@ int main(int argc, char* argv[])
     std::cout << "Return code for clCreateBuffer - in1" << err << std::endl;
   }
 
-  buffer_out = clCreateBuffer(context,  CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR,  sizeof(cl_float) * ndata_out, source_out, &err);
+  buffer_out = clCreateBuffer(context,  CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR,  sizeof(cl_float) * ndata_out, source_hw_out, &err);
   if (err != CL_SUCCESS) {
     std::cout << "Return code for clCreateBuffer - in1" << err << std::endl;
   }  
-  buffer_average = clCreateBuffer(context,  CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR,  sizeof(cl_float) * ndata_average, source_average, &err);
+  buffer_average = clCreateBuffer(context,  CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR,  sizeof(cl_float) * ndata_average, source_hw_average, &err);
   if (err != CL_SUCCESS) {
     std::cout << "Return code for clCreateBuffer - in1" << err << std::endl;
   }
@@ -221,11 +204,16 @@ int main(int argc, char* argv[])
   pt[3] = buffer_out;
   pt[4] = buffer_average;
 
-  struct timespec start_kernel;
-  struct timespec stop_kernel;
+  struct timespec start_device;
+  struct timespec stop_device;
 
-  clock_gettime(CLOCK_REALTIME, &start_kernel);
+  clock_gettime(CLOCK_REALTIME, &start_device);
   err = clEnqueueMigrateMemObjects(commands,(cl_uint)3,pt, 0 ,0,NULL, NULL);
+  if (err != CL_SUCCESS) {
+    printf("Error: Failed to set kernel_prepare arguments! %d\n", err);
+    printf("Test failed\n");
+ 
+  }
   
   err = 0;
   err |= clSetKernelArg(kernel_prepare, 0, sizeof(cl_mem), &buffer_in); 
@@ -234,7 +222,7 @@ int main(int argc, char* argv[])
   err |= clSetKernelArg(kernel_prepare, 3, sizeof(cl_mem), &buffer_out); 
   err |= clSetKernelArg(kernel_prepare, 4, sizeof(cl_mem), &buffer_average);
   if (err != CL_SUCCESS) {
-    printf("Error: Failed to set kernel_vector_add arguments! %d\n", err);
+    printf("Error: Failed to set kernel_prepare arguments! %d\n", err);
     printf("Test failed\n");
  
   }
@@ -256,9 +244,21 @@ int main(int argc, char* argv[])
   }
   
   err = clFinish(commands);
-  clock_gettime(CLOCK_REALTIME, &stop_kernel);
-  elapsed_time = (stop_kernel.tv_sec - start_kernel.tv_sec) + (stop_kernel.tv_nsec - start_kernel.tv_nsec)/1.0E9L;
+  clock_gettime(CLOCK_REALTIME, &stop_device);
+  elapsed_time = (stop_device.tv_sec - start_device.tv_sec) + (stop_device.tv_nsec - start_device.tv_nsec)/1.0E9L;
   fprintf(stdout, "Elapsed time of kernel is %f seconds \n", elapsed_time);
+
+  for(i=0;i<ndata_average;i++){
+    //fprintf(stdout, "Average: %f\t%f\n", source_sw_average[i], source_hw_average[i]);
+    if(source_sw_average[i]!=source_hw_average[i])
+      fprintf(stdout, "Mismatch on average: %f\t%f\n", source_sw_average[i], source_hw_average[i]);
+  }
+  
+  for(i=0;i<ndata_out;i++){
+    //fprintf(stdout, "Out: %f\t%f\n", source_sw_out[i], source_hw_out[i]);
+    if(source_sw_out[i]!=source_hw_out[i])
+      fprintf(stdout, "Mismatch on out: %f\t%f\n", source_sw_out[i], source_hw_out[i]);
+  }
   
   /* Free memory */
   clReleaseMemObject(buffer_in);
@@ -268,10 +268,12 @@ int main(int argc, char* argv[])
   clReleaseMemObject(buffer_average);
   
   free(source_in);
-  free(source_out);
+  free(source_sw_out);
+  free(source_hw_out);
   free(source_cal);
   free(source_sky);
-  free(source_average);
+  free(source_sw_average);
+  free(source_hw_average);
   
   clReleaseProgram(program);
   clReleaseKernel(kernel_prepare);

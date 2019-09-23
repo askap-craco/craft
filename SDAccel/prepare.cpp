@@ -76,10 +76,10 @@ void prepare(
 #pragma HLS INTERFACE s_axilite port=return bundle=control
   
   float cal_buf[NSAMP_PER_TIME*4];
-  float sky_buffer[NSAMP_PER_TIME*2];
+  float sky_buf[NSAMP_PER_TIME*2];
   float in_buf[NSAMP_PER_TIME*4];
   float out_buf[NSAMP_PER_TIME*2];
-  float average_buf[NSAMP_PER_TIME*2]={0};
+  float average_buf[NSAMP_PER_TIME*4]={0};
   unsigned int i;
   unsigned int j;
   unsigned int loc_raw;
@@ -94,8 +94,8 @@ void prepare(
   
   // Burst read in sky model
  read_sky: for(i = 0; i < NSAMP_PER_TIME; i++) {    
-    sky_buffer[2*i] = sky[2*i];
-    sky_buffer[2*i + 1] = sky[2*i + 1];
+    sky_buf[2*i] = sky[2*i];
+    sky_buf[2*i + 1] = sky[2*i + 1];
   }
 
   for(i = 0; i < NTIME_PER_BUFBLOCK; i++) {
@@ -109,21 +109,21 @@ void prepare(
     }
     
   prepare: for(j = 0; j < NSAMP_PER_TIME; j++){
+#pragma HLS PIPELINE II=1
       // Do the calculation
       average_buf[j*4]    +=in_buf[j*4];
       average_buf[j*4 + 1]+=in_buf[j*4 + 1];
       average_buf[j*4 + 2]+=in_buf[j*4 + 2];
       average_buf[j*4 + 3]+=in_buf[j*4 + 3];
 
-      out_buf[j*2] = in[j*4]*cal[j*4] - in[j*4 + 1]*cal[j*4 + 1] + // Real of pol 1 after cal
-	in[j*4 + 2]*cal[j*4 + 2] - in[j*4 + 3]*cal[j*4 + 3] - // Real of pol 2 after cal
-	sky[j*2];// Real of sky
+      out_buf[j*2] = in_buf[j*4]*cal_buf[j*4] - in_buf[j*4 + 1]*cal_buf[j*4 + 1] + // Real of pol 1 after cal
+	in_buf[j*4 + 2]*cal_buf[j*4 + 2] - in_buf[j*4 + 3]*cal_buf[j*4 + 3] - // Real of pol 2 after cal
+	sky_buf[j*2];// Real of sky
       
-      out_buf[j*2 + 1] = in[j*4]*cal[j*4 + 1] + in[j*4 + 1]*cal[j*4] + // Image of pol 1 after cal
-	in[j*4 + 2]*cal[j*4 + 3] + in[j*4 + 3]*cal[j*4 + 2] - // Image of pol 2 after cal
-	sky[j*2 + 1];// Image of sky	  
+      out_buf[j*2 + 1] = in_buf[j*4]*cal_buf[j*4 + 1] + in_buf[j*4 + 1]*cal_buf[j*4] + // Image of pol 1 after cal
+	in_buf[j*4 + 2]*cal_buf[j*4 + 3] + in_buf[j*4 + 3]*cal_buf[j*4 + 2] - // Image of pol 2 after cal
+	sky_buf[j*2 + 1];// Image of sky	  
     }
-    //fprintf(stdout, "HERE prepare\t%d\n", NSAMP_PER_TIME);
     
     // Burst output raw data
   write_out: for(j = 0; j < NSAMP_PER_TIME; j++){
@@ -140,6 +140,5 @@ void prepare(
     average[4*i + 2] = average_buf[4*i + 2];
     average[4*i + 3] = average_buf[4*i + 3];
   }
-  
 }
 }
