@@ -15,6 +15,19 @@ def isquare(f):
 def cff(f1_start, f1_end, f2_start, f2_end):
     return (isquare(f1_start) - isquare(f1_end))/(isquare(f2_start) - isquare(f2_end))
 
+def copy_kernel(v1, vout):
+    '''
+    Pretty simple really - just copies v1 to the output
+
+    v1 and vout have differnet shapes - so we write the final part with zero
+    '''
+    assert len(vout) >= len(v1)
+    n = len(v1)
+    vout[:n] = v1[:]
+    vout[n:] = 0
+
+    assert not np.any(np.isnan(vout))
+
 def add_offset_kernel2(v1, v2, vout, toff):
     '''
     Add vector v1 to v2 applying an offset of toff samples, save result in vout.
@@ -24,7 +37,7 @@ def add_offset_kernel2(v1, v2, vout, toff):
     Raise error if: len(v1) != len(v2) or len(vout) < len(v1) or toff < 0 or toff > len(v1)
 
     Implementation notes: There's a few max/min and conditions in here that could be done in the plan
-    Saving the odd branch or two, if you care.
+    Saving the odd branch or two in the kernel, if you care.
 
     This is the key kernel of the FDMT.
     :v1: input vector. Always the same size as v2
@@ -47,10 +60,12 @@ def add_offset_kernel2(v1, v2, vout, toff):
     >>>  # Can't do larger offsets - add_offset_kernel2(np.arange(4), np.arange(4)+1, np.zeros(6, dtype=int), 4)
     #array([0, 1, 3, 5, 3, 4])
     
-    '''    
+    '''
     assert len(v1) == len(v2)
     assert toff >= 0
     assert len(vout) >= len(v1)
+    assert not np.any(np.isnan(v1)), 'V1 contains nans'
+    assert not np.any(np.isnan(v2)), 'V2 contains nans'
 
     nt_in = len(v1)
     nt_out = len(vout)
@@ -64,7 +79,6 @@ def add_offset_kernel2(v1, v2, vout, toff):
     vout[t:t+nsum] = v1[t:t+nsum] + v2[0:nsum]
     t+= nsum
     nrest = min(nt_in - nsum, nt_out - t)
-    #print 'add_offset', len(v1), len(v2), len(vout), toff
 
     if nrest > 0:
         vout[t:t+nrest] = v2[nsum:nsum+nrest]
@@ -73,7 +87,9 @@ def add_offset_kernel2(v1, v2, vout, toff):
     # this part where we write zeros isn't really necessary if we didn't want to look at a pretty square plot at the end. 
     # Ideally you wouldn't waste memory, or memory bandwidth on this. But I really like looking at pretty plots.
     if t < nt_out:
-        vout[t:nt_out] = 0
+        vout[t:nt_out+1] = 0
+
+    assert not np.any(np.isnan(vout)), 'Data not written nt_in={} nt_out={} nsum={} toff={} {}'.format(nt_in, nt_out, nsum, toff, vout)
                  
     return vout
 
@@ -153,14 +169,13 @@ class Fdmt(object):
         self._df_bot *= 2.0 # Bottom channels will be added together
 
         if nf == 1: # if this is the last iteration
-            fres = self._df_top
+            delta_f = self._df_top
         else:
-            fres = self._df_bot
+            delta_f = self._df_bot
 
-        print 'Iteration = {} output bottom channel bandwidth = {} bottom channel output  bandwidth={} top channel input bandwidth{} copy? {}'.format(intnum, fres, self._df_bot, self._df_top, do_copy)
-
+        fres = self._df_bot
         # delta_f = 2**(intnum)*self.d_f # channel width in MHz - of the normal channels
-        delta_t = self._calc_delta_t(self.f_min, self.f_min + fres) # Max IDT for this iteration
+        delta_t = self._calc_delta_t(self.f_min, self.f_min + delta_f) # Max IDT for this iteration
         ndt = delta_t
 
         state_shape = np.array([nf, delta_t, n_t + ndt])
@@ -179,10 +194,14 @@ class Fdmt(object):
         nf_data = []
         self.hist_nf_data.append(nf_data)
 
+        #print 'Iteration = {} output bottom channel bandwidth = {} bottom channel output bandwidth={} top channel input bandwidth{} copy? {} inshape={} outshape={}'.format(intnum, fres, self._df_bot, self._df_top, do_copy,
+        #s, state_shape)
+
         # for each ouput subband
         for iif in xrange(nf):
             is_top_subband = iif == nf - 1 # True if it's the final subband
             f_start = fres * float(iif) + self.f_min # frequency at the bottom of the subband
+            copy_subband = False
             if not is_top_subband: # if it's one of the bottom channels
                 f_end = f_start + fres
                 f_middle = f_start + fres/2.0 - correction # Middle freq of subband less 0.5x resolution
@@ -198,14 +217,17 @@ class Fdmt(object):
                     f_middle = f_start + fres/2.0 - correction
                     delta_t_local = self._calc_delta_t(f_start, f_end) 
                     self._ndt_top = delta_t_local
+                    copy_subband = False
 
             #f_middle_larger = (f_end - f_start)/2.0 + f_start + correction # Frequency of the middle - with a bit extra - for rounding calculation
             f_middle_larger = f_middle + 2*correction # Middle freq of subband + 0.5x resolution
 
+            #print 'Iterno={} iif={} f_start={} f_end={} f_middle={} delta_t_local={} copy?={}'.format(intnum, iif, f_start, f_end, f_middle, delta_t_local, copy_subband)
+
             # Fix detla_t_local if we've made a mistake. Gross but it happens for some parameters
             if delta_t_local > self.max_dt:
                 delta_t_local = self.max_dt
-            
+
             # save per-subband info for posterity
             idt_data = []
             nf_data.append((f_start, f_end, f_middle, f_middle_larger, delta_t_local, idt_data))
@@ -228,6 +250,13 @@ class Fdmt(object):
                 id1 = dt_middle_index
                 id2 = dt_rest_index
                 offset = dt_middle_larger
+
+                # we'll use id2=-1 as a flag to say copy
+                if is_top_subband and do_copy:
+                    id1 = idt
+                    id2 = -1
+                    offset = 0
+                    
 
                 # dt_middle_larger is also known as mint
                 idt_data.append((dt_middle, id1, offset, id2, sum_dst_start, sum_src1_start, sum_src2_start))
@@ -269,7 +298,6 @@ class Fdmt(object):
         assert np.all(din.shape == self.hist_state_shape[iterno]), 'Invalid input shape. Was: {} expected {}'.format(din.shape, self.hist_state_shape[iterno])
         out_shape = self.hist_state_shape[iterno+1]
         dout = np.ones(out_shape, dtype=din.dtype)*np.nan # Set to NaN so we can check aftwards that we've filled everything in correctly - but this can be empty
-        
         nchan, ndt, nt_out = out_shape
         # Not all of the out_shape is filled - ndt is filled at the lower end of the band, but we don't do all of it at the higher
         # end - it wastes operations.
@@ -288,12 +316,20 @@ class Fdmt(object):
                 # TODO: Make this config a little easier to grok than just a tuple
                 _, id1, offset, id2, _, _, _ = config
 
-                # TODO: for those interested in caching, id1 and id2 are 
+                # TODO: for those interested in caching, id1 and id2 are
 
+                #print 'ichan={} idt={} id1={} id2={} offset={} din.shape={} dout.shape={}'.format(ichan,  idt, id1, id2, offset, din.shape, dout.shape)
                 in1 = din[2*ichan, id1, :] # first channel 
-                in2 = din[2*ichan+1, id2, :] # second channel is adjacent
                 out = dout[ichan, idt, :]
-                add_offset_kernel2(in1, in2, out, offset)
+                if id2 == -1: # copy - all idt in this channel. id2 should be -1 for all idt for this channel
+                    # This should be the highest input subband
+                    assert ichan == nchan - 1, 'Help, invalid subband'
+                    copy_kernel(in1, out)
+                else:
+                    in2 = din[2*ichan+1, id2, :] # second channel is the next channel up from the first channel
+                    add_offset_kernel2(in1, in2, out, offset)
+
+        #assert not np.any(np.isnan(dout)), 'Help! Some data not written'
 
         return dout
 
