@@ -14,11 +14,11 @@ int prepare(float *in, float *cal, float *sky, float *out, float *average)
   cl_uint loc_average;
   
   for(i=0; i<NTIME_PER_BUFBLOCK; i++){
-    for(j=0; j<NCHAN; j++){
-      for(k=0; k<NBASELINE; k++){
-	loc_raw = i * NCHAN * NBASELINE + j * NBASELINE + k;
-	loc_average = j * NBASELINE + k;
-
+    for(j=0; j<NBASELINE; j++){
+      for(k=0; k<NCHAN; k++){
+	loc_raw = i * NCHAN * NBASELINE + j * NCHAN + k;
+	loc_average = j * NCHAN + k;
+	
 	/* Get average data */
 	average[loc_average*4]+=in[loc_raw*4];
 	average[loc_average*4 + 1]+=in[loc_raw*4 + 1];
