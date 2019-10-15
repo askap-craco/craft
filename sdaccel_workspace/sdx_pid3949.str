@@ -1,0 +1,183 @@
+/*
+
+Xilinx SDx v2019.1 (64-bit) [Major: 2019, Minor: 1]
+SW Build: 2552052 on Fri May 24 14:48:04 MDT 2019
+
+Process ID (PID): 3949
+License: Customer
+
+Current time: 	Tue Oct 15 10:56:54 AEDT 2019
+Time zone: 	Australian Eastern Standard Time (New South Wales) (Australia/Canberra)
+
+OS: Ubuntu
+OS Version: 4.9.0-9-amd64
+OS Architecture: amd64
+Available processors (cores): 20
+
+Display: :8.0
+Screen size: 1900x1200
+Screen resolution (DPI): 100
+Available screens: 1
+Available disk space: 0 GB
+
+Java version: 	9.0.4 64-bit
+Java home: 	/data/FRIGG_2/Xilinx/SDx/2019.1/tps/lnx64/jre9.0.4
+Java executable location: 	/data/FRIGG_2/Xilinx/SDx/2019.1/tps/lnx64/jre9.0.4/bin/java
+Java initial memory (-Xms): 	64 MB
+Java maximum memory (-Xmx):	 4 GB
+
+Java library paths: /data/FRIGG_2/Xilinx/SDx/2019.1/lib/lnx64.o/Ubuntu:/data/FRIGG_2/Xilinx/SDx/2019.1/lib/lnx64.o:/data/FRIGG_2/Xilinx/SDx/2019.1/tps/lnx64/jre9.0.4/lib/:/data/FRIGG_2/Xilinx/SDx/2019.1/tps/lnx64/jre9.0.4/lib//server:/data/FRIGG_2/Xilinx/SDK/2019.1/lib/lnx64.o:/data/FRIGG_2/Xilinx/SDx/2019.1/lib/lnx64.o/Ubuntu:/data/FRIGG_2/Xilinx/SDx/2019.1/lib/lnx64.o:/opt/xilinx/xrt/lib:/data/FRIGG_2/Xilinx/SDx/2019.1/lib/lnx64.o/Ubuntu:/data/FRIGG_2/Xilinx/SDx/2019.1/lib/lnx64.o:/data/FRIGG_2/Xilinx/SDx/2019.1/runtime/lib/x86_64:/data/FRIGG_2/Xilinx/SDx/2019.1/bin/../lnx64/tools/dot/lib:/usr/java/packages/lib:/usr/lib64:/lib64:/lib:/usr/lib
+
+Java class paths: /data/FRIGG_2/Xilinx/SDx/2019.1/eclipse/lnx64.o//plugins/org.eclipse.equinox.launcher_1.4.0.v20161219-1356.jar
+LD_LIBRARY_PATH: /data/FRIGG_2/Xilinx/SDx
+
+User name: 	root
+User home directory: /root
+User working directory: /data/FRIGG_2/craft/sdaccel_workspace
+User country: 	AU
+User language: 	en
+User locale: 	en_AU
+
+RDI_BASEROOT: /data/FRIGG_2/Xilinx/SDx
+HDI_APPROOT: /data/FRIGG_2/Xilinx/SDx/2019.1
+RDI_DATADIR: /data/FRIGG_2/Xilinx/SDx/2019.1/data
+RDI_BINDIR: /data/FRIGG_2/Xilinx/SDx/2019.1/bin
+
+SDx preferences directory: /root/.Xilinx/SDx/2019.1/
+SDx workspace directory: /data/FRIGG_2/craft/sdaccel_workspace
+SDx workspace log file location: /data/FRIGG_2/craft/sdaccel_workspace/.metadata/.log
+Engine tmp dir: 	./.Xil/sdx-3949-frigg
+
+Xilinx Environment Variables
+----------------------------
+XILINX_DSP: 
+XILINX_PLANAHEAD: /data/FRIGG_2/Xilinx/SDx/2019.1
+XILINX_SDK: /data/FRIGG_2/Xilinx/SDK/2019.1
+XILINX_SDX: /data/FRIGG_2/Xilinx/SDx/2019.1
+XILINX_VIVADO: /data/FRIGG_2/Xilinx/Vivado/2019.1
+XILINX_VIVADO_HLS: /data/FRIGG_2/Xilinx/Vivado/2019.1
+XILINX_XRT: /opt/xilinx/xrt
+_RDI_DONT_SET_XILINX_AS_PATH: True
+
+
+Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
+
+*/
+
+selectButton("Details", "SDx Internal Exception", "Button", "DETAILS");
+selectButton("Continue", "SDx Internal Exception", "Button", "CONTINUE");
+selectMenuItem("File", "WorkbenchWindow", "MenuItem.FILE");
+selectMenuItem("New", "WorkbenchWindow", "MenuItem.NEW");
+selectMenuItem("SDx Application Project", "WorkbenchWindow", "MenuItem.SDX_APPLICATION");
+setTextField("prepare", "New SDx Application Project (Create a New SDx Application Project)", "ApplicationProjectWizard", "Text.PROJECT_NAME");
+selectButton("Next", "New SDx Application Project (Create a New SDx Application Project)", "ApplicationProjectWizard", "Button.NEXT");
+selectTreeTable("xilinx_u280_xdma_201910_1", "New SDx Application Project (Platform)", "ApplicationProjectWizard", "TreeViewer.ArrayTreeContentProvider");
+selectButton("Next", "New SDx Application Project (Platform)", "ApplicationProjectWizard", "Button.NEXT");
+selectButton("Finish", "New SDx Application Project (Templates)", "ApplicationProjectWizard", "Button.FINISH");
+selectProjectExplorer("src", "prepare", EventType.POPUP_TRIGGER_CLICK, "ProjectExplorer", "TreeViewer.NavigatorContentServiceContentProvider");
+selectMenuItem("Import Sources", "Project Explorer", "ProjectExplorer", "MenuItem.IMPORT_SOURCES");
+selectButton("Browse", "Import Sources (File system)", "FileSystemImportWizard", "Button.BROWSE");
+selectTree("src", "Import Sources (File system)", "FileSystemImportWizard", "Tree.SRC");
+selectTable("prepare_host.c", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("prepare_host.h", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("prepare.c", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("prepare.cpp", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("prepare.h", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("util_sdaccel.c", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("util_sdaccel.h", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectButton("Finish", "Import Sources (File system)", "FileSystemImportWizard", "Button.FINISH");
+selectToolBarButton("Add Binary Container", "prepare", "CTabItem", "ToolItem.ADD_BINARY_CONTAINER");
+selectToolBarButton("Add Hardware Function", "prepare", "CTabItem", "ToolItem.ADD_HARDWARE_FUNCTION");
+selectButton("OK", "Add Hardware Functions", "OpenCLAcceleratorsSelectionDialog", "Button.OK");
+selectProjectExplorer("_sdx", "prepare", "ProjectExplorer", "TreeViewer.NavigatorContentServiceContentProvider");
+selectMenuItem("File", "prepare", "WorkbenchWindow", "MenuItem.FILE");
+selectMenuItem("New", "prepare", "WorkbenchWindow", "MenuItem.NEW");
+selectMenuItem("SDx Application Project", "prepare", "WorkbenchWindow", "MenuItem.SDX_APPLICATION");
+setTextField("prepare_batch", "New SDx Application Project (Create a New SDx Application Project)", "ApplicationProjectWizard", "Text.PROJECT_NAME");
+selectButton("Next", "New SDx Application Project (Create a New SDx Application Project)", "ApplicationProjectWizard", "Button.NEXT");
+selectTreeTable("xilinx_u280_xdma_201910_1", "New SDx Application Project (Platform)", "ApplicationProjectWizard", "TreeViewer.ArrayTreeContentProvider");
+selectButton("Next", "New SDx Application Project (Platform)", "ApplicationProjectWizard", "Button.NEXT");
+selectButton("Finish", "New SDx Application Project (Templates)", "ApplicationProjectWizard", "Button.FINISH");
+selectProjectExplorer("prepare_batch", "ProjectExplorer", "TreeViewer.NavigatorContentServiceContentProvider");
+selectProjectExplorer("src", "prepare_batch", EventType.POPUP_TRIGGER_CLICK, "ProjectExplorer", "TreeViewer.NavigatorContentServiceContentProvider");
+selectMenuItem("Import Sources", "Project Explorer", "ProjectExplorer", "MenuItem.IMPORT_SOURCES");
+selectButton("Browse", "Import Sources (File system)", "FileSystemImportWizard", "Button.BROWSE");
+selectTree("src", "Import Sources (File system)", "FileSystemImportWizard", "Tree.SRC");
+selectTable("prepare_host.c", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("prepare_host.h", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("prepare.c", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("prepare.cpp", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("prepare.h", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("util_sdaccel.c", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectTable("util_sdaccel.h", "Import Sources (File system)", "FileSystemImportWizard", "Table");
+selectButton("Finish", "Import Sources (File system)", "FileSystemImportWizard", "Button.FINISH");
+selectToolBarButton("Add Binary Container", "prepare_batch", "CTabItem", "ToolItem.ADD_BINARY_CONTAINER");
+selectToolBarButton("Add Hardware Function", "prepare_batch", "CTabItem", "ToolItem.ADD_HARDWARE_FUNCTION");
+selectButton("OK", "Add Hardware Functions", "OpenCLAcceleratorsSelectionDialog", "Button.OK");
+selectProjectExplorer("_sdx", "prepare_batch", "ProjectExplorer", "TreeViewer.NavigatorContentServiceContentProvider");
+selectTreeTable("Emulation-SW", "prepare_batch", "Assistant", "SDXAssistantView", "TreeViewer.AssistantContentProvider");
+selectToolBarButton("Build Emulation-SW for project prepare_batch", "Assistant", "SDXAssistantView", "ToolItem.BUILD_EMULATION_SW");
+selectButton("Continue", "Unsupported Operating System", "MessageDialog", "Button.CONTINUE");
+selectButton("Continue", "Unsupported Operating System", "MessageDialog", "Button.CONTINUE");
+selectToolBarMenuButton("Run prepare_batch-Default", "prepare_batch", "WorkbenchWindow", "ToolItem.RUN_PREPARE_BATCH_DEFAULT");
+selectMenuItem("Run Configurations", "Console", "WorkbenchWindow", "MenuItem.RUN_CONFIGURATIONS");
+selectTab("Main", "Progress Information", "ProgressMonitorJobsDialog", "TabItem.MAIN");
+selectButton("Close", "Run Configurations", "LaunchConfigurationsDialog", "Button.CLOSE");
+selectProjectExplorer("prepare.h", "prepare_batch > src", EventType.DOUBLE_CLICK, "ProjectExplorer", "TreeViewer.NavigatorContentServiceContentProvider");
+selectProjectExplorer("prepare.h", "prepare > src", EventType.DOUBLE_CLICK, "ProjectExplorer", "TreeViewer.NavigatorContentServiceContentProvider");
+selectToolBarMenuButton("Run prepare_batch-Default", "prepare", "WorkbenchWindow", "ToolItem.RUN_PREPARE_BATCH_DEFAULT");
+selectMenuItem("Run Configurations", "prepare.h", "WorkbenchWindow", "MenuItem.RUN_CONFIGURATIONS");
+selectTab("Main", "Run Configurations", "LaunchConfigurationsDialog", "TabItem.MAIN");
+selectTab("Arguments", "Run Configurations", "LaunchConfigurationsDialog", "CTabItem.ARGUMENTS");
+selectCheckBox("Automatically add binary container", Boolean.TRUE, "Run Configurations", "LaunchConfigurationsDialog", "Button.AUTOMATICALLY_ADD");
+setTextField("../binary_container_1.xclbin", "Run Configurations", "LaunchConfigurationsDialog", "Text");
+selectButton("Apply", "Run Configurations", "LaunchConfigurationsDialog", "Button.APPLY");
+selectTree("prepare-Default", "OpenCL", "Run Configurations", "LaunchConfigurationsDialog", "Tree");
+selectTab("Main", "Run Configurations", "LaunchConfigurationsDialog", "TabItem.MAIN");
+selectCheckBox("Automatically add binary container", Boolean.TRUE, "Run Configurations", "LaunchConfigurationsDialog", "Button.AUTOMATICALLY_ADD");
+setTextField("../binary_container_1.xclbin", "Run Configurations", "LaunchConfigurationsDialog", "Text");
+selectButton("Apply", "Run Configurations", "LaunchConfigurationsDialog", "Button.APPLY");
+selectTree("prepare_batch-TCF", "OpenCL", "Run Configurations", "LaunchConfigurationsDialog", "Tree");
+selectCheckBox("Automatically add binary container", Boolean.TRUE, "Run Configurations", "LaunchConfigurationsDialog", "Button.AUTOMATICALLY_ADD");
+setTextField("../binary_container_1.xclbin", "Run Configurations", "LaunchConfigurationsDialog", "Text");
+selectButton("Apply", "Run Configurations", "LaunchConfigurationsDialog", "Button.APPLY");
+selectTree("prepare-TCF", "OpenCL", "Run Configurations", "LaunchConfigurationsDialog", "Tree");
+selectCheckBox("Automatically add binary container", Boolean.TRUE, "Run Configurations", "LaunchConfigurationsDialog", "Button.AUTOMATICALLY_ADD");
+setTextField("../binary_container_1.xclbin", "Run Configurations", "LaunchConfigurationsDialog", "Text");
+selectButton("Apply", "Run Configurations", "LaunchConfigurationsDialog", "Button.APPLY");
+selectButton("Close", "Run Configurations", "LaunchConfigurationsDialog", "Button.CLOSE");
+selectToolBarButton("Settings", "Assistant", "SDXAssistantView", "ToolItem.SETTINGS");
+selectTreeTable("binary_container_1", "prepare_batch > System", "Build Configuration Settings", "AssistantPreferencesDialog", "TreeViewer.PreferenceContentProvider");
+selectTreeTable("prepare_knl", "prepare_batch > System > binary_container_1", "Binary Container Settings", "AssistantPreferencesDialog", "TreeViewer.PreferenceContentProvider");
+selectTreeTable("prepare_knl", "prepare_batch > System > binary_container_1", "Hardware Function Settings", "AssistantPreferencesDialog", "TreeViewer.ProfilingSettingsContentProvider");
+selectTreeTable("prepare_knl_1", "prepare_knl", "Hardware Function Settings", "AssistantPreferencesDialog", "TreeViewer.ProfilingSettingsContentProvider");
+selectTreeTable("prepare_knl", "prepare_knl", "Hardware Function Settings", "AssistantPreferencesDialog", "TreeViewer.ProfilingSettingsContentProvider");
+selectButton("Apply", "Hardware Function Settings", "AssistantPreferencesDialog", "Button.APPLY");
+selectButton("Cancel", "Hardware Function Settings", "AssistantPreferencesDialog", "Button.CANCEL");
+selectToolBarButton("Settings", "Assistant", "SDXAssistantView", "ToolItem.SETTINGS");
+selectTreeTable("prepare_batch", "Build Configuration Settings", "AssistantPreferencesDialog", "TreeViewer.PreferenceContentProvider");
+selectTreeTable("binary_container_1", "prepare > System", "Build Configuration Settings", "AssistantPreferencesDialog", "TreeViewer.PreferenceContentProvider");
+selectTreeTable("prepare_knl", "prepare > System > binary_container_1", "Binary Container Settings", "AssistantPreferencesDialog", "TreeViewer.PreferenceContentProvider");
+selectTreeTable("prepare_knl", "prepare > System > binary_container_1", "Hardware Function Settings", "AssistantPreferencesDialog", "TreeViewer.ProfilingSettingsContentProvider");
+selectTreeTable("cal", "prepare_knl > prepare_knl_1", "Hardware Function Settings", "AssistantPreferencesDialog", "TreeViewer.ProfilingSettingsContentProvider");
+selectTreeTable("prepare_knl", "prepare_knl > prepare_knl_1", "Hardware Function Settings", "AssistantPreferencesDialog", "TreeViewer.ProfilingSettingsContentProvider");
+selectButton("Apply", "Hardware Function Settings", "AssistantPreferencesDialog", "Button.APPLY");
+selectButton("Apply and Close", "Hardware Function Settings", "AssistantPreferencesDialog", "Button.APPLY_AND_CLOSE");
+selectToolBarMenuButton("Run prepare_batch-Default", "prepare", "WorkbenchWindow", "ToolItem.RUN_PREPARE_BATCH_DEFAULT");
+selectMenuItem("Run Configurations", "prepare.h", "WorkbenchWindow", "MenuItem.RUN_CONFIGURATIONS");
+selectTab("Main", "Run Configurations", "LaunchConfigurationsDialog", "TabItem.MAIN");
+selectTab("Arguments", "Run Configurations", "LaunchConfigurationsDialog", "CTabItem.ARGUMENTS");
+selectTab("Environment", "Run Configurations", "LaunchConfigurationsDialog", "CTabItem.ENVIRONMENT");
+selectTab("Debug", "Run Configurations", "LaunchConfigurationsDialog", "CTabItem.DEBUG");
+selectTab("Main", "Run Configurations", "LaunchConfigurationsDialog", "CTabItem.MAIN");
+selectButton("Close", "Run Configurations", "LaunchConfigurationsDialog", "Button.CLOSE");
+selectTreeTable("prepare_batch", "Assistant", "SDXAssistantView", "TreeViewer.AssistantContentProvider");
+selectTreeTable("Emulation-SW", "prepare_batch", "Assistant", "SDXAssistantView", "TreeViewer.AssistantContentProvider");
+selectToolBarButton("Run prepare_batch-Default", "prepare", "WorkbenchWindow", "ToolItem.RUN_PREPARE_BATCH_DEFAULT");
+selectButton("Continue", "Unsupported Operating System", "MessageDialog", "Button.CONTINUE");
+setText("11:05:28 **** Incremental Build of configuration Em", "Console", "ConsoleView", "StyledText");
+selectTreeTable("Emulation-SW", "prepare", "Assistant", "SDXAssistantView", "TreeViewer.AssistantContentProvider");
+selectToolBarButton("Run Emulation-SW for project prepare", "Assistant", "SDXAssistantView", "ToolItem.RUN_EMULATION_SW");
+selectMenuItem("prepare-Default", "Assistant", "SDXAssistantView", "MenuItem.PREPARE_DEFAULT");
+selectButton("Continue", "Unsupported Operating System", "MessageDialog", "Button.CONTINUE");
+selectButton("Continue", "Unsupported Operating System", "MessageDialog", "Button.CONTINUE");

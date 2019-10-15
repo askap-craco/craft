@@ -1,0 +1,42 @@
+Tue Oct 15 10:56:52 2019: Server was asked to start on port: '42723'
+Tue Oct 15 10:56:52 2019: Attempting to start server on port '42723'
+Tue Oct 15 10:56:52 2019: XRC main fifo: created main fifo '/tmp/xrcmain42723', fd read = 10
+Tue Oct 15 10:56:52 2019: Running Rule Check Server
+Tue Oct 15 10:56:52 2019: Version 1.4.0
+Tue Oct 15 10:56:53 2019: Rule Check Server: Accepted socket connection from client
+Tue Oct 15 10:56:53 2019: EXCHANGE_TOKEN received, server token: 33cb05d7-85e2-4a30-bd62-18d10fb3f263, passed token: 33cb05d7-85e2-4a30-bd62-18d10fb3f263
+Tue Oct 15 10:57:27 2019: SESSION_MGR: creating session with session uuid: '8fcdf2ea-0b02-427e-8d43-4caf5332b6d4' and name 'Emulation-SW'
+Tue Oct 15 10:57:27 2019: SESSION_MGR: closing session for UUID '8fcdf2ea-0b02-427e-8d43-4caf5332b6d4' with name 'Emulation-SW'
+Tue Oct 15 10:57:28 2019: SESSION_MGR: creating session with session uuid: 'c130ba33-f63d-4d1e-accb-c65092ab1ae5' and name 'Emulation-HW'
+Tue Oct 15 10:57:28 2019: SESSION_MGR: closing session for UUID 'c130ba33-f63d-4d1e-accb-c65092ab1ae5' with name 'Emulation-HW'
+Tue Oct 15 10:57:28 2019: SESSION_MGR: creating session with session uuid: 'c35874e0-13cc-44be-9036-b1b729fb1a8d' and name 'System'
+Tue Oct 15 10:57:28 2019: SESSION_MGR: closing session for UUID 'c35874e0-13cc-44be-9036-b1b729fb1a8d' with name 'System'
+Tue Oct 15 10:59:59 2019: SESSION_MGR: creating session with session uuid: '6d48a67a-eee0-4d6f-9d14-2a46bc643931' and name 'Emulation-SW'
+Tue Oct 15 10:59:59 2019: SESSION_MGR: closing session for UUID '6d48a67a-eee0-4d6f-9d14-2a46bc643931' with name 'Emulation-SW'
+Tue Oct 15 10:59:59 2019: SESSION_MGR: creating session with session uuid: '52045e5c-0401-4c39-a6c0-9f90a86d7c9d' and name 'Emulation-HW'
+Tue Oct 15 10:59:59 2019: SESSION_MGR: closing session for UUID '52045e5c-0401-4c39-a6c0-9f90a86d7c9d' with name 'Emulation-HW'
+Tue Oct 15 10:59:59 2019: SESSION_MGR: creating session with session uuid: 'ba9d0363-de09-4556-b452-9d0f49df30e9' and name 'System'
+Tue Oct 15 10:59:59 2019: SESSION_MGR: closing session for UUID 'ba9d0363-de09-4556-b452-9d0f49df30e9' with name 'System'
+Tue Oct 15 11:00:50 2019: SESSION_MGR: creating session with session uuid: '4c567c55-70e4-4f2b-9e8f-28b4fda58d31' and name 'Emulation-SW'
+Tue Oct 15 11:00:51 2019: SESSION_MGR: closing session for UUID '4c567c55-70e4-4f2b-9e8f-28b4fda58d31' with name 'Emulation-SW'
+Tue Oct 15 11:00:52 2019: SESSION_MGR: creating session with session uuid: '5813b25e-e9ec-49d4-8be2-0a9f164b57b6' and name 'Emulation-SW'
+Tue Oct 15 11:00:55 2019: Rule Check Server: Accepted socket connection from client
+Tue Oct 15 11:01:19 2019: Rule Check Server: Accepted socket connection from client
+Tue Oct 15 11:01:27 2019: Rule Check Server: Accepted socket connection from client
+Tue Oct 15 11:01:56 2019: SESSION_MGR: closing session for UUID '5813b25e-e9ec-49d4-8be2-0a9f164b57b6' with name 'Emulation-SW'
+Tue Oct 15 11:05:28 2019: SESSION_MGR: creating session with session uuid: '126b5582-799e-4c26-9f65-0597f78b4f1d' and name 'Emulation-SW'
+Tue Oct 15 11:05:32 2019: Rule Check Server: Accepted socket connection from client
+Tue Oct 15 11:05:55 2019: Rule Check Server: Accepted socket connection from client
+Tue Oct 15 11:06:04 2019: Rule Check Server: Accepted socket connection from client
+Tue Oct 15 11:06:20 2019: SESSION_MGR: closing session for UUID '126b5582-799e-4c26-9f65-0597f78b4f1d' with name 'Emulation-SW'
+Tue Oct 15 11:06:20 2019: SESSION_MGR: creating session with session uuid: '4b41f711-15c8-4b66-9936-f9de7448d9e1' and name 'prepare_batch-Default'
+Tue Oct 15 11:06:27 2019: SESSION_MGR: closing session for UUID '4b41f711-15c8-4b66-9936-f9de7448d9e1' with name 'prepare_batch-Default'
+Tue Oct 15 11:06:29 2019: SESSION_MGR: creating session with session uuid: '7195cb25-1597-4445-ac66-9799aad6e1d9' and name 'Emulation-SW'
+Tue Oct 15 11:06:29 2019: SESSION_MGR: closing session for UUID '7195cb25-1597-4445-ac66-9799aad6e1d9' with name 'Emulation-SW'
+Tue Oct 15 11:06:30 2019: SESSION_MGR: creating session with session uuid: '5f5182a0-bf20-44f5-8f3e-71dcd4a095aa' and name 'Emulation-SW'
+Tue Oct 15 11:06:33 2019: Rule Check Server: Accepted socket connection from client
+Tue Oct 15 11:06:57 2019: Rule Check Server: Accepted socket connection from client
+Tue Oct 15 11:07:05 2019: Rule Check Server: Accepted socket connection from client
+Tue Oct 15 11:07:34 2019: SESSION_MGR: closing session for UUID '5f5182a0-bf20-44f5-8f3e-71dcd4a095aa' with name 'Emulation-SW'
+Tue Oct 15 11:07:34 2019: SESSION_MGR: creating session with session uuid: '006a575d-32ec-4039-86d5-409b6d82ef5d' and name 'prepare-Default'
+Tue Oct 15 11:07:41 2019: SESSION_MGR: closing session for UUID '006a575d-32ec-4039-86d5-409b6d82ef5d' with name 'prepare-Default'

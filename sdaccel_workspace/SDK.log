@@ -1,0 +1,13 @@
+10:56:50 INFO  : Launching XSCT server: xsct -n -sdx -interactive /data/FRIGG_2/craft/sdaccel_workspace/temp_xsdb_launch_script.tcl
+10:56:51 INFO  : Registering command handlers for SDx TCF services
+10:56:53 INFO  : Validating SDSoC License...
+10:56:54 INFO  : License for SDSoC is unavailable
+10:56:54 INFO  : Validating SDAccel License...
+10:56:54 INFO  : License available for SDAccel
+10:56:54 INFO  : XSCT server has started successfully.
+10:56:54 INFO  : Successfully done setting XSCT server connection channel  
+10:56:55 INFO  : plnx-install-location is set to ''
+10:56:55 INFO  : Successfully done setting workspace for the tool. 
+10:56:55 INFO  : Successfully done query RDI_DATADIR 
+11:06:20 INFO  : Launching executable: Emulation-SW/prepare_batch.exe ../binary_container_1.xclbin xilinx_u280_xdma_201910_1
+11:07:34 INFO  : Launching executable: Emulation-SW/prepare.exe ../binary_container_1.xclbin xilinx_u280_xdma_201910_1

@@ -1,0 +1,228 @@
+!SESSION 2019-10-15 10:56:41.826 -----------------------------------------------
+eclipse.buildId=2019.1
+java.version=9.0.4
+java.vendor=Oracle Corporation
+BootLoader constants: OS=linux, ARCH=x86_64, WS=gtk, NL=en_AU
+Command-line arguments:  -os linux -ws gtk -arch x86_64 -data /data/FRIGG_2/craft/sdaccel_workspace
+
+!ENTRY com.xilinx.sdx.aie.core 4 0 2019-10-15 10:56:42.669
+!MESSAGE FrameworkEvent ERROR
+!STACK 0
+org.osgi.framework.BundleException: Could not resolve module: com.xilinx.sdx.aie.core [78]
+Bundle was filtered by a resolver hook.
+
+	at org.eclipse.osgi.container.Module.start(Module.java:444)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.incStartLevel(ModuleContainer.java:1634)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.incStartLevel(ModuleContainer.java:1613)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.doContainerStartLevel(ModuleContainer.java:1585)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.dispatchEvent(ModuleContainer.java:1528)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.dispatchEvent(ModuleContainer.java:1)
+	at org.eclipse.osgi.framework.eventmgr.EventManager.dispatchEvent(EventManager.java:230)
+	at org.eclipse.osgi.framework.eventmgr.EventManager$EventThread.run(EventManager.java:340)
+
+!ENTRY com.xilinx.sdx.aie.debug 4 0 2019-10-15 10:56:42.670
+!MESSAGE FrameworkEvent ERROR
+!STACK 0
+org.osgi.framework.BundleException: Could not resolve module: com.xilinx.sdx.aie.debug [79]
+Bundle was filtered by a resolver hook.
+
+	at org.eclipse.osgi.container.Module.start(Module.java:444)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.incStartLevel(ModuleContainer.java:1634)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.incStartLevel(ModuleContainer.java:1613)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.doContainerStartLevel(ModuleContainer.java:1585)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.dispatchEvent(ModuleContainer.java:1528)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.dispatchEvent(ModuleContainer.java:1)
+	at org.eclipse.osgi.framework.eventmgr.EventManager.dispatchEvent(EventManager.java:230)
+	at org.eclipse.osgi.framework.eventmgr.EventManager$EventThread.run(EventManager.java:340)
+
+!ENTRY com.xilinx.sdx.aie.model 4 0 2019-10-15 10:56:42.671
+!MESSAGE FrameworkEvent ERROR
+!STACK 0
+org.osgi.framework.BundleException: Could not resolve module: com.xilinx.sdx.aie.model [80]
+Bundle was filtered by a resolver hook.
+
+	at org.eclipse.osgi.container.Module.start(Module.java:444)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.incStartLevel(ModuleContainer.java:1634)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.incStartLevel(ModuleContainer.java:1613)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.doContainerStartLevel(ModuleContainer.java:1585)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.dispatchEvent(ModuleContainer.java:1528)
+	at org.eclipse.osgi.container.ModuleContainer$ContainerStartLevel.dispatchEvent(ModuleContainer.java:1)
+	at org.eclipse.osgi.framework.eventmgr.EventManager.dispatchEvent(EventManager.java:230)
+	at org.eclipse.osgi.framework.eventmgr.EventManager$EventThread.run(EventManager.java:340)
+
+!ENTRY org.eclipse.emf.ecore 2 0 2019-10-15 10:56:45.583
+!MESSAGE Both 'com.autoesl.autopilot.ui.models' and 'com.autoesl.autopilot.ui.models' register a package for 'com.autoesl.autopilot.solution'
+
+!ENTRY org.eclipse.ui 2 0 2019-10-15 10:56:45.911
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2019-10-15 10:56:45.911
+!MESSAGE Commands should really have a category: plug-in='com.xilinx.sdk.appwiz', id='com.xilinx.sdk.app.commands.ChangeAtfBuiltReferences', categoryId='com.xilinx.sdk.app.commands.category'
+
+!ENTRY org.eclipse.ui 2 0 2019-10-15 10:56:46.720
+!MESSAGE Warnings while parsing the commands from the 'org.eclipse.ui.commands' and 'org.eclipse.ui.actionDefinitions' extension points.
+!SUBENTRY 1 org.eclipse.ui 2 0 2019-10-15 10:56:46.721
+!MESSAGE Commands should really have a category: plug-in='com.xilinx.sdk.appwiz', id='com.xilinx.sdk.app.commands.ChangeAtfBuiltReferences', categoryId='com.xilinx.sdk.app.commands.category'
+
+!ENTRY org.eclipse.ui 4 4 2019-10-15 10:56:47.399
+!MESSAGE Conflicting handlers for com.xilinx.sdx.system.core.importSourcesCommand: {com.xilinx.sdx.system.core.handler.ImportSourcesHandler} vs {com.xilinx.sdx.system.core.handler.ImportSourcesHandler}
+
+!ENTRY com.xilinx.sdx.ui.utils 4 0 2019-10-15 10:56:50.785
+!MESSAGE Mount point not found
+!STACK 0
+java.io.IOException: Mount point not found
+	at java.base/sun.nio.fs.LinuxFileStore.findMountEntry(Unknown Source)
+	at java.base/sun.nio.fs.UnixFileStore.<init>(Unknown Source)
+	at java.base/sun.nio.fs.LinuxFileStore.<init>(Unknown Source)
+	at java.base/sun.nio.fs.LinuxFileSystemProvider.getFileStore(Unknown Source)
+	at java.base/sun.nio.fs.LinuxFileSystemProvider.getFileStore(Unknown Source)
+	at java.base/sun.nio.fs.UnixFileSystemProvider.getFileStore(Unknown Source)
+	at java.base/java.nio.file.Files.getFileStore(Unknown Source)
+	at com.xilinx.sdk.startup.InitSDK.checkHomeDirUsableSpace(InitSDK.java:170)
+	at com.xilinx.sdk.startup.InitSDK.earlyStartup(InitSDK.java:125)
+	at org.eclipse.ui.internal.EarlyStartupRunnable.runEarlyStartup(EarlyStartupRunnable.java:77)
+	at org.eclipse.ui.internal.EarlyStartupRunnable.run(EarlyStartupRunnable.java:53)
+	at org.eclipse.core.runtime.SafeRunner.run(SafeRunner.java:42)
+	at org.eclipse.ui.internal.Workbench$40.run(Workbench.java:2747)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:56)
+
+!ENTRY org.eclipse.ui 4 4 2019-10-15 10:56:52.371
+!MESSAGE Conflicting handlers for com.xilinx.sdx.system.core.importSourcesCommand: {com.xilinx.sdx.system.core.handler.ImportSourcesHandler} vs {com.xilinx.sdx.system.core.handler.ImportSourcesHandler}
+
+!ENTRY org.eclipse.tcf 4 0 2019-10-15 10:56:54.076
+!MESSAGE Error calling TCF service provider
+!STACK 0
+java.lang.Error: Only one command server per service is allowed
+	at org.eclipse.tcf.core.AbstractChannel.addCommandServer(AbstractChannel.java:745)
+	at com.xilinx.sdx.xsdb.tcfservice.SdxTcfService.<init>(SdxTcfService.java:46)
+	at com.xilinx.sdx.xsdb.tcfservice.SDxServiceUtils$1.getLocalService(SDxServiceUtils.java:35)
+	at org.eclipse.tcf.internal.core.ServiceManager.onChannelCreated(ServiceManager.java:84)
+	at org.eclipse.tcf.core.AbstractChannel$3.run(AbstractChannel.java:556)
+	at org.eclipse.tcf.EventQueue.run(EventQueue.java:96)
+	at java.base/java.lang.Thread.run(Unknown Source)
+
+!ENTRY org.eclipse.tcf 4 0 2019-10-15 10:56:54.086
+!MESSAGE Error calling TCF service provider
+!STACK 0
+java.lang.Error: Only one command server per service is allowed
+	at org.eclipse.tcf.core.AbstractChannel.addCommandServer(AbstractChannel.java:745)
+	at com.xilinx.sdk.xsdb.tcfservice.SdkTcfService.<init>(SdkTcfService.java:46)
+	at com.xilinx.sdk.xsdb.tcfservice.ServiceUtils$1.getLocalService(ServiceUtils.java:35)
+	at org.eclipse.tcf.internal.core.ServiceManager.onChannelCreated(ServiceManager.java:84)
+	at org.eclipse.tcf.core.AbstractChannel$3.run(AbstractChannel.java:556)
+	at org.eclipse.tcf.EventQueue.run(EventQueue.java:96)
+	at java.base/java.lang.Thread.run(Unknown Source)
+
+!ENTRY com.xilinx.sdk.utils 0 0 2019-10-15 10:56:54.907
+!MESSAGE XSCT Command: [set sdk::sdk_chan tcfchan#0], Thread: Thread-17
+
+!ENTRY com.xilinx.sdk.utils 0 0 2019-10-15 10:56:54.908
+!MESSAGE XSCT Command: [::hsi::utils::init_repo], Thread: Worker-4
+
+!ENTRY com.xilinx.sdk.utils 0 0 2019-10-15 10:56:54.908
+!MESSAGE XSCT Command: [plnx-install-path  ; ::scw::scw_mode gui], Thread: Thread-10
+
+!ENTRY com.xilinx.sdk.utils 0 0 2019-10-15 10:56:54.911
+!MESSAGE XSCT command with result: [set sdk::sdk_chan tcfchan#0], Result: [null, tcfchan#0]. Thread: Thread-17
+
+!ENTRY com.xilinx.sdk.utils 0 0 2019-10-15 10:56:54.912
+!MESSAGE XSCT Command: [setws /data/FRIGG_2/craft/sdaccel_workspace], Thread: Thread-17
+
+!ENTRY com.xilinx.sdk.utils 0 0 2019-10-15 10:56:55.018
+!MESSAGE XSCT command with result: [::hsi::utils::init_repo], Result: [null, ]. Thread: Worker-4
+
+!ENTRY com.xilinx.sdk.utils 0 0 2019-10-15 10:56:55.018
+!MESSAGE XSCT command with result: [plnx-install-path  ; ::scw::scw_mode gui], Result: [null, ]. Thread: Thread-10
+
+!ENTRY com.xilinx.sdk.utils 0 0 2019-10-15 10:56:55.019
+!MESSAGE XSCT command with result: [setws /data/FRIGG_2/craft/sdaccel_workspace], Result: [null, ]. Thread: Thread-17
+
+!ENTRY com.xilinx.sdk.utils 0 0 2019-10-15 10:56:55.023
+!MESSAGE XSCT Command: [set query_var1 $::env(RDI_DATADIR)], Thread: Worker-4
+
+!ENTRY com.xilinx.sdk.utils 0 0 2019-10-15 10:56:55.023
+!MESSAGE XSCT command with result: [set query_var1 $::env(RDI_DATADIR)], Result: [null, /data/FRIGG_2/Xilinx/SDK/2019.1/data]. Thread: Worker-4
+
+!ENTRY org.eclipse.launchbar.core 2 0 2019-10-15 10:57:27.594
+!MESSAGE Enablement expression is missing for descriptor type org.eclipse.cdt.debug.core.coreBuildDescriptorType
+
+!ENTRY org.eclipse.launchbar.core 2 0 2019-10-15 10:57:27.595
+!MESSAGE Enablement expression is missing for config provider for org.eclipse.cdt.debug.core.coreBuildDescriptorType
+
+!ENTRY org.eclipse.launchbar.core 2 0 2019-10-15 10:57:27.595
+!MESSAGE Enablement expression is missing for config provider for org.eclipse.cdt.debug.core.coreBuildDescriptorType
+
+!ENTRY org.eclipse.cdt.core 1 0 2019-10-15 10:57:36.942
+!MESSAGE Indexed 'prepare' (0 sources, 0 headers) in 0.002 sec: 0 declarations; 0 references; 0 unresolved inclusions; 0 syntax errors; 0 unresolved names (0%)
+
+!ENTRY org.eclipse.cdt.core 1 0 2019-10-15 10:57:36.945
+!MESSAGE Indexed 'prepare_system' (0 sources, 0 headers) in 0.001 sec: 0 declarations; 0 references; 0 unresolved inclusions; 0 syntax errors; 0 unresolved names (0%)
+
+!ENTRY org.eclipse.ui 4 4 2019-10-15 10:58:19.608
+!MESSAGE Conflicting handlers for com.xilinx.sdx.system.core.importSourcesCommand: {com.xilinx.sdx.system.core.handler.ImportSourcesHandler@37ee58cf} vs {com.xilinx.sdx.system.core.handler.ImportSourcesHandler}
+
+!ENTRY org.eclipse.cdt.core 1 0 2019-10-15 11:00:08.137
+!MESSAGE Indexed 'prepare_batch' (0 sources, 0 headers) in 0 sec: 0 declarations; 0 references; 0 unresolved inclusions; 0 syntax errors; 0 unresolved names (0%)
+
+!ENTRY org.eclipse.cdt.core 1 0 2019-10-15 11:00:08.139
+!MESSAGE Indexed 'prepare_batch_system' (0 sources, 0 headers) in 0 sec: 0 declarations; 0 references; 0 unresolved inclusions; 0 syntax errors; 0 unresolved names (0%)
+
+!ENTRY com.xilinx.sdk.utils 1 0 2019-10-15 11:00:50.920
+!MESSAGE Tool usage for 'SDX_NO_OP_BUILD' updated to '1'
+
+!ENTRY com.xilinx.sdk.utils 1 0 2019-10-15 11:01:56.037
+!MESSAGE Tool usage for 'SDX_BUILD' updated to '1'
+
+!ENTRY org.eclipse.ui 4 0 2019-10-15 11:04:52.255
+!MESSAGE Unhandled event loop exception
+!STACK 0
+org.eclipse.swt.SWTException: Widget is disposed
+	at org.eclipse.swt.SWT.error(SWT.java:4533)
+	at org.eclipse.swt.SWT.error(SWT.java:4448)
+	at org.eclipse.swt.SWT.error(SWT.java:4419)
+	at org.eclipse.swt.widgets.Widget.error(Widget.java:487)
+	at org.eclipse.swt.widgets.Widget.checkWidget(Widget.java:424)
+	at org.eclipse.swt.widgets.Control.setEnabled(Control.java:4768)
+	at com.xilinx.sdx.assistant.adapters.common.AssistantPreferencePage.updateApplyButton(AssistantPreferencePage.java:120)
+	at com.xilinx.sdx.assistant.adapters.common.AssistantPreferencePage$1.notifyChanged(AssistantPreferencePage.java:103)
+	at org.eclipse.emf.common.notify.impl.BasicNotifierImpl.eNotify(BasicNotifierImpl.java:374)
+	at com.xilinx.sdx.opencl.model.impl.ComputeUnitArgImpl.setMaster(ComputeUnitArgImpl.java:238)
+	at com.xilinx.sdx.opencl.language.ui.utils.KernelUtils.updateComputeUnitArgs(KernelUtils.java:109)
+	at com.xilinx.sdx.opencl.language.ui.utils.KernelUtils.updateKernelComputeUnits(KernelUtils.java:201)
+	at com.xilinx.sdx.opencl.language.ui.utils.KernelUtils.copyKernelSettings(KernelUtils.java:346)
+	at com.xilinx.sdx.assistant.adapters.sdaccel.BinaryContainerPreferencePage.updateEditingCopyKernels(BinaryContainerPreferencePage.java:104)
+	at com.xilinx.sdx.assistant.adapters.sdaccel.BinaryContainerPreferencePage$1.lambda$0(BinaryContainerPreferencePage.java:82)
+	at org.eclipse.swt.widgets.RunnableLock.run(RunnableLock.java:37)
+	at org.eclipse.swt.widgets.Synchronizer.runAsyncMessages(Synchronizer.java:182)
+	at org.eclipse.swt.widgets.Display.runAsyncMessages(Display.java:4577)
+	at org.eclipse.swt.widgets.Display.readAndDispatch(Display.java:4186)
+	at org.eclipse.e4.ui.internal.workbench.swt.PartRenderingEngine$5.run(PartRenderingEngine.java:1150)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:336)
+	at org.eclipse.e4.ui.internal.workbench.swt.PartRenderingEngine.run(PartRenderingEngine.java:1039)
+	at org.eclipse.e4.ui.internal.workbench.E4Workbench.createAndRunUI(E4Workbench.java:153)
+	at org.eclipse.ui.internal.Workbench.lambda$3(Workbench.java:680)
+	at org.eclipse.core.databinding.observable.Realm.runWithDefault(Realm.java:336)
+	at org.eclipse.ui.internal.Workbench.createAndRunWorkbench(Workbench.java:594)
+	at org.eclipse.ui.PlatformUI.createAndRunWorkbench(PlatformUI.java:148)
+	at com.xilinx.sdsoc.app.SDSoCApplication.start(SDSoCApplication.java:70)
+	at org.eclipse.equinox.internal.app.EclipseAppHandle.run(EclipseAppHandle.java:196)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.runApplication(EclipseAppLauncher.java:134)
+	at org.eclipse.core.runtime.internal.adaptor.EclipseAppLauncher.start(EclipseAppLauncher.java:104)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:388)
+	at org.eclipse.core.runtime.adaptor.EclipseStarter.run(EclipseStarter.java:243)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
+	at java.base/java.lang.reflect.Method.invoke(Unknown Source)
+	at org.eclipse.equinox.launcher.Main.invokeFramework(Main.java:653)
+	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:590)
+	at org.eclipse.equinox.launcher.Main.run(Main.java:1499)
+	at org.eclipse.equinox.launcher.Main.main(Main.java:1472)
+
+!ENTRY com.xilinx.sdk.utils 1 0 2019-10-15 11:06:19.923
+!MESSAGE Tool usage for 'SDX_BUILD' updated to '2'
+
+!ENTRY com.xilinx.sdk.utils 1 0 2019-10-15 11:06:29.659
+!MESSAGE Tool usage for 'SDX_NO_OP_BUILD' updated to '2'
+
+!ENTRY com.xilinx.sdk.utils 1 0 2019-10-15 11:07:34.275
+!MESSAGE Tool usage for 'SDX_BUILD' updated to '3'

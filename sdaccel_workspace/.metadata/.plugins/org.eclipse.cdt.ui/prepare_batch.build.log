@@ -1,0 +1,53 @@
+11:05:28 **** Incremental Build of configuration Emulation-SW for project prepare_batch ****
+make -j20 incremental 
+/data/FRIGG_2/Xilinx/SDx/2019.1/bin/xocc -t sw_emu --platform xilinx_u280_xdma_201910_1 --save-temps   -c -k prepare_knl -g --messageDb binary_container_1/prepare_knl.mdb -I"../src" --xp misc:solution_name=prepare_knl --temp_dir binary_container_1 --report_dir binary_container_1/reports --log_dir binary_container_1/logs -o"binary_container_1/prepare_knl.xo" "../src/prepare.cpp"
+Option Map File Used: '/data/FRIGG_2/Xilinx/SDx/2019.1/data/sdx/xocc/optMap.xml'
+
+****** xocc v2019.1 (64-bit)
+  **** SW Build 2552052 on Fri May 24 14:47:09 MDT 2019
+    ** Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
+
+Attempting to get a license: ap_opencl
+Feature available: ap_opencl
+INFO: [XOCC 60-1306] Additional information associated with this xocc compile can be found at:
+	Reports: /data/FRIGG_2/craft/sdaccel_workspace/prepare_batch/Emulation-SW/binary_container_1/reports/prepare_knl
+	Log files: /data/FRIGG_2/craft/sdaccel_workspace/prepare_batch/Emulation-SW/binary_container_1/logs/prepare_knl
+INFO: [XOCC 60-585] Compiling for software emulation target
+INFO: [XOCC 60-1316] Initiating connection to rulecheck server, at Tue Oct 15 11:05:32 2019
+INFO: [XOCC 60-895]   Target platform: /opt/xilinx/platforms/xilinx_u280_xdma_201910_1/xilinx_u280_xdma_201910_1.xpfm
+INFO: [XOCC 60-423]   Target device: xilinx_u280_xdma_201910_1
+INFO: [XOCC 60-242] Creating kernel: 'prepare_knl'
+
+===>The following messages were generated while  performing high-level synthesis for kernel: prepare_knl Log file: /data/FRIGG_2/craft/sdaccel_workspace/prepare_batch/Emulation-SW/binary_container_1/prepare_knl/prepare_knl/vivado_hls.log :
+INFO: [XOCC 204-61] Option 'relax_ii_for_timing' is enabled, will increase II to preserve clock frequency constraints.
+INFO: [XOCC 60-594] Finished kernel compilation
+INFO: [XOCC 60-586] Created binary_container_1/prepare_knl.xo
+INFO: [XOCC 60-791] Total elapsed time: 0h 0m 29s
+/data/FRIGG_2/Xilinx/SDx/2019.1/bin/xocc -t sw_emu --platform xilinx_u280_xdma_201910_1 --save-temps   -l --nk prepare_knl:1:prepare_knl_1 -g --messageDb binary_container_1.mdb --xp misc:solution_name=link --temp_dir binary_container_1 --report_dir binary_container_1/reports --log_dir binary_container_1/logs --remote_ip_cache /data/FRIGG_2/craft/sdaccel_workspace/ip_cache -o"binary_container_1.xclbin" binary_container_1/prepare_knl.xo
+Option Map File Used: '/data/FRIGG_2/Xilinx/SDx/2019.1/data/sdx/xocc/optMap.xml'
+
+****** xocc v2019.1 (64-bit)
+  **** SW Build 2552052 on Fri May 24 14:47:09 MDT 2019
+    ** Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
+
+Attempting to get a license: ap_opencl
+Feature available: ap_opencl
+INFO: [XOCC 60-1306] Additional information associated with this xocc link can be found at:
+	Reports: /data/FRIGG_2/craft/sdaccel_workspace/prepare_batch/Emulation-SW/binary_container_1/reports/link
+	Log files: /data/FRIGG_2/craft/sdaccel_workspace/prepare_batch/Emulation-SW/binary_container_1/logs/link
+INFO: [XOCC 60-629] Linking for software emulation target
+INFO: [XOCC 60-1316] Initiating connection to rulecheck server, at Tue Oct 15 11:06:04 2019
+INFO: [XOCC 60-895]   Target platform: /opt/xilinx/platforms/xilinx_u280_xdma_201910_1/xilinx_u280_xdma_201910_1.xpfm
+INFO: [XOCC 60-423]   Target device: xilinx_u280_xdma_201910_1
+INFO: [XOCC 60-645] kernel flags are '-g -I /data/FRIGG_2/craft/sdaccel_workspace/prepare_batch/src -g'
+INFO: [XOCC 60-586] Created binary_container_1.xclbin
+INFO: [XOCC 60-1307] Run completed. Additional information can be found in:
+	Steps Log File: /data/FRIGG_2/craft/sdaccel_workspace/prepare_batch/Emulation-SW/binary_container_1/logs/link/link.steps.log
+
+INFO: [XOCC 60-791] Total elapsed time: 0h 0m 15s
+/data/FRIGG_2/Xilinx/SDx/2019.1/bin/xcpp -DSDX_PLATFORM=xilinx_u280_xdma_201910_1 -D__USE_XOPEN2K8 -I/opt/xilinx/xrt/include/ -I/data/FRIGG_2/Xilinx/Vivado/2019.1/include/ -O0 -g -Wall -c -fmessage-length=0 -std=c++14 -o "src/prepare.o" "../src/prepare.c"
+/data/FRIGG_2/Xilinx/SDx/2019.1/bin/xcpp -DSDX_PLATFORM=xilinx_u280_xdma_201910_1 -D__USE_XOPEN2K8 -I/opt/xilinx/xrt/include/ -I/data/FRIGG_2/Xilinx/Vivado/2019.1/include/ -O0 -g -Wall -c -fmessage-length=0 -std=c++14 -o "src/prepare_host.o" "../src/prepare_host.c"
+/data/FRIGG_2/Xilinx/SDx/2019.1/bin/xcpp -o "prepare_batch.exe" src/prepare.o src/prepare_host.o src/util_sdaccel.o -lxilinxopencl -lpthread -lrt -lstdc++ -lmpfr -lgmp -lhlsmc++-GCC46 -lIp_floating_point_v7_0_bitacc_cmodel -lIp_xfft_v9_1_bitacc_cmodel -lIp_fir_compiler_v7_2_bitacc_cmodel -lIp_dds_compiler_v6_0_bitacc_cmodel -L/opt/xilinx/xrt/lib/ -L/data/FRIGG_2/Xilinx/Vivado/2019.1/lnx64/tools/fpo_v7_0 -L/data/FRIGG_2/Xilinx/Vivado/2019.1/lnx64/lib/csim -L/data/FRIGG_2/Xilinx/Vivado/2019.1/lnx64/tools/dds_v6_0 -L/data/FRIGG_2/Xilinx/Vivado/2019.1/lnx64/tools/fir_v7_0 -L/data/FRIGG_2/Xilinx/Vivado/2019.1/lnx64/tools/fft_v9_1 -Wl,-rpath-link,/opt/xilinx/xrt/lib -Wl,-rpath,/data/FRIGG_2/Xilinx/Vivado/2019.1/lnx64/lib/csim -Wl,-rpath,/data/FRIGG_2/Xilinx/Vivado/2019.1/lnx64/tools/fpo_v7_0 -Wl,-rpath,/data/FRIGG_2/Xilinx/Vivado/2019.1/lnx64/tools/fft_v9_1 -Wl,-rpath,/data/FRIGG_2/Xilinx/Vivado/2019.1/lnx64/tools/fir_v7_0 -Wl,-rpath,/data/FRIGG_2/Xilinx/Vivado/2019.1/lnx64/tools/dds_v6_0
+
+11:06:19 Build Finished (took 51s.131ms)
+
