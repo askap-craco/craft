@@ -217,7 +217,7 @@ class ResultsFile(OrderedDict):
         polynames = ('DELAY (us)','U (m)', 'V (m)', 'W (m)')
         polyid = 0
         for polyname in polynames:
-            rfile.scans[0].polys[0].source0antpolys.iteritems()
+            r.scans[0].polys[0].source0antpolys.iteritems()
 
 
 def plot_polys(rfile, tmax):
@@ -226,7 +226,7 @@ def plot_polys(rfile, tmax):
     for polyname in polynames:
         pylab.figure()
         p0 = None
-        print  rfile.scans[0].polys[0]
+        print  r.scans[0].polys[0]
         for ant, polys in rfile.scans[0].polys[0].source0antpolys.iteritems():
             pcoeff = polys[polyname]
             t = np.arange(tmax)
