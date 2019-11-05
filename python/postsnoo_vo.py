@@ -193,21 +193,45 @@ def _main():
     #10.16 651620 1125.9994 11 998 1228.66 1 58772.0634430710 608.67
     cand = np.loadtxt(values.snoopy_log)
     sn, sampno, tsec, boxcar, idt, dm, beamno, mjd, latencyms = cand
+    mjd = float(mjd)
     hdr = DadaHeader.fromfile(values.dada_hdr)
+
+    # TODO: add fetch results to command line
+    # If they are specified on the command line - partse them and add them
+    # To the VO Event - otherwise don't include them in the VOEVENT
+
+    # Move all these caluculations into the NewVoEvent function
+    dm_err = 0
+    width = boxcar+1
+    beam_ras = map(float, hdr.get_value('BEAM_RA').split(','))
+    beam_decs = map(float, hdr.get_value('BEAM_DEC').split(','))
+    beamno = int(beamno) 
+    ra = beam_ras[beamno] # degres
+    dec = beam_decs[beamno] # degrees
+    snr = sn
+    tsamp = float(hdr.get_value('TSAMP'))
+    fluence = 0 # TODO: calculate a simple fluence. Assume single antenna has an SEFD of 2000 Jy, fluence=2000/sqrt(Nant) * snr * width
+    semiMag = 0 # ignore
+    semiMin = 0 # ignore
+    ne2001 = 0 # Find this from a python package somewher
+    name= 0 # ideally we need to get this from TNS - I'm not sure what do do in the interim
+    imp = '' # Is this fixed?
+    utc = '2019-01-11 12:12:12' # Time of the FRB. MJD of the FRB is in the snoopy.log - it's here as the mjd variable. COnver to UTC ! BUT - this is is the time of arrival of the FRB in thebottom channel of hte band. So - we should get the frequencies from the header and work out what that channel frequency is, then correct the MJD to infinite frequency, then convert to MJD.
+    # IN fact - put both times (at the bottom of the band, and at infinite frequency) and let people choose. PUt the MJDs in and UTCS in - the more the merrier.
     
-    dm = args.dm
-    dm_err = args.dm_err
-    width = args.width
-    snr = args.snr
-    fluence = args.fluence
-    ra = args.RA
-    dec = args.DEC
+    #dm = args.dm
+    #dm_err = args.dm_err
+    #width = args.width
+    #snr = args.snr
+    #fluence = args.fluence
+    #ra = args.RA
+    #dec = args.DEC
     #semiMaj = args.semiMaj
     #semiMin = args.semiMin
-    ne2001 = args.NE2001
-    name = args.name
-    imp = args.importance
-    utc = args.utc
+    #ne2001 = args.NE2001
+    #name = args.name
+    #imp = args.importance
+    #utc = args.utc
 
     print (dm, dm_err, width, fluence, ra, dec, ne2001, name, imp, utc)
 
@@ -219,8 +243,9 @@ def _main():
    
     print (c, g, gl, gb)
     #print utc, utc_YY, utc_MM, utc_DD, utc_hh, utc_mm, utc_ss, mjd
-
-
+    # TODO: put the entire cand information in from teh snoopy log.
+    
+    # TODO: - make this function NewVoEvent(cand, hdr)
     NewVOEvent(dm, dm_err, width, snr, fluence, ra, dec, ne2001, name, imp, utc, gl, gb)
     
     
