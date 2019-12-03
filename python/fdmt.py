@@ -6,14 +6,27 @@ Copyright (C) CSIRO 2017
 """
 import numpy as np
 import logging
+from numba import njit, jit, prange
+import math
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+@jit(nopython=True)
 def isquare(f):
     return 1./(f*f)
 
+@jit(nopython=True)
 def cff(f1_start, f1_end, f2_start, f2_end):
     return (isquare(f1_start) - isquare(f1_end))/(isquare(f2_start) - isquare(f2_end))
+
+@jit(nopython=True)
+def calc_delta_t(f_min, f_max, f_start, f_end, max_dt):
+    rf = cff(f_start, f_end, f_min, f_max)
+    delta_tf = (float(max_dt) - 1.0)*rf
+    delta_t = int(math.ceil(delta_tf)) + 1
+    
+    return delta_t
+
 
 def copy_kernel(v1, vout):
     '''
@@ -135,11 +148,9 @@ class Fdmt(object):
             self._save_iteration(i)
 
     def _calc_delta_t(self, f_start, f_end):
-        rf = cff(f_start, f_end, self.f_min, self.f_max)
-        delta_tf = (float(self.max_dt) - 1.0)*rf
-        delta_t = int(np.ceil(delta_tf)) + 1
-        return delta_t
-                                                 
+        return calc_delta_t(self.f_min, self.f_max, f_start, f_end, self.max_dt)
+
+    @jit(nopython=False, parallel=True)
     def _save_iteration(self, intnum):
         '''
         Appends the iteration description to self.hist_nf_data
@@ -234,9 +245,9 @@ class Fdmt(object):
             
             # for each DM in this subband
             for idt in xrange(delta_t_local):
-                dt_middle = int(np.round(idt * cff(f_middle, f_start, f_end, f_start))) # DM of the middle
+                dt_middle = int(round(idt * cff(f_middle, f_start, f_end, f_start))) # DM of the middle
                 dt_middle_index = dt_middle + shift_input # same as dt_middle
-                dt_middle_larger = int(np.round(idt*cff(f_middle_larger, f_start, f_end, f_start))) # dt at slightly larger freq
+                dt_middle_larger = int(round(idt*cff(f_middle_larger, f_start, f_end, f_start))) # dt at slightly larger freq
                 dt_rest = idt - dt_middle_larger # remaining dt
                 dt_rest_index = dt_rest + shift_input # same as dt_rest
 
@@ -350,6 +361,13 @@ class Fdmt(object):
 
         # final state has a single 'channel' - remove this axis
         return state[0, :, :]
+
+    @property
+    def max_state_size(self):
+        '''
+        Return the largest state in elements required to run this FDMT
+        '''
+        return max([s.prod() for s in self.hist_state_shape])
     
     def __call__(self, din):
         return self.execute(din)
