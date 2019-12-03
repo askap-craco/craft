@@ -14,10 +14,10 @@ import datetime
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
-ACCESS_KEY = 'AKIAIUYCJ7ATHZQ274XA'
-SECRET_KEY = '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'
-BUCKET = 'casstestaskapmro2'
-ASKAP_SLACK_URL = "https://hooks.slack.com/services/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"
+ACCESS_KEY = os.getenv('CRAFT_S3_ACCESS')
+SECRET_KEY = os.getenv('CRAFT_S3_SECRET')
+BUCKET = os.getenv('CRAFT_S3_BUCKET')
+ASKAP_SLACK_URL = os.getenv('ASKAP_SLACK_URL')
 
 def upload_file(fname):
     image_key = os.path.abspath(fname)
