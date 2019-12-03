@@ -364,7 +364,6 @@ class Plotter(object):
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
         beams = np.ma.masked_equal(beams, 0)
-        
             
         f0 = files[0]
         self.beams = beams
