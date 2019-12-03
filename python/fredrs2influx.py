@@ -97,7 +97,7 @@ def plot(f, values):
             stat += name, np.median(bdn, axis=2), 'med'
             stat += name, nzero, 'nzero'
             stat += name, ninf, 'ninf'
-            sate += name, nnan, 'nnan'
+            stat += name, nnan, 'nnan'
 
             # if this axis is the frequency axis - just guessing
             if bdn.shape[2] == len(d.freqs):
@@ -114,7 +114,7 @@ def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-s','--step', type=int, default=1, help='Skip this many blocks per write')
+    parser.add_argument('-s','--step', type=int, default=16, help='Skip this many blocks per write')
     parser.add_argument('-i','--start', type=int, default=0, help='Start block number')
     parser.add_argument('-p','--plot', action='store_true', help='Do plot', default=False)
     parser.add_argument(dest='files', nargs='+')
