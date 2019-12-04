@@ -9,6 +9,7 @@
 # NOTE : i=1, n=16384 takes a long time, so it is recommended to run parallel for each antenna and then sum up the time series at the very last step
 # (for each antenna: max. time ~ 9 hrs, max. memory ~ 30g)
 # TODO: maybe consider overlap-save method in the future
+# Please refer to the google docs README for more information: https://docs.google.com/document/d/1uSbsudW5tkjy-GbJaCduERS36AgCEgWox-V8vY-YdA8/edit?usp=sharing
 # ---------------------------------------------------------------------------------
 
 
@@ -21,7 +22,7 @@ i=1
 n=16384 # $n * 54 * 336 is the total length of the output array
 
 
-# FRB details
+# FRB details (for other FRBs, refer to the README file)
 
 echo "FRB181112"
 offset=2106003
@@ -32,7 +33,7 @@ basedr=/fred/oz002/users/hcho/craft/
 calcfile=${basedr}Calibration/aipscal/frb181112/c1_f0/craftfrb.im # geometric delays
 fcm=${basedr}Calibration/aipscal/frb181112/fcm.txt # clock delays
 hwfile=${basedr}Calibration/mircal/frb181112/hwdelays_0407_SB7031_20181112222901_round-8.txt # hardware delays
-mir=${basedr}Calibration/mircal/frb181112/20181112222901_call_beam00_i4096_f9.uvlin # MIRIAD gain, bandpass
+mir=${basedr}Calibration/mircal/frb181112/20181112222901_call_beam01_i4096_f9.uvlin # MIRIAD gain, bandpass
 aips=${basedr}Calibration/aipscal/frb181112/bandpass.bp.txt # AIPS gain, bandpass
 ## VCRAFT file directory - change
 f_vcraft=${basedr}python/voltages/FRB181112/ak**/beam01/*.vcraft
