@@ -7,6 +7,7 @@ import logging
 import socket
 import datetime
 import boto3
+import os
 
 ACCESS_KEY = os.getenv('CRAFT_S3_ACCESS')
 SECRET_KEY = os.getenv('CRAFT_S3_SECRET')
