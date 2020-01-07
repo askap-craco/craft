@@ -274,7 +274,7 @@ class AntennaSource(object):
             # blatetly clear what you should do
             phasor = np.exp(np.pi*2j*phases, dtype=np.complex64)
             freq_ghz = (cfreq+freqs)/1e3
-            mir_cor = np.array([corr.mir.get_solution(iant, 0, f) for f in freq_ghz])
+            mir_cor = corr.mir.get_solution(iant,0,freq_ghz)
             #mir_cor[np.where(mir_cor==0)] = np.nan
             if mir_cor[0] == 0: # if correction is 0, flag data
                 phasor *= 0
@@ -662,8 +662,8 @@ class MiriadGainSolutions(object):
             self.bp_real = bp_real
             bp_imag *= -1  # complex conjugate of bandpass
             self.bp_imag = bp_imag
-            self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant]) for iant in xrange(nant)]
-            self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant]) for iant in xrange(nant)]
+            self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant], fill_value=(self.bp_real[0,iant], self.bp_real[-1,iant]), bounds_error=False) for iant in xrange(nant)]
+            self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant], fill_value=(self.bp_imag[0,iant], self.bp_imag[-1,iant]), bounds_error=False) for iant in xrange(nant)]
             self.bp_coeff = None
         else:
             print('Using AIPS bandpass solutions')
@@ -688,8 +688,22 @@ class MiriadGainSolutions(object):
                 self.bp_imag = np.full((nfreq,nant),np.nan,dtype=np.complex64)
                 g_real = np.full((1,nant),np.nan,dtype=np.complex64)
                 g_imag = np.full((1,nant),np.nan,dtype=np.complex64)
-                fring_f = bp_c_root.replace(bp_c_root.split('/')[-1],"delays.sn.txt")
-                sc_f = bp_c_root.replace(bp_c_root.split('/')[-1],"selfcal.sn.txt")
+
+                # look for a README and get fring, selfcal filenames
+                drcal = os.path.dirname(bp_c_root)
+                import glob
+                readme = glob.glob(drcal+"/README*")
+                if len(readme) == 1:
+                    with open(readme[0],'r') as fl:
+                        for line in fl:
+                            if "delays" in line and ".sn.txt" in line:
+                                fring_f = drcal+'/'+line.split()[0]
+                            if "selfcal" in line and ".sn.txt" in line:
+                                sc_f = drcal+'/'+line.split()[0]
+                else:
+                    print('No or multiple readme file exists for AIPS')
+                    fring_f = bp_c_root.replace(bp_c_root.split('/')[-1],"delays.sn.txt")
+                    sc_f = bp_c_root.replace(bp_c_root.split('/')[-1],"selfcal.sn.txt")
                 aips_cor = aipscor(fring_f,sc_f,bp_c_root)
                 for iant in range(nant):
                     bp = aips_cor.get_phase_bandpass(iant,pol)
@@ -704,15 +718,15 @@ class MiriadGainSolutions(object):
                     try:
                         g = aips_cor.get_phase_fring(iant,pol)*aips_cor.get_phase_selfcal(iant,pol)
                         g = 1/g # inverse of gain
-                    except:
+                    except Exception, e:
                         g = 0
                     bp = np.conj(bp) # complex conjugate of bandpass
                     self.bp_real[:,iant] = np.real(bp)
                     self.bp_imag[:,iant] = np.imag(bp)
                     g_real[0,iant] = np.real(g)
                     g_imag[0,iant] = np.imag(g)
-                self.bp_real_interp = [interp1d(self.freqs, self.bp_real[:, iant]) for iant in xrange(nant)]
-                self.bp_imag_interp = [interp1d(self.freqs, self.bp_imag[:, iant]) for iant in xrange(nant)]
+                self.bp_real_interp = [interp1d(self.freqs, self.bp_real[:, iant], fill_value=(self.bp_real[0,iant], self.bp_real[-1,iant]), bounds_error=False) for iant in xrange(nant)]
+                self.bp_imag_interp = [interp1d(self.freqs, self.bp_imag[:, iant], fill_value=(self.bp_imag[0,iant], self.bp_imag[-1,iant]), bounds_error=False) for iant in xrange(nant)]
                 self.bp_coeff = None
 
         self.g_real = g_real
@@ -728,26 +742,13 @@ class MiriadGainSolutions(object):
         freq_ghz - frequency float in Ghz
         '''
         if self.bp_real is None: # this means no bandpass/gain solution was passed
-            bp_value = 1
+            bp_value = np.array([1])
         elif self.bp_coeff is not None: # Use AIPS polyfit coefficient
             bp_fit = np.poly1d(self.bp_coeff[iant,0,:])+1j*np.poly1d(self.bp_coeff[iant,1,:])
             bp_value = bp_fit(freq_ghz*1e3)
         else: # AIPS polyfit coefficient doesn't exist. Use Miriad/AIPS bandpass interpolation
-            try:
-                f_real = self.bp_real_interp[iant](freq_ghz)
-                f_imag = self.bp_imag_interp[iant](freq_ghz)
-            except:
-                #print('interpolation out of range at '+str(freq_ghz)+'GHz')
-                if freq_ghz > self.freqs[int(len(self.freqs)/3)]:
-                    f_real = self.bp_real[0,iant]
-                    f_imag = self.bp_imag[0,iant]
-                elif freq_ghz < self.freqs[int(len(self.freqs)/3*2)]:
-                    f_real = self.bp_real[-1,iant]
-                    f_imag = self.bp_imag[-1,iant]
-                    #print(f_real,f_imag)
-                else:
-                    print('ERROR IN INTERPOLATING BANDPASS')
-                    print('interpolation out of range at '+str(freq_ghz)+'GHz')
+            f_real = self.bp_real_interp[iant](freq_ghz)
+            f_imag = self.bp_imag_interp[iant](freq_ghz)
             bp_value = f_real + 1j*f_imag
 
         g_value = self.g_real[0,iant] + 1j*self.g_imag[0,iant]
