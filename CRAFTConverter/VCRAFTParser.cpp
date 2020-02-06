@@ -87,7 +87,7 @@ namespace NCodec
 
                     // It is probable that additional parameters are added which
                     // is not an error, per se, so simply flag this fact.
-                    fprintf( stderr, "Unrecognised VCRAFT parameter found.\n" );
+  		    fprintf( stderr, "Missing VCRAFT parameter \"%s\" (probably harmless).\n" , pItem->second.m_sKey.c_str());
                 }
             }
         }
@@ -168,27 +168,48 @@ namespace NCodec
                 { "CMD_NAMESPACE",        eParamTypeString,  "", ""  },
                 { "SAMP_RATE",            eParamTypeDouble,  "", ""  },
                 { "CRAFT_MODE",           eParamTypeInt,     "", ""  },
+		{ "NSAMPS_REQUEST",       eParamTypeInt,     "", ""  },
                 { "ANT_RA",               eParamTypeDouble,  "", ""  },
                 { "ANT_DEC",              eParamTypeDouble,  "", ""  },
                 { "ANT_AZ",               eParamTypeDouble,  "", ""  },
                 { "ANT_EL",               eParamTypeDouble,  "", ""  },
+		{ "ANT_SKYPOL",           eParamTypeDouble,  "", ""  },
+		{ "ANT_PARANG",           eParamTypeDouble,  "", ""  },
+		{ "ANT_SKYPOS",           eParamTypeDouble,  "", ""  },
+		{ "ANT_MJD",              eParamTypeDouble,  "", ""  },
+		{ "ANT_LST",              eParamTypeDouble,  "", ""  },
                 { "NBITS",                eParamTypeInt,     "", ""  },
+		{ "NBEAMS",               eParamTypeInt,     "", ""  },
                 { "NPOL",                 eParamTypeInt,     "", ""  },
                 { "BEAM",                 eParamTypeInt,     "", ""  },
+		{ "MODE",                 eParamTypeInt,     "", ""  },
+		{ "OVERSAMPLING",         eParamTypeString,  "", ""  },
                 { "FPGA_ID",              eParamTypeInt,     "", ""  },
                 { "CARD_NO",              eParamTypeInt,     "", ""  },
+		{ "ANT",                  eParamTypeString,  "", ""  },
                 { "ANTENNA_NO",           eParamTypeInt,     "", ""  },
                 { "NCHANS",               eParamTypeInt,     "", ""  },
+		{ "TELESCOP",             eParamTypeString,  "", ""  },
+		{ "INSTRUME",             eParamTypeString,  "", ""  },
+		{ "FOOTPRINT",            eParamTypeString,  "", ""  },
+		{ "BEAM_RA",              eParamTypeDouble,  "", ""  },
+		{ "BEAM_DEC",             eParamTypeDouble,  "", ""  },
                 { "NOW_MJD",              eParamTypeDouble,  "", ""  },
                 { "NOW_BAT",              eParamTypeHex,     "", ""  },
                 { "START_WRITE_FRAMEID",  eParamTypeInt,     "", ""  },
                 { "STOP_WRITE_FRAMEID",   eParamTypeInt,     "", ""  },
                 { "TRIGGER_FRAMEID",      eParamTypeInt,     "", ""  },
-                { "START_WRITE_BAT",      eParamTypeHex,     "", ""  },
-                { "STOP_WRITE_BAT",       eParamTypeHex,     "", ""  },
-                { "TRIGGER_BAT",          eParamTypeHex,     "", ""  },
+		{ "START_WRITE_BAT",      eParamTypeHex,     "", ""  },
+		{ "STOP_WRITE_BAT",       eParamTypeHex,     "", ""  },
+		{ "TRIGGER_BAT",          eParamTypeHex,     "", ""  },
                 { "FREQS",                eParamTypeList,    "", ""  },
-                { "UTC_NOW",              eParamTypeISODate, "", ""  }
+                { "NOW_UTC",              eParamTypeISODate, "", ""  },
+		{ "START_WRITE_UTC",      eParamTypeISODate, "", ""  },
+		{ "STOP_WRITE_UTC",       eParamTypeISODate, "", ""  },
+		{ "TRIGGER_UTC",          eParamTypeISODate, "", ""  },
+		{ "START_WRITE_MJD",      eParamTypeDouble,  "", ""  },
+		{ "STOP_WRITE_MJD",       eParamTypeDouble,  "", ""  },
+		{ "TRIGGER_MJD",          eParamTypeDouble,  "", ""  }
             };
 
             // Now create the key and parameter types anew in the map ahead of decoding the parameters.

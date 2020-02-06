@@ -20,7 +20,10 @@
 #include "CommandLineParser.h"
 #include "FileDescriptor.h"
 
+//#include <sys/stat.h>
 #include <vector>
+//#include <fstream>
+#include <sstream>
 
 ///////////////////////////////////////////////////////////////////////////////
 // Namespaces.
@@ -81,9 +84,9 @@ int main( int argc, char **argv )
     bool                    bDumpHeader = false;
     EReturnCode             eReturnCode = eReturnCodeFailure;
 
-    static struct option    sLongOptions[] = { { NULL, 0, NULL, 0 } };
+    static struct option    sLongOptions[] = {{"bat0", 1, 0, 'b'}, { NULL, 0, NULL, 0 } };
     CCommandLineParser      CmdLine;
-    string                  sOptionsTemplate{ "d1c?" };
+    string                  sOptionsTemplate{ "d1chb:" };
 
     string                  sInputName;
     string                  sOutputName;
@@ -100,7 +103,7 @@ int main( int argc, char **argv )
     {
         bTerminate  = true;
         eReturnCode = eReturnCodeSuccess;
-        fprintf( stderr, "Usage: CRAFTDataConverter [-d -1 -c -?] InputFile OutputFile\n" );
+        fprintf( stderr, "Usage: CRAFTDataConverter [-d -1 -c -? -b <bat0>] InputFile OutputFile\n" );
     }
     else
     {
@@ -120,6 +123,15 @@ int main( int argc, char **argv )
             iOutputType = CFileDescriptor::eFileFormatCODIF;
         }
 
+        if ( CmdLine.DoesOptionExist( 'b' ) )  // Not sure this is useful - leave it in for now, but this is not used elsewhere
+        {
+	  unsigned long long bat0;
+	  std::stringstream ss;
+	  ss << std::hex << CmdLine.GetOption('b');
+	  ss >> bat0;
+	  // printf("BAT0=0x%llX\n", bat0);
+        }
+	
         // Handle mandatory parameters; only the first two are used.
 
         if ( CmdLine.AreThereParameters() )

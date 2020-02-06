@@ -146,7 +146,9 @@ class Plotter(object):
         beams, files = load_beams(filenames, tstart, ntimes=1, return_files=True)
         self.total_samples = min([f.nsamples for f in files])
         ntimes, self.nbeams, self.nfreq = beams.shape
-
+        self.freq_flags = np.ones(self.nfreq, dtype=np.bool)
+        f0 = files[0]
+        self.freqs = np.linspace(f0.fch1, f0.fch1 + self.nfreq*f0.foff, self.nfreq, endpoint=True)
         self.bnames = [f.filename.split('.')[-2] for f in files]
         nbeams = len(self.files)
         mjdstart = files[0].tstart
@@ -208,6 +210,9 @@ class Plotter(object):
         tax = fig.add_subplot(gs[2,0:2], sharex=rawax)
         fax = fig.add_subplot(gs[0:2,2], sharey=rawax)
         fig.canvas.mpl_connect('key_press_event', self.press)
+        fig.canvas.mpl_connect('pick_event', self.pick)
+        #fig.canvas.mpl_connect('button_press_event', self.button_press)
+        #fig.canvas.mpl_connect('button_release_event', self.button_release)
         #annotate(fig, title, xlab, ylab)
         self.figs[name] = (fig, [rawax, tax, fax])
         self.fig_labels[name] = (title, xlab, ylab)
@@ -257,9 +262,47 @@ class Plotter(object):
         for name, (fig, axes) in self.figs.iteritems():
             fig.draw()
 
-
     def __del__(self):
         self.closeall()
+
+    def pick(self, event):
+        ''' Called when data picked'''
+        #        print event, dir(event)
+        #print event.artist, dir(event.artist)
+        #print event.mouseevent, dir(event.mouseevent)
+        e = event.mouseevent
+        time, freq = e.xdata, e.ydata
+        self.toggle_freq_flags(freq)
+        self.clearfigs()
+        self.draw()
+
+    def toggle_freq_flags(self, f1, f2=None):
+        f1idx = np.argmin(np.round(abs(self.freqs - f1)))
+        if f2 is None:
+            f2idx = f1idx + 1
+        else:
+            f2idx = np.argmin(np.round(abs(self.freqs - f2)))
+
+        if f1idx > f2idx:
+            f1idx, f2idx = (f2idx, f1idx)
+
+        assert f1idx < f2idx
+        print 'Toggling frequencies', f1, f2, f1idx, f2idx
+        self.freq_flags[f1idx:f2idx] = ~ self.freq_flags[f1idx:f2idx]
+    
+    def reset_flagged_frequencies(self):
+        self.freq_flags[:] = True
+        self.draw()
+
+    def flag_frequencies(self):
+        try:
+            l = raw_input('f1 f2 (with space):')
+            f1, f2 = map(float, l.split())
+            self.toggle_freq_flags(f1, f2)
+        except Exception, e:
+            print 'Couldnt parse flags', l, e
+
+
     
     def press(self, event):
         print 'press', event.key
@@ -293,6 +336,10 @@ class Plotter(object):
         elif event.key == 'r':
             self.rescale = not self.rescale
             self.imzrange = None
+        elif event.key == 'g':
+            self.flag_frequencies()
+        elif event.key == 'G':
+            self.reset_flagged_frequencies()
         elif event.key == 'e':
             self.goto_end()
         elif event.key == 'b':
@@ -353,6 +400,8 @@ class Plotter(object):
         d - Dedisperse (I'll ask for the DM on the cmdline
         c - Increase colormap zoom
         C - Decrease colormap zoom
+        g - Set frequency flags from prompt
+        G - clear frequency flags
         r - Toggle rescaling
         k - Show histogram'
         h or ? - Print this help
@@ -366,13 +415,14 @@ class Plotter(object):
         tstart = self.tstart
         ntimes = self.ntimes
         beams, files = load_beams(self.files, tstart, ntimes, return_files=True)
-        beams = np.ma.masked_equal(beams, 0)
-        
+        beams = np.ma.MaskedArray(beams, (beams == 0) | (~self.freq_flags[np.newaxis, np.newaxis, :]))
             
         f0 = files[0]
         self.beams = beams
         print 'Loaded beams', beams.shape
         print 'scrunching t=', self.tscrunch_factor, 'f=', self.fscrunch_factor, 'dm', self.dm
+
+        orig_ntimes, orig_nbeams, orig_nfreq = beams.shape
 
         if self.dm != 0:
             beams = dmroll(beams, self.dm, f0.fch1/1e3, f0.foff/1e3, f0.tsamp*1e3)
@@ -402,10 +452,10 @@ class Plotter(object):
 
         src_raj = f0.src_raj
         src_dej = f0.src_dej
-        freqs = np.linspace(fch1, fch1 + nfreq*foff, nfreq, endpoint=True)
-        times=  np.linspace(tstart*tsamp, (ntimes+tstart)*tsamp, ntimes, endpoint=True)
+        freqs = np.linspace(fch1, fch1 + nfreq*foff*self.fscrunch_factor, nfreq, endpoint=True)
+        times=  np.linspace(tstart*tsamp, (ntimes+tstart)*tsamp*self.tscrunch_factor, ntimes, endpoint=True)
 
-        assert(len(freqs) == nfreq)
+        assert(len(freqs) ==nfreq)
         
         if foff < 0:
             origin = 'upper'
@@ -439,7 +489,7 @@ class Plotter(object):
         imzmin, imzmax = self.imzrange
         print 'BISHAPE', bi.shape, 'ZRAGE', imzmin, imzmax
         
-        rawax.imshow(bi, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none')
+        rawax.imshow(bi, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none', picker=3)
         #if imzmin is None and imzmax is None:
         #self.imzrange = (bi.min(), bi.max())
             

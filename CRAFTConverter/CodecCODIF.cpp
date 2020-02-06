@@ -25,6 +25,8 @@
 #include "CodecCODIF.h"
 #include "VCRAFTBitMode.h"
 
+#include <sys/stat.h>
+#include <fstream>
 #include <cstring>
 #include <cmath>
 #include <ctime>
@@ -52,7 +54,7 @@ namespace               // Anonymous namespace for internal helpers.
     constexpr int      iMaxPacketSize_c            = 9000;   // Maximum bytes for network transport.
     constexpr int      iBitsPerByte_c              = 8;      // Number of bits in a byte.
     constexpr int      iTimeForIntegerSamples_c    = 27;     // Period in seconds, for a whole number of samples.
-    constexpr double   dTolerance_c                = 0.001;  // Tolerance for floating point calculations.
+  //    constexpr double   dTolerance_c                = 0.001;  // Tolerance for floating point calculations.
     constexpr int     DUTC                         = 37;
 
 }                       // End anonymous namespace.
@@ -249,13 +251,28 @@ namespace NCodec        // Part of the Codec namespace.
 	    // work out which frame(sample) starts on the next second boundary
 	    // There *will* be an up to  +-1/2 sample time rounding with this approach
 
-            unsigned long long startBAT = m_ullTriggerWriteBAT - (m_ullTriggerFrameId * (27.0/32.0));
-            m_ullBAT0 = ((startBAT +5e5)/ 1e6); // Round to full second
-            m_ullBAT0 *= 1e6;  // Need to do in two lines as compiler is too clever it seems (optimises it away)
-	    //m_ullFrame0 = (m_ullBAT0-startBAT)*(32.0/27.0); // Number of frames(samples) from startBAT till first 1sec boundary
 
-	    printf("DEBUG: startBAT=0x%llX\n", startBAT);
-	    printf("DEBUG: BAT0=0x%llX\n", m_ullBAT0);
+	    // Maybe a cache file exists
+	    struct stat buffer;   
+	    if (stat(".bat0", &buffer) == 0) { // File exists
+	      printf("Reading BAT0 from cache file\n");
+	      std::fstream batfile(".bat0", std::ios_base::in);
+	      batfile >> std::hex >> m_ullBAT0 >> std::dec >> m_ullFrame0;
+	    } else {
+	      printf("DEBUG: No .bat0 file\n");
+	      unsigned long long startBAT = m_ullTriggerWriteBAT - (m_ullTriggerFrameId * (27.0/32.0));
+	      m_ullBAT0 = ((startBAT + 999999)/ 1e6); // Round up full second
+	      m_ullBAT0 *= 1e6;  // Need to do in two lines as compiler is too clever it seems (optimises it away)
+	      m_ullFrame0 = (m_ullBAT0-startBAT)*(32.0/27.0); // Number of frames(samples) from startBAT till first 1sec boundary
+
+	      std::ofstream batfile;
+	      batfile.open(".bat0", std::ios::trunc); 
+	      batfile << "0x" << std::hex << m_ullBAT0 << std::dec << " " << m_ullFrame0 << std::endl;
+	      batfile.close();
+	    }
+	    
+	    printf("DEBUG: BAT0  =0x%llX\n", m_ullBAT0);
+	    printf("DEBUG: FRAME0=%lld\n", m_ullFrame0);
 	      
             if ( ! ConfigureDFH() )
             {
@@ -428,7 +445,7 @@ namespace NCodec        // Part of the Codec namespace.
             // 32/27 MHz, this means that in 27s there should be 32 x 10^6 samples.
 
             uint64_t uiSampleIntervalsPerPeriod = llrint( m_dSampleRate * iTimeForIntegerSamples_c );
-            assert( fabs( ( uiSampleIntervalsPerPeriod / 1.0e+6 ) - 32.0 ) < dTolerance_c );
+            assert(uiSampleIntervalsPerPeriod==32000000);
 
 	    // Maximum number of samples/frame given the max frame size
 	    int samplesPerFrame = iMaxPacketSize_c / m_iSampleBlockSize;
@@ -524,32 +541,35 @@ namespace NCodec        // Part of the Codec namespace.
             // Figure out the "previous" Period restart
 
 	    unsigned long long bufferSamples = voltage_samples(m_iMode);
-	    printf("DEBUG: Assuming %lld samples per voltage dump\n", bufferSamples);
+	    if (m_iNsampsRequest==0) {
+	      printf("Warning: Assuming %lld samples per voltage dump\n", bufferSamples);
+	    } else {
+	      bufferSamples = m_iNsampsRequest;
+	    }
 
 	    unsigned long long startFrameId = m_ullTriggerFrameId - bufferSamples + m_iSamplesPerWord;
-	    // StopFrameId is the time of the last word, so need to allow for the number of samples/32bit word
+	    // TriggerFrameId is the time of the last word, so need to allow for the number of samples/32bit word
 	    
             unsigned long long EpochMJDSec = getCODIFEpochMJD(pDFH) * 24*60*60;
             unsigned long long BAT0MJDSec = m_ullBAT0/1e6;
-            unsigned long long PeriodsSinceBAT0 = startFrameId / uiSampleIntervalsPerPeriod; // Will round down
+            unsigned long long PeriodsSinceBAT0 = (startFrameId-m_ullFrame0) / uiSampleIntervalsPerPeriod; // Will round down
             int frameseconds = (BAT0MJDSec -DUTC - EpochMJDSec) + PeriodsSinceBAT0 * iTimeForIntegerSamples_c;
-            unsigned long framenumber = (startFrameId % uiSampleIntervalsPerPeriod) / samplesPerFrame;
+            unsigned long framenumber = ((startFrameId-m_ullFrame0) % uiSampleIntervalsPerPeriod) / samplesPerFrame;
 
 	    mask = (1<<(m_iBitsPerSample*2))-1;
 
-            // Finally set the  seconds and frame number
+            // Finally set the seconds and frame number
             setCODIFFrameEpochSecOffset(pDFH, frameseconds);
             setCODIFFrameNumber(pDFH, framenumber);
 
             // There will be samples that don't fit in a frame (ie first sample may start between frames)
             // These will need to be calculated and eventually discarded
 
-            int initialSamples = startFrameId % samplesPerFrame;
+            int initialSamples = (startFrameId-m_ullFrame0) % samplesPerFrame;
 
             if ( initialSamples!=0 )
             {
-              m_iSkipSamples = samplesPerFrame
-		- initialSamples;
+              m_iSkipSamples = samplesPerFrame - initialSamples;
               printf("Warning: Will skip %d samples for frame alignment\n", m_iSkipSamples);
 
 	      m_iSampleOffset = m_iSkipSamples%m_iSamplesPerWord;
