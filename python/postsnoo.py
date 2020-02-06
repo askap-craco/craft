@@ -7,6 +7,12 @@ import logging
 import socket
 import datetime
 import boto3
+import os
+
+ACCESS_KEY = os.getenv('CRAFT_S3_ACCESS')
+SECRET_KEY = os.getenv('CRAFT_S3_SECRET')
+BUCKET = os.getenv('CRAFT_S3_BUCKET')
+ASKAP_SLACK_URL = os.getenv('ASKAP_SLACK_URL')
 
 def _main ():
     
@@ -86,11 +92,6 @@ def slack(text,sb,scan,cid,ant,alias,attachment):
     #image1 = str(sb) + "_" + str(scan) + "_" + str(cid) + "_" + str(ant) + '_' + str(beam) + '_on.png'
     #image2 = str(sb) + "_" + str(scan) + "_" + str(cid) + "_" + str(ant) + '_' + str(beam) + '_off.png'
     
-    ACCESS_KEY = 'AKIAIUYCJ7ATHZQ274XA'
-    SECRET_KEY = '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'
-    BUCKET = 'casstestaskapmro2'
-
-    ASKAP_SLACK_URL = "https://hooks.slack.com/services/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"
     SLACK_URL = { "askap": ASKAP_SLACK_URL }
     HOST = socket.gethostname()
    
