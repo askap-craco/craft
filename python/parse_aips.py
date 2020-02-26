@@ -342,19 +342,24 @@ class aipscor(object):
         else:
             start = "REAL 2         IMAG 2" # y pol
             delay_ind = 7 # real2 location within a line
+        
+        with open(self.bpfile,'r') as fl:
+            for line in fl:
+                if 'TFDIM11' in line:
+                    nfreq = int(line.split()[2])
 
         with open(self.bpfile, 'r') as fl:
             fl.seek(0)
             fl.seek(fl.read().find(start),0)
 
             bool_record = False
-            phase_bp_real = np.full(2016,np.nan)
-            phase_bp_imag = np.full(2016,np.nan)
+            phase_bp_real = np.full(nfreq,np.nan)
+            phase_bp_imag = np.full(nfreq,np.nan)
             while not bool_record:
                 data=fl.readline()
                 if data.split()[0] == str(an_ind+1):
                     bool_record = True
-                    for chan in range(2016):
+                    for chan in range(nfreq):
                         phase_bp_real[chan] = float(data.split()[delay_ind]) # bandpass real phase
                         phase_bp_imag[chan] = float(data.split()[delay_ind+1]) # bandpass imag phase
                         data = fl.readline()
