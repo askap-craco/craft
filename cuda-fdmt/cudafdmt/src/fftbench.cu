@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
 {
 
   if (argc != 6) {
-    printf("%s Usage: gpuid N batchmin batchmax\n", argv[0]);
+    printf("%s Usage: gpuid N batchmin batchmax option\n", argv[0]);
     return EXIT_FAILURE;
   }
 
