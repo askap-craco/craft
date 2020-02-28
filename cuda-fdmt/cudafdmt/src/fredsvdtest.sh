@@ -103,7 +103,7 @@ dada_dbdisk -k $ICS_EXPORT_KEY -z -D icsout &
 mkdir fredda_ics
 pushd fredda_ics
 echo '************* STARTING FIRST FREDDA'
-$cudafdmt -R  -t $BLOCK_CYCLES -d 2048 -p -r 1  -x 10 -o fredda_ics.cand -X $ICS_EXPORT_KEY $input_keys &
+$cudafdmt -R  -t $BLOCK_CYCLES -d 2048 -p -r 1 -s 10 -o fredda_ics.cand -X $ICS_EXPORT_KEY $input_keys &
 popd
 
 
@@ -112,7 +112,7 @@ dbsvddb  $ICS_EXPORT_KEY $SVD_EXPORT_KEY &
 
 mkdir fredda_svd
 pushd fredda_svd
-#$cudafdmt -t $BLOCK_CYCLES -d 2048  -r 1 -K 3  -x 10 -X $FINAL_EXPORT_KEY -R -o fredda_svd.cand $SVD_EXPORT_KEY &
+$cudafdmt -t $BLOCK_CYCLES -d 2048  -r 1 -K 3  -x 10 -X $FINAL_EXPORT_KEY -R -o fredda_svd.cand $SVD_EXPORT_KEY &
 popd
 
 #dada_dbmonitor -k $ICS_EXPORT_KEY &
