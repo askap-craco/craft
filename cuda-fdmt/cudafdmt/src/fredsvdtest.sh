@@ -29,7 +29,7 @@ ls -l $cudafdmt
 #block_size=8128512
 
 # 512 samples/block
-BLOCK_CYCLES=512
+BLOCK_CYCLES=256
 let block_size=72*336*4*${BLOCK_CYCLES}
 let polsum_block_size=36*336*4*${BLOCK_CYCLES}
 
@@ -48,6 +48,7 @@ for i in $(seq $ncount) ; do
 	#echo Header installed $hdr $DADA_KEY
 	#echo dada_diskdb -k $DADA_KEY  -z -f $indir/*.dada
 	dada_diskdb -k $DADA_KEY -z -f $indir/*00000.dada &
+
 	if [[ $DADA_KEY == "1100" ]] ; then
 	    echo dada_dbmonitor -k $DADA_KEY &
 	fi
@@ -82,13 +83,15 @@ FINAL_EXPORT_KEY=1250
 
 all_keys="$input_keys $SVD_EXPORT_KEY $ICS_EXPORT_KEY $FINAL_EXPORT_KEY"
 echo "BLOCK SIZE IS $block_size and polsum block size is $polsum_block_size"
+
+echo "ALL KEYS $all_keys"
 #dada_db -d -k $ICS_EXPORT_KEY
 #dada_db -d -k $SVD_EXPORT_KEY
 #dada_db -d -k $FINAL_EXPORT_KEY
 dada_db -a 32768 -b $polsum_block_size -n 2 -k $ICS_EXPORT_KEY  -l -p -r 2
 dada_db -a 32768 -b $polsum_block_size -n 2 -k $SVD_EXPORT_KEY  -l -p -r 2 
 dada_db -a 32768 -b $polsum_block_size -n 2 -k $FINAL_EXPORT_KEY  -l -p
-rm -f 2*.dada
+#rm -f 2*.dada
 
 rm -f icsout/*.dada svdout/*.dada finalout/*.dada
 mkdir icsout svdout finalout
@@ -99,18 +102,22 @@ dada_dbdisk -k $ICS_EXPORT_KEY -z -D icsout &
 
 mkdir fredda_ics
 pushd fredda_ics
-$cudafdmt -t $BLOCK_CYCLES -d 2048 -p -r 1  -x 10 -o fredda_ics.cand -X $ICS_EXPORT_KEY $input_keys -R &
+echo '************* STARTING FIRST FREDDA'
+$cudafdmt -R  -t $BLOCK_CYCLES -d 2048 -p -r 1  -x 10 -o fredda_ics.cand -X $ICS_EXPORT_KEY $input_keys &
 popd
 
 
 dbsvddb  $ICS_EXPORT_KEY $SVD_EXPORT_KEY &
+#dada_dbcopydb $ICS_EXPORT_KEY $SVD_EXPORT_KEY &
 
 mkdir fredda_svd
 pushd fredda_svd
-$cudafdmt -t $BLOCK_CYCLES -d 2048  -r 1 -K 3  -x 10 -X $FINAL_EXPORT_KEY -R -o fredda_svd.cand $SVD_EXPORT_KEY &
+#$cudafdmt -t $BLOCK_CYCLES -d 2048  -r 1 -K 3  -x 10 -X $FINAL_EXPORT_KEY -R -o fredda_svd.cand $SVD_EXPORT_KEY &
 popd
 
-dada_dbmonitor -k $ICS_EXPORT_KEY &
+#dada_dbmonitor -k $ICS_EXPORT_KEY &
+dada_dbmonitor -k 1100 &
+
 #wait $cudapid
 wait
 #dada_db -d -k $DADA_KEY
