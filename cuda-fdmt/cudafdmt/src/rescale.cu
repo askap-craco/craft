@@ -531,7 +531,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 		if (nsamp == 0) { // Don't update the scale and offset if everything has been flagged
 			offset = offsetarr[i];
 			scale = scalearr[i];
-		} else if (variance == 0.0) { // In what possible circumstance, KB, would you expect this to be valid data?
+		} else if (variance < 1e-4) { // In what possible circumstance, KB, would you expect this to be valid data?
 			scale = 0.0f;
 			offset = 0.0f;
 			//decayoffsetarr[i] = 0.0f;
