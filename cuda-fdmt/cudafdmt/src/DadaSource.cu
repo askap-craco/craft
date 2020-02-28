@@ -184,6 +184,10 @@ size_t DadaSource::read_samples(void** output)
 {
     size_t nt;
     void* ptr = get_next_buffer(nt);
+    if (nt != m_nt) {
+    	printf("Expected m_nt=%d samples but got %d samples. CONFUSED!\n", m_nt, nt);
+    }
+    assert(m_nt == nt);
 	//assert(m_in_data_order == DataOrder::TFBP);
 	m_transpose_timer.start();
 	if (m_in_data_order == m_out_data_order) {
@@ -237,7 +241,7 @@ size_t DadaSource::read_samples(void** output)
 				for(int p = 0; p < 	npols(); ++p) {
 					for (int f = 0;	f < nchans(); ++f) {
 						for(int t = 0; t < nt; ++t) {
-							int outidx = t + nt*(f + nchans()*(b + nbeams()*p));
+							int outidx = p + npols()*(b + nbeams()*(f + nchans()*t));
 							assert(outidx >= 0);
 							assert(outidx < nchans()*npols()*nbeams()*nt);
 							outp[outidx] = *inp;
