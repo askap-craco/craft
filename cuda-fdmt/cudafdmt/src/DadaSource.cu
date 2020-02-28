@@ -184,10 +184,10 @@ size_t DadaSource::read_samples(void** output)
 {
     size_t nt;
     void* ptr = get_next_buffer(nt);
-    if (nt != m_nt) {
+    if (!(nt == 0 || nt == m_nt)) {
     	printf("Expected m_nt=%d samples but got %d samples. CONFUSED!\n", m_nt, nt);
+        assert(m_nt == nt || nt == 0);
     }
-    assert(m_nt == nt);
 	//assert(m_in_data_order == DataOrder::TFBP);
 	m_transpose_timer.start();
 	if (m_in_data_order == m_out_data_order) {
