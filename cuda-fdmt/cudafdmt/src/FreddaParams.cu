@@ -197,7 +197,15 @@ void FreddaParams::set_source(DataSource& _source) {
 	nbeams_per_antenna = source->nbeams()*source->npols(); // number of beams including polarisations
 	nbeams_in_total = nbeams_per_antenna*source->nants();
 	npols_in = source->npols();
+	if (polsum && npols_in == 1) {
+		printf("FREDDA: Polsum requested but npols_in = 1. Ignoring polsum\n");
+		polsum = false;
+	}
 	if (polsum) { // assume polsum and antsum
+		if (npols_in != 2) {
+			printf("FREDDA: Requested polsum but input npols != 2. Quitting.\n");
+			exit(EXIT_FAILURE);
+		}
 		nbeams_out = source->nbeams();
 		npols_out = 1;
 		assert(nbeams_per_antenna %2 == 0);
