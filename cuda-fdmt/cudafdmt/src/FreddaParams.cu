@@ -27,11 +27,11 @@ void runtest_usage() {
 			"   -r R - Blocks per rescale update (0 for no rescaling)\n"
 			"   -S S - Seek to this number of seconds before starting\n"
 			"   -M M - Channel Mean relative change threshold. e.g. 1% is -M 0.01 \n"
-			"   -P P - Flag channels with mean above P\n"
-			"   -Q Q - Flag channels with mean below Q\n"
+			"   -P P - Flag channels with mean below P\n"
+			"   -Q Q - Flag channels with mean above Q\n"
 			"   -T T - Channel StdDev relative changed flagging threshold. e.g. 30% is -T 0.3 \n"
-			"   -A A - Flag channels with StdDev above A\n"
-			"   -V V - Flag channels with StdDev below V\n"
+			"   -A A - Flag channels with StdDev below A\n"
+			"   -V V - Flag channels with StdDev above V\n"
 			"   -K K - Channel Kurtosis threshold (3 is pretty good)\n"
 			"   -G G - GTEST threshold - 0.25 is good. - Also must specify -I\n"
 			"   -I I - Number of samples per integration - required if -G is specified\n"
@@ -69,7 +69,7 @@ void FreddaParams::parse(int _argc, char* _argv[]) {
 	}
 	printf("\n");
 	int ch;
-	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:DRg:M:T:U:K:G:I:C:F:W:n:m:b:z:N:X:uhp")) != -1) {
+	while ((ch = getopt(argc, argv, "d:t:s:o:x:r:S:B:DRg:M:P:Q:T:A:V:U:K:G:I:C:F:W:n:m:b:z:N:X:uhp")) != -1) {
 		switch (ch) {
 		case 'd':
 			nd = atoi(optarg);
@@ -108,19 +108,19 @@ void FreddaParams::parse(int _argc, char* _argv[]) {
 			std_thresh = atof(optarg);
 			break;
 		case 'A':
-			std_max = atof(optarg);
+			std_min = atof(optarg);
 			break;
 		case 'V':
-			std_min = atof(optarg);
+			std_max = atof(optarg);
 			break;
 		case 'M':
 			mean_thresh = atof(optarg);
 			break;
 		case 'P':
-			mean_max = atof(optarg);
+			mean_min = atof(optarg);
 			break;
 		case 'Q':
-			mean_min = atof(optarg);
+			mean_max = atof(optarg);
 			break;
 		case 'G':
 			gtest_thresh = atof(optarg);
@@ -191,6 +191,8 @@ void FreddaParams::parse(int _argc, char* _argv[]) {
 	}
 	assert(seek_seconds >= 0);
 	assert(gtest_thresh > 0);
+	assert(mean_min < mean_max);
+	assert(std_min < std_max);
 
 	// Either INFINITY, -1 or non-infinity and defined are OK - this is exclusive or
 	if ((gtest_thresh != INFINITY) && nsamps_per_int == -1) {
@@ -254,7 +256,6 @@ void FreddaParams::set_source(DataSource& _source) {
 
 void FreddaParams::to_dada(char header_buf[])
 {
-
 	ascii_header_set(header_buf, "NT", "%d", nt);
 	ascii_header_set(header_buf, "ND", "%d", nd);
 	ascii_header_set(header_buf, "SEEK_SECONDS", "%f", seek_seconds);
@@ -267,7 +268,11 @@ void FreddaParams::to_dada(char header_buf[])
 	ascii_header_set(header_buf, "CUDA_DEVICE", "%d", cuda_device);
 	ascii_header_set(header_buf, "KURT_THRESH", "%f", kurt_thresh);
 	ascii_header_set(header_buf, "STD_THRESH", "%f", std_thresh);
+	ascii_header_set(header_buf, "STD_MIN", "%f", std_min);
+	ascii_header_set(header_buf, "STD_MAX", "%f", std_max);
 	ascii_header_set(header_buf, "MEAN_THRESH", "%f", mean_thresh);
+	ascii_header_set(header_buf, "MEAN_MIN", "%f", mean_min);
+	ascii_header_set(header_buf, "MEAN_MAX", "%f", mean_max);
 	ascii_header_set(header_buf, "DM0_THRESH", "%f", dm0_thresh);
 	ascii_header_set(header_buf, "CELL_THRESH", "%f", cell_thresh);
 	ascii_header_set(header_buf, "FLAG_GROW", "%d", flag_grow);
