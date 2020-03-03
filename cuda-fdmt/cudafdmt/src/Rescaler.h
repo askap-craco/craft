@@ -30,6 +30,10 @@ public:
 	float dm0_thresh;
 	float cell_thresh;
 	float gtest_thresh; // Threshold as far as the user is concerned - around 0.3
+	float mean_max;
+	float mean_min;
+	float std_max;
+	float std_min;
 	int flag_grow;
 	bool invert_freq;
 	bool subtract_dm0;
@@ -42,7 +46,7 @@ public:
 	int nsamps_per_int;
 	bool polsum;
 	DataOrder in_order;
-	rescale_dtype global_scale;
+	float global_scale;
 };
 
 class Rescaler {

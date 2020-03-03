@@ -62,6 +62,10 @@ Rescaler::Rescaler(RescaleOptions& _options, FreddaParams& _params) :
 	noflag_options.dm0_thresh = INFINITY;
 	noflag_options.cell_thresh = INFINITY;
 	noflag_options.gtest_thresh = INFINITY;
+	noflag_options.mean_max = INFINITY;
+	noflag_options.mean_min = -INFINITY;
+	noflag_options.std_max = INFINITY;
+	noflag_options.std_min = -INFINITY;
 	noflag_options.decay_constant = 0;
 	noflag_options.flag_grow = 1;
 
@@ -171,10 +175,7 @@ void Rescaler::update_rescale_parameters(RescaleOptions& options, int iant,
 			sum.d_device, sum2.d_device, sum3.d_device, sum4.d_device,
 			decay_offset.d_device, mean.d_device, std.d_device, kurt.d_device,
 			offset.d_device, scale.d_device, weights.d_device, nsamps.d_device,
-			options.target_stdev, options.target_mean, options.mean_thresh,
-			options.std_thresh, options.kurt_thresh, options.gtest_thresh,
-			options.nsamps_per_int,
-			options.flag_grow,
+			options,
 			boff);
 	gpuErrchk(cudaPeekAtLastError());
 	if (iant == 0) {

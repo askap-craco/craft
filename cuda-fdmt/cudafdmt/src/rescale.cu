@@ -10,6 +10,7 @@
 #include <math.h>
 #include <stdio.h>
 #include "array.h"
+#include "Rescaler.h"
 
 void* rescale_malloc(size_t sz)
 {
@@ -426,14 +427,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype* __restrict__ scalearr,
 		rescale_dtype* __restrict__ weights,
 		rescale_dtype* __restrict__ nsamparr,
-		rescale_dtype target_stdev,
-		rescale_dtype target_mean,
-		rescale_dtype mean_thresh,
-		rescale_dtype std_thresh,
-		rescale_dtype kurt_thresh,
-		rescale_dtype gtest_thresh,
-		rescale_dtype nsamps_per_int,
-		int flag_grow,
+		struct RescaleOptions options,
 		int boff)
 {
 	int c = threadIdx.x;
@@ -498,15 +492,18 @@ __global__ void rescale_update_scaleoffset_kernel (
 	// So chuck it for now.
 	// But aaaah, on the contrary, it does find some things, so we will use it after all.
 
-	rescale_dtype gtest =fabs(mean*mean/variance/nsamps_per_int - rescale_dtype(1));
+	rescale_dtype gtest =fabs(mean*mean/variance/options.nsamps_per_int - rescale_dtype(1));
 
 	// some of these divisions can be by 0, and the thresholds can be inf - this handles all that.
 
-	 bool thresh_ok = (meanoff <= mean_thresh) &&
-			(stdoff <= std_thresh) &&
-			(kurtoff <= kurt_thresh) &&
-			(gtest <= gtest_thresh) &&
-			(isfinite(kurt));
+	 bool thresh_ok = (meanoff <= options.mean_thresh) &&
+			 (mean >= options.mean_min) &&
+			 (mean <= options.mean_max) &&
+			(stdoff <= options.std_thresh) &&
+			(std >= options.std_min) &&
+			(std <= options.std_max) &&
+			(kurtoff <= options.kurt_thresh && isfinite(kurt)) &&
+			(gtest <= options.gtest_thresh);
 
 	if (! thresh_ok) {
 //			printf("Rescale ibeam %d ic=%d meanoff=%f prev_mean=%f meanarr=%f mean_thresh=%f stdoff=%f prev_std=%f stdarr=%f kurtoff=%f thresh OK? %d\n",
@@ -519,7 +516,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 	// OOOH, OK, it's hacky but coudl be useful. This channel if any channel in the current block of 32 is flagged
 	int flag_ballot = __ballot_sync(0xffffffff, flag);
 	int lane_id = threadIdx.x % 32;
-	int mask = ((1 << flag_grow) - 1) << (lane_id - flag_grow/2);
+	int mask = ((1 << options.flag_grow) - 1) << (lane_id - options.flag_grow/2);
 	if (mask & flag_ballot) {
 		flag = true;
 	}
@@ -536,11 +533,11 @@ __global__ void rescale_update_scaleoffset_kernel (
 			offset = 0.0f;
 			//decayoffsetarr[i] = 0.0f;
 		} else {
-			scale = (target_stdev / sqrtf(variance))*weight;
+			scale = (options.target_stdev / sqrtf(variance))*weight;
 			if (scale == 0.0f) {
 				offset = 0.0f;
 			} else {
-				offset = -mean + target_mean/scale;
+				offset = -mean + options.target_mean/scale;
 			}
 			//decayoffsetarr[i] = 0.0f;
 
@@ -557,39 +554,5 @@ __global__ void rescale_update_scaleoffset_kernel (
 	m3[i] = 0.0;
 	m4[i] = 0.0;
 	//nsamparr[i] = 0;
-}
-void rescale_update_scaleoffset_gpu(rescale_gpu_t& rescale, int iant)
-{
-	assert(rescale.interval_samps > 0);
-	int nthreads = rescale.nf;
-	assert(rescale.num_elements % nthreads == 0);
-	int nblocks = rescale.num_elements / nthreads;
-	int boff = iant*rescale.nbeams;
-	rescale_update_scaleoffset_kernel<<<nblocks, nthreads>>>(
-			rescale.sum.d_device,
-			rescale.sum2.d_device,
-			rescale.sum3.d_device,
-			rescale.sum4.d_device,
-			rescale.decay_offset.d_device,
-			rescale.mean.d_device,
-			rescale.std.d_device,
-			rescale.kurt.d_device,
-			rescale.offset.d_device,
-			rescale.scale.d_device,
-			rescale.weights.d_device,
-			rescale.nsamps.d_device,
-			rescale.target_stdev,
-			rescale.target_mean,
-			rescale.mean_thresh,
-			rescale.std_thresh,
-			rescale.kurt_thresh,
-			rescale.gtest_thresh,
-			1.0f,
-			rescale.flag_grow,
-			boff);
-	// zero decay offsets after updating block offsets - otherwise you get big steps. CRAFT-206
-	//array4d_zero(&rescale.decay_offset);
-	gpuErrchk(cudaDeviceSynchronize());
-	rescale.sampnum = 0;
 }
 

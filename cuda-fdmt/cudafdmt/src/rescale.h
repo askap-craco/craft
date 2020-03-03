@@ -100,14 +100,7 @@ __global__ void rescale_update_scaleoffset_kernel (
 		rescale_dtype* __restrict__ scalearr,
 		rescale_dtype* __restrict__ weightsarr,
 		rescale_dtype* __restrict__ nsamparr,
-		rescale_dtype target_stdev,
-		rescale_dtype target_mean,
-		rescale_dtype mean_thresh,
-		rescale_dtype std_thresh,
-		rescale_dtype kurt_thresh,
-		rescale_dtype gtest_thresh,
-		rescale_dtype nsamps_per_int,
-		int flag_grow,
+		struct RescaleOptions options,
 		int iant);
 
 template <int nsamps_per_word, typename wordT> __device__ __host__ inline rescale_dtype extract_sample(const wordT word, const int samp)

@@ -167,7 +167,11 @@ int main(int argc, char* argv[])
 	rescale.target_stdev = 1.0/sqrt(params.nbeams_summed);
 	rescale.decay_constant = 0.35 * params.decay_timescale / source->tsamp(); // This is how the_decimator.C does it, I think.
 	rescale.mean_thresh = params.mean_thresh;
+	rescale.mean_max = params.mean_max;
+	rescale.mean_min = params.mean_min;
 	rescale.std_thresh = params.std_thresh;
+	rescale.std_max = params.std_max;
+	rescale.std_min = params.std_min;
 	rescale.kurt_thresh = params.kurt_thresh;
 	rescale.flag_grow = params.flag_grow;
 	rescale.dm0_thresh = params.dm0_thresh;
@@ -175,6 +179,7 @@ int main(int argc, char* argv[])
 	rescale.gtest_thresh = params.gtest_thresh;
 	rescale.invert_freq = (params.foff < 0);
 	rescale.subtract_dm0 = params.subtract_dm0;
+
 	rescale.nt = nt;
 	rescale.nf = nf;
 	rescale.nbeams_per_ant = params.nbeams_per_antenna;

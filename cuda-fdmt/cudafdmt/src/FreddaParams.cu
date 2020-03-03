@@ -27,7 +27,11 @@ void runtest_usage() {
 			"   -r R - Blocks per rescale update (0 for no rescaling)\n"
 			"   -S S - Seek to this number of seconds before starting\n"
 			"   -M M - Channel Mean relative change threshold. e.g. 1% is -M 0.01 \n"
+			"   -P P - Flag channels with mean above P\n"
+			"   -Q Q - Flag channels with mean below Q\n"
 			"   -T T - Channel StdDev relative changed flagging threshold. e.g. 30% is -T 0.3 \n"
+			"   -A A - Flag channels with StdDev above A\n"
+			"   -V V - Flag channels with StdDev below V\n"
 			"   -K K - Channel Kurtosis threshold (3 is pretty good)\n"
 			"   -G G - GTEST threshold - 0.25 is good. - Also must specify -I\n"
 			"   -I I - Number of samples per integration - required if -G is specified\n"
@@ -103,8 +107,20 @@ void FreddaParams::parse(int _argc, char* _argv[]) {
 		case 'T':
 			std_thresh = atof(optarg);
 			break;
+		case 'A':
+			std_max = atof(optarg);
+			break;
+		case 'V':
+			std_min = atof(optarg);
+			break;
 		case 'M':
 			mean_thresh = atof(optarg);
+			break;
+		case 'P':
+			mean_max = atof(optarg);
+			break;
+		case 'Q':
+			mean_min = atof(optarg);
 			break;
 		case 'G':
 			gtest_thresh = atof(optarg);

@@ -62,7 +62,7 @@ rm -f *.dat
 #$cudafdmt -t 512 -d 512 -r 1  -s 0  -M 0.2 -T 0.2 -C 6.0  -o fredda.$1.cand *.fil
 #$cudafdmt -t 512 -d 512 -r 1  -s 0  -o fredda.$1.cand *.fil
 CUDA_DEVICE=1
-fredda_cand_file=/tmp/fredda.cand
+fredda_cand_file=fredda.cand
 DADA_KEYS=$all_keys
 icsdir=/tmp/
 
@@ -103,7 +103,7 @@ dada_dbdisk -k $ICS_EXPORT_KEY -z -D icsout &
 mkdir fredda_ics
 pushd fredda_ics
 echo '************* STARTING FIRST FREDDA'
-$cudafdmt -R  -t $BLOCK_CYCLES -d 2048 -p -r 1 -s 10 -o fredda_ics.cand -X $ICS_EXPORT_KEY $input_keys &
+$cudafdmt -R  -t $BLOCK_CYCLES -d 2048 -p -r 1 -K 3 -I 2047 -W 3 -z 10 -C 10 -T 0.25 -M 0.007 -s 10 -o fredda_ics.cand -X $ICS_EXPORT_KEY $input_keys &
 popd
 
 
@@ -116,7 +116,7 @@ $cudafdmt -t $BLOCK_CYCLES -d 2048  -r 1 -K 3  -x 10 -X $FINAL_EXPORT_KEY -R -o 
 popd
 
 #dada_dbmonitor -k $ICS_EXPORT_KEY &
-dada_dbmonitor -k 1100 &
+dada_dbmonitor -k 1100 & 
 
 #wait $cudapid
 wait
