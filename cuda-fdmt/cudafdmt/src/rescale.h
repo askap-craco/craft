@@ -213,21 +213,16 @@ __global__ void rescale_calc_perchannel_stats (
 		wordT word = inarr[wordidx];
 		rescale_dtype vin = extract_sample<nsamps_per_word, wordT>(word, s);
 
-		//rescale_dtype vout = (vin + offset) * scale;
-		//rescale_dtype sout = vout;
-		rescale_dtype sout;
-		if (k == 0) { // If we set the timescale to zero, we just don't do any decaying - use block offset
-			decay_offset = 0;
-			sout = (vin + offset)* scale;
-		} else { // use decay offset - don't use block offset
-			decay_offset = (vin + decay_offset*k)/(1.0 + k);
-			sout = (vin - decay_offset)*scale;
-		}
-
 		int dm0idx = t + nt*rsbeam; // DM0 idx: BT order
 		rescale_dtype dm0count = dm0countarr[dm0idx];
 		rescale_dtype dm0sum = dm0arr[dm0idx] ; // sum accros dm0 - not normalised
-		rescale_dtype dm0z = dm0sum*rsqrtf(dm0count);
+		rescale_dtype dm0z = dm0sum*rsqrtf(dm0count); // DM0 normalised as an S/N
+		rescale_dtype sout;
+		if (k == 0) { // If we set the timescale to zero, we just don't do any decaying - use block offset
+			sout = (vin + offset)* scale;
+		} else { // use decay offset - don't use block offset
+			sout = (vin - decay_offset)*scale;
+		}
 
 		// the mean accross the dm0 trace is the dm0sum/dm0count (that's a mean)
 		// We also subtract off the mean of the dm0 trace - the dm0state_mean has *already*
@@ -238,8 +233,11 @@ __global__ void rescale_calc_perchannel_stats (
 			rescale_dtype dm0mean = dm0sum/dm0count - dm0stat_mean*rsqrtf(dm0count);
 			sout -= dm0mean;
 		}
-		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && fabs(dm0sum) < block_dm0thresh;
-		bool this_sample_ok = fabs(dm0z) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
+
+		bool this_sample_ok = fabs(dm0z) < dm0_thresh
+							&& fabs(sout) < cell_thresh
+							&& dm0min > -3*dm0_thresh;
+
 		if (this_sample_ok && last_sample_ok) {
 			// Calculate higher order modments using a numerically stable approach.
 			// See: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
@@ -262,6 +260,14 @@ __global__ void rescale_calc_perchannel_stats (
 		    kurtosis = (n*M4) / (M2*M2) - 3
 		    return kurtosis
 		    */
+
+			// Only update the decay offset is the sample was not flagged
+			if (k == 0) {
+				decay_offset = 0;
+			} else {
+				decay_offset = (vin + decay_offset*k)/(rescale_dtype(1) + k);
+			}
+
 
 			rescale_dtype n1 = rescale_dtype(nsamps);
 			nsamps += 1;
@@ -391,22 +397,16 @@ __global__ void rescale_apply_flags_and_add (
 		// coalesced read from global for all x threads.
 		wordT word = inarr[wordidx];
 		rescale_dtype vin = extract_sample<nsamps_per_word, wordT>(word, s);
-
-		//rescale_dtype vout = (vin + offset) * scale;
-		//rescale_dtype sout = vout;
-		rescale_dtype sout;
-		if (k == 0) { // If we set the timescale to zero, we just don't do any decaying - use block offset
-			decay_offset = 0;
-			sout = (vin + offset)* scale;
-		} else { // use decay offset - don't use block offset
-			decay_offset = (vin + decay_offset*k)/(1.0 + k);
-			sout = (vin - decay_offset)*scale;
-		}
-
 		int dm0idx = t + nt*rsbeam; // DM0 idx: BT order
 		rescale_dtype dm0count = dm0countarr[dm0idx];
 		rescale_dtype dm0sum = dm0arr[dm0idx] ; // sum accros dm0 - not normalised
-		rescale_dtype dm0z = dm0sum*rsqrtf(dm0count);
+		rescale_dtype dm0z = dm0sum*rsqrtf(dm0count); // DM0 normalised as an S/N
+		rescale_dtype sout;
+		if (k == 0) { // If we set the timescale to zero, we just don't do any decaying - use block offset
+			sout = (vin + offset)* scale;
+		} else { // use decay offset - don't use block offset
+			sout = (vin - decay_offset)*scale;
+		}
 
 		// the mean accross the dm0 trace is the dm0sum/dm0count (that's a mean)
 		// We also subtract off the mean of the dm0 trace - the dm0state_mean has *already*
@@ -417,8 +417,11 @@ __global__ void rescale_apply_flags_and_add (
 			rescale_dtype dm0mean = dm0sum/dm0count - dm0stat_mean*rsqrtf(dm0count);
 			sout -= dm0mean;
 		}
-		//int this_sample_ok = fabs(dm0) < dm0_thresh && fabs(sout) < cell_thresh && fabs(dm0sum) < block_dm0thresh;
-		bool this_sample_ok = fabs(dm0z) < dm0_thresh && fabs(sout) < cell_thresh && dm0min > -3*dm0_thresh;
+
+		bool this_sample_ok = fabs(dm0z) < dm0_thresh
+							&& fabs(sout) < cell_thresh
+							&& dm0min > -3*dm0_thresh;
+
 		int outidx = t + nt*(outc + nf*outbeam);
 
 		if (this_sample_ok && last_sample_ok) {
@@ -428,8 +431,6 @@ __global__ void rescale_apply_flags_and_add (
 
 		}
 		last_sample_ok = this_sample_ok;
-
-
 	}
 
 	// write everything back to global memory -- all coalesced

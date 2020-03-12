@@ -247,8 +247,7 @@ int main(int argc, char* argv[])
 	signal(SIGHUP, &handle_signal);
 	signal(SIGINT, &handle_signal);
 	signal(SIGTERM, &handle_signal);
-	uint64_t num_flagged_beam_chans = 0;
-	uint64_t num_flagged_times = 0;
+
 
 	// Create streams - one for each antenan
 	const int MAX_NANT = 72;
@@ -363,6 +362,9 @@ int main(int argc, char* argv[])
 	const int nbeams_in_total = params.nbeams_in_total;
 	double boxcar_ngops = (double)nbeams_out*(double)nt*(double)nd*2.0*(double)NBOX/1e9;
 	double data_nsecs = blocknum*nt*source->tsamp();
+
+	uint64_t num_flagged_beam_chans = rescaler->num_flagged_beam_chans;
+	uint64_t num_flagged_times = rescaler->num_flagged_times;
 
 	double flagged_percent = ((double) num_flagged_beam_chans) / ((double) nf*nbeams_in_total*blocknum) * 100.0;
 	double dm0_flagged_percent = ((double) num_flagged_times) / ((double) blocknum*nbeams_in_total*nt*nf) * 100.0;

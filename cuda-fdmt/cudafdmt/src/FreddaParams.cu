@@ -35,7 +35,7 @@ void runtest_usage() {
 			"   -K K - Channel Kurtosis threshold (3 is pretty good)\n"
 			"   -G G - GTEST threshold - 0.25 is good. - Also must specify -I\n"
 			"   -I I - Number of samples per integration - required if -G is specified\n"
-			"   -z Z - Zap times with 0 DM above threshold Z\n"
+			"   -z Z - Zap times with 0 DM above S/N threshold Z (5 is good)\n"
 			"   -C C - Zap time/frequency cells with S/N above threshold C\n"
 			"   -W W - Grow frequency flags by W channels\n"
 			"   -F FILE - Flag frequencies contained in this file\n"
