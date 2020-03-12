@@ -243,11 +243,7 @@ int main(int argc, char* argv[])
 
 	CandidateList candidate_list(params.max_ncand_per_block);
 
-	// measure bytes used
-	size_t gpu_free_bytes, gpu_total_bytes;
-	gpuErrchk(cudaMemGetInfo( &gpu_free_bytes, &gpu_total_bytes ));
-
-	// add signal handler
+		// add signal handler
 	signal(SIGHUP, &handle_signal);
 	signal(SIGINT, &handle_signal);
 	signal(SIGTERM, &handle_signal);
@@ -262,6 +258,11 @@ int main(int argc, char* argv[])
 		gpuErrchk(cudaStreamCreate(&streams[i]));
 		//streams[i] = 0;
 	}
+
+	// measure bytes used
+	size_t gpu_free_bytes, gpu_total_bytes;
+	gpuErrchk(cudaMemGetInfo( &gpu_free_bytes, &gpu_total_bytes ));
+
 
 	while (true) {
 		if (stopped) {
