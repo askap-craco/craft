@@ -154,33 +154,6 @@ void Rescaler::do_apply_flags_and_sum(array4d_t& rescale_buf, wordT* read_buf_de
 	assert(nf % nsamps_per_word == 0);
 	int boff = iant*options.nbeams_per_ant;
 	assert(options.in_order == DataOrder::TFBP || options.in_order == DataOrder::BPTF);
-
-	rescale_calc_dm0_kernel< nsamps_per_word, wordT > <<<nbeams_in, 256, 0, stream>>>(
-			read_buf_device,
-			offset.d_device,
-			scale.d_device,
-			dm0.d_device,
-			dm0count.d_device,
-			nf, nt,
-			options.cell_thresh,
-			options.in_order,
-			boff);
-	gpuErrchk(cudaPeekAtLastError());
-
-
-	// Take the mean all the dm0 times into one big number per beam - this is the how we flag
-	// short dropouts see ACES-209
-	// probably could do this in rescale_calc_dm0_kernel after yu've done it
-	// But i Haven't got htere yet.
-	rescale_calc_dm0stats_kernel<<<1, nbeams_in, 0, stream>>>(
-			dm0.d_device,
-			dm0count.d_device,
-			dm0stats.d_device,
-			nt,
-			boff);
-	gpuErrchk(cudaPeekAtLastError());
-
-
 	int nthread;
 	if (nwords % (128/nsamps_per_word) == 0) {
 		nthread = 128/nsamps_per_word; // Tuneable  -- needed if nf > 1024 which is a commmon limitiation for the number of threads.
@@ -279,7 +252,7 @@ void Rescaler::do_calculate_block_stats(wordT* read_buf_device, RescaleOptions &
 	assert(blockdim.x == nsamps_per_word);
 	assert(griddim.x == nbeams_in);
 
-	rescale_calc_stats< nsamps_per_word, wordT ><<<griddim, blockdim, 0, stream>>>(
+	rescale_calc_perchannel_stats< nsamps_per_word, wordT ><<<griddim, blockdim, 0, stream>>>(
 			read_buf_device,
 			sum.d_device,
 			sum2.d_device,

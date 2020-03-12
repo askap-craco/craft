@@ -138,7 +138,7 @@ template <> __device__ __host__ inline rescale_dtype extract_sample<1, double>(c
 }
 
 template <int nsamps_per_word, typename wordT>
-__global__ void rescale_calc_stats (
+__global__ void rescale_calc_perchannel_stats (
 		const wordT* __restrict__ inarr,
 		rescale_dtype* __restrict__ sumarr,
 		rescale_dtype* __restrict__ sum2arr,

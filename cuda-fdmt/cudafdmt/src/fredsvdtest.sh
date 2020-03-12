@@ -85,6 +85,7 @@ all_keys="$input_keys $SVD_EXPORT_KEY $ICS_EXPORT_KEY $FINAL_EXPORT_KEY"
 echo "BLOCK SIZE IS $block_size and polsum block size is $polsum_block_size"
 
 echo "ALL KEYS $all_keys"
+echo "INPUT KEYS" $input_keys
 #dada_db -d -k $ICS_EXPORT_KEY
 #dada_db -d -k $SVD_EXPORT_KEY
 #dada_db -d -k $FINAL_EXPORT_KEY
@@ -112,7 +113,8 @@ dbsvddb  $ICS_EXPORT_KEY $SVD_EXPORT_KEY &
 
 mkdir fredda_svd
 pushd fredda_svd
-$cudafdmt -t $BLOCK_CYCLES -d 2048  -r 1 -K 3  -x 10 -X $FINAL_EXPORT_KEY -R -o fredda_svd.cand $SVD_EXPORT_KEY &
+flag_flags=-K 3 -M 0.1 -P -0.5 -Q 1.5 -A 0.7 -V 1.3 
+echo $cudafdmt -t $BLOCK_CYCLES -d 2048 -r 1 -x 10 $flag_flags -X $FINAL_EXPORT_KEY -R -o fredda_svd.cand $SVD_EXPORT_KEY &
 popd
 
 #dada_dbmonitor -k $ICS_EXPORT_KEY &
