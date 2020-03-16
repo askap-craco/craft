@@ -29,7 +29,7 @@ header = 'S/N, sampno, secs from file start, boxcar, idt, dm, beamno,mjd, sampno
 intf = '%d'
 floatf = '%0.3f'
 mjd='%0.15f'
-formats = (floatf, intf, floatf, intf, intf, floatf, intf,floatf, intf, intf, intf, intf, intf)
+formats = (floatf, intf, floatf, intf, intf, floatf, intf,mjd, intf, intf, intf, intf, intf)
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter

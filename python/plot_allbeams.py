@@ -111,7 +111,7 @@ def dmroll(beams, dm, fch1, foff, tint):
         freq = fch1 + f*foff
         tdelay = 4.15*dm*(fch1**-2 - freq**-2)
         shift = int(np.round(tdelay/tint))
-        newbeams[:, :, f] = np.roll(beams[:,:,f], shift)
+        newbeams[:, :, f] = np.roll(beams[:,:,f], shift, axis=0)
 
     return newbeams
         
@@ -420,7 +420,7 @@ class Plotter(object):
         print 'scrunching t=', self.tscrunch_factor, 'f=', self.fscrunch_factor, 'dm', self.dm
 
         orig_ntimes, orig_nbeams, orig_nfreq = beams.shape
-
+        
         if self.dm != 0:
             beams = dmroll(beams, self.dm, f0.fch1/1e3, f0.foff/1e3, f0.tsamp*1e3)
 
