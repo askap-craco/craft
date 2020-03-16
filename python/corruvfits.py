@@ -11,6 +11,8 @@ import pyfits
 from pyfits import Column as Col
 from astropy.time import Time
 import warnings
+import sys
+import datetime
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -76,6 +78,9 @@ class CorrUvFitsFile(object):
         hdr['SORTORD'] = 'TB'
         hdr['SPECSYS'] = 'TOPOCENT'
         hdr['ORIGIN'] = 'craftcor'
+
+        histstr = 'Created on {} by {}'.format(datetime.datetime.now().isoformat(), ' '.join(sys.argv))
+        hdr['HISTORY'] = histstr
 
         self.fout = open(fname, 'w+')
         self.fout.write(hdr.tostring())
