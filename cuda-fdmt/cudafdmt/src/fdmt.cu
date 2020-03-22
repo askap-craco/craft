@@ -1236,7 +1236,7 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 	fdmt->curr_state_idx = s; // Tell people where to find the current state
 }
 
-int fdmt_execute_batch(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata, int ibeam, int nbeams)
+int fdmt_execute_batch(fdmt_t* fdmt, fdmt_dtype* indata, int ibeam, int nbeams)
 {
 	// Runs nbeams beams starting at ibeam through the FDMT
 	// and updates the relevant output state
@@ -1295,7 +1295,7 @@ int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
 		int nbeams = min(fdmt->nbeams_alloc, nbeams_remaining);
 		assert(nbeams > 0);
 		assert(nbeams <= fdmt->nbeams_alloc);
-		fdmt_execute_batch(fdmt, indata, outdata, ibeam, nbeams);
+		fdmt_execute_batch(fdmt, indata, ibeam, nbeams);
 	}
 
 	if (fdmt->dump_data) {
