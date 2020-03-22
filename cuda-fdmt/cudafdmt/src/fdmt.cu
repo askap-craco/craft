@@ -446,8 +446,7 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 		fdmt_dtype* __restrict__ state, int delta_t, int max_dt, int nt, bool count)
 {
 	// indata is 4D array: (nbeams, nf, 1, nt): index [ibeam, c, 0, t] = t + nt*(0 + 1*(c + nf*ibeam))
-	// State is a 4D array: (nbeams, nf, delta_t, delta_t + nt) ( for the moment)
-	// full index [ibeam, c, idt, t] is t + max_dt*(idt + delta_t*(c + nf*ibeam))
+	// State is a 4D array: (nbeams, nf, delta_t, nt) ( for the moment)
 	// If coutn is true, it initialises the input to the number of cells that will be added
 
 	int nbeams = gridDim.x; // number of beams
@@ -461,7 +460,9 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 	int outidx = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, 0, 0);
 	int imidx = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0);
 	while (t < nt) {
-		if (count) {
+		assert(outidx+t < nbeams*nf*delta_t*max_dt);
+		assert(imidx+t < nbeams*nf*nt);
+		if (count == true) {
 			state[outidx + t] = 1.;
 		} else {
 			state[outidx + t] = indata[imidx + t];
@@ -472,7 +473,7 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 	// Do partial sums initialisation recursively (Equation 20.)
 	for (int idt = 1; idt < delta_t; ++idt) {
 		int outidx = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, idt, idt);
-		int iidx   = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, idt-1, idt);
+		int iidx   = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, idt-1, idt-1);
 		int imidx  = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0 );
 
 		// The state for dt=d = the state for dt=(d-1) + the time-reversed input sample
@@ -480,8 +481,13 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 		// (TODO: Not including a missing overlap with the previous block here)
 		// originally this was j=idt, rather than j=0. But that just meant that 0<=j<idt were zero, which seems weird.
 		t = threadIdx.x; // reset t
-		while (t < nt - delta_t) {
-			if (count) {
+		while (t < nt - idt) {
+			assert(outidx+t < nbeams*nf*delta_t*max_dt);
+			assert(iidx+t < nbeams*nf*delta_t*max_dt);
+			assert(imidx+t < nbeams*nf*nt);
+			assert(state[outidx+t] == 0); // everythign should be 0 to bgin with
+
+			if (count == true) {
 				state[outidx + t] = fdmt_dtype(idt+1);
 			} else {
 				state[outidx + t] = state[iidx + t]+ indata[imidx + t];
@@ -494,7 +500,7 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* state, bool count)
 {
 	// indata is 4D array: (nbeams, nf, 1, nt)
-	// State is a 4D array: (nbeams, nf, deltat, max_dt) ( for the moment)
+	// State is a 4D array: (nbeams, nf, deltat, nt) ( for the moment)
 
 	int nbeams = indata->nw; // number of beams in this batch
 	assert(nbeams > 0);
@@ -520,7 +526,7 @@ int fdmt_initialise_gpu(const fdmt_t* fdmt, const array4d_t* indata, array4d_t* 
 	//fdmt_initialise_kernel<<<fdmt->nbeams, fdmt->nf>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt, fdmt->nt);
 	int nthreads = 256;
 	fdmt_initialise_kernel2<<<grid_shape, nthreads>>>(indata->d_device, state->d_device, fdmt->delta_t, fdmt->max_dt, fdmt->nt, count);
-	//gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaDeviceSynchronize());
 
 	return 0;
 
@@ -1105,12 +1111,14 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 		fdmt_dtype ind = iptr[t];
 		if (t < nt) {
 			// Weight only the last block by the weights
-			optr[t] = (ind + optr[t + nt])*weight;
+			fdmt_dtype v = (ind + optr[t + nt]);
+			optr[t] = v*weight;
 		} else if (t >= max_dt) {
 			optr[t] = ind;
 		} else {
 			optr[t] = (ind + optr[t + nt]);
 		}
+
 
 		// sync threads before doing the next block otherwise we don't copy the ostate correctly
 		__syncthreads();
