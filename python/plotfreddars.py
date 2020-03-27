@@ -11,6 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
+from cmdline import strrange
 from rtdata import FreddaRescaleData
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -65,7 +66,7 @@ def showplot(ax, x, d, values, name, label=None, **kwargs):
 class RescalePlot(object):
     def __init__(self, f, values):
         self.thefile = f
-        self.d = FreddaRescaleData(f)
+        self.d = FreddaRescaleData(f, values.exclude_ants)
         self.values = values
         self.figs = []
         self.axs = []
@@ -232,6 +233,7 @@ def _main():
     parser.add_argument('--normant', type=int, help='Normalise by this antenna number')
     parser.add_argument('--normchan', type=int, help='Normalise by this channel')
     parser.add_argument('-I','--nsamps-per-int', type=int, help='Number of samples per integration - for GTEST', default=1)
+    parser.add_argument('--exclude-ants', type=strrange, help='Names of antennas to exclude')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
     if values.verbose:

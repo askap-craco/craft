@@ -21,6 +21,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose', default='sum.fil')
     parser.add_argument('-o','--output', help='output file', default='sum.fil')
     #parser.add_argument('-c','--channel-average', help='Average this many channels', type=int, default=0)
+    parser.add_argument('-n','--nsamps-per-block', help='Number of samples per block for rescaling', type=int, default=1)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -46,7 +47,7 @@ def _main():
 
     hdr = {'fch1':fch1_out, 'foff':foff_out,'tsamp':s0.tsamp, 'tstart':tstart_max, 'nbits':32, 'nifs':1, 'nchans':nchan_out, 'src_raj':s0.src_raj, 'src_dej':s0.src_dej}
     fout = sigproc.SigprocFile(values.output, 'w', hdr)
-    ntimes = 1
+    ntimes = values.nsamps_per_block
     sampno = 0
     nsamples = min([f.nsamples - soff for (f, soff) in zip(infiles, sampoffs)])
     while sampno < nsamples - ntimes:

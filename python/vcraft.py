@@ -93,6 +93,7 @@ class VcraftFile(object):
         self.bat0_40 = self.bat0 & 0xffffffffff
         self.beam = int(hdr['BEAM'][0])
         self.pol = hdr.get('POL', (None, None))[0]
+        self.ant = hdr.get('ANT')[0]
         self._read_ahead_nsamp = int(read_ahead) # number of samples to read ahead
         self._cache_startsamp = None
         self._cache_requested_nsamp = None
@@ -313,7 +314,7 @@ class VcraftMux(object):
     frequency axis
     '''
 
-    def __init__(self, vcraft_files, delays=None):
+    def __init__(self, vcraft_files, delays=None, default_freq_offset=-1.0):
         '''
         :vcraft_files: A list of open Vcraft files
         '''
@@ -337,7 +338,7 @@ class VcraftMux(object):
         # See craft-232
         # undo it if nothing is specified in the header to the contrary
         
-        freq_offset = float(self.hdr_identical('FREQ_OFFSET', -1.0))
+        freq_offset = float(self.hdr_identical('FREQ_OFFSET', default_freq_offset))
         freqs += freq_offset
         
         nchan_per_file = len(freqs[0])
@@ -420,24 +421,29 @@ class VcraftMux(object):
 
         return d
 
-def mux_by_pol(filenames, delays=None, **kwargs):
+def mux_by_none(filenames, **kwargs):
+    all_files = [VcraftFile(f, **kwargs) for f in filenames]
+    all_files.sort(key=lambda f:(f.hdr['ANT'][0], f.hdr['CARD_NO'], f.hdr['FPGA_ID']))
+    return all_files
+
+def mux_by_pol(filenames, delays=None, default_freq_offset=-1.0, **kwargs):
     '''
     :return: Dictionary keyened by 'X' or "Y
     '''
     all_files = [VcraftFile(f, **kwargs) for f in filenames]
     all_files.sort(key=lambda f:f.pol)
     mux_by_pol = itertools.groupby(all_files, lambda f:f.pol)
-    muxes = {pol:VcraftMux(list(files), delays) for pol, files in mux_by_pol}
+    muxes = {pol:VcraftMux(list(files), delays, default_freq_offset) for pol, files in mux_by_pol}
     
     return muxes
     
 
-def mux_by_antenna(filenames, delays=None, **kwargs):
+def mux_by_antenna(filenames, delays=None, default_freq_offset=-1.0, **kwargs):
     all_files = [VcraftFile(f, **kwargs) for f in filenames]
     all_files.sort(key=lambda f:f.hdr['ANT'][0])
     ants = [f.hdr['ANT'][0] for f in all_files]
     mux_by_ant = itertools.groupby(all_files, lambda f:f.hdr['ANT'][0])
-    muxes = [VcraftMux(list(files), delays) for antname, files in mux_by_ant]
+    muxes = [VcraftMux(list(files), delays, default_freq_offset) for antname, files in mux_by_ant]
     muxes.sort(key=lambda mux: mux.antno) # sort by antenna number
     
     return muxes
@@ -449,6 +455,7 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-n','--nsamps', help='Number of samples per integration', type=int, default=1500)
     parser.add_argument('-s','--show', help='Show plots', action='store_true', default=False)
+    parser.add_argument('-a','--mux-by-antenna', help='Do mux but antenna to consolidate printout', action='store_true', default=False)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -464,13 +471,20 @@ def _main():
         vf.print_summary()
         all_files.append(vf)
 
-    muxes = mux_by_antenna(values.files)
+    if values.mux_by_antenna:
+        muxes = mux_by_antenna(values.files)
+    else:
+        muxes = mux_by_none(values.files)
+        
     for mux in muxes:
-        print mux.freqconfig
-        print mux.freqconfig.freqs
-        print mux.freqconfig.chanmaps
-        print mux.freqconfig.freqmaps
-        print mux.freqs
+        #print mux.freqconfig
+        #print mux.freqconfig.freqs
+        #print mux.freqconfig.chanmaps
+        #print mux.freqconfig.freqmaps
+        #print mux.freqs
+        mjd = mux.start_mjd
+        secofday = (mjd - int(mjd))*86400.0
+        print str(mux), mux.ant, 'STARTMJD', '%0.10f'%mux.start_mjd, secofday
 
 if __name__ == '__main__':
     _main()
