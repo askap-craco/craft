@@ -78,6 +78,7 @@ int array4d_copy_to_device(array4d_t* a);
 void array4d_print_shape(const array4d_t* a);
 void array4d_set(array4d_t* a, fdmt_dtype v);
 int array4d_fill_device(array4d_t* a, fdmt_dtype v);
+void array4d_free(array4d_t* a);
 size_t array4d_zero(array4d_t* a);
 
 

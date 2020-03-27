@@ -395,8 +395,8 @@ int fdmt_initialise(const fdmt_t* fdmt, const array3d_t* indata, array4d_t* stat
 				for (int j = idt; j < fdmt->nt; j++) {
 					fdmt_dtype n = (fdmt_dtype)  j;
 					state->d[outidx + j] = (state->d[iidx + j] + indata->d[imidx - j]);
-					printf("Chan c=%c idt=%idt j=%d stateout=%f sattein=%f indata=%f\n", c, idt, j,
-							state->d[outidx + j], state->d[iidx + j], indata->d[imidx - j]);
+//					printf("Chan c=%c idt=%idt j=%d stateout=%f sattein=%f indata=%f\n", c, idt, j,
+//							state->d[outidx + j], state->d[iidx + j], indata->d[imidx - j]);
 				}
 			}
 		}
@@ -462,7 +462,7 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 	while (t < nt) {
 		assert(outidx+t < nbeams*nf*delta_t*max_dt);
 		assert(imidx+t < nbeams*nf*nt);
-		if (count == true) {
+		if (count) {
 			state[outidx + t] = 1.;
 		} else {
 			state[outidx + t] = indata[imidx + t];
@@ -474,7 +474,7 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 	for (int idt = 1; idt < delta_t; ++idt) {
 		int outidx = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, idt, idt);
 		int iidx   = array4d_idx(nbeams, nf, delta_t, nt, ibeam, c, idt-1, idt-1);
-		int imidx  = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, 0 );
+		int imidx  = array4d_idx(nbeams, nf, 1, nt, ibeam, c, 0, idt );
 
 		// The state for dt=d = the state for dt=(d-1) + the time-reversed input sample
 		// for each time
@@ -487,11 +487,12 @@ void __global__ fdmt_initialise_kernel2(const fdmt_dtype* __restrict__ indata,
 			assert(imidx+t < nbeams*nf*nt);
 			assert(state[outidx+t] == 0); // everythign should be 0 to bgin with
 
-			if (count == true) {
+			if (count) {
 				state[outidx + t] = fdmt_dtype(idt+1);
 			} else {
 				state[outidx + t] = state[iidx + t]+ indata[imidx + t];
 			}
+
 			t += tblock;
 		}
 	}
@@ -1036,7 +1037,6 @@ __host__ void cuda_fdmt_iteration4(const fdmt_t* fdmt, const int iteration_num, 
 		// We run enough kernels to cover nbeams x ndt
 		// The kernels will only do fun computation if idt < ndt
 		// If idt >= ndt, then they just set the output to zero
-		int nthreads = tmax;
 		dim3 grid_size(nbeams, ndtout);
 
 		//printf("Iteration %d iif %d indata->nz %d outdata->nz %d nt=%d delta_t_local %d tmax %d tend %d\n", iteration_num, iif,
@@ -1211,7 +1211,7 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 #ifdef DUMP_STATE
 	{
 		char buf[128];
-		sprintf(buf, "state_s%d.dat", 0);
+		sprintf(buf, "state_e%d_s%d.dat", fdmt->execute_count, 0);
 		array4d_t* currstate = &fdmt->states[s];
 		array4d_copy_to_host(currstate);
 		array4d_dump(currstate, buf);
@@ -1230,7 +1230,7 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 		{
 			char buf[128];
 			array4d_copy_to_host(newstate);
-			sprintf(buf, "state_s%d.dat", iter);
+			sprintf(buf, "state_e%d_s%d.dat", fdmt->execute_count, iter);
 			array4d_dump(newstate, buf);
 		}
 
@@ -1269,7 +1269,7 @@ int fdmt_execute_batch(fdmt_t* fdmt, fdmt_dtype* indata, int ibeam, int nbeams)
 	// dump init state to disk
 	char buf[128];
 	array4d_copy_to_host(&fdmt->states[s]);
-	sprintf(buf, "state_s%d.dat", 0);
+	sprintf(buf, "initstate_e%d_s%d.dat", fdmt->execute_count, 0);
 	array4d_dump(&fdmt->states[s], buf);
 #endif
 
@@ -1332,8 +1332,7 @@ __global__ void fdmt_set_weights_kernel(const __restrict__ fdmt_dtype* ostate, f
 	{
 		fdmt_dtype nhits = ostate[stride * idx];
 	    weights[idx] = rsqrtf(nhits);
-		//weights[idx] = 1.;
-	    //weights[idx] = nhits;
+	    //printf("idx=%d nhits=%f weights=%f\n", idx, nhits, weights[idx]);
 	}
 }
 
@@ -1342,18 +1341,28 @@ __global__ void fdmt_set_weights_kernel(const __restrict__ fdmt_dtype* ostate, f
 // Use the supplied inarra as working memory
 int fdmt_calculate_weights(fdmt_t* fdmt)
 {
-	int nruns = fdmt->max_dt/fdmt->nt + 1; // add 1 for extraq giggles
+	int nruns = fdmt->max_dt/fdmt->nt + 1; // add 1 for extra giggles
+
+	// dummy weights
 	array4d_t inarr_dummy;
-	inarr_dummy.nw = 1;
-	inarr_dummy.nx = 1;
+	inarr_dummy.nw = 1; // nbeams
+	inarr_dummy.nx = fdmt->nf;
 	inarr_dummy.ny = 1;
-	inarr_dummy.nz = 1;
+	inarr_dummy.nz = fdmt->nt;
+	inarr_dummy.d_device = NULL;
+	//array4d_malloc(&inarr_dummy, true, true);
 
 	for (int ii = 0; ii < nruns; ++ii) {
 		int s = 0;
 		fdmt_initialise_gpu(fdmt, &inarr_dummy, &fdmt->states[s], true); // Initialise state with ones
 		fdmt_execute_iterations(fdmt); //  actually execute the iterations on the GPU
 		fdmt_update_ostate(fdmt, 0, 1); // update the output state
+#ifdef DUMP_STATE
+		char fbuf[1024];
+		sprintf(fbuf, "initostate_ii%d.dat", ii);
+		array4d_copy_to_host(&fdmt->ostate);
+		array4d_dump(&fdmt->ostate, fbuf);
+#endif
 	}
 
 	// set weights array

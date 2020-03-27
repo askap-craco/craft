@@ -101,6 +101,17 @@ size_t array4d_malloc(array4d_t* a, bool host, bool device)
     return size;
 }
 
+void array4d_free(array4d_t* a) {
+	if (a->d) {
+		free(a->d);
+		a->d = NULL;
+	}
+	if (a->d_device) {
+		gpuErrchk(cudaFree((void**) a->d_device));
+		a->d_device = NULL;
+	}
+}
+
 
 
 int array2d_malloc_hostonly(array2d_t* a)
