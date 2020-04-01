@@ -284,13 +284,13 @@ class Fdmt(object):
         :din: input array must have shape (nf, nt)
         :returns: array with shape (nf, nd, nt) and same dtype as input.
         '''
-        assert din.shape == (self.n_f, self.n_t)
+        assert din.shape == (self.n_f, self.n_t), 'Initialise input is invalid={}'.format(din.shape)
         outshape = (self.n_f, self.init_delta_t, self.n_t+self.init_delta_t)
         state = np.zeros(outshape, dtype=din.dtype)
         idt = 0
         state[:, 0, 0:self.n_t] = din
         for idt in xrange(1, self.init_delta_t):
-            state[:, idt, idt:idt+self.n_t] = state[:, idt-1, idt-1:idt+self.n_t-1] + din
+            state[:, idt, idt:idt+self.n_t] = state[:, idt-1, idt:idt+self.n_t] + din
 
 
         return state
