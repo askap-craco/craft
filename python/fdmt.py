@@ -292,7 +292,6 @@ class Fdmt(object):
         for idt in xrange(1, self.init_delta_t):
             state[:, idt, idt:idt+self.n_t] = state[:, idt-1, idt:idt+self.n_t] + din
 
-
         return state
         
 
