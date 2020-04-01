@@ -46,6 +46,7 @@ def _main():
     parser.add_argument('-s','--show', action='store_true')
     parser.add_argument('-c','--nchan', type=int, help='Number of channels', default=336)
     parser.add_argument('--toffset', type=int, help='Sampel offset to start dpulse', default=1500)
+    parser.add_argument('--ntimes', type=int,help='Duration of filterbank in samples', default=4096)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -99,7 +100,7 @@ def _main():
 def mkfrb(dm,  hdr, values):
     nchans = hdr['nchans']
     nifs = hdr['nifs']
-    ntimes = 4096
+    ntimes = values.ntimes
     shape = (ntimes, nifs, nchans)
     f1 = hdr['fch1']/1e3
     foff = hdr['foff']/1e3

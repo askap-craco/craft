@@ -26,7 +26,7 @@ def dmdelay(dm, f1, f2):
     return 4.15*dm*(f1**-2 - f2**-2)
 
 
-def mkfrb(f1, foff, nchans, tsamp, dm, amp=1, offset=0, noiserms=0, ntimes=4096):
+def mkfrb(f1, foff, nchans, tsamp, dm, amp=1, offset=0, noiserms=0, ntimes=4096, dclevel=0):
     '''
     Make a simple time-frequency waterfall plot containing a width=1 FRB.
 
@@ -39,6 +39,7 @@ def mkfrb(f1, foff, nchans, tsamp, dm, amp=1, offset=0, noiserms=0, ntimes=4096)
     :offset: Time offset in samples
     :noiserms: RMS of noise to add
     :ntimes: block size
+    :dclevel: DC level
     :returns: Numpy array with shape (ntimes, nchans)
     '''
     assert f1 > 0
@@ -52,7 +53,7 @@ def mkfrb(f1, foff, nchans, tsamp, dm, amp=1, offset=0, noiserms=0, ntimes=4096)
     shape = (ntimes, nchans)
     f2 = f1 + float(nchans) * foff
     fstart = f1 + foff*0.5
-    d = np.random.randn(np.prod(shape))*noiserms 
+    d = np.random.randn(np.prod(shape))*noiserms + dclevel
     d.shape = shape
     t = 0    
 

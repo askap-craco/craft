@@ -39,7 +39,7 @@ def copy_kernel(v1, vout):
     vout[:n] = v1[:]
     vout[n:] = 0
 
-    assert not np.any(np.isnan(vout))
+    #assert not np.any(np.isnan(vout))
 
 def add_offset_kernel2(v1, v2, vout, toff):
     '''
@@ -77,8 +77,8 @@ def add_offset_kernel2(v1, v2, vout, toff):
     assert len(v1) == len(v2)
     assert toff >= 0
     assert len(vout) >= len(v1)
-    assert not np.any(np.isnan(v1)), 'V1 contains nans'
-    assert not np.any(np.isnan(v2)), 'V2 contains nans'
+    #assert not np.any(np.isnan(v1)), 'V1 contains nans'
+    #assert not np.any(np.isnan(v2)), 'V2 contains nans'
 
     nt_in = len(v1)
     nt_out = len(vout)
@@ -102,7 +102,7 @@ def add_offset_kernel2(v1, v2, vout, toff):
     if t < nt_out:
         vout[t:nt_out+1] = 0
 
-    assert not np.any(np.isnan(vout)), 'Data not written nt_in={} nt_out={} nsum={} toff={} {}'.format(nt_in, nt_out, nsum, toff, vout)
+    #assert not np.any(np.isnan(vout)), 'Data not written nt_in={} nt_out={} nsum={} toff={} {}'.format(nt_in, nt_out, nsum, toff, vout)
                  
     return vout
 
@@ -193,7 +193,7 @@ class Fdmt(object):
         
         correction = 0.0
         if intnum > 0: # this is always invoked - it's a leftover from Barak's code
-            correction = self.d_f/2.0*0
+            correction = self.d_f/2.0
 
         # shift input and shift output are never used - they're leftovers from barak's code
         shift_input = 0
@@ -290,7 +290,7 @@ class Fdmt(object):
         idt = 0
         state[:, 0, 0:self.n_t] = din
         for idt in xrange(1, self.init_delta_t):
-            state[:, idt, idt:idt+self.n_t] = state[:, idt-1, idt:idt+self.n_t] + din
+            state[:, idt, idt:idt+self.n_t] = state[:, idt-1, idt-1:idt+self.n_t-1] + din
 
 
         return state
@@ -360,7 +360,7 @@ class Fdmt(object):
             state = self._execute_iteration(i, state)
 
         # final state has a single 'channel' - remove this axis
-        return state[0, :, :]
+        return state[0, :, :].copy()
 
     @property
     def max_state_size(self):
