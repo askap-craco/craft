@@ -21,9 +21,9 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 class TestBoxcar(TestCase):
 
     def setUp(self):
-        self.nd = 1
-        self.nt = 10
-        self.nbox = 3
+        self.nd = 10
+        self.nt = 21
+        self.nbox = 13
         self.boxcar = boxcar.Boxcar(self.nd, self.nbox, np.float32)
 
     def tearDown(self):
