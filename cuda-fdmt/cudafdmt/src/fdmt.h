@@ -25,6 +25,13 @@
 
 using namespace std;
 
+class FdmtSum {
+public:
+	int id1;
+	int id2;
+	int offset;
+};
+
 class FdmtIteration
 {
 public:
@@ -32,6 +39,8 @@ public:
 	vector<Array2d<int>* > dt_data;
 	vector<int> delta_ts;
 	coord4_t state_shape;
+	vector<FdmtSum> sum_data;
+
 
 	FdmtIteration()
 	{
@@ -57,6 +66,7 @@ public:
 		dts->set_host(idt, 1, src2_offset);
 		dts->set_host(idt, 2, out_offset);
 		dts->set_host(idt, 3, mint);
+
 
 	}
 
