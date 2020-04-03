@@ -29,6 +29,7 @@ class TestFdmt(TestCase):
         self.nt = 256 # Number of samples per block
         self.tsamp = 1.0 # milliseconds
         self.thefdmt = fdmt.Fdmt(self.fmin, self.df, self.nf, self.nd, self.nt) # make FDMT
+        self.nbox = 32
 
     def tearDown(self):
         pass
@@ -63,9 +64,72 @@ class TestFdmt(TestCase):
                       
             self.assertTrue(np.all(abs(diff) < 1e-6))
 
+    def test_self_made_frb_nt(self):
+        idt = self.nt
+        frb = self.thefdmt.add_frb_track(idt)
+        frbout = self.thefdmt(frb)
+        maxpos = np.argmax(frbout)
+        maxd, maxt = np.unravel_index(maxpos, frbout.shape)
+        self.assertEqual(frb.sum(), frbout.max(), 'Didnt get all the hits')
+        self.assertEqual(maxt, idt, 'Peak at Wrong time')
+        self.assertEqual(maxd, idt, 'Peak at Wrong DM')
 
 
+    def test_self_made_frbs_le_nt(self):
+        # Only tests up to nt sized frbs. After that we'll need to test overlap and sum
+        for idt in xrange(self.nt):
+            frb = self.thefdmt.add_frb_track(idt)
+            frbout = self.thefdmt(frb)
+            maxpos = np.argmax(frbout)
+            maxd, maxt = np.unravel_index(maxpos, frbout.shape)
+            self.assertEqual(frb.sum(), frbout.max(), 'Didnt get all the hits')
+            self.assertEqual(maxt, idt, 'Peak at Wrong time')
+            self.assertEqual(maxd, idt, 'Peak at Wrong DM')
 
+
+    def _test_self_made_frb(self, idt):
+        osum = fdmt.OverlapAndSum(self.nd, self.nt)
+        d = np.zeros((self.nf, self.nd), dtype=np.float32)
+        frb = self.thefdmt.add_frb_track(idt, d)
+        nblocks = self.nd/self.nt
+        expected_blk = idt//self.nt
+        expected_t = idt % self.nt
+        total_sum = 0
+        for blk in xrange(nblocks):
+            din = d[:, blk*self.nt:(blk+1)*self.nt]
+            fdmtout = self.thefdmt(din)
+            frbout = osum(fdmtout)
+
+            
+            maxpos = np.argmax(frbout)
+            maxd, maxt = np.unravel_index(maxpos, frbout.shape)
+            if blk == expected_blk:
+                self.assertEqual(frb.sum(), frbout.max(),
+                                 'Didnt get all the hits. idt={} blk={} maxd={} maxt={} frbsum={} frboutmax={}'\
+                                 .format(idt, blk, maxd, maxt, frb.sum(), frbout.max()))
+                self.assertEqual(maxt, expected_t, 'Peak at Wrong time')
+                self.assertEqual(maxd, idt, 'Peak at Wrong DM')
+
+
+    def test_self_made_frbs_eq_nd(self):
+        # test FRBs up to ND.
+        # Requires overlap and sum
+
+        idt = self.nd-1
+        self._test_self_made_frb(idt)
+
+    def test_self_made_frbs_le_nd(self):
+        # test FRBs up to ND.
+        # Requires overlap and sum
+        for idt in xrange(self.nd):
+            self._test_self_made_frb(idt)
+
+    def test_effective_variance_calcs_equal(self):
+        for idt in xrange(self.nd):
+            for w in xrange(self.nbox):
+                sig1 = self.thefdmt.get_eff_sigma(idt, w)
+                var1 = self.thefdmt.get_eff_var_recursive(idt, w)
+                self.assertEquals(sig1, np.sqrt(var1))
 
 def _main():
     unittest_main()
