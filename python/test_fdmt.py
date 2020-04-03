@@ -146,14 +146,24 @@ class TestFdmtWithHistoryHits(TestCase):
             # f2 at t = 0 should = f1 at nt-1 plus idt + 1
             self.assertLess((f1[:, idt, nt-1] + idt + 1 - f2[:, idt, 0]).max(), 1e-6)
                 
-    def _test_self_made_frb(self, idt):
+    def _test_self_made_frb(self, idt, testwithones=False):
+
+        # If testwithones=1 it make sure you've only added where the FRB is
+        # and not elsewhere. The FRB is 2 where the FBR exists and 1 elsewhere
         osum = fdmt.OverlapAndSum(self.nd, self.nt)
         d = np.zeros((self.nf, self.nd), dtype=np.float32)
+        if testwithones:
+            d += 1
+            
         frb = self.thefdmt.add_frb_track(idt, d)
+        if testwithones:
+            frbsum = (frb.sum() - np.prod(frb.shape))*2
+            
         nblocks = self.nd/self.nt
         expected_blk = idt//self.nt
         expected_t = idt % self.nt
         total_sum = 0
+        
         for blk in xrange(nblocks):
             din = d[:, blk*self.nt:(blk+1)*self.nt]
             fdmtout = self.thefdmt(din)
@@ -163,7 +173,7 @@ class TestFdmtWithHistoryHits(TestCase):
             maxpos = np.argmax(frbout)
             maxd, maxt = np.unravel_index(maxpos, frbout.shape)
             if blk == expected_blk:
-                self.assertEqual(frb.sum(), frbout.max(),
+                self.assertEqual(frbsum, frbout.max(),
                                  'Didnt get all the hits. idt={} blk={} maxd={} maxt={} frbsum={} frboutmax={}'\
                                  .format(idt, blk, maxd, maxt, frb.sum(), frbout.max()))
                 self.assertEqual(maxt, expected_t, 'Peak at Wrong time')
@@ -183,6 +193,22 @@ class TestFdmtWithHistoryHits(TestCase):
 
         idt = self.nd-1
         self._test_self_made_frb(idt)
+
+    def test_self_made_frbs_eq_2nt_ones(self):
+        # test FRBs up to ND.
+        # Requires overlap and sum
+
+        idt = self.nt*2-1
+        self._test_self_made_frb(idt, True)
+
+
+    def test_self_made_frbs_eq_nd_ones(self):
+        # test FRBs up to ND.
+        # Requires overlap and sum
+
+        idt = self.nd-1
+        self._test_self_made_frb(idt, True)
+
 
     def test_self_made_frbs_le_nd(self):
         # test FRBs up to ND.
