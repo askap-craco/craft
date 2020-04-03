@@ -18,7 +18,7 @@ from pylab import *
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
     
 
-class TestFdmt(TestCase):
+class TestFdmtSimple(TestCase):
 
     def setUp(self):
         self.nf = 336 # number of channels - must be a power of 2 currently.
@@ -64,13 +64,41 @@ class TestFdmt(TestCase):
                       
             self.assertTrue(np.all(abs(diff) < 1e-6))
 
+    def test_effective_variance_calcs_equal(self):
+        for idt in xrange(self.nd):
+            for w in xrange(self.nbox):
+                sig1 = self.thefdmt.get_eff_sigma(idt, w+1)
+                var1 = self.thefdmt.get_eff_var_recursive(idt, w+1)
+                self.assertLess(abs(sig1 -  np.sqrt(var1)), 1e-6,
+                                  'Variances not equal idt={} w={} {}!={}'.format(idt, w, sig1, np.sqrt(var1)))
+
+
+class TestFdmtSingleBlockHits(TestCase):
+
+    def setUp(self):
+        self.nf = 336 # number of channels - must be a power of 2 currently.
+        self.fmax = 1448. +0.5#  Freuency of the top of the band in MHz
+        self.df = 1.0 # Channel bandwidth in MHz
+        self.fmin = self.fmax - self.nf*self.df # Frequency of the bottom of the band in MHz
+        self.nd = 1024 # Number of DM trials to do
+        self.nt = 256 # Number of samples per block
+        self.tsamp = 1.0 # milliseconds
+        self.thefdmt = fdmt.Fdmt(self.fmin, self.df, self.nf, self.nd, self.nt) # make FDMT
+        self.nbox = 32
+
+    def tearDown(self):
+        pass
+
     def test_self_made_frb_nt(self):
-        idt = self.nt
-        frb = self.thefdmt.add_frb_track(idt)
+        idt = self.nt-1
+        # Check we don't get any extra
+        d = np.zeros((self.nf, self.nt))+1 
+        frb = self.thefdmt.add_frb_track(idt, d)
+        frbsum = (frb.sum() - np.prod(frb.shape))*2
         frbout = self.thefdmt(frb)
         maxpos = np.argmax(frbout)
         maxd, maxt = np.unravel_index(maxpos, frbout.shape)
-        self.assertEqual(frb.sum(), frbout.max(), 'Didnt get all the hits')
+        self.assertEqual(frbsum, frbout.max(), 'Didnt get all the hits')
         self.assertEqual(maxt, idt, 'Peak at Wrong time')
         self.assertEqual(maxd, idt, 'Peak at Wrong DM')
 
@@ -78,15 +106,46 @@ class TestFdmt(TestCase):
     def test_self_made_frbs_le_nt(self):
         # Only tests up to nt sized frbs. After that we'll need to test overlap and sum
         for idt in xrange(self.nt):
-            frb = self.thefdmt.add_frb_track(idt)
+            d = np.zeros((self.nf, self.nt))+1 
+            frb = self.thefdmt.add_frb_track(idt, d)
+            frbsum = (frb.sum() - np.prod(frb.shape))*2
             frbout = self.thefdmt(frb)
             maxpos = np.argmax(frbout)
             maxd, maxt = np.unravel_index(maxpos, frbout.shape)
-            self.assertEqual(frb.sum(), frbout.max(), 'Didnt get all the hits')
+            self.assertEqual(frbsum, frbout.max(), 'Didnt get all the hits {} {} at {} {}'
+                             .format(frbsum, frbout.max(), maxd, maxt))
             self.assertEqual(maxt, idt, 'Peak at Wrong time')
             self.assertEqual(maxd, idt, 'Peak at Wrong DM')
 
 
+class TestFdmtWithHistoryHits(TestCase):
+
+    def setUp(self):
+        self.nf = 336 # number of channels - must be a power of 2 currently.
+        self.fmax = 1448. +0.5#  Freuency of the top of the band in MHz
+        self.df = 1.0 # Channel bandwidth in MHz
+        self.fmin = self.fmax - self.nf*self.df # Frequency of the bottom of the band in MHz
+        self.nd = 1024 # Number of DM trials to do
+        self.nt = 256 # Number of samples per block
+        self.tsamp = 1.0 # milliseconds
+        self.thefdmt = fdmt.Fdmt(self.fmin, self.df, self.nf, self.nd, self.nt, history_dtype=np.float32) # make FDMT
+        self.nbox = 32
+
+    def tearDown(self):
+        pass
+
+    def test_init_with_history(self):
+        nt = self.nt
+        ramp = np.zeros((self.nf, self.nt*2))
+        r = np.arange(0, self.nt*2)
+        ramp[:, :] = r[np.newaxis, :]
+        f1 = self.thefdmt.initialise(ramp[:, 0:nt])
+        f2 = self.thefdmt.initialise(ramp[:, nt:])
+        initdt = f1.shape[1]
+        for idt in xrange(initdt):
+            # f2 at t = 0 should = f1 at nt-1 plus idt + 1
+            self.assertLess((f1[:, idt, nt-1] + idt + 1 - f2[:, idt, 0]).max(), 1e-6)
+                
     def _test_self_made_frb(self, idt):
         osum = fdmt.OverlapAndSum(self.nd, self.nt)
         d = np.zeros((self.nf, self.nd), dtype=np.float32)
@@ -110,6 +169,13 @@ class TestFdmt(TestCase):
                 self.assertEqual(maxt, expected_t, 'Peak at Wrong time')
                 self.assertEqual(maxd, idt, 'Peak at Wrong DM')
 
+    def test_self_made_frbs_eq_2nt(self):
+        # test FRBs up to ND.
+        # Requires overlap and sum
+
+        idt = self.nt*2-1
+        self._test_self_made_frb(idt)
+
 
     def test_self_made_frbs_eq_nd(self):
         # test FRBs up to ND.
@@ -124,12 +190,6 @@ class TestFdmt(TestCase):
         for idt in xrange(self.nd):
             self._test_self_made_frb(idt)
 
-    def test_effective_variance_calcs_equal(self):
-        for idt in xrange(self.nd):
-            for w in xrange(self.nbox):
-                sig1 = self.thefdmt.get_eff_sigma(idt, w)
-                var1 = self.thefdmt.get_eff_var_recursive(idt, w)
-                self.assertEquals(sig1, np.sqrt(var1))
 
 def _main():
     unittest_main()
