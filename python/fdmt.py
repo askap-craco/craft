@@ -160,7 +160,7 @@ class Fdmt(object):
         self.n_t = int(n_t)
         freqs = np.arange(n_f)*self.d_f + self.f_min
         self.init_delta_t = self._calc_delta_t(self.f_min, self.f_min + self.d_f)
-        self._state_shape = np.array([self.n_f, self.init_delta_t, self.n_t + self.init_delta_t])
+        self._state_shape = np.array([self.n_f, self.init_delta_t, self.n_t])
         self.hist_delta_t = [self.init_delta_t]
         self.hist_state_shape = [self._state_shape]
         if history_dtype is None:
@@ -318,16 +318,14 @@ class Fdmt(object):
         :returns: array with shape (nf, nd, nt) and same dtype as input.
         '''
         assert din.shape == (self.n_f, self.n_t), 'Initialise input is invalid={}'.format(din.shape)
-        outshape = (self.n_f, self.init_delta_t, self.n_t+self.init_delta_t)
+        outshape = (self.n_f, self.init_delta_t, self.n_t)
         state = np.zeros(outshape, dtype=din.dtype)
         idt = 0
         state[:, 0, 0:self.n_t] = din
 
         for idt in xrange(1, self.init_delta_t):
-            state[:, idt, idt:idt+self.n_t] = state[:, idt-1, idt:idt+self.n_t] + din
+            state[:, idt, idt:self.n_t] = state[:, idt-1, idt:self.n_t] + din[:, 0:-idt]
 
-        state[:, :, self.n_t] = 0 # Clear last samples for a check
-        
 
         # Now do the first few samples:
         if self.init_history is not None:
