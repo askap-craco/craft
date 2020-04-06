@@ -158,6 +158,8 @@ class TestFdmtWithHistoryHits(TestCase):
         frb = self.thefdmt.add_frb_track(idt, d)
         if testwithones:
             frbsum = (frb.sum() - np.prod(frb.shape))*2
+        else:
+            frbsum = frb.sum()
             
         nblocks = self.nd/self.nt
         expected_blk = idt//self.nt
