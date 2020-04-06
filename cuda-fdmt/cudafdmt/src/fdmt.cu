@@ -57,6 +57,111 @@ __host__ __device__ int calc_delta_t(float f_start, float f_end, float fmin, flo
 	return delta_t;
 }
 
+/*
+ *
+    Calculate the variance expected in a single channel, given the
+    smearing done by the FDMT in tiem, and the width of the boxcar
+    :smearing: Amount of smearing done by the FDMT in this channel. > 0
+    :width: Width of boxcar > 0
+    :returns: Variance channel
+    :thanks: To clancy for working this out. I was completely stuffed
+
+ *
+ */
+float calc_var(int smearing, int width) {
+	assert(smearing > 0);
+	assert(width > 0);
+	float H,L;
+	if (smearing > width) {
+		H = float(smearing);
+		L = float(width);
+	} else {
+		L = float(smearing);
+		H = float(width);
+	}
+
+	assert(H >= L);
+	//Clancy's formula
+	float var_chan = (H-L+1.0f)*(L*L) + (2.0f*L - 1.0f)*L*(L-1.0f)/3.0f;
+
+	return var_chan;
+
+}
+
+/**
+ *
+        Calculates the effecive variance of an FDMT + boxcar output
+        for a dynamic spectrum with 0 mean, and unit variance
+        at the given value if dm (idt) and boxcar width (>0)
+        Uses a recusrive method that (should) closely match what FREDDA does.
+
+        :idt: DM trial in units of samples 0 <= idt < max_dt
+        :width: boxcar with. Must be > 0
+        :returns: effective variance
+        */
+float get_effective_variance(fdmt_t* fdmt, int idm, int width, int ichan=0, int iterno=-1)
+{
+	if (iterno == -1) { // This is the flag to say it's been called from outside
+		iterno = fdmt->iterations.size() - 1;
+		assert(0 <= idm);
+		assert(idm < fdmt->max_dt);
+		assert(ichan == 0);
+	}
+	assert(width >= 0);
+
+	assert(iterno >= 0);
+	assert(iterno < fdmt->iterations.size());
+	auto iter = fdmt->iterations.at(iterno);
+	int nchan = iter->m_nf;
+	assert(ichan >= 0);
+	assert(ichan < nchan);
+	FdmtSubbandConfig* chanconfig = iter->subband_config.at(ichan);
+	FdmtDmConfig dmconfig = chanconfig->dmconfig.at(idm);
+	int inchan1 = 2*ichan;
+	int inchan2 = 2*ichan+1;
+
+	float var_chan1, var_chan2;
+	if (iterno == 0) { // terminate recursion
+		var_chan1 = calc_var(dmconfig.id1+1, width+1);
+		var_chan2 = calc_var(dmconfig.id2+1, width+1);
+	} else {
+		var_chan1 = get_effective_variance(fdmt, dmconfig.id1, width, inchan1, iterno-1);
+		// If we're doign a copy, the effective variance of the opper channel is zero
+		if (dmconfig.id2 == -1) {
+			var_chan2 = 0;
+		} else {
+			var_chan2 = get_effective_variance(fdmt, dmconfig.id2, width, inchan2, iterno-1);
+		}
+	}
+
+	float total_var = var_chan1 + var_chan2;
+
+	return total_var;
+}
+
+// Normalise weights to boxcar0 weight
+// Update Osum applies the boxcar0 weight
+void calc_weights(fdmt_t* fdmt)
+{
+	assert(fdmt->weights.nw == 1);
+	assert(fdmt->weights.nx == 1);
+	assert(fdmt->weights.ny == fdmt->max_dt);
+	assert(fdmt->weights.nz == fdmt->nbox);
+
+	for(int idt = 0; idt < fdmt->max_dt; idt++) {
+		for(int ibox = 0; ibox < fdmt->nbox; ibox++) {
+			int idx = array4d_idx(&fdmt->weights, 0, 0, idt, ibox);
+			float variance = get_effective_variance(fdmt, idt, ibox);
+			float weight = rsqrtf(variance);
+			fdmt->weights.d[idx] = weight;
+		}
+	}
+	array4d_copy_to_device(&fdmt->weights);
+	if (fdmt->dump_data) {
+		array4d_dump(&fdmt->weights, "fdmtweights.dat");
+	}
+}
+
 __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_num, const array4d_t* indata, array4d_t* outdata)
 {
 
@@ -97,7 +202,7 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 
 	//assert(array4d_size(outdata) <= fdmt->state_size);
 
-	FdmtIteration* iter = new FdmtIteration(outdata->nw, outdata->nx, outdata->ny, outdata->nz);
+	FdmtIteration* iter = new FdmtIteration(iteration_num, outdata->nw, outdata->nx, outdata->ny, outdata->nz);
 	fdmt->iterations.push_back(iter);
 
 
@@ -219,13 +324,23 @@ __host__ FdmtIteration* fdmt_save_iteration(fdmt_t* fdmt, const int iteration_nu
 			int src1_offset = array4d_idx(indata, 0, 2*iif, dt_middle_index, 0);
 			int src2_offset = array4d_idx(indata, 0, 2*iif+1, dt_rest_index, 0);
 			int out_offset = array4d_idx(outdata, 0, iif, idt, 0);
+
 			if (copy_subband) {
 				src1_offset = array4d_idx(indata, 0, 2*iif, idt, 0);
 				src2_offset = -1;
 				mint = 0;
 			}
+
+			// more modern names for the variables - gee I wish I'd done this a long time ago
+			int id1 = dt_middle_index;
+			int id2 = dt_rest_index;
+			int toff = mint;
+			if (copy_subband) {
+				id2 = -1;
+			}
+
 			//printf("Subband idt %d src1_offset %d src2_offset %d out_offset %d mint %d\n", idt, src1_offset, src2_offset, out_offset, mint);
-			iter->save_subband_values(idt, src1_offset, src2_offset, out_offset, mint);
+			iter->save_subband_values(idt, src1_offset, src2_offset, out_offset, mint, id1, id2, toff);
 		}
 	}
 	iter->copy_to_device();
@@ -253,6 +368,8 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 	} else {
 		fdmt->nbeams_alloc = nbeams_alloc;
 	}
+	fdmt->nbox = 32;
+	assert(fdmt->nbox >=1);
 	fdmt->dump_data = dump_data;
 	fdmt->nops = 0;
 	bool host_alloc = dump_data;
@@ -335,16 +452,13 @@ int fdmt_create(fdmt_t* fdmt, float fmin, float fmax, int nf, int max_dt, int nt
 
 	fdmt->weights.nw = 1;
 	fdmt->weights.nx = 1;
-	fdmt->weights.ny = 1;
-	fdmt->weights.nz = fdmt->max_dt;
-	array4d_malloc(&fdmt->weights, host_alloc, true);
-	array4d_fill_device(&fdmt->weights, 1.0);
-
-
+	fdmt->weights.ny = fdmt->max_dt;
+	fdmt->weights.nz = fdmt->nbox;
+	array4d_malloc(&fdmt->weights, true, true);
 
 	fdmt->execute_count = 0;
 
-	fdmt_calculate_weights(fdmt);
+	calc_weights(fdmt);
 
 	return 0;
 }
@@ -662,6 +776,9 @@ int fdmt_iteration(const fdmt_t* fdmt,
 	}
 	return 0;
 }
+
+
+
 
 
 void __global__ cuda_fdmt_iteration_kernel2(float fmin, float frange, float fjumps, float correction)
@@ -1076,6 +1193,7 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 										const fdmt_dtype* __restrict__ indata,
 										const fdmt_dtype* __restrict__ weights,
 										int nt,
+										int nbox,
 										int ostate_ibeam,
 										int ostate_nbeams)
 {
@@ -1096,9 +1214,9 @@ __global__ void cuda_fdmt_update_ostate(fdmt_dtype* __restrict__ ostate,
 
 	int in_off = array4d_idx(1, in_nbeams, max_dt, max_dt+nt, 0, in_ibeam, idt, 0);
 	const fdmt_dtype* iptr = indata + in_off;
-	const fdmt_dtype weight = weights[idt];
-	//const fdmt_dtype weight = 1.0;
-
+	const int weight_idx = array4d_idx(1,1,max_dt,nbox,0,0,idt,0);
+	// const fdmt_dtype weight = weights[weight_idx];
+	const fdmt_dtype weight = 1.0f;
 	int ostate_off = array4d_idx(1, ostate_nbeams, max_dt, max_dt+nt,
 			0, ostate_ibeam+in_ibeam, idt, 0);
 	fdmt_dtype* optr = ostate + ostate_off;
@@ -1140,7 +1258,7 @@ __host__ void fdmt_update_ostate(fdmt_t* fdmt, int ibeam, int nbeams)
 
 	dim3 grid_shape(nbeams, fdmt->max_dt);
 	cuda_fdmt_update_ostate<<<grid_shape, 256>>>(fdmt->ostate.d_device,
-			currstate->d_device, fdmt->weights.d_device, fdmt->nt, ibeam, fdmt->nbeams);
+			currstate->d_device, fdmt->weights.d_device, fdmt->nt, fdmt->nbox, ibeam, fdmt->nbeams);
 
 	//gpuErrchk(cudaDeviceSynchronize());
 }

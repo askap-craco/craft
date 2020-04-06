@@ -324,6 +324,7 @@ int main(int argc, char* argv[])
 			tboxcar.start();
 			boxcar_do_gpu (
 					&fdmt.ostate,
+					&fdmt.weights,
 					&boxcar_data,
 					&boxcar_history,
 					&boxcar_discards,

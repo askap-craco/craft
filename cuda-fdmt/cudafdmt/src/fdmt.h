@@ -25,11 +25,19 @@
 
 using namespace std;
 
-class FdmtSum {
-public:
+typedef struct _FdmtSum {
 	int id1;
 	int id2;
-	int offset;
+	int toff;
+	int inchan1;
+	int inchan2;
+	int iterno;
+} FdmtDmConfig;
+
+class FdmtSubbandConfig {
+public:
+	int delta_t;
+	vector<FdmtDmConfig> dmconfig;
 };
 
 class FdmtIteration
@@ -39,15 +47,16 @@ public:
 	vector<Array2d<int>* > dt_data;
 	vector<int> delta_ts;
 	coord4_t state_shape;
-	vector<FdmtSum> sum_data;
+	vector<FdmtSubbandConfig*> subband_config;
+	int m_iterno;
+	int m_nbeam;
+	int m_nf;
+	int m_ndt;
+	int m_nt;
 
-
-	FdmtIteration()
-	{
-
-	}
-
-	FdmtIteration(int nbeam, int nf, int ndt, int nt) {
+	FdmtIteration(int iterno, int nbeam, int nf, int ndt, int nt) :
+		m_iterno(iterno),
+		m_nbeam(nbeam), m_nf(nf), m_ndt(ndt), m_nt(nt) {
 		state_shape.w = nbeam;
 		state_shape.x = nf;
 		state_shape.y = ndt;
@@ -58,16 +67,25 @@ public:
 	__host__ void add_subband(int delta_t) {
 		dt_data.push_back(new Array2d<int>(delta_t, 4));
 		delta_ts.push_back(delta_t);
+		FdmtSubbandConfig* config = new FdmtSubbandConfig();
+		config->delta_t = delta_t;
+		subband_config.push_back(config);
 	}
 
-	__host__ void save_subband_values(int idt, int src1_offset, int src2_offset, int out_offset, int mint) {
+	__host__ void save_subband_values(int idt, int src1_offset, int src2_offset, int out_offset, int mint,
+			int id1, int id2, int toff) {
 		Array2d<int>* dts = dt_data.back();
 		dts->set_host(idt, 0, src1_offset);
 		dts->set_host(idt, 1, src2_offset);
 		dts->set_host(idt, 2, out_offset);
 		dts->set_host(idt, 3, mint);
 
-
+		FdmtSubbandConfig* conf = subband_config.back();
+		FdmtDmConfig dmconfig;
+		dmconfig.id1 = id1;
+		dmconfig.id2 = id2;
+		dmconfig.toff = toff;
+		conf->dmconfig.push_back(dmconfig);
 	}
 
 	__host__ void copy_to_device() {
@@ -89,6 +107,7 @@ typedef struct _fdmt_t
 	int max_dt; // Maximum number of time integrations
 	int nf; // Number of frequency bins
 	int nt; // Number of integrations per block
+	int nbox; // Number of boxcar trials to calculate weights for
 	int delta_t; // Initial delta_t for the initialisation
 	int nbeams; // Number of beams
 	int nbeams_alloc; // Number of beams to allocate memory for, and process simultaneously

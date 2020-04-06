@@ -430,6 +430,7 @@ __global__ void boxcar_do_kernel2 (
 __launch_bounds__(336)
 __global__ void boxcar_do_kernel3 (
 		const __restrict__ fdmt_dtype* indata,
+		const __restrict__ fdmt_dtype* weights,
 		fdmt_dtype* __restrict__ outdata,
 		fdmt_dtype* __restrict__ historydata,
 		fdmt_dtype* __restrict__ discarddata,
@@ -465,6 +466,10 @@ __global__ void boxcar_do_kernel3 (
 	int hist_off = array4d_idx(1, nbeams, ndt, NBOX, 0, ibeam, idt, 0); // history offset
 	int discard_off = array4d_idx(1,1,nbeams,ndt,0,0,ibeam,idt); // discard offset
 
+	// Weight for this boxcar and dt
+	const int weight_idx = array4d_idx(1,1,ndt, NBOX, 0, 0, idt, ibc);
+	const fdmt_dtype weight = weights[weight_idx];
+
 	// Shared memory
 	__shared__ fdmt_dtype thread_indata[DT_BLOCKS][NBOX];
 
@@ -493,15 +498,13 @@ __global__ void boxcar_do_kernel3 (
 	// Read the previous sample (relevant for this boxcar width from global memory)
 	fdmt_dtype vprev = global_history[ibc];
 
+
 	candidate_t cand;
 	cand.t = -1; // t of the best detection so far. -1 for no current detection ongoing
 	cand.sn = -1; // vout for best detection so far.
 	cand.ibc = ibc;
 	cand.idt = idt;
 	cand.ibeam = ibeam;
-
-	const fdmt_dtype ibc_scale = sqrtf(float(ibc + 1));
-	threshold *= ibc_scale;// scale threshold, otherwise you have to do lots of processing per sample, which is wasteful.
 	int fullt = 0;
 
 	for(int blk = 0; blk < nt/NBOX; ++blk) {
@@ -515,6 +518,8 @@ __global__ void boxcar_do_kernel3 (
 
 		// loop through shared memory
 		for (int t = 0 ; t < NBOX; ++t) {
+
+
 			vin = thread_indata[thread_dt][t]; // 'broadcast' from shared memory
 			// Add the current sample and subtract the 'previous' one
 			state += vin - vprev;
@@ -528,13 +533,11 @@ __global__ void boxcar_do_kernel3 (
 			}
 
 			// scale output value to have constant variance per boxcar size
-			//fdmt_dtype vout = state/(sqrtf((float) (ibc + 1)));
-			//fdmt_dtype vout = state * ibc_scale;
-			fdmt_dtype vout = state;
+			fdmt_dtype vout = state*weight;
 
 			// write state into output
 			if (outdata != NULL) {
-				optr[ibc] = vout/ibc_scale;
+				optr[ibc] = vout;
 				// increment output pointer
 				optr += NBOX;
 			}
@@ -550,7 +553,7 @@ __global__ void boxcar_do_kernel3 (
 				// Find out if the candidate ended this sample: do warp vote to find out if all boxcars are now below threshold
 				if (__all_sync(FULL_MASK, vout < threshold) || fullt == nt - 1) { // if all boxcars are below threshold, or we're at the end of the block
 					// find maximum across all boxcars
-					fdmt_dtype scaled_sn = cand.sn/ibc_scale; // scale by boxcar width, so all boxcars have the same variance
+					fdmt_dtype scaled_sn = cand.sn; // scale by boxcar width, so all boxcars have the same variance
 					fdmt_dtype best_sn_for_ibc = warpAllReduceMax(scaled_sn);
 					// work out which ibc has the best vout - do a warp ballot of which ibc owns the best one
 					int boxcar_mask = __ballot_sync(FULL_MASK, best_sn_for_ibc == scaled_sn);
@@ -618,6 +621,7 @@ __global__ void test_cub_prefix_sum() {
 
 
 int boxcar_do_gpu(const array4d_t* indata,
+		const array4d_t* weights,
 		array4d_t* boxcar_data,
 		array4d_t* boxcar_history,
 		array4d_t* boxcar_discards,
@@ -642,6 +646,10 @@ int boxcar_do_gpu(const array4d_t* indata,
 	assert(boxcar_history->nx == nbeams);
 	assert(boxcar_history->ny == ndt);
 	assert(boxcar_history->nz == NBOX);
+	assert(weights->nw == 1);
+	assert(weights->nx == 1);
+	assert(weights->ny == ndt);
+	assert(weights->nz == NBOX);
 
 	assert(mindm < ndt);
 
@@ -657,6 +665,7 @@ int boxcar_do_gpu(const array4d_t* indata,
 
 	boxcar_do_kernel3<<<grid_shape, block_shape>>>(
 			indata->d_device,
+			weights->d_device,
 			boxcar_data->d_device,
 			boxcar_history->d_device,
 			boxcar_discards->d_device,
