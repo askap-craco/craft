@@ -59,6 +59,8 @@ def _main():
     parser.add_argument('--save', help='Save plots as png', action='store_true', default=False)
     parser.add_argument('--raw-units', help='Use raw unts, rather than physical units on axis', action='store_true', default=False)
     parser.add_argument('-d', '--dm', help='Dispersion measure (pc/cm3)', default=0., type=float)
+    parser.add_argument('-T', '--tscrunch', help='TScrunch by this factor', default=1, type=int)
+    parser.add_argument('-F','--fscrunch', help='Fscrunch by this factor', default=1, type=int)
     parser.set_defaults(verbose=False, nxy="1,1")
     values = parser.parse_args()
     if values.verbose:
@@ -107,11 +109,12 @@ def fscrunch(beams, factor):
 def dmroll(beams, dm, fch1, foff, tint):
     newbeams = np.empty_like(beams)
     ntimes, nbeams, nfreq = newbeams.shape
+    reffreq = min(fch1, fch1 + nfreq*foff)
     for f in xrange(nfreq):
         freq = fch1 + f*foff
-        tdelay = 4.15*dm*(fch1**-2 - freq**-2)
+        tdelay = 4.15*dm*(reffreq**-2 - freq**-2)
         shift = int(np.round(tdelay/tint))
-        newbeams[:, :, f] = np.roll(beams[:,:,f], shift)
+        newbeams[:, :, f] = np.roll(beams[:,:,f], shift, axis=0)
 
     return newbeams
         
@@ -119,7 +122,7 @@ class Plotter(object):
     @staticmethod
 
     def from_values(values, tstart, ntimes):
-        p = Plotter(values.files, values.nxy, fft=values.fft, raw_units=values.raw_units)
+        p = Plotter(values.files, values.nxy, fft=values.fft, raw_units=values.raw_units, tscrunch=values.tscrunch, fscrunch=values.fscrunch)
         if values.seconds:
             p.set_position_seconds(*values.seconds)
         elif values.mjd:
@@ -133,7 +136,7 @@ class Plotter(object):
 
         return p
     
-    def __init__(self, filenames, nxy, tstart=0, ntimes=1024, fft=False, raw_units=False):
+    def __init__(self, filenames, nxy, tstart=0, ntimes=1024, fft=False, raw_units=False, tscrunch=1, fscrunch=1):
         self.nrows, self.ncols = nxy
         self.figs = {}
         self.fig_labels = {}
@@ -151,8 +154,8 @@ class Plotter(object):
         mjdstart = files[0].tstart
         tsamp = files[0].tsamp
         self.raw_units = raw_units
-        self.tscrunch_factor = 1
-        self.fscrunch_factor = 1
+        self.tscrunch_factor = tscrunch
+        self.fscrunch_factor = fscrunch
         self.dm = 0.
         if self.raw_units:
             xunit = 'sample'
@@ -420,7 +423,7 @@ class Plotter(object):
         print 'scrunching t=', self.tscrunch_factor, 'f=', self.fscrunch_factor, 'dm', self.dm
 
         orig_ntimes, orig_nbeams, orig_nfreq = beams.shape
-
+        
         if self.dm != 0:
             beams = dmroll(beams, self.dm, f0.fch1/1e3, f0.foff/1e3, f0.tsamp*1e3)
 

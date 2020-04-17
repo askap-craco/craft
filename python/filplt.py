@@ -39,8 +39,11 @@ def _main():
             plot(f, values)
     else:
         candidates = np.loadtxt(values.cand_file, dtype=np.float64)
+        if len(candidates) == 0:
+            raise ValueError('No candidates in file {}'.format(values.cand_file))
         if len(candidates.shape) == 1:
             candidates.shape = (1, -1)
+            
         ncand = candidates.shape[0]
 
         for c in xrange(ncand):
@@ -52,8 +55,10 @@ def _main():
                 beam_files = values.files
             else:
                 beam_files = [f for f in values.files if int(f.split('.')[-2]) == beam]
+            print beam_files
 
             for f in beam_files:
+                print f, mjd, dm, beam
                 plot(f, values, mjd, dm)
 
 def plot(f, values, mjd=None, dm=None):

@@ -44,6 +44,7 @@ def _main():
         # Ryan's addition
         sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
         sock.bind((host, port))
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 256*1024*1024)
         # add to multicast group # https://stackoverflow.com/questions/603852/how-do-you-udp-multicast-in-pythonESC[m
         mreq = struct.pack('4sl', socket.inet_aton(host), socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)

@@ -49,10 +49,10 @@ def load4d(fname, dtype=np.float32):
     v = np.fromfile(fin, dtype=dtype, count=theshape.prod())
     v.shape = theshape
     fin.close()
-    print fname, v.shape, len(v), 'zeros?', np.all(v == 0), \
+    print fname, v.shape, len(v), 'Nzeros=', np.sum(v == 0), \
             'max/min/mean/sum {}/{}/{}/{}'.format(v.max(), v.min(), v.mean(), v.sum()), \
             'max at', \
-            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
+            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v)), 'Ninfs?=', np.sum(np.isinf(v))
 
     return v
 
@@ -67,33 +67,28 @@ def file_series(prefix, start=0):
         i += 1
 
 def show_inbuf_series(prefix, theslice, start=0, maxn=10):
+    fig = pylab.figure()
+    
     for ifname, fname in enumerate(file_series(prefix, start)):
+        fig.clear()
+        gs = gridspec.GridSpec(1,1)
+        p = plt.subplot
+        ax = p(gs[0])
+
         ostate = load4d(fname)
         v = ostate[theslice]
-        print fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), \
-            'max/min/mean/sum {}/{}/{}/{}'.format(v.max(), v.min(), v.mean(), v.sum()), \
-            'max at', \
-            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
-        
         v = np.ma.masked_invalid(v)
+        v = np.ma.masked_equal(v, 0)
         nfreq, ntime = v.shape
         vmid = np.ma.median(v)
         voff = np.std((v - vmid))
-        fig, axes = pylab.subplots(1,2)
+        myimshow(ax, (v), aspect='auto', origin='lower')
+        ax.set_xlabel('t')
+        ax.set_ylabel('dt')
+        ax.set_title(fname)
 
-        myimshow(axes[0], (v), aspect='auto', origin='lower')
-        axes[0].set_xlabel('t')
-        axes[0].set_ylabel('dt')
+        pylab.show()
 
-        #bins = np.linspace(vmid-3,vmid+3,50)
-        bins = 50
-
-        for f in xrange(nfreq):
-            #axes[1].hist(v[f,:], bins=bins, histtype='step')
-            pass
-            #axes[1].loglog(abs(np.fft.rfft(v[120:140, :].sum(axis=0))))
-
-        pylab.title(fname)
 
         if maxn is not None and ifname >= maxn:
             print 'Quitting as maxn exceeded'
