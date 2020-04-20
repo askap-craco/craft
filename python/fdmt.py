@@ -112,7 +112,7 @@ class Fdmt(object):
         Make an object that does the FDMT.
         This contsructor makes the FDMT plan which can then be called with .execute() or just __call__
 
-        :f_min: minimum frequency in MHz
+        :f_min: minimum frequency in MHz - is this center frequency of the first channel, or the bottom?
         :f_off: Maximum frequency in MHz
         :n_f: Numberof channels
         :max_dt: Number of DM trials

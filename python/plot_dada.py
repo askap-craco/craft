@@ -27,8 +27,12 @@ def _main():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-t', '--time', help='Sample times', default='0,256')
     parser.add_argument('-b', '--bmax', help='Maximum beam to plot', type=int, default=2)
+    parser.add_argument('--tscrunch', help='Tscrunch factor', type=int, default=1)
+    parser.add_argument('--fscrunch', help='Fscrunch factor', type=int, default=1)
     parser.add_argument('--imrange', help='Imavge vertical plot range')
     parser.add_argument('--nxy', help='nxy', default='6,12')
+    parser.add_argument('--order', help='Force ordering')
+    parser.add_argument('--mask-limit', help='Mask values with absolute less than this', default=0.0, type=float)
     parser.add_argument('-r','--rescale', action='store_true', help='Rescale data', default=False)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
@@ -45,7 +49,11 @@ def _main():
     npol = int(hdr['NPOL'][0])
     tstart, nint = map(int, values.time.split(','))
     dtype = np.dtype(hdr.get_value('DTYPE', '<f4'))
-    order = hdr.get_value('DORDER', 'TFBP')
+    if values.order is not None:
+        order = values.order
+    else:
+        order = hdr.get_value('DORDER', 'TFBP')
+        
     nint = int(hdr.get_value('NT', nint))
     transpose = None
 
@@ -62,7 +70,6 @@ def _main():
     else:
         raise ValueError('Unknown order {}'.format(order))
 
-
     print nbeam, nchan, npol, tstart, nint, dtype, order, nint, shape, transpose
     
     f = dada.DadaFile(values.files[0], shape=shape)
@@ -71,8 +78,18 @@ def _main():
         if transpose is not None:
             b = b.transpose(transpose)
 
+        b = np.ma.masked_where(abs(b) <= values.mask_limit, b)
+
+        # At this point b.shape is (Time, Chan, Beam, Pol)
         print b.shape, shape, transpose, orig_shape
-        plot(b, nint, nbeam, nchan, npol, values)
+        tscrunch = values.tscrunch
+        fscrunch = values.fscrunch
+        nint_out = nint/tscrunch
+        nchan_out = nchan/fscrunch
+        b = b.reshape(nint_out, tscrunch, nchan, nbeam, npol).mean(axis=1)
+        b = b.reshape(nint_out, nchan_out, fscrunch, nbeam, npol).mean(axis=2)
+        print b.shape, shape, transpose, orig_shape
+        plot(b, nint_out, nbeam, nchan_out, npol, values)
 
 
 def plot(v, nint, nbeam, nchan, npol, values):
