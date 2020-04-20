@@ -15,6 +15,7 @@ from crafthdr import DadaHeader
 from sigproc import SigprocFile
 import vcraft
 
+
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 def _main():
@@ -26,6 +27,8 @@ def _main():
     #parser.add_argument('-n','--nfft', help='FFT size / 64. I.e. for 128 point FFT specify 2', type=int, default=1)
     parser.add_argument('-n','--nchan', help='FFT size / 64. I.e. for 128 point FFT specify 2. '+\
             'If 0 (default) no finer channels are produced', type=int, default=0)
+    parser.add_argument('--tstart', type=float, default=0, help='Start time in seconds')
+    parser.add_argument('--nsampout', type=int, help='Number of output samples')
     parser.add_argument('-d', '--npolout', help='1=XX+YY, 2=XX,XY,YX,YY', type=int, default=1)
     parser.add_argument('-o','--outfile', help='Outfile', default='beam.fil')
     parser.add_argument(dest='files', nargs='+')
@@ -98,13 +101,18 @@ def detect(files, values):
     else:
         raise RuntimeError("Wrong --nchans provided: %i. Should be >= 0", values.nchan)
 
-    nsampout = int(nsamps_total/sample_block)
-    nsampin = nsampout*sample_block
-
+    toff_sec = values.tstart
+    toff_insamps = int(np.round(toff_sec * infsamp))
+    if values.nsampout is None:
+        nsampout = int(nsamps_total/sample_block)
+    else:
+        nsampout = values.nsampout
+        
+    nsampin = nsampout*sample_block - toff_insamps
 
     hdr = {'data_type': 1,
            'tsamp': tsamp,
-           'tstart': tstart,
+           'tstart': tstart + toff_sec/86400.,
            'fch1':fch1,
            'foff':bw_file,
            'nbits':nbits,
@@ -128,7 +136,7 @@ def detect(files, values):
     dout = np.empty((npolout, nchan_file), dtype=np.float32) # XXX
     # reshape to integral number of integrations
     for s in xrange(nsampout):
-        sampno = s*sample_block
+        sampno = s*sample_block + toff_insamps
         logging.debug('block %i/%i, sampno: %i', s, nsampout,sampno)
         for ipol, pol in enumerate(pols):
             din[ipol, :, :]  = all_muxes[pol].read(sampno, sample_block)

@@ -27,6 +27,33 @@ def calc_delta_t(f_min, f_max, f_start, f_end, max_dt):
     
     return delta_t
 
+def calc_var(smearing, width):
+    '''
+    Calculate the variance expected in a single channel, given the 
+    smearing done by the FDMT in tiem, and the width of the boxcar
+    :smearing: Amount of smearing done by the FDMT in this channel. > 0
+    :width: Width of boxcar > 0
+    :returns: Variance channel
+    :thanks: To clancy for working this out. I was completely stuff
+    '''
+    
+    if smearing > width:
+        H = smearing
+        L = width
+    else:
+        L = smearing
+        H = width
+
+    assert H > 0
+    assert L > 0
+    assert H >= L
+
+    # Clancy's formula
+    var_chan = (H-L+1)*(L**2) + (2*L - 1)*L*(L-1)/3
+    
+    return var_chan
+
+
 
 def copy_kernel(v1, vout):
     '''
@@ -39,7 +66,7 @@ def copy_kernel(v1, vout):
     vout[:n] = v1[:]
     vout[n:] = 0
 
-    assert not np.any(np.isnan(vout))
+    #assert not np.any(np.isnan(vout))
 
 def add_offset_kernel2(v1, v2, vout, toff):
     '''
@@ -77,8 +104,8 @@ def add_offset_kernel2(v1, v2, vout, toff):
     assert len(v1) == len(v2)
     assert toff >= 0
     assert len(vout) >= len(v1)
-    assert not np.any(np.isnan(v1)), 'V1 contains nans'
-    assert not np.any(np.isnan(v2)), 'V2 contains nans'
+    #assert not np.any(np.isnan(v1)), 'V1 contains nans'
+    #assert not np.any(np.isnan(v2)), 'V2 contains nans'
 
     nt_in = len(v1)
     nt_out = len(vout)
@@ -102,12 +129,12 @@ def add_offset_kernel2(v1, v2, vout, toff):
     if t < nt_out:
         vout[t:nt_out+1] = 0
 
-    assert not np.any(np.isnan(vout)), 'Data not written nt_in={} nt_out={} nsum={} toff={} {}'.format(nt_in, nt_out, nsum, toff, vout)
+    #assert not np.any(np.isnan(vout)), 'Data not written nt_in={} nt_out={} nsum={} toff={} {}'.format(nt_in, nt_out, nsum, toff, vout)
                  
     return vout
 
 class Fdmt(object):
-    def __init__(self, f_min, f_off, n_f, max_dt, n_t):
+    def __init__(self, f_min, f_off, n_f, max_dt, n_t, history_dtype=None):
         '''
         Make an object that does the FDMT.
         This contsructor makes the FDMT plan which can then be called with .execute() or just __call__
@@ -117,6 +144,9 @@ class Fdmt(object):
         :n_f: Numberof channels
         :max_dt: Number of DM trials
         :n_t: Number of samples in input block
+        :init_history: dtype of histoory byffer  Keep the history of samples so initialisation of
+        first sample  at large DMs is correctly initialised. False by defualt here for historical reasons
+        but you want the history when you're running in a pipeline
         '''
         self.f_min = float(f_min)
         self.d_f = f_off
@@ -130,12 +160,15 @@ class Fdmt(object):
         self.n_t = int(n_t)
         freqs = np.arange(n_f)*self.d_f + self.f_min
         self.init_delta_t = self._calc_delta_t(self.f_min, self.f_min + self.d_f)
-        self._state_shape = np.array([self.n_f, self.init_delta_t, self.n_t + self.init_delta_t])
+        self._state_shape = np.array([self.n_f, self.init_delta_t, self.n_t])
         self.hist_delta_t = [self.init_delta_t]
         self.hist_state_shape = [self._state_shape]
+        if history_dtype is None:
+            self.init_history = None
+        else:
+            self.init_history = np.zeros((self.n_f, self.init_delta_t), dtype=history_dtype)
 
         # This hist_nf_data is the guts of the plan. I need to organise this to be more than just a list of tuples.
-        # 
         self.hist_nf_data = []
 
         # channel width of top (copied) and bottom (i.e. all remaining) channels
@@ -193,7 +226,7 @@ class Fdmt(object):
         
         correction = 0.0
         if intnum > 0: # this is always invoked - it's a leftover from Barak's code
-            correction = self.d_f/2.0*0
+            correction = self.d_f/2.0
 
         # shift input and shift output are never used - they're leftovers from barak's code
         shift_input = 0
@@ -284,14 +317,28 @@ class Fdmt(object):
         :din: input array must have shape (nf, nt)
         :returns: array with shape (nf, nd, nt) and same dtype as input.
         '''
-        assert din.shape == (self.n_f, self.n_t)
-        outshape = (self.n_f, self.init_delta_t, self.n_t+self.init_delta_t)
+        assert din.shape == (self.n_f, self.n_t), 'Initialise input is invalid={}'.format(din.shape)
+        outshape = (self.n_f, self.init_delta_t, self.n_t)
         state = np.zeros(outshape, dtype=din.dtype)
         idt = 0
         state[:, 0, 0:self.n_t] = din
-        for idt in xrange(1, self.init_delta_t):
-            state[:, idt, idt:idt+self.n_t] = state[:, idt-1, idt:idt+self.n_t] + din
 
+        for idt in xrange(1, self.init_delta_t):
+            state[:, idt, idt:self.n_t] = state[:, idt-1, idt:self.n_t] + din[:, 0:-idt]
+
+
+        # Now do the first few samples:
+        if self.init_history is not None:
+            # we already have state initialised for [:, 0:idt, idt:end]
+            # So we use this to initialise [:, 0:idt, 0:idt]
+            initdt = self.init_delta_t
+            for tback in xrange(1, initdt): # tback number of samples backwards from t=0
+                h = self.init_history[:, -tback]
+                for idt in xrange(tback, initdt):
+                    state[:, idt, idt-tback] = state[:, idt-1, idt-tback] + h
+
+            # Copy last few samples of input data to init history
+            self.init_history[:, :] = din[:, -self.init_delta_t:]
 
         return state
         
@@ -360,7 +407,7 @@ class Fdmt(object):
             state = self._execute_iteration(i, state)
 
         # final state has a single 'channel' - remove this axis
-        return state[0, :, :]
+        return state[0, :, :].copy()
 
     @property
     def max_state_size(self):
@@ -372,6 +419,178 @@ class Fdmt(object):
     def __call__(self, din):
         return self.execute(din)
 
+    def trace_dm(self, idm, ichan=0, cumulative_offset=0, iterno=None, nodes=None):
+        '''
+        Traces the given DM recursively backwards through the FDMT iterations down to the input channel resoultion.
+        *Only ever specify IDM. Leave all other arguments as is. This fucntio is allso used for the recustion*
+        You have been warned.
+        
+        :idm: The DM (in samples, an integer) that you want to trace
+        :returns: A list (length NCHAN) of tuples containing (channel number, time width-1, total offset)
+        where 'time width' is the number of time sample averaged across time - 1 (time width=2 = 3 samples across)
+        and 'total offset' is the number amount of delay in samples. Note: total_offset is in the opposite sense for
+        an FRB simulation. i.e. for an incoming FRB the largest offset is at the bottom frequency, whereas 
+        this function returns the largest offset at the top channel
+        whereas
+        :see also: add_dm_track to make an FRB that exactly fits what the FDMT will use.
+        '''
+
+        
+        thefdmt = self
+
+        # If iterno is None, we assume this was the user requesting. Otherwise it's an internal recusion
+        if iterno is None: 
+            iterno = len(thefdmt.hist_nf_data) - 1
+            
+            # idt it set to -1 when it's a non-power-of-2 FDMT
+            assert 0 <= idm < self.max_dt, 'Invalid Idm ={}'.format(idm)
+            assert ichan == 0
+            assert cumulative_offset == 0
+            assert nodes == None
+            nodes = []
+        
+        nfd = thefdmt.hist_nf_data[iterno]
+        nchan = len(nfd)
+        chanconfig = nfd[ichan][-1]
+        _ , id1, offset, id2, _, _, _ = chanconfig[idm]
+        inchan1 = 2*ichan
+        inchan2 = 2*ichan+1
+        #print 'iterno {} IDM {} for ichan{} = dm={} chan{} + dm{} chan{} at offset {}'.format(iterno, idm, ichan, id1, inchan1, id2, inchan2, offset)
+        
+        # terminate recursion
+        if iterno == 0:
+            n = (inchan1, id1, inchan2, id2, offset, cumulative_offset)
+            n1 = (inchan1, id1, cumulative_offset)
+            n2 = (inchan2, id2, cumulative_offset + offset)
+            nodes.append(n1)
+            nodes.append(n2)
+        else:
+            # Cumulative only aplies to the upper channel
+            assert inchan2 > inchan1
+            self.trace_dm(id1, inchan1, cumulative_offset, iterno-1, nodes)
+            
+            # For non power of 2 FDMT, idm ==-1 indicates a copy - so we don't go down the line for this guy.
+            if id2 != -1:
+                self.trace_dm(id2, inchan2, cumulative_offset+offset, iterno-1, nodes)
+            
+        return nodes
+
+    def add_frb_track(self, idm, d=None, amplitude=1.0, toffset=0, frbmode=True):
+        '''
+        Adds a DM track to the given data with a given DM (in idt units) that exactly matches what the FDMT
+        will search for.
+
+        :idm: DM of the FRB (in idt units) to add
+        :d: numpy data array to add the FRB to. Shape (nchan, ntimes) where ntimes must be greater than idt+1
+        if 'None' d is created with size (nchan, nt) and dtype=np.float32
+        :amplitude: amplitdue of the FRB to add
+        :toffset: offset in samples to apply
+        :frbmode: Set to true if you want it to look like an FRB, false if you want it backwards (you want true)
+        :returns: d
+        '''
+        nodes = self.trace_dm(idm)
+        id2end = nodes[-1][1]
+        offend = nodes[-1][2]
+        maxoff = id2end + offend+toffset
+        if d is None:
+            d = np.zeros((self.n_f, self.n_t), dtype=np.float32)
+        
+        nf, nsamp = d.shape
+        assert nf == self.n_f, 'Input data has incorrect number of channels'
+        assert nsamp >= idm+toffset, 'Input data has insufficient number of samples. Need at least {}'.format(idm)
+        
+        for (inchan1, id1, offset) in nodes:            
+            coff1 = offset
+            l1 = id1
+            if frbmode:
+                d[inchan1, maxoff-coff1-l1+toffset:maxoff-coff1+1+toffset] += amplitude
+            else:
+                d[inchan1, coff1+toffset:coff1+l1+1+toffset] += amplitude
+            
+        return d
+
+    def get_eff_sigma(self, idt, width):
+        '''
+        Calculates the effecive standard deviation of an FDMT + boxcar output
+        for a dynamic spectrum with 0 mean, and unit variance
+        at the given value if dm (idt) and boxcar width (>0)
+        Uses a simpler method that illustrates the point.
+        :idt: DM trial in units of samples 0 <= idt < max_dt
+        :width: boxcar with. Must be > 0
+        :returns: effective standard deviation
+        
+        '''
+        thefdmt = self
+        assert width > 0
+        assert 0 <= idt < thefdmt.max_dt
+        nchan = thefdmt.n_f
+        nodes = thefdmt.trace_dm(idt)
+        smearing = [n[1]+1 for n in nodes]
+        total_var = 0
+        for chan in xrange(nchan):
+            if smearing[chan] > width:
+                H = smearing[chan]
+                L = width
+            else:
+                L = smearing[chan]
+                H = width
+            
+            assert H > 0
+            assert L > 0
+        
+            var_chan = (H-L+1)*(L**2) + (2*L - 1)*L*(L-1)/3
+            total_var += var_chan
+        
+        eff_sigma = pow(float(total_var),0.5)
+    
+        return eff_sigma
+
+
+
+    def get_eff_var_recursive(self, idm, width, ichan=0, iterno=None):
+        '''
+        Calculates the effecive variance of an FDMT + boxcar output
+        for a dynamic spectrum with 0 mean, and unit variance
+        at the given value if dm (idt) and boxcar width (>0)
+        Uses a recusrive method that (should) closely match what FREDDA does.
+
+        :idt: DM trial in units of samples 0 <= idt < max_dt
+        :width: boxcar with. Must be > 0
+        :returns: effective variance
+        '''
+
+        thefdmt = self
+        if iterno is None:
+            iterno = len(thefdmt.hist_nf_data) - 1
+            # idt it set to -1 when it's a non-power-of-2 FDMT
+            assert 0 <= idm < thefdmt.max_dt, 'Invalid Idm ={}'.format(idm)
+            assert ichan == 0
+        
+        nfd = thefdmt.hist_nf_data[iterno]
+        nchan = len(nfd)
+        chanconfig = nfd[ichan][-1]
+        _ , id1, offset, id2, _, _, _ = chanconfig[idm]
+        inchan1 = 2*ichan
+        inchan2 = 2*ichan+1
+
+        # terminate recursion
+        if iterno == 0:
+            var_chan1 = calc_var(id1+1, width)
+            var_chan2 = calc_var(id2+1, width) 
+        else:
+            # Cumulative only aplies to the upper channel
+            assert inchan2 > inchan1
+            var_chan1 = self.get_eff_var_recursive(id1, width, inchan1, iterno-1)
+
+            # For non power of 2 FDMT, idm ==-1 indicates a copy - so we don't go down the line for this guy.
+            if id2 == -1:
+                var_chan2 = 0
+            else:
+                var_chan2 = self.get_eff_var_recursive(id2, width, inchan2, iterno-1)
+
+        total_var = var_chan1 + var_chan2
+    
+        return total_var
 
 class OverlapAndSum(object):
     '''
@@ -419,7 +638,6 @@ class OverlapAndSum(object):
         output = self.history[:, 0:nt]
         
         return output
-    
 
     def __call__(self, block):
         return self.process(block)

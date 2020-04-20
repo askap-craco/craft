@@ -1,5 +1,4 @@
 
-
 // An attempt at an FDMT but with a loop. - To illustrate the problem for David Li.
 // Does not compile. Lookup table values are not correct
 // But have the right general shape
