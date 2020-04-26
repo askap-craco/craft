@@ -282,9 +282,9 @@ class FdmtDagFileIter3(object):
             iterstart = ''
             iterstart += '//Iteration {iterno}\n'.format(**locals())
             if ncout == 1:
-                iterdecl = 'void iteration{iterno}(unsigned int t, const fdmt_t in[{ndin}][{ncin}], fdmt_t out[{ndout}])'.format(**locals())
+                iterdecl = 'void iteration{iterno}(const fdmt_t in[{ndin}][{ncin}], fdmt_t out[{ndout}])'.format(**locals())
             else:
-                iterdecl = 'void iteration{iterno}(unsigned int t, const fdmt_t in[{ndin}][{ncin}], fdmt_t out[{ndout}][{ncout}])'.format(**locals())
+                iterdecl = 'void iteration{iterno}(const fdmt_t in[{ndin}][{ncin}], fdmt_t out[{ndout}][{ncout}])'.format(**locals())
 
             header_iterdecl += iterdecl + ';\n'
             iterstart += iterdecl + '\n'
@@ -449,7 +449,9 @@ const int FIFO_GROUP_NCLKS[] = {{ {group_sizes_csep} }} ; // Number of clocks to
 const int FIFO_GROUP_OFFSETS[] = {{ {group_offsets_csep} }}; // Offset address for each FIFO group within its cache block
 const int NUM_CACHES = {num_caches}; // Total number of cache blocks
 const int CACHE_SIZES[] = {{ {cache_sizes_csep} }}; // Depth of each individual cache (we can't always use all of a cache)
-const int FIFO_GROUP_CACHE_IDS = {{ {group_cache_ids_csep} }}; // The ID of the cache each group will go in
+const int FIFO_GROUP_CACHE_IDS[] = {{ {group_cache_ids_csep} }}; // The ID of the cache each group will go in
+
+typedef fdmt_t group_cache_t[MAX_CACHE_DEPTH][NFIFOS_PER_GROUP];
 '''.format(**locals())
 
         assert max(cache_sizes) <= max_cache_depth
@@ -458,6 +460,7 @@ const int FIFO_GROUP_CACHE_IDS = {{ {group_cache_ids_csep} }}; // The ID of the 
 
         funcstart = process_func_decl + ''' {
         #pragma HLS PIPELINE II=16
+        #pragma HLS INLINE
         '''
         funcdecl = ''
         funcrun = ''
@@ -491,7 +494,7 @@ const int FIFO_GROUP_CACHE_IDS = {{ {group_cache_ids_csep} }}; // The ID of the 
 
         cfile = '''
 {preamble}
-#include "{self.header_file_name}"
+#include "fdmt.h"
 {queuedecl}
 {iters}
 {funcstart}
@@ -514,11 +517,13 @@ const int FIFO_GROUP_CACHE_IDS = {{ {group_cache_ids_csep} }}; // The ID of the 
 // Iteration functions
 {header_iterdecl}
 
+// Processing functions
+{process_func_decl};
+
 // FIFO loading funtions
 {header_loadfun_decl}
 
-// Processing functions
-{process_func_decl};
+
 #endif
 '''.format(**locals())
 
@@ -561,6 +566,18 @@ const int FIFO_GROUP_CACHE_IDS = {{ {group_cache_ids_csep} }}; // The ID of the 
             print("Writing to", cout);
             fout.write(self.cfile)
 
+    def write_random_test_vectors(self, target_dir='.', seed=42):
+        np.random.seed(seed)
+        din = np.random.randn(self.thefdmt.n_f, self.thefdmt.n_t).astype(np.float32)
+        dout = self.thefdmt(din)
+        din.tofile(os.path.join(target_dir, self.root_file_name+'.test.rand.in'))
+        dout.tofile(os.path.join(target_dir, self.root_file_name+'.test.rand.out'))
+
+    def write_ones_test_vectors(self, target_dir='.'):
+        din = np.ones((self.thefdmt.n_f, self.thefdmt.n_t), dtype=np.float32)
+        dout = self.thefdmt(din)
+        din.tofile(os.path.join(target_dir, self.root_file_name+'.test.ones.in'))
+        dout.tofile(os.path.join(target_dir, self.root_file_name+'.test.ones.out'))
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -571,6 +588,7 @@ def _main():
     parser.add_argument('--chanbw', type=float, help='Channel bandwidtdh (MHz)', default=1.0)
     parser.add_argument('--nt', type=int, help='Time samples per block', default=256)
     parser.add_argument('--destdir', help='Desination directory for generated files', default='.')
+    parser.add_argument('--test_dest_dir', help='Destination directory for test data', default='./testdata')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
     if values.verbose:
@@ -602,9 +620,13 @@ def _main():
         if nd < 32:
             code = FdmtDagFileIter3(dag, fifos_per_group=nd, max_cache_depth=nd)
             code.write_files(values.destdir)
+            code.write_ones_test_vectors(values.test_dest_dir)
+            code.write_random_test_vectors(values.test_dest_dir)
 
         code = FdmtDagFileIter3(dag, fifos_per_group=32, max_cache_depth=1024)
         code.write_files(values.destdir)
+        code.write_ones_test_vectors(values.test_dest_dir)
+        code.write_random_test_vectors(values.test_dest_dir)
 
 
 if __name__ == '__main__':
