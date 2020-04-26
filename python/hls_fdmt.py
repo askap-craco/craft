@@ -15,6 +15,7 @@ import numpy as np
 from scipy import constants
 import fdmt # you'll need to have ../python in  you PYTHONPATH
 from graphviz import Digraph
+import datetime
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -243,7 +244,7 @@ class FdmtDagFileIter3(object):
 
     '''
 
-    def __init__(self, fdmt_dag, fifos_per_group=64, max_cache_depth=512, comment_constants=True):
+    def __init__(self, fdmt_dag, fifos_per_group=64, max_cache_depth=512, comment_constants=False):
         self.fdmt_dag = fdmt_dag
         self.thefdmt = fdmt_dag.thefdmt
         self.fifos_per_group = fifos_per_group
@@ -252,19 +253,18 @@ class FdmtDagFileIter3(object):
         thefdmt = self.thefdmt
         all_offsets = []
         output_fifo_sizes = OrderedDict()
+        now = now=datetime.datetime.now().isoformat()
+        cname=type(self).__name__
         hfile = '' # Header file
         # make initial nodes
         preamble = '''
-#ifndef _FDMT_PROCESS_H
-#define _FDMT_PROCESS_H
-//
-// FDMT produced by hls_fdmt.py
+// FDMT produced by hls_fdmt.py on {now}
 // Class {cname}
 // nd={f.max_dt} nf={f.n_f} fmin={f.f_min} nchan={f.n_f} df={f.d_f} bw={f.bw}
 // fifos_per_group={fifos_per_group}
 // max_cache_depth={max_cache_depth}
 // comment_constants={comment_constants}
-'''.format(f=thefdmt, cname=type(self).__name__, **locals())
+'''.format(f=thefdmt, **locals())
 
         ishape = thefdmt.hist_state_shape[0]
         iters = ''
@@ -282,12 +282,12 @@ class FdmtDagFileIter3(object):
             iterstart = ''
             iterstart += '//Iteration {iterno}\n'.format(**locals())
             if ncout == 1:
-                iterdecl = 'void iteration{iterno}(unsigned int t, const fdmt_t in[{ndin}][{ncin}], fdmt_t out[{ndout}]) \n'.format(**locals())
+                iterdecl = 'void iteration{iterno}(unsigned int t, const fdmt_t in[{ndin}][{ncin}], fdmt_t out[{ndout}])'.format(**locals())
             else:
-                iterdecl = 'void iteration{iterno}(unsigned int t, const fdmt_t in[{ndin}][{ncin}], fdmt_t out[{ndout}][{ncout}]) \n'.format(**locals())
+                iterdecl = 'void iteration{iterno}(unsigned int t, const fdmt_t in[{ndin}][{ncin}], fdmt_t out[{ndout}][{ncout}])'.format(**locals())
 
             header_iterdecl += iterdecl + ';\n'
-            iterstart += iterdecl
+            iterstart += iterdecl + '\n'
             iterstart += '{\n'
             queuepush = '// FIFO push statements\n\n'
             do_sums = ''
@@ -380,8 +380,8 @@ class FdmtDagFileIter3(object):
             group_fifos[group_id] = gf
 
 
-        loadfun = '// FIFO loading functions'
-        loadfun_decl = '// FIFO loading functions'
+        loadfun = ''
+        header_loadfun_decl = ''
 
         cacheid = 0
         this_cache_depth = 0
@@ -403,7 +403,7 @@ class FdmtDagFileIter3(object):
             # make load function
             loaddecl = '''void fdmt_load_fifos_group{group_id}(const group_cache_t input_cache,
                                                            group_cache_t output_cache)'''.format(**locals())
-            loadfun_decl += loaddecl + ';\n'
+            header_loadfun_decl += loaddecl + ';\n'
             loadfun += loaddecl + '''
     {{
         for(int i =0; i < FIFO_GROUP_NCLKS[{group_id}]; i++) {{
@@ -432,33 +432,31 @@ class FdmtDagFileIter3(object):
         total_nclks = sum(group_sizes)
 
         constants = '''
-        // CONSTANTS
-        const int NC={f.n_f}; // Number of channels
-        const float FMIN = {f.f_min}; // Frequency of bottom channel (GHz)
-        const float FMAX = {f.f_max}; // Frequency of bottom channel (GHz)
-        const int ND = {f.max_dt}; // Number of output DM trials
-        const int ND_IN = {f.hist_state_shape[0][1]}; // number of input dm trials
-        const float DF = {f.d_f}; // channel interval (GHz)
-        const float BW = {f.bw}; // Total bandwidth (GHz)
-
-        '''.format(f=thefdmt)
+const int NC={f.n_f}; // Number of channels
+const float FMIN = {f.f_min}; // Frequency of bottom channel (GHz)
+const float FMAX = {f.f_max}; // Frequency of bottom channel (GHz)
+const int ND = {f.max_dt}; // Number of output DM trials
+const int ND_IN = {f.hist_state_shape[0][1]}; // number of input dm trials
+const float DF = {f.d_f}; // channel interval (GHz)
+const float BW = {f.bw}; // Total bandwidth (GHz)
+'''.format(f=thefdmt)
         constants += '''
-        const int NGROUPS = {ngroups}; // total number of FIFO groups
-        const int NFIFOS_PER_GROUP = {fifos_per_group}; // Number of FIFOs in a group. Should = DRAM bus width = 64 in full system
-        const int MAX_CACHE_DEPTH = {max_cache_depth}; // Maximum depth of a cache block. Is the depth of the BRAM = 1024 in full system
-        const int FIFO_TOTAL_NCLKS = {total_nclks}; // Total number of CLKS require to clock in all the FIFOs serially
-        const int FIFO_GROUP_NCLKS[] = {{ {group_sizes_csep} }} ; // Number of clocks to load in each FIFO group
-        const int FIFO_GROUP_OFFSETS[] = {{ {group_offsets_csep} }}; // Offset address for each FIFO group within its cache block
-        const int NUM_CACHES = {num_caches}; // Total number of cache blocks
-        const int CACHE_SIZES[] = {{ {cache_sizes_csep} }}; // Depth of each individual cache (we can't always use all of a cache)
-        const int FIFO_GROUP_CACHE_IDS = {{ {group_cache_ids_csep} }}; // The ID of the cache each group will go in
-
-        '''.format(**locals())
+const int NGROUPS = {ngroups}; // total number of FIFO groups
+const int NFIFOS_PER_GROUP = {fifos_per_group}; // Number of FIFOs in a group. Should = DRAM bus width = 64 in full system
+const int MAX_CACHE_DEPTH = {max_cache_depth}; // Maximum depth of a cache block. Is the depth of the BRAM = 1024 in full system
+const int FIFO_TOTAL_NCLKS = {total_nclks}; // Total number of CLKS require to clock in all the FIFOs serially
+const int FIFO_GROUP_NCLKS[] = {{ {group_sizes_csep} }} ; // Number of clocks to load in each FIFO group
+const int FIFO_GROUP_OFFSETS[] = {{ {group_offsets_csep} }}; // Offset address for each FIFO group within its cache block
+const int NUM_CACHES = {num_caches}; // Total number of cache blocks
+const int CACHE_SIZES[] = {{ {cache_sizes_csep} }}; // Depth of each individual cache (we can't always use all of a cache)
+const int FIFO_GROUP_CACHE_IDS = {{ {group_cache_ids_csep} }}; // The ID of the cache each group will go in
+'''.format(**locals())
 
         assert max(cache_sizes) <= max_cache_depth
 
+        process_func_decl = 'void fdmt_process(fdmt_t in[ND_IN][NC], fdmt_t out[ND])'
 
-        funcstart = '''void fdmt_process(unsigned int t, fdmt_t in[ND_IN][NC], fdmt_t out[ND]) {
+        funcstart = process_func_decl + ''' {
         #pragma HLS PIPELINE II=16
         '''
         funcdecl = ''
@@ -471,11 +469,11 @@ class FdmtDagFileIter3(object):
             if iterno != 0:
                 funcdecl += '    fdmt_t d_iter{i}[{nd}][{nc}];\n'.format(i=iterno,nc=in_shape[0], nd=in_shape[1])
             if iterno == 0:
-                funcrun += '    iteration{iterno}(t, in, d_iter{nextiter});\n'.format(**locals())
+                funcrun += '    iteration{iterno}(in, d_iter{nextiter});\n'.format(**locals())
             elif iterno == lastiter:
-                funcrun += '    iteration{iterno}(t, d_iter{iterno}, out);\n'.format(**locals())
+                funcrun += '    iteration{iterno}(d_iter{iterno}, out);\n'.format(**locals())
             else:
-                funcrun += '    iteration{iterno}(t, d_iter{iterno}, d_iter{nextiter});\n'.format(**locals())
+                funcrun += '    iteration{iterno}(d_iter{iterno}, d_iter{nextiter});\n'.format(**locals())
 
 
         funcend = '''
@@ -491,8 +489,39 @@ class FdmtDagFileIter3(object):
         if comment_constants:
             constants = constants_com
 
+        cfile = '''
+{preamble}
+#include "{self.header_file_name}"
+{queuedecl}
+{iters}
+{funcstart}
+{funcdecl}
+{funcrun}
+{funcend}
 
-        cfile = preamble  + constants +queuedecl + iters + funcstart + funcdecl + funcrun + funcend + loadfun +fileend
+// FIFO loading funtions
+{loadfun}
+ '''.format(**locals())
+
+
+        hfile = '''#ifndef _FDMT_PROCESS_H
+#define _FDMT_PROCESS_H
+{preamble}
+
+// Constants
+{constants}
+
+// Iteration functions
+{header_iterdecl}
+
+// FIFO loading funtions
+{header_loadfun_decl}
+
+// Processing functions
+{process_func_decl};
+#endif
+'''.format(**locals())
+
         self.cfile = cfile
         self.hfile = hfile
         self.preamble = preamble
@@ -506,15 +535,28 @@ class FdmtDagFileIter3(object):
         self.loadfun = loadfun
         self.fileend = fileend
 
+    @property
+    def root_file_name(self):
+        root = 'fdmt_d{f.max_dt}_c{f.n_f}_f{f.f_min}_ff{self.fifos_per_group}_mcd{self.max_cache_depth}_iter3'.format(f=self.thefdmt, self=self)
+        return root
+
+    @property
+    def header_file_name(self):
+        return self.root_file_name + '.h'
+
+    @property
+    def code_file_name(self):
+        return self.root_file_name + '.cpp'
+
+
     def write_files(self, target_dir='.'):
         print('Writing to ', target_dir)
-        root = 'fdmt_d{f.max_dt}_c{f.n_f}_f{f.f_min}_ff{self.fifos_per_group}_mcd{self.max_cache_depth}_iter3.h'.format(f=self.thefdmt, self=self)
-        hout = os.path.join(target_dir, root+'.h')
+        hout = os.path.join(target_dir, self.header_file_name)
         with open(hout, 'w') as fout:
             print("Writing to", hout)
             fout.write(self.hfile)
 
-        cout = os.path.join(target_dir, root+'.cpp')
+        cout = os.path.join(target_dir, self.code_file_name)
         with open(cout, 'w') as fout:
             print("Writing to", cout);
             fout.write(self.cfile)
