@@ -11,10 +11,8 @@ import os
 import sys
 import logging
 import socket
-import struct
 from astropy.time import Time
 from pyclustering.cluster.dbscan import dbscan
-
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -41,50 +39,44 @@ def _main():
         host, port = p.split(':')
         port = int(port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Ryan's addition
-        sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,1)
         sock.bind((host, port))
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 256*1024*1024)
-        # add to multicast group # https://stackoverflow.com/questions/603852/how-do-you-udp-multicast-in-pythonESC[m
-        mreq = struct.pack('4sl', socket.inet_aton(host), socket.INADDR_ANY)
-        sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         while True:
             data, addr = sock.recvfrom(1500)
             npdata = np.fromstring(data, sep=' ')
             npdata.shape = (-1, 8)
             npdata = do_DBSCAN(npdata, values)
-            if len(npdata > 0):
-                sn = npdata[:, 0]
-                sampnum = npdata[:, 1]
-                tsec = npdata[:, 2]
-                width = npdata[:, 3]
-                idt = npdata[:, 4]
-                dm = npdata[:, 5]
-                beamno = npdata[:, 6]
-                mask = (sn > values.min_sn) & (width < values.max_boxcar) & (dm > values.min_dm) & (beamno != 35) & (tsec > 10.)
-                if np.any(mask):
-                    goodat = npdata[mask, :]
-                    good_sn = goodat[:, 0]
-                    best_cand_idx = np.argmax(good_sn)
-                    best_cand = goodat[best_cand_idx, :]
-                    sn, sampnum, tsec, width, idt, dm, beamno, cand_mjd = best_cand
-                    #print 'FOUND CANDIDATE', np.array2string(best_cand, precision=1), best_cand.shape
-                    now = Time.now()
-                    latency_ms = (now.mjd - cand_mjd)*86400.0*1e3
-                    best_beam = int(beamno)
-                    s = 'Found CANDIDATE: sn={} width={} dm={} mjd={} latency={}ms beam={}'.format(sn, width, dm, cand_mjd, latency_ms, best_beam)
-                    print s
-                    cand_list = list(best_cand)
-                    cand_list.append(latency_ms)
+            sn = npdata[:, 0]
+            sampnum = npdata[:, 1]
+            tsec = npdata[:, 2]
+            width = npdata[:, 3]
+            idt = npdata[:, 4]
+            dm = npdata[:, 5]
+            beamno = npdata[:, 6]
+            mask = (sn > values.min_sn) & (width < values.max_boxcar) & (dm > values.min_dm) & (beamno != 35) & (tsec > 10.)
+            if np.any(mask):
+                goodat = npdata[mask, :]
+                good_sn = goodat[:, 0]
+                best_cand_idx = np.argmax(good_sn)
+                best_cand = goodat[best_cand_idx, :]
+                sn, sampnum, tsec, width, idt, dm, beamno, cand_mjd = best_cand
+                #print 'FOUND CANDIDATE', np.array2string(best_cand, precision=1), best_cand.shape
+                now = Time.now()
+                latency_ms = (now.mjd - cand_mjd)*86400.0*1e3
+                best_beam = int(beamno)
+                s = 'Found CANDIDATE: sn={} width={} dm={} mjd={} latency={}ms beam={}'.format(sn, width, dm, cand_mjd, latency_ms, best_beam)
+                print s
+                cand_list = list(best_cand)
+                cand_list.append(latency_ms)
 
-                    outf = values.outfile
-                    if outf:
-                        outf.write('# S/N, sampno, secs from file start, boxcar, idt, dm, beamno, mjd, latency_ms\n')
-                        outf.write('{:0.2f} {:0.0f} {:0.4f} {:0.0f} {:0.0f} {:0.2f} {:0.0f} {:0.10f} {:0.2f}\n'.format(*cand_list))
-                        outf.flush()
-                        outf.close()
+                outf = values.outfile
+                if outf:
+                    outf.write('# S/N, sampno, secs from file start, boxcar, idt, dm, beamno, mjd, latency_ms\n')
+                    outf.write('{:0.2f} {:0.0f} {:0.4f} {:0.0f} {:0.0f} {:0.2f} {:0.0f} {:0.10f} {:0.2f}\n'.format(*cand_list))
+                    outf.flush()
+                    outf.close()
                     
-                    sys.exit(best_beam+10)
+                sys.exit(best_beam+10)
  
 def do_DBSCAN(cands, values):
     # Abbreviated candidates - only the sampnums, widths, and idts of the candidates

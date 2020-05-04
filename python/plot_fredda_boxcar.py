@@ -27,6 +27,7 @@ def _main():
     parser.add_argument('-s','--start', type=int, help='Start block')
     parser.add_argument('-w','--boxcar', type=int, help='Boxcar to print stats of')
     parser.add_argument('-n','--maxn', type=int, help='max number of blocks ot plot')
+    parser.add_argument('--tsamp', type=float, help='Sample duration for FFT plot (milliseconds)', default=1.0)
     parser.set_defaults(verbose=False, beam=0, start=4, maxn=10, dm=0, boxcar=0, time=0)
     values = parser.parse_args()
     if values.verbose:
@@ -57,7 +58,9 @@ def _main():
         print 'S/N per beam idm=%d t=%d bc=%d: %s' % (values.dm, values.time, values.boxcar, alld[:, values.dm, values.time, values.boxcar])
 
         ax3 = ax[3]
-        ax3.imshow(alld[values.beam, :, :, values.boxcar], aspect='auto')
+        ax3.imshow(alld[values.beam, :, :, values.boxcar], aspect='auto', origin='lower')
+        ax[3].set_xlabel('Sample')
+        ax[3].set_ylabel('idt')
 
         ax4 = ax[4]
         for w in (0,1,30,31):
@@ -69,8 +72,13 @@ def _main():
 
         ax5 = ax[5]
         x = alld[values.beam,values.dm,:,values.boxcar]
-        ax5.loglog(abs(np.fft.rfft(x)))
-        
+        xamp = abs(np.fft.rfft(x))**2
+        tsamp = values.tsamp
+        fs = 1.0/tsamp
+        fsfreq = np.arange(len(xamp))*fs/2.0
+        ax5.loglog(fsfreq, xamp, label='b={} idt={} w={}'.format(values.beam, values.dm, values.boxcar))
+        ax5.set_ylabel('FFT^2')
+        ax5.set_xlabel('Hz')
                     
         pylab.show()
         

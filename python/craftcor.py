@@ -209,8 +209,8 @@ class AntennaSource(object):
         framediff_samp = corr.refant.trigger_frame - self.trigger_frame
         framediff_us = framediff_samp / corr.fs
         (geom_delay_us, geom_delay_rate_us) = corr.get_geometric_delay_delayrate_us(self)
-        self.all_geom_delays.append(geom_delay_us)
-        self.all_mjds.append(corr.curr_mjd_mid)
+        #self.all_geom_delays.append(geom_delay_us)
+        #self.all_mjds.append(corr.curr_mjd_mid)
 
         #logging.debug'ALL GEOM DELAYS', self.all_geom_delays, type(geom_delay_us)
         #print 'ALL MJDs', self.all_mjds
@@ -274,7 +274,7 @@ class AntennaSource(object):
             # blatetly clear what you should do
             phasor = np.exp(np.pi*2j*phases, dtype=np.complex64)
             freq_ghz = (cfreq+freqs)/1e3
-            mir_cor = np.array([corr.mir.get_solution(iant, 0, f) for f in freq_ghz])
+            mir_cor = corr.mir.get_solution(iant,0,freq_ghz)
             #mir_cor[np.where(mir_cor==0)] = np.nan
             if mir_cor[0] == 0: # if correction is 0, flag data
                 phasor *= 0
@@ -369,7 +369,7 @@ class Correlator(object):
         self.fmid = self.freqs.mean()
         self.inttime_secs = float(self.nint*self.nfft)/(self.fs*1e6)
         self.inttime_days = self.inttime_secs/86400.
-        self.curr_intno = 0
+        self.curr_intno = values.start_intno
         self.curr_samp = self.curr_intno*self.nint + 1000
         self.prodout = PlotOut(self)
         self.calcmjd()
@@ -662,8 +662,8 @@ class MiriadGainSolutions(object):
             self.bp_real = bp_real
             bp_imag *= -1  # complex conjugate of bandpass
             self.bp_imag = bp_imag
-            self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant]) for iant in xrange(nant)]
-            self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant]) for iant in xrange(nant)]
+            self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant], fill_value=(self.bp_real[0,iant], self.bp_real[-1,iant]), bounds_error=False) for iant in xrange(nant)]
+            self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant], fill_value=(self.bp_imag[0,iant], self.bp_imag[-1,iant]), bounds_error=False) for iant in xrange(nant)]
             self.bp_coeff = None
         else:
             print('Using AIPS bandpass solutions')
@@ -688,8 +688,22 @@ class MiriadGainSolutions(object):
                 self.bp_imag = np.full((nfreq,nant),np.nan,dtype=np.complex64)
                 g_real = np.full((1,nant),np.nan,dtype=np.complex64)
                 g_imag = np.full((1,nant),np.nan,dtype=np.complex64)
-                fring_f = bp_c_root.replace(bp_c_root.split('/')[-1],"delays.sn.txt")
-                sc_f = bp_c_root.replace(bp_c_root.split('/')[-1],"selfcal.sn.txt")
+
+                # look for a README and get fring, selfcal filenames
+                drcal = os.path.dirname(bp_c_root)
+                import glob
+                readme = glob.glob(drcal+"/README*")
+                if len(readme) == 1:
+                    with open(readme[0],'r') as fl:
+                        for line in fl:
+                            if "delays" in line and ".sn.txt" in line:
+                                fring_f = drcal+'/'+line.split()[0]
+                            if "selfcal" in line and ".sn.txt" in line:
+                                sc_f = drcal+'/'+line.split()[0]
+                else:
+                    print('No or multiple readme file exists for AIPS')
+                    fring_f = bp_c_root.replace(bp_c_root.split('/')[-1],"delays.sn.txt")
+                    sc_f = bp_c_root.replace(bp_c_root.split('/')[-1],"selfcal.sn.txt")
                 aips_cor = aipscor(fring_f,sc_f,bp_c_root)
                 for iant in range(nant):
                     bp = aips_cor.get_phase_bandpass(iant,pol)
@@ -704,15 +718,15 @@ class MiriadGainSolutions(object):
                     try:
                         g = aips_cor.get_phase_fring(iant,pol)*aips_cor.get_phase_selfcal(iant,pol)
                         g = 1/g # inverse of gain
-                    except:
+                    except Exception, e:
                         g = 0
                     bp = np.conj(bp) # complex conjugate of bandpass
                     self.bp_real[:,iant] = np.real(bp)
                     self.bp_imag[:,iant] = np.imag(bp)
                     g_real[0,iant] = np.real(g)
                     g_imag[0,iant] = np.imag(g)
-                self.bp_real_interp = [interp1d(self.freqs, self.bp_real[:, iant]) for iant in xrange(nant)]
-                self.bp_imag_interp = [interp1d(self.freqs, self.bp_imag[:, iant]) for iant in xrange(nant)]
+                self.bp_real_interp = [interp1d(self.freqs, self.bp_real[:, iant], fill_value=(self.bp_real[0,iant], self.bp_real[-1,iant]), bounds_error=False) for iant in xrange(nant)]
+                self.bp_imag_interp = [interp1d(self.freqs, self.bp_imag[:, iant], fill_value=(self.bp_imag[0,iant], self.bp_imag[-1,iant]), bounds_error=False) for iant in xrange(nant)]
                 self.bp_coeff = None
 
         self.g_real = g_real
@@ -728,26 +742,13 @@ class MiriadGainSolutions(object):
         freq_ghz - frequency float in Ghz
         '''
         if self.bp_real is None: # this means no bandpass/gain solution was passed
-            bp_value = 1
+            bp_value = np.array([1])
         elif self.bp_coeff is not None: # Use AIPS polyfit coefficient
             bp_fit = np.poly1d(self.bp_coeff[iant,0,:])+1j*np.poly1d(self.bp_coeff[iant,1,:])
             bp_value = bp_fit(freq_ghz*1e3)
         else: # AIPS polyfit coefficient doesn't exist. Use Miriad/AIPS bandpass interpolation
-            try:
-                f_real = self.bp_real_interp[iant](freq_ghz)
-                f_imag = self.bp_imag_interp[iant](freq_ghz)
-            except:
-                #print('interpolation out of range at '+str(freq_ghz)+'GHz')
-                if freq_ghz > self.freqs[int(len(self.freqs)/3)]:
-                    f_real = self.bp_real[0,iant]
-                    f_imag = self.bp_imag[0,iant]
-                elif freq_ghz < self.freqs[int(len(self.freqs)/3*2)]:
-                    f_real = self.bp_real[-1,iant]
-                    f_imag = self.bp_imag[-1,iant]
-                    #print(f_real,f_imag)
-                else:
-                    print('ERROR IN INTERPOLATING BANDPASS')
-                    print('interpolation out of range at '+str(freq_ghz)+'GHz')
+            f_real = self.bp_real_interp[iant](freq_ghz)
+            f_imag = self.bp_imag_interp[iant](freq_ghz)
             bp_value = f_real + 1j*f_imag
 
         g_value = self.g_real[0,iant] + 1j*self.g_imag[0,iant]
@@ -807,12 +808,14 @@ def _main():
     parser.add_argument('--show', help='Show plot', action='store_true', default=False)
     parser.add_argument('-i','--nint', help='Number of fine spectra to average', type=int, default=128)
     parser.add_argument('-f','--fscrunch', help='Frequency average by this factor', default=1, type=int)
+    parser.add_argument('-s','--start-intno', help='Starting integration number to skip to', default=0, type=int)
     parser.add_argument('--rfidelay', type=int, help='Delay in fine samples to add to second component to make an RFI data set', default=0)
     parser.add_argument('--mirsolutions', help='Root file name for miriad gain solutions')
     parser.add_argument('--aips_c', help='AIPS banpass polynomial fit coeffs',default=None)
     parser.add_argument('--an', type=int, help='Specific antenna', default=None)
     parser.add_argument('--offset', type=int, help='FFT offset to add', default=0)
     parser.add_argument('--tab', help='Do tied-array beamforming', action='store_true', default=False)
+    parser.add_argument('--freqoff', help='Apply frequency offset', type=float, default=-1.0)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -832,7 +835,7 @@ def _main():
         
     # hacking delays
     delaymap = parse_delays(values)
-    antennas = [AntennaSource(mux) for mux in vcraft.mux_by_antenna(values.files, delaymap)]
+    antennas = [AntennaSource(mux) for mux in vcraft.mux_by_antenna(values.files, delaymap, default_freq_offset=values.freqoff)]
     #antennas = [AntennaSource(vcraft.VcraftFile(f)) for f in values.files]
     given_offset = values.offset
     corr = Correlator(antennas, sources, values, abs_delay=given_offset)

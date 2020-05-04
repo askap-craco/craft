@@ -37,7 +37,7 @@ class FreddaRescaleBlock(dict):
             # confuse the user
             
             assert data.shape[0] == 1
-            data = data[0,:,:,:]
+            data = data[0,rsdata.antenna_idxs,:,:]
             self[name] = data
 
         self.mjd = rsdata.tstart + blkid*rsdata.tsamp/86400.
@@ -45,7 +45,7 @@ class FreddaRescaleBlock(dict):
         self.blkid = blkid
 
 class FreddaRescaleData(object):
-    def __init__(self, path):
+    def __init__(self, path, exclude_ants=None):
         self.path = path
 
         dada_file_paths = glob.glob(os.path.join(self.path, '*.dada'))
@@ -69,10 +69,22 @@ class FreddaRescaleData(object):
         self.tsamp = float(self.hdr.get_value('TSAMP')) # tsamp fo rrescaling different from source tsamp
         self.antennas = self.hdr.get_value('SOURCE_ANTENNA_NAME','')
         if self.antennas.strip() == '':
-            self.antennas = ['ia{:02d}'.format(ia) for ia in xrange(nant)]
+            antennas = ['ia{:02d}'.format(ia) for ia in xrange(nant)]
         else:
-            self.antennas = self.antennas.split(',')
+            antennas = self.antennas.split(',')
 
+        if exclude_ants is None:
+            self.antennas = antennas
+            self.antenna_idxs = slice(None) # select everything
+        else:
+            self.antennas = []
+            self.antenna_idxs = []
+            for ia, a in enumerate(antennas):
+                antid = int(a[2:])
+                if antid not in exclude_ants:
+                    self.antennas.append(a)
+                    self.antenna_idxs.append(ia)
+                
     @property
     def nblocks(self):
         return min(map(len, self.dada_files))

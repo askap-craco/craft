@@ -77,7 +77,7 @@ def _main():
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s', '--show', action='store_true', help='Show plot')
-    parser.add_argument('-o','--outfile', help='Output file')
+    parser.add_argument('-o','--outfile', help='Output file', required=True)
     parser.add_argument('-c','--candfile', help='Candidate file')
     parser.add_argument('-w','--width', help='Gaussian width represented by boxcar=0 (milliseconds)', type=float, default=1.0)
     parser.add_argument('--update', action='store_true', help='Multply FRB weight to existing weights', default=False)
@@ -124,6 +124,9 @@ def _main():
     logging.info('CANDIDATE MJDstart %s %s %s %s %s', cmjd, cand_mjdstart, cand_mjdend, dm_delay_ms_max, freqs.max())
     logging.info('Candidates is from {}-{} seconds into file'.format((cand_mjdstart - mjds[0])*86400, (cand_mjdend - mjds[0])*86400.))
 
+    assert mjds[0] == mjds.min()
+    assert mjds[-1] == mjds.max()
+    
     logging.info('UVstats mjdstart {} {}'.format(mjds.min(), mjds.max()))
     logging.info('FREQS [0]={} freqs[-1]={}'.format(freqs[0], freqs[-1]))
     row_range = np.where((mjds >= cand_mjdstart - width_days*3) & (mjds <= cand_mjdend + width_days*3))[0]
