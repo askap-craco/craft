@@ -153,7 +153,7 @@ class Fdmt(object):
         self.n_f = int(n_f)
         assert n_f > 0
         self.bw = self.n_f * f_off
-        self.f_max = self.f_min + self.bw
+        self.f_max = self.f_min + (self.n_f - 1)*self.d_f
         assert(self.f_min < self.f_max)
         self.niter = int(np.ceil(np.log2(n_f)))
         self.max_dt = int(max_dt)
@@ -220,6 +220,9 @@ class Fdmt(object):
         fres = self._df_bot
         # delta_f = 2**(intnum)*self.d_f # channel width in MHz - of the normal channels
         delta_t = self._calc_delta_t(self.f_min, self.f_min + delta_f) # Max IDT for this iteration
+        if delta_t > self.max_dt:
+            delta_t = self.max_dt
+            
         ndt = delta_t
 
         state_shape = np.array([nf, delta_t, n_t + ndt])

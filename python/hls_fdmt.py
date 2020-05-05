@@ -19,6 +19,81 @@ import datetime
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+def mkline(l, indent, endl='\n'):
+    s = ''
+    if isinstance(l, Cblock):
+        s = str(l)
+    else:
+        s = ' '*indent + str(l)
+        if not s.endswith(endl):
+            s += endl
+
+    return s
+
+class Cblock():
+    def __init__(self, parent, hdr, indent=0, formatdict=None):
+        if formatdict:
+            self.hdr = hdr.format(**formatdict)
+        else:
+            self.hdr = hdr
+
+        self.lines = []
+        self.parent = parent
+        self.indent = indent
+
+
+    def __str__(self):
+        s = mkline(self.hdr, self.indent)
+        s += mkline('{', self.indent)
+        for l in self.lines:
+            s += mkline(l, self.indent + 4)
+        s += mkline('}', self.indent)
+        return s
+
+    def __iadd__(self, line):
+        self.lines.append(line);
+
+        return self
+
+    def block(self, hdr):
+        blk = Cblock(self, hdr, indent=self.indent + 4)
+        self.lines.append(blk)
+        return blk
+
+class Code:
+    def __init__(self, preamble='', hfile='FDMT_PROCESS'):
+        self.functions = []
+        self.funcdefs = []
+        self.cfile = ''
+        self.preamble = preamble
+        self.hfile = hfile
+
+    @property
+    def header(self):
+        body = ''.join(mkline(func.hdr, indent=0, endl=';\n') for func in self.functions)
+        if self.hfile:
+            s = '''
+#ifndef _{hfile}
+#define _{hfile}
+
+{body}
+#endif
+'''.format(hfile=self.hfile, body=body)
+        else:
+            s = body
+
+        return s
+
+    @property
+    def code(self):
+        s = self.preamble + '\n\n'.join(map(str, self.functions))
+        return s
+
+    def cfunction(self, funcdef, formatdict=None):
+        thefunc = Cblock(self, funcdef, indent=0, formatdict=formatdict)
+        self.functions.append(thefunc)
+        return thefunc
+
 def fmt(i,c,d):
     return 'I{}D{}C{}'.format(i,d,c)
 
@@ -26,7 +101,7 @@ ignore_ant = ['ak31','ak32','ak33','ak34','ak35','ak36']
 
 # List of configuraitons to dump by Default
 # (Nd, Nchan, )
-configs = ((2,2), (4, 4), (8,8), (16,16), (32,32), (64,64),(128,128),(256,256),(1024,256),(1024,288),(256,288),(32,288))
+configs = ((2,2), (4, 4), (8,8), (16,16), (32,32), (64,64),(128,128),(256,256),(1024,256),(1024,288),(256,288),(32,288), (512, 256))
 
 class FdmtDag(object):
     '''
@@ -288,7 +363,10 @@ class FdmtDagFileIter3(object):
 
             header_iterdecl += iterdecl + ';\n'
             iterstart += iterdecl + '\n'
-            iterstart += '{\n'
+            iterstart += '''{
+#pragma HLS inline
+'''
+
             queuepush = '// FIFO push statements\n\n'
             do_sums = ''
             read = ' '*4 + '// Read inputs\n'
@@ -388,6 +466,18 @@ class FdmtDagFileIter3(object):
         cache_sizes = []
         group_offsets = []
         group_cache_ids = []
+        cache_groups = [[]]
+
+        # load all groups functions
+        load_all_fifos_decl = '''
+void fdmt_load_fifos_from_cache(const group_cache_t input_cache[NUM_CACHES], group_cache_t output_cache[NUM_CACHES])'''
+        header_loadfun_decl += load_all_fifos_decl + ';\n'
+
+        loadallfun = load_all_fifos_decl + '''
+{
+#pragma HLS INLINE OFF
+'''
+
         for group_id, fifos in group_fifos.iteritems():
             # Work out cache sizes
             groupsz = group_sizes[group_id]
@@ -395,14 +485,18 @@ class FdmtDagFileIter3(object):
                 cache_sizes.append(this_cache_depth)
                 cacheid += 1
                 this_cache_depth = 0
+                cache_groups.append([])
 
             group_offsets.append(this_cache_depth)
             group_cache_ids.append(cacheid)
+            cache_groups[-1].append(group_id)
+
             this_cache_depth += groupsz
 
+            loadallfun += 'fdmt_load_fifos_group{group_id}(input_cache[FIFO_GROUP_CACHE_IDS[{group_id}]],output_cache[FIFO_GROUP_CACHE_IDS[{group_id}]]);\n'.format(**locals())
+
             # make load function
-            loaddecl = '''void fdmt_load_fifos_group{group_id}(const group_cache_t input_cache,
-                                                           group_cache_t output_cache)'''.format(**locals())
+            loaddecl = '''void fdmt_load_fifos_group{group_id}(const group_cache_t input_cache,group_cache_t output_cache)'''.format(**locals())
             header_loadfun_decl += loaddecl + ';\n'
             loadfun += loaddecl + '''
     {{
@@ -410,8 +504,6 @@ class FdmtDagFileIter3(object):
     #pragma HLS PIPELINE II=1
 
     '''.format(**locals())
-
-
 
             for fifo_name in fifos:
                 loadfun += '        {fifo_name}_fifo.group_shift(i, input_cache, output_cache);\n'.format(**locals())
@@ -421,9 +513,28 @@ class FdmtDagFileIter3(object):
     } // end fifo load
 
     '''
+        loadallfun += '}\n\n'
 
         # Add final cache size
         cache_sizes.append(this_cache_depth)
+        code = Code(preamble='', hfile=None)
+        # Make cache load functions
+        # make big cache load funciton
+        load_all_func = code.cfunction('void fdmt_load_fifos_from_cache(const group_cache_t input_cache[NUM_CACHES], group_cache_t output_cache[NUM_CACHES])')
+        load_all_func += '// Loads all caches in parallel'
+
+        for cacheid, cache_groups in enumerate(cache_groups):
+            cache_load_func = code.cfunction('void fdmt_load_cache{cacheid}(const group_cache_t input_cache, group_cache_t output_cache)'.format(**locals()))
+            cache_load_func += '// Loads each group sequentially'
+            load_all_func += 'fdmt_load_cache{cacheid}(input_cache[{cacheid}], output_cache[{cacheid}]);'.format(**locals())
+            for groupid in cache_groups:
+                cache_load_func += 'fdmt_load_fifos_group{groupid}(input_cache, output_cache);'.format(**locals())
+
+
+
+
+
+        # output constants
         group_sizes_csep = ','.join(map(str, group_sizes))
         group_offsets_csep =  ','.join(map(str, group_offsets))
         cache_sizes_csep = ','.join(map(str, cache_sizes))
@@ -452,6 +563,7 @@ const int CACHE_SIZES[] = {{ {cache_sizes_csep} }}; // Depth of each individual 
 const int FIFO_GROUP_CACHE_IDS[] = {{ {group_cache_ids_csep} }}; // The ID of the cache each group will go in
 
 typedef fdmt_t group_cache_t[MAX_CACHE_DEPTH][NFIFOS_PER_GROUP];
+const char* const FDMT_NAME = "{self.root_file_name}";
 '''.format(**locals())
 
         assert max(cache_sizes) <= max_cache_depth
@@ -460,7 +572,7 @@ typedef fdmt_t group_cache_t[MAX_CACHE_DEPTH][NFIFOS_PER_GROUP];
 
         funcstart = process_func_decl + ''' {
         #pragma HLS PIPELINE II=16
-        #pragma HLS INLINE
+        #pragma HLS INLINE off
         '''
         funcdecl = ''
         funcrun = ''
@@ -479,10 +591,7 @@ typedef fdmt_t group_cache_t[MAX_CACHE_DEPTH][NFIFOS_PER_GROUP];
                 funcrun += '    iteration{iterno}(d_iter{iterno}, d_iter{nextiter});\n'.format(**locals())
 
 
-        funcend = '''
-}
-'''
-
+        funcend = '\n\n}'
         fileend = "#endif"
 
         constants_com = ''
@@ -504,6 +613,7 @@ typedef fdmt_t group_cache_t[MAX_CACHE_DEPTH][NFIFOS_PER_GROUP];
 
 // FIFO loading funtions
 {loadfun}
+{code.code}
  '''.format(**locals())
 
 
@@ -521,7 +631,7 @@ typedef fdmt_t group_cache_t[MAX_CACHE_DEPTH][NFIFOS_PER_GROUP];
 {process_func_decl};
 
 // FIFO loading funtions
-{header_loadfun_decl}
+{code.header}
 
 
 #endif
@@ -568,16 +678,16 @@ typedef fdmt_t group_cache_t[MAX_CACHE_DEPTH][NFIFOS_PER_GROUP];
 
     def write_random_test_vectors(self, target_dir='.', seed=42):
         np.random.seed(seed)
-        din = np.random.randn(self.thefdmt.n_f, self.thefdmt.n_t).astype(np.float32)
+        din = np.random.randint(-2**3, 2**3, size=(self.thefdmt.n_f, self.thefdmt.n_t)).astype(np.float32)
         dout = self.thefdmt(din)
-        din.tofile(os.path.join(target_dir, self.root_file_name+'.test.rand.in'))
-        dout.tofile(os.path.join(target_dir, self.root_file_name+'.test.rand.out'))
+        din.T.tofile(os.path.join(target_dir, self.root_file_name+'.test.rand.in'))
+        dout.T.tofile(os.path.join(target_dir, self.root_file_name+'.test.rand.out'))
 
     def write_ones_test_vectors(self, target_dir='.'):
         din = np.ones((self.thefdmt.n_f, self.thefdmt.n_t), dtype=np.float32)
         dout = self.thefdmt(din)
-        din.tofile(os.path.join(target_dir, self.root_file_name+'.test.ones.in'))
-        dout.tofile(os.path.join(target_dir, self.root_file_name+'.test.ones.out'))
+        din.T.tofile(os.path.join(target_dir, self.root_file_name+'.test.ones.in'))
+        dout.T.tofile(os.path.join(target_dir, self.root_file_name+'.test.ones.out'))
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter

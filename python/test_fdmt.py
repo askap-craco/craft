@@ -21,7 +21,7 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 class TestFdmtSimple(TestCase):
 
     def setUp(self):
-        self.nf = 336 # number of channels - must be a power of 2 currently.
+        self.nf = 336 # number of channels 
         self.fmax = 1448. +0.5#  Freuency of the top of the band in MHz
         self.df = 1.0 # Channel bandwidth in MHz
         self.fmin = self.fmax - self.nf*self.df # Frequency of the bottom of the band in MHz
@@ -169,9 +169,8 @@ class TestFdmtWithHistoryHits(TestCase):
         for blk in xrange(nblocks):
             din = d[:, blk*self.nt:(blk+1)*self.nt]
             fdmtout = self.thefdmt(din)
+            self.assertEqual(fdmtout.shape[0], self.nd)
             frbout = osum(fdmtout)
-
-            
             maxpos = np.argmax(frbout)
             maxd, maxt = np.unravel_index(maxpos, frbout.shape)
             if blk == expected_blk:
