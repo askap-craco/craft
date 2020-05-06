@@ -100,7 +100,6 @@ class SampleFdmt(object):
                     in_d1 = config[1]
                     in_d2 = config[3]
                     time_offset = config[2]
-
                     in_chan1 = 2*output_channel
                     in_chan2 = 2*output_channel+1
                     
@@ -217,49 +216,65 @@ class MaxFifoPerIteration(SampleFdmt):
     
 class IndividualFifos(SampleFdmt):
     '''
-    Makes 1 buffer per FIFO of exactly the right length
+    Makes 1 buffer per FIFO of exactly the right length for each node
+    Some nodes have a FIFO attached to 2 downstream nodes.
+    This will only make 1 output FIFO per node that is the correct size
     '''
     def __init__(self, thefdmt):
         super(IndividualFifos, self).__init__(thefdmt)        
-        self.fifos = [] # list of list of list of fifos
+        self.fifos = {} # Dictionary of FIFOS (cheater) key=(iterno, d, c) 
         self.__buffer_size = 0
-
-        # we need to add a bank of length=ND_IN FIFOs for the input
-        initlist = []
-        self.fifos.append(initlist)
-        nchan = thefdmt.n_f
-        nd_in = thefdmt.init_delta_t
-        for ochan in xrange(nchan):
-            chanlist = []
-            initlist.append(chanlist)
-            for idt in xrange(nd_in):
-                fifo_size = nd_in + 1
-                fifo = np.zeros(fifo_size)
-                chanlist.append(fifo)
-                self.__buffer_size += fifo_size
         
         for curr_iterno, theiter in enumerate(thefdmt.hist_nf_data):
             iterlist = []
             self.fifos.append(iterlist)
-            for ochan in xrange(len(theiter)):
+            for output_channel in xrange(len(theiter)):
                 chanlist = []
                 iterlist.append(chanlist)
-                chanconfig = thefdmt.hist_nf_data[curr_iterno][ochan][-1]
+                chanconfig = thefdmt.hist_nf_data[curr_iterno][output_channel][-1]
                 for idt, config in enumerate(chanconfig):
-                    offset = config[2]
-                    fifo_size = offset+1
-                    #self.fifos[(curr_iterno, idt, ochan)] = np.zeros(fifo_size)
+                    in_d1 = config[1]
+                    in_d2 = config[3]
+                    time_offset = config[2]
+                    fifo_size = time_offset + 1
+                    in_chan1 = 2*output_channel
+                    in_chan2 = 2*output_channel+1
                     if curr_iterno == 0:
                         print 'Iter', curr_iterno, 'ochan', ochan, 'idt', idt, 'size', fifo_size
-                    fifo = np.zeros(fifo_size)
-                    chanlist.append(fifo)
-                    self.__buffer_size += fifo_size
+
+                    # you only ever read t=0 sample from inchan1
+                    self._create_fifo(curr_iterno, in_d1, in_chan1, 1)
+                    self._create_fifo(curr_iterno, in_d1, in_chan1, fifo_size)
+
+    def _create_fifo(self, iterno, d, c, size):
+        '''
+        Makes a fifo of the requested size and puts it in the fifo dictionary
+        and keeps track of the total buffer size
+        If the fifo already exists in the dictionary, it is resized to provide enough room for the maximum size
+        '''
+        key = (iterno, d, c)
+        if key in self.fifos:
+            fifo = self.fifos[key]
+            if len(fifo) < size:
+                # Remove the old FIFO and we'll make a new one
+                self.__buffer_size -= len(fifo)
+                del self.fifos[key]
+                fifo = np.zeros(size)
+                self.fifos[key] = fifo
+                self.__buffer_size += len(fifo)
+            else: # existing FIFO OK size
+                pass
+        else: # no FIFO for that key yet
+            fifo = np.zeros(size)
+            self.fifos[key] = fifo
+            self.__buffer_size += len(fifo)
     
     def _get_fifo(self, iterno, d, c):
         # Need to do a 3 pointer derefrences to find the FIFO of interest
         #print iterno, d, c
         #print len(self.fifos[iterno]), len(self.fifos[iterno][c])
-        fifo = self.fifos[iterno][c][d] # Not the DM and channel in opposite order
+        #fifo = self.fifos[iterno][c][d] # Not the DM and channel in opposite order
+        fifo = self.fifos[(iterno, d, c)]
         return fifo
 
     def buffer_size(self):
