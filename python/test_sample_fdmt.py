@@ -41,6 +41,7 @@ class TestSampleFdmtsMatchBlock(TestCase):
         sampfdmt = sampfdmt_class(self.thefdmt)
         sampout = sampfdmt(blockin)
         print goldout.shape, sampout.shape
+        self.assertTrue(np.all(goldout[:, :self.nt] == sampout))
 
     def test_max_fifo(self):
         self._test_fdmt(sample_fdmt.MaxFifo)

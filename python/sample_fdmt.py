@@ -216,9 +216,10 @@ class MaxFifoPerIteration(SampleFdmt):
     
 class IndividualFifos(SampleFdmt):
     '''
-    Makes 1 buffer per FIFO of exactly the right length for each node
-    Some nodes have a FIFO attached to 2 downstream nodes.
+    Makes 1 buffer per FIFO of exactly the right length for the output of each node
     This will only make 1 output FIFO per node that is the correct size
+    Usually a FIFO will have a read at t=0 and a read at t=FIFO_LENGTH-1, but 
+    occasionally it will have multiple reads at 0 < t < FIFO_LENGTH
     '''
     def __init__(self, thefdmt):
         super(IndividualFifos, self).__init__(thefdmt)        
@@ -226,11 +227,7 @@ class IndividualFifos(SampleFdmt):
         self.__buffer_size = 0
         
         for curr_iterno, theiter in enumerate(thefdmt.hist_nf_data):
-            iterlist = []
-            self.fifos.append(iterlist)
             for output_channel in xrange(len(theiter)):
-                chanlist = []
-                iterlist.append(chanlist)
                 chanconfig = thefdmt.hist_nf_data[curr_iterno][output_channel][-1]
                 for idt, config in enumerate(chanconfig):
                     in_d1 = config[1]
@@ -239,12 +236,9 @@ class IndividualFifos(SampleFdmt):
                     fifo_size = time_offset + 1
                     in_chan1 = 2*output_channel
                     in_chan2 = 2*output_channel+1
-                    if curr_iterno == 0:
-                        print 'Iter', curr_iterno, 'ochan', ochan, 'idt', idt, 'size', fifo_size
-
                     # you only ever read t=0 sample from inchan1
                     self._create_fifo(curr_iterno, in_d1, in_chan1, 1)
-                    self._create_fifo(curr_iterno, in_d1, in_chan1, fifo_size)
+                    self._create_fifo(curr_iterno, in_d2, in_chan2, fifo_size)
 
     def _create_fifo(self, iterno, d, c, size):
         '''
@@ -271,9 +265,7 @@ class IndividualFifos(SampleFdmt):
     
     def _get_fifo(self, iterno, d, c):
         # Need to do a 3 pointer derefrences to find the FIFO of interest
-        #print iterno, d, c
-        #print len(self.fifos[iterno]), len(self.fifos[iterno][c])
-        #fifo = self.fifos[iterno][c][d] # Not the DM and channel in opposite order
+        # oR just lookup in a dictionary for now
         fifo = self.fifos[(iterno, d, c)]
         return fifo
 
@@ -281,10 +273,13 @@ class IndividualFifos(SampleFdmt):
         return self.__buffer_size
         
     def shift(self, iterno, d, c, value):
-        fifo = self._get_fifo(iterno, d, c)
-        fifo[1:] = fifo[:-1]
-        fifo[0] = value
-        
+        try:
+            fifo = self._get_fifo(iterno, d, c)
+            fifo[1:] = fifo[:-1]
+            fifo[0] = value
+        except KeyError: # Happens occasionally. Not all iterno/d/c have a fifo
+            pass
+            
     def read(self, iterno, d, c, t):
         fifo = self._get_fifo(iterno, d, c)
         v = fifo[t]
