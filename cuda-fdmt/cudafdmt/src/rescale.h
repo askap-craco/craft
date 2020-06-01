@@ -429,6 +429,15 @@ __global__ void rescale_apply_flags_and_add (
 			// doing an atomic add for polarisation summing and antenna summing - probably adds some overhead but we'll see.t
 			atomicAdd(outarr + outidx, sout);
 
+
+			// Only update the decay offset is the sample was not flagged
+			if (k == 0) {
+				decay_offset = 0;
+			} else {
+				decay_offset = (vin + decay_offset*k)/(rescale_dtype(1) + k);
+			}
+
+
 		}
 		last_sample_ok = this_sample_ok;
 	}
