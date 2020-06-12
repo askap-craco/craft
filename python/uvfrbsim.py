@@ -139,12 +139,26 @@ def pointsim(amp, lm, p, telnames, freqs, noiseamp=0):
             
     return d
 
-def modify_data(amps, h0):
+def modify_data(amps, h0, values):
     t = 0
     currdate = h0.data[0]['DATE']
     nrows = h0.data.shape[0]
     logging.info('Data shape is %s', h0.data[0]['DATA'].shape)
     ntimes, _ = amps.shape
+
+    f1 = values.fch1
+    Nchan = values.nchan
+    Npol = 2 # ASKAP has XX and YY only
+    chanbw = values.foff
+
+    if np.isinf(values.frb_sn):
+        noiseamp = 0
+    else:
+        nant = len(telnames)
+        nbl = nant*(nant-1)/2
+        # S/N = A/noisermsinonechannel/sqrt(Nbl,Npol,Nchan,Ntime)
+        noiseamp = values.frb_amp/values.frb_sn/np.sqrt(Nchan*nbl*Npol)
+
     for irow in xrange(nrows):
         row = h0.data[irow]
         if row['DATE'] != currdate:
@@ -161,8 +175,6 @@ def modify_data(amps, h0):
 
 
         if False:
-            dreal = row['DATA'][0,0,:,0,0]
-            dimag = row['DATA'][0,0,:,0,1]
             pylab.plot(dreal)
             pylab.plot(dimag)
             pylab.plot(dreal*amp)
@@ -170,14 +182,22 @@ def modify_data(amps, h0):
             pylab.ylim(-0.1, +1.1)
             pylab.show()
 
+
+        if noiseamp == 0:
+            noise_r = 0
+            noise_i = 0
+        else:
+            noise_r = np.random.randn(Nchan)
+            noise_i = np.random.randn(Nchan)
+
+        dreal = row['DATA'][0,0,:,0,0]
+        dimag = row['DATA'][0,0,:,0,1]
+
         # real part
-        row['DATA'][0,0,:,0,0] *= amp
+        row['DATA'][0,0,:,0,0] = dreal*amp + noise_r
 
         # imag part
-        row['DATA'][0,0,:,0,1] *= amp
-
-        
-
+        row['DATA'][0,0,:,0,1] = dimag*amp + noise_i
 
 
 def _main():
@@ -219,8 +239,8 @@ def _main():
     Npol = 2 # ASKAP has XX and YY only
     chanbw = values.foff
 
-    freqs = f1 + np.arange(Nchan)*chanbw
-    lambdas = constants.c / (freqs*1e9)
+    #freqs = f1 + np.arange(Nchan)*chanbw
+    #lambdas = constants.c / (freqs*1e9)
     #rfile = 'SB6637neweop_alltell.im'
     #rfile = values.calcfile
     #cfile = calc11.ResultsFile(rfile)
@@ -248,15 +268,6 @@ def _main():
         pylab.show()
 
 
-    if np.isinf(values.frb_sn):
-        noiseamp = 0
-    else:
-        nant = len(telnames)
-        nbl = nant*(nant-1)/2
-        # S/N = A/noisermsinonechannel/sqrt(Nbl,Npol,Nchan,Ntime)
-        noiseamp = values.frb_amp/values.frb_sn/np.sqrt(Nchan*nbl*Npol)
-
-
     uvgen(values)
     export_fits(values)
 
@@ -268,7 +279,7 @@ def _main():
     h0.header['HISTORY'][16] = ''
 
     try:
-        modify_data(amps, h0)
+        modify_data(amps, h0,v alues)
     finally:
         if os.path.exists(fitsfile):
             os.remove(fitsfile)
