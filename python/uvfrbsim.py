@@ -279,7 +279,7 @@ def _main():
     h0.header['HISTORY'][16] = ''
 
     try:
-        modify_data(amps, h0,v alues)
+        modify_data(amps, h0, values)
     finally:
         if os.path.exists(fitsfile):
             os.remove(fitsfile)
