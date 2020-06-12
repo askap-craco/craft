@@ -19,7 +19,20 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 parnames = ('UU','VV','WW','DATE','BASELINE','FREQSEL','SOURCE','INTTIM','DATA')
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband):
+    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT'):
+        '''
+        Make a correlator UV fits file
+        :fname: file name
+        :fcent: Center frequency (Hz)
+        :foff: Channel offset (Hz):
+        :nchan: numberof channels (Hz)
+        :npol: Number of polarisations
+        :mjd0: MJD of first sample
+        :sources: List of osurces (format?)
+        :antenas: List of antenas
+        :sideband: 
+        '''
+        
         self.dshape = [1,1,1,nchan, npol, 3]
         hdr = pyfits.Header()
         self.hdr = hdr
@@ -72,12 +85,12 @@ class CorrUvFitsFile(object):
         #self.first_time.format = 'fits'
         hdr['OBJECT'] = 'MULTI'
         #hdr['DATE_OBS'] = self.first_time.value Miriad gets confused by this 
-        hdr['TELESCOP'] = 'ASKAP'
-        hdr['INSTRUME'] = 'VCRAFT'
+        hdr['TELESCOP'] = telesop
+        hdr['INSTRUME'] = instrume
+        hdr['ORIGIN'] = origin
         hdr['OBSERVER'] = ''
         hdr['SORTORD'] = 'TB'
         hdr['SPECSYS'] = 'TOPOCENT'
-        hdr['ORIGIN'] = 'craftcor'
 
         histstr = 'Created on {} by {}'.format(datetime.datetime.now().isoformat(), ' '.join(sys.argv))
         hdr['HISTORY'] = histstr
