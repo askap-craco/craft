@@ -139,7 +139,7 @@ def pointsim(amp, lm, p, telnames, freqs, noiseamp=0):
             
     return d
 
-def modify_data(amps, h0, values):
+def modify_data(amps, h0, nant, values):
     t = 0
     currdate = h0.data[0]['DATE']
     nrows = h0.data.shape[0]
@@ -154,7 +154,6 @@ def modify_data(amps, h0, values):
     if np.isinf(values.frb_sn):
         noiseamp = 0
     else:
-        nant = len(telnames)
         nbl = nant*(nant-1)/2
         # S/N = A/noisermsinonechannel/sqrt(Nbl,Npol,Nchan,Ntime)
         noiseamp = values.frb_amp/values.frb_sn/np.sqrt(Nchan*nbl*Npol)
@@ -277,9 +276,10 @@ def _main():
     # fix header
     logging.info('Fixing header %s', h0.header['HISTORY'][16])
     h0.header['HISTORY'][16] = ''
+    nant = hdul[1].data.shape[0]
 
     try:
-        modify_data(amps, h0, values)
+        modify_data(amps, h0, nant, values)
     finally:
         if os.path.exists(fitsfile):
             os.remove(fitsfile)
