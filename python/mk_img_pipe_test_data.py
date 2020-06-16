@@ -131,10 +131,10 @@ def blocks(vis, nt):
         d[blid][:, t].real = row.data[...,0].reshape(nchan)
         d[blid][:, t].imag = row.data[...,1].reshape(nchan)
 
-    if t < nt:
-        warnings.warn('Final integration only contained {} of {} samples'.format(t, nt))
         
     if len(d) > 0:
+        if t < nt:
+            warnings.warn('Final integration only contained {} of {} samples'.format(t, nt))
         yield d
 
 def fdmt_baselines(hdul, baselines, uvcells, values):
@@ -158,7 +158,7 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
         for iuv, uvd in enumerate(uvcells):
             cell_data = uvd.extract(d)
             print  'blkt', blkt, 'iuv', iuv, cell_data.shape
-            # Truncating for the moment
+            # Truncating times for the moment, as we don't keep history
             dblk[iuv, :, :] = thefdmt(cell_data)[:, :values.nt]
 
         fname = '{}.b{:d}.uvdata'.format(values.files, blkt)
