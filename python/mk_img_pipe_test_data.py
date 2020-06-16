@@ -14,6 +14,8 @@ import sys
 import logging
 from astropy.io import fits
 from scipy import constants
+import fdmt
+import warnings
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -72,6 +74,15 @@ class BaselineCell(object):
     def nchan(self):
         return self.chan_end - self.chan_start + 1
 
+    def extract(self, baseline_block):
+        cstart = self.chan_start
+        cend = self.chan_end+1
+        # pad with zeros
+        alld = baseline_block[self.blid]
+        padded_d = np.zeros_like(alld)
+        padded_d[cstart:cend, :] = alld[cstart:cend, :]
+        return padded_d
+
 def grid(uvcells, values):
     Npix = values.npix
     np2 = int(float(Npix)/2.)
@@ -96,7 +107,63 @@ def image_fft(g):
     
     cimg = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(g))).astype(np.complex64)
     return cimg/np.prod(cimg.shape)
-            
+
+def blocks(vis, nt):
+    nrows = vis.size
+    nchan = vis[0].data.shape[-3]
+    d = {}
+    t = 0
+    d0 = vis[0]['DATE']
+    for irow in xrange(nrows):
+        row = vis[irow]
+        if row['DATE'] > d0:
+            t += 1
+            if t == nt:
+                yield d
+                d = {}
+                d0 = row['DATE']
+                t = 0
+
+        blid = row['BASELINE']
+        if blid not in d.keys():
+            d[blid] = np.zeros((nchan, nt), dtype=np.complex64)
+
+        d[blid][:, t].real = row.data[...,0].reshape(nchan)
+        d[blid][:, t].imag = row.data[...,1].reshape(nchan)
+
+    if t < nt:
+        warnings.warn('Final integration only contained {} of {} samples'.format(t, nt))
+        
+    if len(d) > 0:
+        yield d
+
+def fdmt_baselines(hdul, baselines, uvcells, values):
+    hdr = hdul[0].header
+    fch1 = hdr['CRVAL4']
+    foff = hdr['CDELT4']
+    ch1 = hdr['CRPIX4']
+    assert ch1 == 1.0, 'Unexpected initial frequency'
+    vis = hdul[0].data
+    nchan = vis[0].data.shape[-3]
+    freqs = np.arange(nchan)*foff + fch1 # Hz
+    nrows = vis.size
+    thefdmt = fdmt.Fdmt(fch1*1e6, foff*1e6, nchan, values.ndm, values.nt)
+    nbl = len(baselines)
+    baselines = sorted(baselines.keys())
+    nuv = len(uvcells)
+    for blkt, d in enumerate(blocks(vis, values.nt)):
+        dblk = np.zeros((nuv, values.ndm, values.nt), dtype=np.complex64)
+        logging.info('UV data output shape is %s', dblk.shape)
+        # FDMT everything
+        for iuv, uvd in enumerate(uvcells):
+            cell_data = uvd.extract(d)
+            print  'blkt', blkt, 'iuv', iuv, cell_data.shape
+            # Truncating for the moment
+            dblk[iuv, :, :] = thefdmt(cell_data)[:, :values.nt]
+
+        fname = '{}.b{:d}.uvdata'.format(values.files, blkt)
+        logging.info('Writing shape %s to %s', dblk.shape, fname)
+        dblk.tofile(fname)
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -104,6 +171,9 @@ def _main():
     parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
     parser.add_argument('--npix', help='Number of pixels in image', type=int, default=256)
     parser.add_argument('--cell', help='Image cell size (arcsec)', default='10,10')
+    parser.add_argument('--nt', help='Number of times per block', type=int, default=256)
+    parser.add_argument('--ndm', help='Number of DM trials', type=int, default=16)
+                        
     parser.add_argument(dest='files', nargs='?')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -114,7 +184,6 @@ def _main():
 
     logging.info('Opening file %s', values.files)
     hdul = fits.open(values.files)
-
     vis = hdul[0].data
 
     # get data for first integration to work out UVW coordinatse
@@ -150,6 +219,8 @@ def _main():
         vlam = bldata['VV'] * freqs
         upix = np.round(ulam/ucell + Npix/2).astype(int)
         vpix = np.round(vlam/vcell + Npix/2).astype(int)
+        if np.any((upix < 0) | (upix >= Npix) | (vpix < 0) | (vpix >= Npix)):
+            warnings.warn('Pixel coordinates out of range')
 
         pylab.plot(ulam/1e3, vlam/1e3)
 
@@ -167,11 +238,12 @@ def _main():
     pylab.xlabel('U(klambda)')
     pylab.ylabel('V(klambda)')
 
-    pylab.figure()
     fix, ax = pylab.subplots(1,2)
     g = grid(uvcells, values)
     ax[0].imshow(abs(g), aspect='auto', origin='lower')
     ax[1].imshow(image_fft(g).real, aspect='auto', origin='lower')
+                  
+    fdmt_baselines(hdul, baselines, uvcells, values)
     pylab.show()
     
         
