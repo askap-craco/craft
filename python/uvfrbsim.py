@@ -2,7 +2,7 @@
 """
 Create simulated FRB in visibility data
 
-Copyright (C) CSIRO 2019
+Copyright (C) CSIRO 2020
 """
 import pylab
 import matplotlib as mpl
@@ -59,7 +59,7 @@ def uvgen(values):
             return
         
     args = {'source':sourcefile,
-            'ant':'askaprel.ant',
+            'ant':values.antfile,
             'telescop':'askap',
             'baseunit':'3.33564',
             'corr':'{nchan},1,0,{width_mhz}'.format(**locals()),
@@ -186,8 +186,8 @@ def modify_data(amps, h0, nant, values):
             noise_r = 0
             noise_i = 0
         else:
-            noise_r = np.random.randn(Nchan)
-            noise_i = np.random.randn(Nchan)
+            noise_r = np.random.randn(Nchan)*noiseamp
+            noise_i = np.random.randn(Nchan)*noiseamp
 
         dreal = row['DATA'][0,0,:,0,0]
         dimag = row['DATA'][0,0,:,0,1]
@@ -208,12 +208,13 @@ def _main():
     parser.add_argument('--nchan', type=int, help='Number of channels', default=256)
 #    parser.add_argument('-f', '--calcfile', required=True, help='Calc11 im file for UV coordinates and stuff')
     parser.add_argument('-o','--outfile', help='Output data file', default='frb')
+    parser.add_argument('--antfile', help='Antenna file', default='askap-ak1-ak30.ant')
     parser.add_argument('--clobber', action='store_true', help='Clobber output files')
     parser.add_argument('--ignore-ant', help='Antennas numbers to ignore', default='31-36', type=strrange)
     parser.add_argument('--include-ant', help='Antenna numbers to include (overrides --ignore-ant)', type=strrange)
     parser.add_argument('--format', help='Output data format. [uvfits, raw]', default='uvfits')
     parser.add_argument('--tint', type=float, help='Integration time (ms)', default=0.876)
-    parser.add_argument('--duration', type=float, help='Duration (integraions)', default=1000)
+    parser.add_argument('--duration', type=float, help='Duration (integraions)', default=256)
     parser.add_argument('--phase_center', help='Phase center of observations. hh:mm:ss,dd:mm:ss format, or as decimal hours and decimal degrees', default='0,-30')
     parser.add_argument('--stokes', help='Sotkes to produce. I or XX,YY', default='I')
     

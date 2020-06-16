@@ -11,6 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
+import warnings
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -50,7 +51,9 @@ def mkfrb(f1, foff, nchans, tsamp, dm, amp=1, offset=0, noiserms=0, ntimes=4096,
     assert f1 < 10, 'You probably have the wrong units for frequency. f1 is in GHz. f1={}'.format(f1)
     assert abs(foff) < 1, 'You probably have the wrong units for foff. It is in GHz. foff={}'.format(foff)
     assert tsamp > 0
-    assert tsamp < 100, 'You probably have the wrong units for tsamp. Its in milliseconds. tsamp={}'.format(tsamp)
+    if tsamp > 100:
+        warnings.warn('You probably have the wrong units for tsamp. Its in milliseconds. tsamp={}'.format(tsamp))
+        
     assert amp > 0
     assert offset >= 0
 
@@ -134,7 +137,8 @@ def mkfrb2(f1, foff, nchans, tsamp, dm, amp=1, toffset=0, noiserms=0, ntimes=409
     assert f1 > 0
     assert f1 < 10, 'You probably have the wrong units for frequency. f1 is in GHz. f1={}'.format(f1)
     assert tsamp > 0
-    assert tsamp < 100, 'You probably have the wrong units for tsamp. Its in milliseconds. tsamp={}'.format(tsamp)
+    if tsamp > 100:
+        warnings.warn('You probably have the wrong units for tsamp. Its in milliseconds. tsamp={}'.format(tsamp))
 
     ntimes = int(ntimes)
     nchans = int(nchans)
