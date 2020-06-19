@@ -63,7 +63,7 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
         # FDMT everything
         for iuv, uvd in enumerate(uvcells):
             cell_data = uvd.extract(d)
-            print  'blkt', blkt, 'iuv', iuv, cell_data.shape
+            print('blkt', blkt, 'iuv', iuv, cell_data.shape)
             # Truncating times for the moment, as we don't keep history
             dblk[iuv, :, :] = thefdmt(cell_data)[:, :values.nt]
 
@@ -97,7 +97,7 @@ def _main():
     # get data for first integration to work out UVW coordinatse
     d0 = vis[0]['DATE']
     baselines = {}
-    for i in xrange(vis.size):
+    for i in range(vis.size):
         row = vis[i]
         baselines[row['BASELINE']] = row
         if row['DATE'] != d0:
