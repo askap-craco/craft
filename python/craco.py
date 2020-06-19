@@ -11,6 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
+import warnings
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
