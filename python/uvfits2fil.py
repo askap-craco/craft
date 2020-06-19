@@ -26,6 +26,7 @@ def _main():
     parser.add_argument('-s', '--show', action='store_true', help='show plots')
     parser.add_argument('--weight', action='store_true', help='Multiply output by weight')
     parser.add_argument('--no-cross', action='store_false', dest='do_cross', default=True)
+    parser.add_argument('--maxfiles', help='max files to open', default=np.inf, type=int)
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -48,13 +49,18 @@ def _main():
         bl = int(row['BASELINE'])
         ia1 = bl % 256 - 1
         ia2 = bl // 256 - 1
+        a1 = get_antname(hdu, ia1)
+        a2 = get_antname(hdu, ia2)
+        if not (a1 == a2 or values.do_cross):
+            continue
+
 
         data = row['DATA']
-        nchan = data.shape[3]
+        nchan = data.shape[-3]
         spec = np.zeros(nchan, np.complex64)
-        spec.real = data[0,0,0,:,0,0]
-        spec.imag = data[0,0,0,:,0,1]
-        weights = data[0,0,0,:,0,2]
+        spec.real = data[...,0].reshape(nchan)
+        spec.imag = data[...,1].reshape(nchan)
+        weights = data[...,2].reshape(nchan)
         if values.weight:
             spec *= weights
             
@@ -63,9 +69,7 @@ def _main():
             pylab.plot(spec.imag)
             pylab.show()
 
-        if bl not in outfiles.keys():
-            a1 = get_antname(hdu, ia1)
-            a2 = get_antname(hdu, ia2)
+        if bl not in outfiles.keys() and len(outfiles) < values.maxfiles:
             if ia1 == ia2:
                 extra = 'auto'
             else:
@@ -73,7 +77,11 @@ def _main():
                 
             outf = '{}-{}-{}-{}.fil'.format(fin.replace('.fits',''),a1,a2, extra)
             jd = row['DATE']
-            inttime = row['INTTIM']
+            try:
+                inttime = row['INTTIM']
+            except:
+                inttime = 1
+                
             #dayfrac = row['_DATE']
             fulljd = float(jd) 
             mjd = fulljd - 2400000.5
@@ -84,8 +92,9 @@ def _main():
             fout = sigproc.SigprocFile(outf, 'w', hdr)
             outfiles[bl] = fout
 
-        fout = outfiles[bl]
-        abs(spec).tofile(fout.fin)
+        if bl in outfiles:
+            fout = outfiles[bl]
+            abs(spec).tofile(fout.fin)
 
     for k,fout in outfiles.iteritems():
         fout.fin.close()

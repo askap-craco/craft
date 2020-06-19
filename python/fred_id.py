@@ -304,7 +304,7 @@ def _main():
         print("reading data from psrcat")
         #print(psrcat)
     else:
-        os.system("psrcat -c 'name p0 dm raj decj dmdist' -o short_csv -nohead -nonumber > psrcat_.csv ")
+        os.system("psrcat -c 'name p0 dm raj decj' -o short_csv -nohead -nonumber > psrcat_.csv ")
         print("generating psrcat.csv file")
         cat=np.genfromtxt("psrcat_.csv",skip_header=2,delimiter=';',dtype=str)
         name=cat.T[0]
@@ -314,8 +314,15 @@ def _main():
         dec=cat.T[4]
         newcat=open("psrcat.csv",'w')
         for i in range(len(ra)):
-             c = SkyCoord(ra[i]+' '+dec[i], unit=(u.hourangle, u.deg))
-             newcat.write(name[i]+";"+p0[i]+";"+dm[i]+';'+str(c.ra.deg)+';'+str(c.dec.deg)+";\n")
+            if ra[i]=="*":
+                print (name[i],ra[i],dec[i])
+                continue
+            if dec[i]=='*':
+                print (name[i],ra[i],dec[i])
+                continue
+            c = SkyCoord(ra[i]+' '+dec[i], unit=(u.hourangle, u.deg))
+            newcat.write(name[i]+";"+p0[i]+";"+dm[i]+';'+str(c.ra.deg)+';'+str(c.dec.deg)+";\n")
+        newcat.close()
         psrcat='psrcat.csv'
 
     cat=np.genfromtxt(psrcat,delimiter=';',dtype=str)
@@ -353,7 +360,6 @@ def _main():
         #bpos=SkyCoord(ra*u.deg,dec*u.deg)
         #idx, d2d, d3d = bpos.match_to_catalog_sky(catalog)
         #print cat_name[idx]
-        ,u
         sep=c.separation(catalog)
         psr_select=np.where(sep.deg<radius)
         if len(bm_list) > 0:
