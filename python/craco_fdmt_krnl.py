@@ -57,7 +57,7 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
     nbl = len(baselines)
     baselines = sorted(baselines.keys())
     nuv = len(uvcells)
-    for blkt, d in enumerate(time_block(vis, values.nt)):
+    for blkt, d in enumerate(time_blocks(vis, values.nt)):
         dblk = np.zeros((nuv, values.ndm, values.nt), dtype=np.complex64)
         logging.info('UV data output shape is %s', dblk.shape)
         # FDMT everything
@@ -81,6 +81,7 @@ def _main():
     parser.add_argument('--cell', help='Image cell size (arcsec)', default='10,10')
     parser.add_argument('--nt', help='Number of times per block', type=int, default=256)
     parser.add_argument('--ndm', help='Number of DM trials', type=int, default=16)
+    parser.add_argument('-s','--show', help='Show plots', action='store_true')
                         
     parser.add_argument(dest='files', nargs='?')
     parser.set_defaults(verbose=False)
@@ -128,7 +129,8 @@ def _main():
         if np.any((upix < 0) | (upix >= Npix) | (vpix < 0) | (vpix >= Npix)):
             warnings.warn('Pixel coordinates out of range')
 
-        pylab.plot(ulam/1e3, vlam/1e3)
+        if values.show:
+            pylab.plot(ulam/1e3, vlam/1e3)
 
         uvpos = list(zip(upix, vpix))
         for istart, iend in runidxs(uvpos):
@@ -141,17 +143,17 @@ def _main():
     d = np.array([(f.a1, f.a2, f.uvpix[0], f.uvpix[1], f.chan_start, f.chan_end) for f in uvcells], dtype=np.uint32)
     
     np.savetxt(values.files+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
-
-    pylab.xlabel('U(klambda)')
-    pylab.ylabel('V(klambda)')
-
-    fix, ax = pylab.subplots(1,2)
-    g = grid(uvcells, values.npix)
-    ax[0].imshow(abs(g), aspect='auto', origin='lower')
-    ax[1].imshow(image_fft(g).real, aspect='auto', origin='lower')
-                  
     fdmt_baselines(hdul, baselines, uvcells, values)
-    pylab.show()
+
+    if values.show:
+        pylab.xlabel('U(klambda)')
+        pylab.ylabel('V(klambda)')
+        
+        fix, ax = pylab.subplots(1,2)
+        g = grid(uvcells, values.npix)
+        ax[0].imshow(abs(g), aspect='auto', origin='lower')
+        ax[1].imshow(image_fft(g).real, aspect='auto', origin='lower')
+        pylab.show()
     
         
     
