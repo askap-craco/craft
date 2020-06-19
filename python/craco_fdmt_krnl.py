@@ -16,50 +16,9 @@ from astropy.io import fits
 from scipy import constants
 import fdmt
 import warnings
+from craco import *
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
-
-def bl2ant(bl):
-    '''
-    Convert baseline to antena numbers according to UV fits convention
-    Antenna numbers start at 1 and:
-
-    baseline = 256*ant1 + ant2
-
-    :see: http://parac.eu/AIPSMEM117.pdf
-
-    :returns: (ant1, ant2) as integers
-
-    >>> bl2ant(256*1 + 2)
-    (1, 2)
-
-    >> bl2ant(256*7 + 12)
-    (7, 12)
-    '''
-    ibl = int(bl)
-    a1 = ibl // 256
-    a2 = ibl % 256
-
-    assert a1 >= 1
-    assert a2 >= 1
-
-    return (a1, a2)
-
-def runidxs(x):
-    ''' 
-    Return the indexes of the start an end of a list numbers that might be equal
-
-    '''
-    istart = 0
-    for i in xrange(1, len(x)):
-        if x[i] != x[istart]:
-            yield (istart, i-1)
-            istart = i
-            
-    yield (istart, i)
-
-def arcsec2rad(strarcsec):
-    return np.radians(float(strarcsec)/3600.)
 
 class BaselineCell(object):
     def __init__(self, blid, uvpix, chan_start, chan_end, freqs):
@@ -83,59 +42,6 @@ class BaselineCell(object):
         padded_d[cstart:cend, :] = alld[cstart:cend, :]
         return padded_d
 
-def grid(uvcells, values):
-    Npix = values.npix
-    np2 = int(float(Npix)/2.)
-    g = np.zeros((Npix, Npix), dtype=np.complex)
-
-    for b in uvcells:
-        upix, vpix = b.uvpix
-        g[vpix, upix] += b.nchan
-        g[Npix-vpix, Npix-upix] += b.nchan
-
-    return g
-
-
-def image_fft(g):
-    '''
-    Do the complex-to-complex imaging FFT with the correct shifts and correct inverse thingy
-    If g.shape = (Npix, Npix) then we assume the center of the UV plane is at
-    Npix/2, Npix/2 = DC
-    '''
-    # The old version was incorrect!
-    #cimg = np.fft.fftshift(np.fft.ifft2(g)).astype(np.complex64)
-    
-    cimg = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(g))).astype(np.complex64)
-    return cimg/np.prod(cimg.shape)
-
-def blocks(vis, nt):
-    nrows = vis.size
-    nchan = vis[0].data.shape[-3]
-    d = {}
-    t = 0
-    d0 = vis[0]['DATE']
-    for irow in xrange(nrows):
-        row = vis[irow]
-        if row['DATE'] > d0:
-            t += 1
-            if t == nt:
-                yield d
-                d = {}
-                d0 = row['DATE']
-                t = 0
-
-        blid = row['BASELINE']
-        if blid not in d.keys():
-            d[blid] = np.zeros((nchan, nt), dtype=np.complex64)
-
-        d[blid][:, t].real = row.data[...,0].reshape(nchan)
-        d[blid][:, t].imag = row.data[...,1].reshape(nchan)
-
-        
-    if len(d) > 0:
-        if t < nt:
-            warnings.warn('Final integration only contained {} of {} samples'.format(t, nt))
-        yield d
 
 def fdmt_baselines(hdul, baselines, uvcells, values):
     hdr = hdul[0].header
@@ -151,7 +57,7 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
     nbl = len(baselines)
     baselines = sorted(baselines.keys())
     nuv = len(uvcells)
-    for blkt, d in enumerate(blocks(vis, values.nt)):
+    for blkt, d in enumerate(time_block(vis, values.nt)):
         dblk = np.zeros((nuv, values.ndm, values.nt), dtype=np.complex64)
         logging.info('UV data output shape is %s', dblk.shape)
         # FDMT everything
@@ -161,9 +67,11 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
             # Truncating times for the moment, as we don't keep history
             dblk[iuv, :, :] = thefdmt(cell_data)[:, :values.nt]
 
-        fname = '{}.b{:d}.uvdata'.format(values.files, blkt)
+        fname = '{}.b{:d}.uvdata.npy'.format(values.files, blkt)
         logging.info('Writing shape %s to %s', dblk.shape, fname)
-        dblk.tofile(fname)
+        #dblk.tofile(fname)
+        np.save(fname, dblk)
+        
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -209,8 +117,6 @@ def _main():
     mfov = mcell*Npix
     ucell, vcell = 1./lfov, 1./mfov
     logging.info('Fch1=%f foff=%f uvcell=%s', fch1, foff, (ucell, vcell))
-
-
     uvcells = []
 
     for blid, bldata in baselines.iteritems():
@@ -233,13 +139,14 @@ def _main():
 
     uvcells = sorted(uvcells, key=lambda b:b.uvpix)
     d = np.array([(f.a1, f.a2, f.uvpix[0], f.uvpix[1], f.chan_start, f.chan_end) for f in uvcells], dtype=np.uint32)
-    np.savetxt('grid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
+    
+    np.savetxt(values.files+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
 
     pylab.xlabel('U(klambda)')
     pylab.ylabel('V(klambda)')
 
     fix, ax = pylab.subplots(1,2)
-    g = grid(uvcells, values)
+    g = grid(uvcells, values.npix)
     ax[0].imshow(abs(g), aspect='auto', origin='lower')
     ax[1].imshow(image_fft(g).real, aspect='auto', origin='lower')
                   
