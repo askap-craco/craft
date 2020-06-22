@@ -82,20 +82,28 @@ def time_blocks(vis, nt):
 
     nrows = vis.size
     nchan = vis[0].data.shape[-3]
+    logging.info('returning blocks for nrows=%s rows nt=%s visshape=%s', nrows, nt, vis[0].data.shape)
     d = {}
     t = 0
     d0 = vis[0]['DATE']
+    first_blid = vis[0]['BASELINE']
     for irow in xrange(nrows):
         row = vis[irow]
-        if row['DATE'] > d0:
+        blid = row['BASELINE']
+        #logging.(irow, blid, bl2ant(blid), row['DATE'], d0, t)
+        if row['DATE'] > d0 or (blid == first_blid and irow != 0): # integration finifhsed when we see first blid again. date doesnt have enough resolution
             t += 1
+            tdiff = row['DATE'] - d0
+            d0 = row['DATE']
+            logging.debug('Time change or baseline change irow=%d, len(d)=%d t=%d d0=%s rowdate=%s tdiff=%0.2f millisec', irow, len(d), t, d0, row['DATE'], tdiff*86400*1e3)
+
             if t == nt:
+                logging.debug('Returning block irow=%d, len(d)=%d t=%d d0=%s rowdate=%s tdiff=%0.2f millisec', irow, len(d), t, d0, row['DATE'], tdiff*86400*1e3)
                 yield d
                 d = {}
-                d0 = row['DATE']
                 t = 0
 
-        blid = row['BASELINE']
+
         if blid not in d.keys():
             d[blid] = np.zeros((nchan, nt), dtype=np.complex64)
 
@@ -104,8 +112,8 @@ def time_blocks(vis, nt):
 
         
     if len(d) > 0:
-        if t < nt:
-            warnings.warn('Final integration only contained {} of {} samples'.format(t, nt))
+        if t < nt - 1:
+            warnings.warn('Final integration only contained {} of {} samples len(d)={} nrows={}'.format(t, nt, len(d), nrows))
         yield d
 
 def grid(uvcells, Npix):

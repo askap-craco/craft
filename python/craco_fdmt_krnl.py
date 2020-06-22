@@ -59,18 +59,31 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
     nuv = len(uvcells)
     for blkt, d in enumerate(time_blocks(vis, values.nt)):
         dblk = np.zeros((nuv, values.ndm, values.nt), dtype=np.complex64)
-        logging.info('UV data output shape is %s', dblk.shape)
+        logging.info('UV data output shape is %s blkt=%s d.shape=%s', dblk.shape, blkt, len(d))
         # FDMT everything
         for iuv, uvd in enumerate(uvcells):
             cell_data = uvd.extract(d)
-            print('blkt', blkt, 'iuv', iuv, cell_data.shape)
+            logging.debug(' '.join(['blkt', blkt, 'iuv', iuv, cell_data.shape]))
             # Truncating times for the moment, as we don't keep history
             dblk[iuv, :, :] = thefdmt(cell_data)[:, :values.nt]
 
-        fname = '{}.b{:d}.uvdata.npy'.format(values.files, blkt)
-        logging.info('Writing shape %s to %s', dblk.shape, fname)
-        #dblk.tofile(fname)
-        np.save(fname, dblk)
+            if values.show:
+                fig, ax = pylab.subplots(1,2)
+                ax[0].imshow(abs(dblk[iuv, :, :]))
+                ax[1].imshow(np.angle(dblk[iuv, :, :]))
+                pylab.show()
+
+        if values.outfile:
+            outfile = values.outfile
+        else:
+            outfile = values.files
+            
+        fname = '{}.ndm{:d}_nt{:d}.b{:d}.uvdata.{}'.format(outfile, values.ndm, values.nt, blkt, values.format)
+        logging.info('Writing shape (nuv, nd, nt)=%s to %s in format=%s', dblk.shape, fname, values.format)
+        if values.format == 'npy':
+            np.save(fname, dblk)
+        else:
+            dblk.tofile(fname)
         
 
 def _main():
@@ -81,6 +94,8 @@ def _main():
     parser.add_argument('--cell', help='Image cell size (arcsec)', default='10,10')
     parser.add_argument('--nt', help='Number of times per block', type=int, default=256)
     parser.add_argument('--ndm', help='Number of DM trials', type=int, default=16)
+    parser.add_argument('--outfile', help='Output filename base. Defualts to input filename')
+    parser.add_argument('--format', help='Output format', choices=('npy','raw'), default='raw')
     parser.add_argument('-s','--show', help='Show plots', action='store_true')
                         
     parser.add_argument(dest='files', nargs='?')

@@ -68,9 +68,19 @@ class Imager(object):
         
 
 def image_pipeline(fname, values):
-    d = np.load(fname)
-    nuv, nd, nt = d.shape
     uvgrid = np.loadtxt(values.uvgrid)
+    if fname.endswith('.npy'):
+        d = np.load(fname)
+        nuv, nd, nt = d.shape
+    else:
+        nuv = uvgrid.shape[0]
+        nd = values.ndm
+        nt = values.nt
+        d = np.fromfile(fname, dtype=np.complex64).reshape(nuv, nd, nt)
+
+    assert uvgrid.shape[0] == nuv
+    assert d.shape == (nuv, nd, nt)
+    
     idm = 0
     t = 0
     gridder = Gridder(uvgrid, values.npix)
@@ -79,7 +89,7 @@ def image_pipeline(fname, values):
     npix = values.npix
     outshape = (nd, nt, npix, npix)
     logging.info("Input shape is %s. Writing outut data to %s shape is %s", d.shape, outfname, outshape)
-    fout = open(fname+'.img.dat', 'w')
+    fout = open(fname+'.img.raw', 'w')
     
     for idm in xrange(nd):    
         for t in xrange(nt):
@@ -88,7 +98,10 @@ def image_pipeline(fname, values):
             img.real.astype(np.complex64).tofile(fout)
             if values.show:
                 pylab.imshow(abs(img), aspect='auto', origin='lower')
+                pylab.title('idm={} t={}'.format(idm, t))
                 pylab.show()
+
+    logging.info("Wrote outpuut images to %s shape=", outfname, outshape)
 
     fout.close()
             
@@ -100,6 +113,8 @@ def _main():
     parser.add_argument('--uvgrid', help='UV Grid file output')
     parser.add_argument('--npix', help='Number of pixels', type=int, default=256)
     parser.add_argument('--outfile', help='Raw data output file')
+    parser.add_argument('--nt', type=int, help='Number of times per block. Used if using raw format', default=256)
+    parser.add_argument('--ndm', type=int, help='Number of DMs.  Used if raw format', default=16)
     parser.add_argument('-s','--show', action='store_true', help='Show plots', default=False)
     parser.add_argument(dest='files', nargs='*')
     parser.set_defaults(verbose=False)

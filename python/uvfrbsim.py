@@ -158,28 +158,21 @@ def modify_data(amps, h0, nant, values):
         # S/N = A/noisermsinonechannel/sqrt(Nbl,Npol,Nchan,Ntime)
         noiseamp = values.frb_amp/values.frb_sn/np.sqrt(Nchan*nbl*Npol)
 
+    firstbl = h0.data[0]['BASELINE']
     for irow in xrange(nrows):
         row = h0.data[irow]
-        if row['DATE'] != currdate:
+        blid = row['BASELINE']
+        if row['DATE'] != currdate or (blid == firstbl and irow != 0):
             diff = row['DATE'] - currdate
-            logging.info('Time change by %f milliseconds', diff*86400*1e3)
             currdate = row['DATE']
             t += 1
+            logging.info('Time change by %f milliseconds or new baseline irow=%s t=%d', diff*86400*1e3, irow, t)
 
         # modify amplitude of real and imaginary parts
         if t >= ntimes:
             amp = 0
         else:
             amp = amps[t, :]
-
-
-        if False:
-            pylab.plot(dreal)
-            pylab.plot(dimag)
-            pylab.plot(dreal*amp)
-            pylab.plot(dimag*amp)
-            pylab.ylim(-0.1, +1.1)
-            pylab.show()
 
 
         if noiseamp == 0:
@@ -191,6 +184,15 @@ def modify_data(amps, h0, nant, values):
 
         dreal = row['DATA'][0,0,:,0,0]
         dimag = row['DATA'][0,0,:,0,1]
+
+        if False:
+            logging.debug('Dreal %s, amp=%s, noiseamp=%s', dreal, amp, noiseamp)
+            pylab.plot(dreal)
+            pylab.plot(dimag)
+            pylab.plot(dreal*amp)
+            pylab.plot(dimag*amp)
+            pylab.ylim(-0.1, +1.1)
+            pylab.show()
 
         # real part
         row['DATA'][0,0,:,0,0] = dreal*amp + noise_r
@@ -210,9 +212,9 @@ def _main():
     parser.add_argument('-o','--outfile', help='Output data file', default='frb')
     parser.add_argument('--antfile', help='Antenna file', default='askap-ak1-ak30.ant')
     parser.add_argument('--clobber', action='store_true', help='Clobber output files')
-    parser.add_argument('--ignore-ant', help='Antennas numbers to ignore', default='31-36', type=strrange)
-    parser.add_argument('--include-ant', help='Antenna numbers to include (overrides --ignore-ant)', type=strrange)
-    parser.add_argument('--format', help='Output data format. [uvfits, raw]', default='uvfits')
+    #parser.add_argument('--ignore-ant', help='Antennas numbers to ignore', default='31-36', type=strrange)
+    #parser.add_argument('--include-ant', help='Antenna numbers to include (overrides --ignore-ant)', type=strrange)
+    #parser.add_argument('--format', help='Output data format. [uvfits, raw]', default='uvfits')
     parser.add_argument('--tint', type=float, help='Integration time (ms)', default=0.876)
     parser.add_argument('--duration', type=float, help='Duration (integraions)', default=256)
     parser.add_argument('--phase_center', help='Phase center of observations. hh:mm:ss,dd:mm:ss format, or as decimal hours and decimal degrees', default='0,-30')
@@ -285,6 +287,7 @@ def _main():
         if os.path.exists(fitsfile):
             os.remove(fitsfile)
 
+        logging.info('Writing output to %s', fitsfile)
         hdul.writeto(fitsfile, output_verify='fix+warn')
 
         
