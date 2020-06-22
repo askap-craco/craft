@@ -101,7 +101,7 @@ def image_pipeline(fname, values):
                 pylab.title('idm={} t={}'.format(idm, t))
                 pylab.show()
 
-    logging.info("Wrote outpuut images to %s shape=", outfname, outshape)
+    logging.info("Wrote outpuut images to %s shape=%s", outfname, outshape)
 
     fout.close()
             

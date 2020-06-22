@@ -113,7 +113,7 @@ def time_blocks(vis, nt):
         
     if len(d) > 0:
         if t < nt - 1:
-            warnings.warn('Final integration only contained {} of {} samples len(d)={} nrows={}'.format(t, nt, len(d), nrows))
+            warnings.warn('Final integration only contained t={} of nt={} samples len(d)={} nrows={}'.format(t, nt, len(d), nrows))
         yield d
 
 def grid(uvcells, Npix):
