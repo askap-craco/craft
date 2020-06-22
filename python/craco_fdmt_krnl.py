@@ -106,7 +106,7 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    logging.info('Opening file %s', values.files)
+    logging.info('Running %s with arguments %s', sys.argv[0], values)
     hdul = fits.open(values.files)
     vis = hdul[0].data
 

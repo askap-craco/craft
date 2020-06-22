@@ -124,6 +124,7 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
+    logging.info('Running %s with arguments %s', sys.argv[0], values)
     for f in values.files:
         image_pipeline(f, values)
     
