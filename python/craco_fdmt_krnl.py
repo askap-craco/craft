@@ -63,7 +63,7 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
         # FDMT everything
         for iuv, uvd in enumerate(uvcells):
             cell_data = uvd.extract(d)
-            logging.debug(' '.join(['blkt', blkt, 'iuv', iuv, cell_data.shape]))
+            logging.debug('blkt %s iuv %s cell_data shape=%s', blkt, iuv, cell_data.shape)
             # Truncating times for the moment, as we don't keep history
             dblk[iuv, :, :] = thefdmt(cell_data)[:, :values.nt]
 
