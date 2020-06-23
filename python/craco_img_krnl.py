@@ -71,15 +71,15 @@ def image_pipeline(fname, values):
     uvgrid = np.loadtxt(values.uvgrid)
     if fname.endswith('.npy'):
         d = np.load(fname)
-        nuv, nd, nt = d.shape
+        nd, nt, nuv = d.shape
     else:
         nuv = uvgrid.shape[0]
         nd = values.ndm
         nt = values.nt
-        d = np.fromfile(fname, dtype=np.complex64).reshape(nuv, nd, nt)
+        d = np.fromfile(fname, dtype=np.complex64).reshape(nd, nt, nuv)
 
     assert uvgrid.shape[0] == nuv
-    assert d.shape == (nuv, nd, nt)
+    assert d.shape == (nd, nt, nuv)
     
     idm = 0
     t = 0
@@ -93,7 +93,7 @@ def image_pipeline(fname, values):
     
     for idm in xrange(nd):    
         for t in xrange(nt):
-            g = gridder(d[:, idm, t])
+            g = gridder(d[idm, t, :])
             img = imager(g)
             img.real.astype(np.complex64).tofile(fout)
             if values.show:
