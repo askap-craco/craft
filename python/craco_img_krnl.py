@@ -11,7 +11,8 @@ import numpy as np
 import os
 import sys
 import logging
-from craco import image_fft
+from craco import image_fft, printstats
+
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -49,7 +50,7 @@ class Gridder(object):
         for iuv in xrange(nuv):
             upix, vpix = map(int, self.config[iuv, 2:4])
             v1 = data1[iuv]
-            if data2:
+            if data2 is not None:
                 v2 = data2[iuv]*1j
             else:
                 v2 = 0
@@ -65,7 +66,7 @@ class Imager(object):
     '''
     def __call__(self, g):
         return image_fft(g)
-        
+
 
 def image_pipeline(fname, values):
     uvgrid = np.loadtxt(values.uvgrid)
@@ -87,28 +88,36 @@ def image_pipeline(fname, values):
     imager = Imager()
     outfname = fname + '.img.dat'
     npix = values.npix
-    outshape = (nd, nt, npix, npix)
-    logging.info("Input shape is %s. Writing outut data to %s shape is %s", d.shape, outfname, outshape)
-    fout = open(fname+'.img.raw', 'w')
-    
-    for idm in xrange(nd):    
-        for t in xrange(nt):
-            uvdata = d[idm, t, :].copy()
-            print('Uvdata max', uvdata.real.max())
-            #uvdata[(uvdata.real < 64)] = 0
-            print('Uvdata max after', uvdata.real.max())
-            g = gridder(uvdata)
-            img = imager(g)
-            img.real.astype(np.complex64).tofile(fout)
+    outshape = (nd, nt/2, npix, npix)
+    logging.info("Input shape is %s. Writing output data to %s shape is (nd,nt,npix,npix)=%s", d.shape, outfname, outshape)
+    fout = open(outfname, 'w')
+
+    assert nt % 2 == 0, 'Nt must be divisible by 2 as were doign complex-to-real gridding'
+
+    for idm in xrange(nd):
+        for t in xrange(nt/2):
+            g = gridder(d[idm, t, :], d[idm, t+1, :])
+            img = imager(g).astype(np.complex64)
+            img.tofile(fout)
+            rlabel = 'img real idm={} t={}'.format(idm, t)
+            ilabel = 'img imag idm={} t={}'.format(idm, t+1)
+            printstats(img.real, rlabel)
+            printstats(img.imag, ilabel)
+            printstats(g.real, 'grid.real')
+            printstats(g.imag, 'grid.imag')
             if values.show:
-                fig, axs = pylab.subplots(1,2)
-                axs[0].imshow(abs(g), aspect='auto', origin='lower')
-                axs[1].imshow(abs(img), aspect='auto', origin='lower')
-                pylab.title('idm={} t={}'.format(idm, t))
+                fig, ax = pylab.subplots(2,2)
+                ax[0,0].imshow(img.real, aspect='auto', origin='lower')
+                ax[0,1].imshow(img.imag, aspect='auto', origin='lower')
+                ax[1,0].imshow(g.real, aspect='auto', origin='lower')
+                ax[1,1].imshow(g.imag, aspect='auto', origin='lower')
+                ax[0,0].set_title(rlabel)
+                ax[0,1].set_title(ilabel)
+                ax[1,0].set_title('real(UV plane)')
+                ax[1,1].set_title('imag(UV plane)')
                 pylab.show()
 
-    logging.info("Wrote output images to %s shape=%s", outfname, outshape)
-
+    logging.info("Wrote output images to %s shape=%s (nd,nt,npix,npix)=dtype=%s", outfname, outshape, img.dtype)
     fout.close()
             
 
@@ -130,6 +139,7 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
+    logging.info('Running %s with arguments %s', sys.argv[0], values)
     for f in values.files:
         image_pipeline(f, values)
     

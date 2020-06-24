@@ -595,6 +595,31 @@ class Fdmt(object):
     
         return total_var
 
+    def nchan_out_for_iter(self, iterno):
+        return self.hist_state_shape[iterno+1][0]
+
+    def ndm_out_for_iter(self, iterno):
+        '''
+        Returns NDM for the bottom of the subband which is the largest over the whole subbands
+        '''
+
+        return self.hist_state_shape[iterno+1][1]
+
+    def get_config(self, iterno, ichan, idm):
+        '''
+        Returns input dm1, input dm2 and offset for the given iteration umber, channel and idt
+
+
+        :returns: (id1, id2, offset)
+        '''
+
+        nfd = self.hist_nf_data[iterno]
+        chanconfig = nfd[ichan][-1]
+        _ , id1, offset, id2, _, _, _ = chanconfig[idm]
+
+        return (id1, id2, offset)
+    
+
 class OverlapAndSum(object):
     '''
     Implements an overlap and sum operation so you can get full S/N
