@@ -64,12 +64,32 @@ def image_fft(g):
     Do the complex-to-complex imaging FFT with the correct shifts and correct inverse thingy
     If g.shape = (Npix, Npix) then we assume the center of the UV plane is at
     Npix/2, Npix/2 = DC
+    Noramlised by np.prod(img.shape)
     '''
     # The old version was incorrect!
     #cimg = np.fft.fftshift(np.fft.ifft2(g)).astype(np.complex64)
     
-    cimg = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(g))).astype(np.complex64)
-    return cimg/np.prod(cimg.shape)
+    cimg = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(g)))/np.prod(g.shape)
+    return cimg
+
+def printstats(d, prefix=''):
+    '''
+    Print and return statistics
+    :prefix: prefix to stats
+    :d: np.array to find stats of
+    :returns: string describing statistics
+    '''
+    sn = d.max()/d.std()
+    maxidx = d.argmax()
+    maxpos = np.unravel_index(maxidx, d.shape)
+    dmax = d.max()
+    dmin = d.min()
+    dmean = d.mean()
+    dstd = d.std()
+    s = '{prefix} max/min/mean/rms = {dmax:.2e}/{dmin:0.2e}/{dmean:0.2e}/{dstd:0.2e} peak S/N={sn:0.1f} at {maxpos}'.format(**locals())
+    print s
+    return s
+
 
 def time_blocks(vis, nt):
     '''

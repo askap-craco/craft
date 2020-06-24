@@ -81,7 +81,7 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
         fname = '{}.ndm{:d}_nt{:d}.b{:d}.uvdata.{}'.format(outfile, values.ndm, values.nt, blkt, values.format)
         # Transpose to [NDm, NT, NUV] order
         dblk = np.transpose(dblk, (1, 2, 0))
-        logging.info('Writing shape (NDM, NT, NUV)=%s to %s in format=%s', dblk.shape, fname, values.format)
+        logging.info('Writing shape (NDM, NT, NUV)=%s to %s in format=%s num nonozero=%d', dblk.shape, fname, values.format, np.sum(dblk != 0))
         if values.format == 'npy':
             np.save(fname, dblk)
         else:
