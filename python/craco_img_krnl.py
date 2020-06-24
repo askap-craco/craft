@@ -93,15 +93,21 @@ def image_pipeline(fname, values):
     
     for idm in xrange(nd):    
         for t in xrange(nt):
-            g = gridder(d[idm, t, :])
+            uvdata = d[idm, t, :].copy()
+            print('Uvdata max', uvdata.real.max())
+            #uvdata[(uvdata.real < 64)] = 0
+            print('Uvdata max after', uvdata.real.max())
+            g = gridder(uvdata)
             img = imager(g)
             img.real.astype(np.complex64).tofile(fout)
             if values.show:
-                pylab.imshow(abs(img), aspect='auto', origin='lower')
+                fig, axs = pylab.subplots(1,2)
+                axs[0].imshow(abs(g), aspect='auto', origin='lower')
+                axs[1].imshow(abs(img), aspect='auto', origin='lower')
                 pylab.title('idm={} t={}'.format(idm, t))
                 pylab.show()
 
-    logging.info("Wrote outpuut images to %s shape=%s", outfname, outshape)
+    logging.info("Wrote output images to %s shape=%s", outfname, outshape)
 
     fout.close()
             
