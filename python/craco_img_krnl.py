@@ -87,18 +87,22 @@ def image_pipeline(fname, values):
     gridder = Gridder(uvgrid, values.npix)
     imager = Imager()
     outfname = fname + '.img.dat'
+    outgridname= fname + '.grid.dat'
     npix = values.npix
     outshape = (nd, nt/2, npix, npix)
     logging.info("Input shape is %s. Writing output data to %s shape is (nd,nt,npix,npix)=%s", d.shape, outfname, outshape)
     fout = open(outfname, 'w')
+    gout = open(outgridname, 'w')
 
     assert nt % 2 == 0, 'Nt must be divisible by 2 as were doign complex-to-real gridding'
 
     for idm in xrange(nd):
         for t in xrange(nt/2):
             g = gridder(d[idm, t, :], d[idm, t+1, :])
+            g.tofile(gout)
             img = imager(g).astype(np.complex64)
             img.tofile(fout)
+
             rlabel = 'img real idm={} t={}'.format(idm, t)
             ilabel = 'img imag idm={} t={}'.format(idm, t+1)
             printstats(img.real, rlabel)
@@ -119,6 +123,7 @@ def image_pipeline(fname, values):
 
     logging.info("Wrote output images to %s shape=%s (nd,nt,npix,npix)=dtype=%s", outfname, outshape, img.dtype)
     fout.close()
+    gout.close()
             
 
 def _main():

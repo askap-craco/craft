@@ -59,17 +59,25 @@ def arcsec2rad(strarcsec):
     return np.radians(float(strarcsec)/3600.)
 
 
-def image_fft(g):
+def image_fft(g, scale='none'):
     '''
     Do the complex-to-complex imaging FFT with the correct shifts and correct inverse thingy
     If g.shape = (Npix, Npix) then we assume the center of the UV plane is at
     Npix/2, Npix/2 = DC
     Noramlised by np.prod(img.shape)
+    
+    :scale: 'none' or None for raw FFT output. 'prod' for np.prod(g.shape)
+
     '''
     # The old version was incorrect!
     #cimg = np.fft.fftshift(np.fft.ifft2(g)).astype(np.complex64)
+
+    if scale == 'none':
+        s = 1.0
+    elif scale == 'prod':
+        s = np.prod(g.shape)
     
-    cimg = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(g)))/np.prod(g.shape)
+    cimg = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(g)))/s
     return cimg
 
 def printstats(d, prefix=''):
