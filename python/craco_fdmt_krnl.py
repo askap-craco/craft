@@ -141,8 +141,14 @@ def _main():
         #UU, VV WW are in seconds
         ulam = bldata['UU'] * freqs
         vlam = bldata['VV'] * freqs
-        upix = np.round(ulam/ucell + Npix/2).astype(int)
-        vpix = np.round(vlam/vcell + Npix/2).astype(int)
+
+        uvcent = False
+        pix_offset = 0
+        if uvcent:
+            pix_offset = Npix/2
+        
+        upix = np.round(ulam/ucell + pix_offset).astype(int)
+        vpix = np.round(vlam/vcell + pix_offset).astype(int)
         if np.any((upix < 0) | (upix >= Npix) | (vpix < 0) | (vpix >= Npix)):
             warnings.warn('Pixel coordinates out of range')
 

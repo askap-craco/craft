@@ -6,7 +6,6 @@
 
 from pylab import *
 import matplotlib as mpl
-import seaborn as sns
 import calc11
 import numpy as np
 from scipy import constants

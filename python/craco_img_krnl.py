@@ -56,7 +56,7 @@ class Gridder(object):
                 v2 = 0
                 
             g[vpix, upix] += v1 + v2
-            g[-vpix, -upix] += np.conj(v1) - np.conj(v2)
+            g[npix-vpix, npix-upix] += np.conj(v1) - np.conj(v2)
 
         return g
 

@@ -9,7 +9,6 @@ import numpy as np
 import logging
 import math
 
-
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 def is_power_of_2(x):
     return math.log(x, 2).is_integer()
@@ -289,7 +288,6 @@ def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
-    parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
     if values.verbose:
