@@ -98,6 +98,7 @@ def _main():
     parser.add_argument('--ndm', help='Number of DM trials', type=int, default=16)
     parser.add_argument('--outfile', help='Output filename base. Defualts to input filename')
     parser.add_argument('--format', help='Output format', choices=('npy','raw'), default='raw')
+    parser.add_argument('--no-fft-shift', help='Dont shift fft', action='store_false', dest='fft_shift', default=True)
     parser.add_argument('-s','--show', help='Show plots', action='store_true')
                         
     parser.add_argument(dest='files', nargs='?')
@@ -141,10 +142,8 @@ def _main():
         #UU, VV WW are in seconds
         ulam = bldata['UU'] * freqs
         vlam = bldata['VV'] * freqs
-
-        uvcent = False
         pix_offset = 0
-        if uvcent:
+        if values.fftshift:
             pix_offset = Npix/2
         
         upix = np.round(ulam/ucell + pix_offset).astype(int)
