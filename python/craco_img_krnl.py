@@ -70,6 +70,9 @@ class Imager(object):
 
 def image_pipeline(fname, values):
     uvgrid = np.loadtxt(values.uvgrid)
+    if uvgrid.ndim == 1:
+        uvgrid = uvgrid[np.newaxis, :]
+        
     if fname.endswith('.npy'):
         d = np.load(fname)
         nd, nt, nuv = d.shape
