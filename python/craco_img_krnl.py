@@ -138,6 +138,7 @@ def _main():
     parser.add_argument('--outfile', help='Raw data output file')
     parser.add_argument('--nt', type=int, help='Number of times per block. Used if using raw format', default=256)
     parser.add_argument('--ndm', type=int, help='Number of DMs.  Used if raw format', default=16)
+    parser.add_argument('--nfft', type=int, help='Number of FFT Computing Units for transpose', default=1)
     parser.add_argument('-s','--show', action='store_true', help='Show plots', default=False)
     parser.add_argument(dest='files', nargs='*')
     parser.set_defaults(verbose=False)

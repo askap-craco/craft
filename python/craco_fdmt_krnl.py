@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Makes dedispersed visibilities suitable for the CRACO imaging pipelien that does gridding, FFT and boxcar.
+Makes dedispersed visibilities suitable for the CRACO imaging pipeline that does gridding, FFT and boxcar.
 
 
 Copyright (C) CSIRO 2020
