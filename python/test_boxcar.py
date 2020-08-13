@@ -76,8 +76,77 @@ class TestBoxcar(TestCase):
                 #print 'diff', diff
                 self.assertTrue(np.all(abs(diff) < 1e-5))
 
+
+def davg(x, b):
+    return x.sum(axis=0)/(b+1)
+
+def dsum(x, b):
+    return x.sum(axis=0)
+
+def dsqrt(x, b):
+    return x.sum(axis=0)/np.sqrt(b+1)
+    
+class TestBoxcarImage(TestCase):
+
+    def setUp(self):
+        self.nd = 10
+        self.nt = 21
+        self.nbox = 13
+        self.npix = 4
+        self.nt = self.nbox + 5
+
+    def check_box(self, ib, indata, func):
+        for d in xrange(self.nd):
+            for t in xrange(self.nt):
+                dout = ib(d, indata[t, :, :]*d)
+                for b in xrange(self.nbox):
+                    start = 0 if t < b else t - b
+                    expected = func(indata[start:t+1:,:]*d, b)
+                    self.assertTrue(np.allclose(dout[:,:,b], expected))
         
         
+    def test_avg_impulse(self):
+        ib = boxcar.ImageBoxcar(self.nd, self.npix, self.nbox, 'avg')
+        nt, npix = self.nt, self.npix
+        indata = np.zeros((nt, npix, npix))
+        indata[0, :, :] = 1
+        self.check_box(ib, indata, davg)
+
+    def test_avg_step(self):
+        ib = boxcar.ImageBoxcar(self.nd, self.npix, self.nbox, 'avg')
+        nt, npix = self.nt, self.npix
+        indata = np.zeros((nt, npix, npix))
+        indata[:, :, :] = 1
+        self.check_box(ib, indata, davg)
+
+
+    def test_sum_impulse(self):
+        ib = boxcar.ImageBoxcar(self.nd, self.npix, self.nbox, 'sum')
+        nt, npix = self.nt, self.npix
+        indata = np.zeros((nt, npix, npix))
+        indata[0, :, :] = 1
+        self.check_box(ib, indata, dsum)
+
+    def test_sum_step(self):
+        ib = boxcar.ImageBoxcar(self.nd, self.npix, self.nbox, 'sum')
+        nt, npix = self.nt, self.npix
+        indata = np.zeros((nt, npix, npix))
+        indata[:, :, :] = 1
+        self.check_box(ib, indata, dsum)
+
+    def test_sqrt_impulse(self):
+        ib = boxcar.ImageBoxcar(self.nd, self.npix, self.nbox, 'sqrt')
+        nt, npix = self.nt, self.npix
+        indata = np.zeros((nt, npix, npix))
+        indata[0, :, :] = 1
+        self.check_box(ib, indata, dsqrt)
+
+    def test_sqrt_step(self):
+        ib = boxcar.ImageBoxcar(self.nd, self.npix, self.nbox, 'sqrt')
+        nt, npix = self.nt, self.npix
+        indata = np.zeros((nt, npix, npix))
+        indata[:, :, :] = 1
+        self.check_box(ib, indata, dsqrt)
 
 
 def _main():

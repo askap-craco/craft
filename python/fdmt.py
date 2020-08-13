@@ -605,6 +605,12 @@ class Fdmt(object):
 
         return self.hist_state_shape[iterno+1][1]
 
+    def ndm_in_for_iter(self, iterno):
+        return self.hist_state_shape[iterno][1]
+
+    def nchan_in_for_iter(self, iterno):
+        return self.hist_state_shape[iterno][0]
+
     def get_config(self, iterno, ichan, idm):
         '''
         Returns input dm1, input dm2 and offset for the given iteration umber, channel and idt

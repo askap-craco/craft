@@ -75,7 +75,7 @@ def uvgen(values):
     return runmir('uvgen', **args)
 
 def export_fits(values):
-    outfile = values.outfile+'.fits'
+    outfile = values.outfile
     if os.path.exists(outfile):
         if values.clobber:
             os.remove(outfile)
@@ -273,7 +273,7 @@ def _main():
     uvgen(values)
     export_fits(values)
 
-    fitsfile = values.outfile +'.fits'
+    fitsfile = values.outfile
     hdul = fits.open(fitsfile)
     h0 = hdul[0]
     # fix header

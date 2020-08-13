@@ -101,7 +101,7 @@ ignore_ant = ['ak31','ak32','ak33','ak34','ak35','ak36']
 
 # List of configuraitons to dump by Default
 # (Nd, Nchan, )
-configs = ((2,2), (4, 4), (8,8), (16,16), (32,32), (64,64),(128,128),(256,256),(1024,256),(1024,288),(256,288),(32,288), (512, 256))
+configs = ((2,2), (4, 4), (8,8), (16,16), (32,32), (64,64),(128,128),(256,256),(1024,256),(1024,288),(256,288),(32,288), (512, 256), (1024, 32), (1024, 64), (1024, 128))
 
 class FdmtDag(object):
     '''
@@ -319,7 +319,7 @@ class FdmtDagFileIter3(object):
 
     '''
 
-    def __init__(self, fdmt_dag, fifos_per_group=64, max_cache_depth=512, comment_constants=False):
+    def __init__(self, fdmt_dag, fifos_per_group=64, max_cache_depth=512, comment_constants=False, compound_threshold=256, bram_depth=1024):
         self.fdmt_dag = fdmt_dag
         self.thefdmt = fdmt_dag.thefdmt
         self.fifos_per_group = fifos_per_group
@@ -445,12 +445,28 @@ class FdmtDagFileIter3(object):
         # NB: padding at the beginning rather than the end saves a bunch of memory
         group_sizes = np.zeros(ngroups, dtype=int)
         group_fifos = {}
+        total_fifo_entries = 0
+        num_lut16 = 0
+        num_bram = 0
+        word_size_bits = 16
 
         for fifo_enum, (fifo_name, fifo_sizes) in enumerate(sorted_queues):
             fifo_id = fifo_enum + npad # pad id from the beginning
             group_id = fifo_id // fifos_per_group
             group_offset = fifo_id % fifos_per_group
             fifo_size = max(fifo_sizes)
+            total_fifo_entries += fifo_size
+            if fifo_size >= compound_threshold:
+                nlut = word_size_bits
+            else:
+                nlut = word_size_bits*((fifo_size + 16) // 16)
+
+            if fifo_size >= compound_threshold:
+                num_bram += (fifo_size + bram_depth -1 )//bram_depth
+                
+            print(fifo_name, fifo_size, nlut, num_bram)
+
+            num_lut16 += nlut
             queuedecl += 'static FdmtFifo<{}, {}, {}> {}_fifo;\n'.format(fifo_size, group_id, group_offset, fifo_name);
             group_sizes[group_id] = max(group_sizes[group_id], fifo_size)
             gf = group_fifos.get(group_id, [])
@@ -561,6 +577,12 @@ const int FIFO_GROUP_OFFSETS[] = {{ {group_offsets_csep} }}; // Offset address f
 const int NUM_CACHES = {num_caches}; // Total number of cache blocks
 const int CACHE_SIZES[] = {{ {cache_sizes_csep} }}; // Depth of each individual cache (we can't always use all of a cache)
 const int FIFO_GROUP_CACHE_IDS[] = {{ {group_cache_ids_csep} }}; // The ID of the cache each group will go in
+const int TOTAL_FIFO_ENTRIES = {total_fifo_entries};
+const int COMPOUND_THRESHOLD = {compound_threshold};
+const int NUM_LUT16 = {num_lut16};
+const int NUM_BRAM = {num_bram};
+const int BRAM_DEPTH = {bram_depth};
+
 
 typedef fdmt_t group_cache_t[MAX_CACHE_DEPTH][NFIFOS_PER_GROUP];
 const char* const FDMT_NAME = "{self.root_file_name}";
@@ -706,7 +728,8 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    fc = 1.12 # center frequency GHz
+    # Typical center frequencies are 860 and 920 Mhz
+    fc = 0.860 # center frequency GHz
     bw = 0.288 # bandwidth GHz
     Nd = 512 # number of DM trials
     Nchan= 256

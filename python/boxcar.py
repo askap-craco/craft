@@ -50,19 +50,107 @@ class Boxcar(object):
         return dout
 
     __call__ = do_boxcar
+
+class ImageBoxcar(object):
+    def __init__(self, nd, npix, nbox, weight='sqrt', dtype=np.float32):
+        '''
+        Makes an image boxcar - tries to be more faithful to how the the real CRACO image pipeline works
+
+        :nd: Number of DMs to keep a history for
+        :npix: Number of pixels on the side of an image
+        :nbox: Number of boxcars to compute
+        :weight: 'sum' for the sum over the history, 'avg' for the averge over the history or 'sqrt' 
+        for the square root over the history. You want 'sqrt' for the S/N weighting.
+        '''
+        assert nd > 0
+        assert npix > 0
+        assert nbox > 0
+        self.nd = nd
+        self.npix = npix
+        self.nbox = nbox
+        self.history = np.zeros((nd, npix, npix, nbox-1), dtype=dtype)
+
+        if weight == 'sum':
+            self.weights = np.ones(nbox, dtype=dtype)
+        elif weight == 'avg':
+            self.weights = 1./(np.arange(nbox, dtype=dtype) + 1)
+        elif weight == 'sqrt':
+            self.weights = 1./np.sqrt(np.arange(nbox, dtype=dtype) + 1)
+        else:
+            raise ValueError('Invalid weight type: %s' % weight)
+
+    def boxcar_image(self, d, img):
+        '''
+        Does the boxcar on the given image and updates the history
+        
+        :d: DM index. 0 <= d < nd
+        :img: Image shape (npix, npix)
+        :returns: (npix, npix, nbox) boxcar output
+        '''
+
+        nd = self.nd
+        npix = self.npix
+        nbox = self.nbox
+        assert 0 <= d < nd, 'Invalid dm index'
+        assert img.shape == (npix, npix)
+
+        dout = np.zeros((npix, npix, nbox), dtype=self.history.dtype)
+
+        # set initial boxcar value
+        dout[:,:, 0] = img
+
+        # Compute boxcar
+        for b in xrange(1, nbox):
+            dout[:,:,b] = (dout[:,:,b-1] + self.history[d, :,:,b-1])
+
+        # Multiply by boxcar weights
+        dout *= self.weights
+            
+        # update history - shift everything to the right and put the current image in to position [0]
+        self.history[d,:,:, 1:] = self.history[d,:,:,:-1]
+        self.history[d,:,:,0] = img
+
+        return dout
+
+    __call__ = boxcar_image
+
         
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
-    parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
     if values.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
+
+    import pylab
+
+    nd = 10
+    npix = 1
+    nbox = 6
+    
+    ib = ImageBoxcar(nd, npix, nbox, 'avg')
+    nt = 10
+
+    indata = np.zeros((nt, npix, npix))
+    indata[0, :, :] = 1
+
+    outd = []
+    for t in xrange(nt):
+        outd.append(ib(0, indata[t,:,:]))
+
+    outd = np.array(outd)
+
+    pylab.plot(outd[:, 0, 0, :])
+    pylab.show()
+    
+
+
+    
     
 
 if __name__ == '__main__':
