@@ -59,7 +59,14 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
     nuv = len(uvcells)
     for blkt, d in enumerate(time_blocks(vis, values.nt)):
         dblk = np.zeros((nuv, values.ndm, values.nt), dtype=np.complex64)
-        logging.info('UV data output shape is %s blkt=%s d.shape=%s', dblk.shape, blkt, len(d))
+        alld = []
+        for k, v in d.iteritems():
+            alld.append(v)
+        alld = np.array(alld)
+        logging.info('UV data output shape is %s nbl=%s blkt=%s d.shape=%s real/imag mean: %f/%f std: %f/%f',
+                     dblk.shape, nbl, blkt, len(d),
+                     alld.real.mean(), alld.imag.mean(),
+                     alld.real.std(), alld.imag.std())
         # FDMT everything
         for iuv, uvd in enumerate(uvcells):
             cell_data = uvd.extract(d)
@@ -79,9 +86,27 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
             outfile = values.files
             
         fname = '{}.ndm{:d}_nt{:d}.b{:d}.uvdata.{}'.format(outfile, values.ndm, values.nt, blkt, values.format)
-        # Transpose to [NDm, NT, NUV] order
-        dblk = np.transpose(dblk, (1, 2, 0))
-        logging.info('Writing shape (NDM, NT, NUV)=%s to %s in format=%s num nonozero=%d', dblk.shape, fname, values.format, np.sum(dblk != 0))
+        # initial shape is NUV, NDM, NT order
+        nuv, ndm, nt = dblk.shape
+        # Add CU axis
+        # // Input order is assumed to be [DM-TIME-UV][DM-TIME-UV]
+        #// Each [DM-TIME-UV] block has all DM and all UV, but only half TIME
+        #// in1 is attached to the first block and in2 is attached to the second block
+        #// The first half TIME has [1,2, 5,6, 9,10 ...] timestamps
+        #// The second half TIME has [3,4, 7,8, 11,12 ...] timestamps
+        dblk.shape = (nuv, ndm, nt/values.nfftcu, values.nfftcu)
+        
+        # Transpose to [NCU, NDM, NT, NUV] order
+        dblk = np.transpose(dblk, (3, 1, 2, 0))
+
+        # Scale output
+        dblk *= values.output_scale
+
+        logging.info('Writing shape (NCU, NDM, NT, NUV)=%s to %s in format=%s num nonozero=%d scaling with %f real/imag mean:%f/%f std:%f/%f',
+                     dblk.shape, fname, values.format, np.sum(dblk != 0), values.output_scale,
+                     dblk.real.mean(), dblk.imag.mean(),
+                     dblk.real.std(), dblk.imag.std())
+        
         if values.format == 'npy':
             np.save(fname, dblk)
         else:
@@ -96,8 +121,10 @@ def _main():
     parser.add_argument('--cell', help='Image cell size (arcsec)', default='10,10')
     parser.add_argument('--nt', help='Number of times per block', type=int, default=256)
     parser.add_argument('--ndm', help='Number of DM trials', type=int, default=16)
-    parser.add_argument('--outfile', help='Output filename base. Defualts to input filename')
+    parser.add_argument('--outfile', help='Output filename base. Defaults to input filename')
     parser.add_argument('--format', help='Output format', choices=('npy','raw'), default='raw')
+    parser.add_argument('--nfftcu', type=int, help='Number of FFT Computing Units for transpose', default=1)
+    parser.add_argument('--output-scale', type=float, help='Scalar to multiply output by to change level', default=1.0)
     parser.add_argument('-s','--show', help='Show plots', action='store_true')
                         
     parser.add_argument(dest='files', nargs='?')
@@ -142,7 +169,7 @@ def _main():
         ulam = bldata['UU'] * freqs
         vlam = bldata['VV'] * freqs
 
-        uvcent = False
+        uvcent = True
         pix_offset = 0
         if uvcent:
             pix_offset = Npix/2
@@ -178,10 +205,6 @@ def _main():
         ax[1].imshow(image_fft(g).real, aspect='auto', origin='lower')
         pylab.show()
     
-        
-    
-    
-        
 
 if __name__ == '__main__':
     _main()

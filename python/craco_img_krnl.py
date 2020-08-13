@@ -12,6 +12,7 @@ import os
 import sys
 import logging
 from craco import image_fft, printstats
+from boxcar import ImageBoxcar
 
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -68,6 +69,49 @@ class Imager(object):
         return image_fft(g)
 
 
+class Grouper(object):
+    '''
+    Groups boxcar candidates
+    
+    Candidates is a list of (idm, t, xpix, ypix, boxwidth, sn)
+    '''
+    def __init__(self, threshold):
+        self.threshold = threshold
+        self.candidates = []
+
+    def __call__(self, idm, t, boxout):
+        '''
+        runs on a single boxcar output with shape (npix, npix, nbox) 
+        and returns the associated candidates
+        :idm: DM value
+        :t: Time stamp
+        :boxout: boxcar output shape (npix, npix, nbox)
+        '''
+
+        # Find the boxcar with the largest value for each pixel
+        # See https://stackoverflow.com/questions/42519475/python-numpy-argmax-to-max-in-multidimensional-array
+        max_box = np.argmax(boxout, axis=2)
+        i,j = np.indices(max_box.shape)
+        
+        # Find pixels where the largest boxcar is larger than the threshold
+        pys, pxs = np.where(boxout[i,j,max_box] >= self.threshold)
+
+        cands = []
+        for xpix, ypix in zip(pxs, pys):
+            boxwidth = max_box[ypix, xpix] # boxwidth = 1 for the smallest boxcar
+            sn = boxout[ypix,xpix,boxwidth]
+            cand = (idm, t, xpix, ypix, boxwidth+1, sn)
+            cands.append(cand)
+
+        self.candidates.extend(cands)
+        
+        return cands
+
+    def to_file(self, fname):
+        logging.info('Saved %s candiates to %s', len(self.candidates), fname)
+        fmt = '%d %d %d %d %d %0.1f'
+        np.savetxt(fname, np.array(self.candidates), header='idm t xpix ypix boxwidth sn', fmt=fmt)
+
 def image_pipeline(fname, values):
     uvgrid = np.loadtxt(values.uvgrid)
     if uvgrid.ndim == 1:
@@ -75,29 +119,41 @@ def image_pipeline(fname, values):
         
     if fname.endswith('.npy'):
         d = np.load(fname)
-        nd, nt, nuv = d.shape
+        ncu, nd, nt_on_ncu, nuv = d.shape
+        nt = nt_on_ncu * ncu
     else:
         nuv = uvgrid.shape[0]
         nd = values.ndm
         nt = values.nt
-        d = np.fromfile(fname, dtype=np.complex64).reshape(nd, nt, nuv)
+        ncu = values.nfftcu
+        nt_on_ncu = nt // ncu
+        d = np.fromfile(fname, dtype=np.complex64).reshape(ncu, nd, nt_on_ncu, nuv)
 
     assert uvgrid.shape[0] == nuv
+    assert d.shape == (ncu, nd, nt_on_ncu, nuv)
+
+    # d is in [NCU, ND, NT/NCU, NUV] order
+    # put d back in [ND, NT, NUV] order. We don't care about CUs
+    # First transpose to [ND, NT/NCU, NCU, NUV] then merge the axes
+    d = np.transpose(d, (1, 2, 0, 3)).reshape(nd, nt, nuv)
     assert d.shape == (nd, nt, nuv)
     
     idm = 0
     t = 0
     gridder = Gridder(uvgrid, values.npix)
     imager = Imager()
+    boxcar = ImageBoxcar(nd, values.npix, values.nbox, 'sqrt')
+    grouper = Grouper(values.threshold)
     outfname = fname + '.img.dat'
     outgridname= fname + '.grid.dat'
+    candname = fname + '.cand'
     npix = values.npix
     outshape = (nd, nt/2, npix, npix)
-    logging.info("Input shape is %s. Writing output data to %s shape is (nd,nt,npix,npix)=%s", d.shape, outfname, outshape)
+    logging.info("Input shape is %s. Writing output data to %s shape is (nd,nt/2,npix,npix)=%s", d.shape, outfname, outshape)
     fout = open(outfname, 'w')
     gout = open(outgridname, 'w')
 
-    assert nt % 2 == 0, 'Nt must be divisible by 2 as were doign complex-to-real gridding'
+    assert nt % 2 == 0, 'Nt must be divisible by 2 as were doing complex-to-real gridding'
 
     for idm in xrange(nd):
         for t in xrange(nt/2):
@@ -105,6 +161,8 @@ def image_pipeline(fname, values):
             g.tofile(gout)
             img = imager(g).astype(np.complex64)
             img.tofile(fout)
+            grouper(idm, 2*t, boxcar(idm, img.real))
+            grouper(idm, 2*t + 1, boxcar(idm, img.imag))
 
             rlabel = 'img real idm={} t={}'.format(idm, t)
             ilabel = 'img imag idm={} t={}'.format(idm, t+1)
@@ -125,6 +183,8 @@ def image_pipeline(fname, values):
                 pylab.show()
 
     logging.info("Wrote output images to %s shape=%s (nd,nt,npix,npix)=dtype=%s", outfname, outshape, img.dtype)
+
+    grouper.to_file(candname)
     fout.close()
     gout.close()
             
@@ -138,7 +198,9 @@ def _main():
     parser.add_argument('--outfile', help='Raw data output file')
     parser.add_argument('--nt', type=int, help='Number of times per block. Used if using raw format', default=256)
     parser.add_argument('--ndm', type=int, help='Number of DMs.  Used if raw format', default=16)
-    parser.add_argument('--nfft', type=int, help='Number of FFT Computing Units for transpose', default=1)
+    parser.add_argument('--nfftcu', type=int, help='Number of FFT Computing Units for transpose', default=1)
+    parser.add_argument('--nbox', type=int, help='Number of boxcars to compute', default=8)
+    parser.add_argument('--threshold', type=float, help='Threshold for candidate grouper', default=10)
     parser.add_argument('-s','--show', action='store_true', help='Show plots', default=False)
     parser.add_argument(dest='files', nargs='*')
     parser.set_defaults(verbose=False)
