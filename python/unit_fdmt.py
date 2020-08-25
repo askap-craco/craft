@@ -63,6 +63,12 @@ class IterConfig(object):
         id1 = int(round(odm * cff1))
         offset = int(round(odm * cff2))
         id2 = odm - offset
+
+
+        cid1, cid2, coffset = self.thefdmt.get_config(iterno, output_channel, odm)
+        assert id1 == cid1
+        assert id2 == cid2
+        assert offset == coffset
         
         return (id1, id2, offset)
         
@@ -109,24 +115,29 @@ class UnitFdmt(sample_fdmt.MaxFifoPerIteration):
             for d in xrange(din.shape[1]):
                 self.shift(0, d, c, din[c, d])
 
-        for iterno, theiter in enumerate(thefdmt.hist_nf_data):
-            iconfig = IterConfig(self.thefdmt, iterno)
-            for output_channel in xrange(iconfig.nchan):
-                ndm = iconfig.ndm_out_for_iter_chan(iterno, output_channel)
-                chanconfig = thefdmt.hist_nf_data[iterno][output_channel][-1]
-                assert len(chanconfig) == ndm
-                #for odm, config in enumerate(chanconfig):
-                for chanu in xrange(iconfig.nunit_per_chan):
-                    for d in xrange(iconfig.ndm_per_unit):
+        for d in xrange(MAX_DM_PER_UNIT):
+            for iterno, theiter in enumerate(thefdmt.hist_nf_data):
+                iconfig = IterConfig(self.thefdmt, iterno)
+                for output_channel in xrange(iconfig.nchan):
+                    ndm = iconfig.ndm_out_for_iter_chan(iterno, output_channel)
+                    for chanu in xrange(iconfig.nunit_per_chan):
+                        # For each channel we need to update the state, then calculate the
                         odm = chanu*iconfig.ndm_per_unit + d
+                        iunit = output_channel*iconfig.nunit_per_chan + chanu
+                        assert iunit < nunit
                         if odm >= ndm: # Because there are extra units, we occasionally overstep the mark.
                             break
+
+                        for iout in xrange(maxout):
+                            iidx = d*maxout + iout # Index of where we are in the whole state
+                            thedm = iidx % maxout # which FIFO DM we'll use 
+                            ioffset = iidx // maxout # Which offset within that fifo
+                            fifo_length = self.fifo_length(iterno, thedm, output_channel)
+                            toffset = max(fifo_length - ioffset, 0) # time offset from end of FIFO
+                            state[iterno][iunit][iout] = self.read(iterno, d, chan, toffset)
+
                         try:
-                            id1, id2, offset = self.thefdmt.get_config(iterno, output_channel, odm)
                             in_d1, in_d2, time_offset = iconfig.get_config(output_channel, odm)
-                            assert id1 == in_d1
-                            assert id2 == in_d2
-                            assert offset == time_offset
                             in_chan1 = 2*output_channel
                             in_chan2 = 2*output_channel+1
                             v1 = self.read(iterno, in_d1, in_chan1, 0)
