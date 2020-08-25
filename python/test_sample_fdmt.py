@@ -13,10 +13,13 @@ except ImportError:
 
 import fdmt
 import sample_fdmt
+import unit_fdmt
 import numpy as np
 from pylab import *
+from craco import printstats
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
+
     
 
 class TestSampleFdmtsMatchBlock(TestCase):
@@ -31,6 +34,7 @@ class TestSampleFdmtsMatchBlock(TestCase):
         self.tsamp = 1.0 # milliseconds
         self.thefdmt = fdmt.Fdmt(self.fmin, self.df, self.nf, self.nd, self.nt) # make FDMT - not with history
         self.nbox = 32
+        self.doplot = True
 
     def tearDown(self):
         pass
@@ -41,7 +45,20 @@ class TestSampleFdmtsMatchBlock(TestCase):
         sampfdmt = sampfdmt_class(self.thefdmt)
         sampout = sampfdmt(blockin)
         print goldout.shape, sampout.shape
-        self.assertTrue(np.all(goldout[:, :self.nt] == sampout))
+        g = goldout[:,:self.nt]
+        ok = np.allclose(g, sampout)
+
+        if self.doplot and not ok:
+            fig, axs = subplots(1,3)
+            printstats(g, 'golden')
+            printstats(sampout, 'calculated')
+            printstats(g - sampout, 'golden - calculated')
+            axs[0].imshow(g)
+            axs[1].imshow(sampout)
+            axs[2].imshow(g - sampout)
+            show()
+            
+        self.assertTrue(ok)
 
     def test_max_fifo(self):
         self._test_fdmt(sample_fdmt.MaxFifo)
@@ -52,6 +69,8 @@ class TestSampleFdmtsMatchBlock(TestCase):
     def test_individual_fifos(self):
         self._test_fdmt(sample_fdmt.IndividualFifos)
 
+    def test_unit_fdmt(self):
+        self._test_fdmt(unit_fdmt.UnitFdmt)
 
 def _main():
     unittest_main()

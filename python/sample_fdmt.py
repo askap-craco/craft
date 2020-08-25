@@ -224,7 +224,6 @@ class IndividualFifos(SampleFdmt):
         super(IndividualFifos, self).__init__(thefdmt)        
         self.fifos = {} # Dictionary of FIFOS (cheater) key=(iterno, d, c) 
         self.__buffer_size = 0
-        
         for curr_iterno, theiter in enumerate(thefdmt.hist_nf_data):
             for output_channel in xrange(len(theiter)):
                 chanconfig = thefdmt.hist_nf_data[curr_iterno][output_channel][-1]
@@ -280,8 +279,11 @@ class IndividualFifos(SampleFdmt):
             pass
             
     def read(self, iterno, d, c, t):
-        fifo = self._get_fifo(iterno, d, c)
-        v = fifo[t]
+        try:
+            fifo = self._get_fifo(iterno, d, c)
+            v = fifo[t]
+        except:
+            raise ValueError('Could not read value for iterno={} d={} c={} t={} len fifo={}'.format(iterno, d, c, t, len(fifo)))
         return v
 
 def _main():
