@@ -168,14 +168,7 @@ def _main():
         #UU, VV WW are in seconds
         ulam = bldata['UU'] * freqs
         vlam = bldata['VV'] * freqs
-<<<<<<< HEAD
-=======
-
-        uvcent = True
->>>>>>> 387047d8b28a52e2c377fe72e1ffb04d65b08027
-        pix_offset = 0
-        if values.fftshift:
-            pix_offset = Npix/2
+        pix_offset = Npix/2
         
         upix = np.round(ulam/ucell + pix_offset).astype(int)
         vpix = np.round(vlam/vcell + pix_offset).astype(int)
