@@ -255,6 +255,7 @@ def _main():
     #logging.info('Simulating FRB. Start mjd=%0.5f telnames=%s', mjdstart,  ','.join(telnames))
 
     noiserms = 0 # Need to make independant noise for every baseline/pol - we'll do that shortly.
+
     amps = simfrb.mkfrb2(values.fch1, \
                         values.foff, \
                         Nchan, \
@@ -267,6 +268,8 @@ def _main():
 
     if values.show:
         pylab.imshow(amps.T, aspect='auto', origin='lower', interpolation='nearest')
+        pylab.xlabel('Time')
+        pylab.ylabel('Frequency')
         pylab.show()
 
 

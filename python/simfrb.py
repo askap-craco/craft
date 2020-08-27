@@ -154,8 +154,8 @@ def mkfrb2(f1, foff, nchans, tsamp, dm, amp=1, toffset=0, noiserms=0, ntimes=409
         tstart_ms = t*tsamp # Beginnignof this integration
         tend_ms = (t+1)*tsamp # end of this integration
         for ic, f in enumerate(freqs):
-            ttop_ms = dmdelay(dm, f+0.5*foff, ftop) - toffset # time FRB enters the top of this channel
-            tbot_ms = dmdelay(dm, f-0.5*foff, ftop) - toffset # time FRB exits the bottom of the channel
+            ttop_ms = dmdelay(dm, f+0.5*foff, ftop) + toffset # time FRB enters the top of this channel
+            tbot_ms = dmdelay(dm, f-0.5*foff, ftop) + toffset # time FRB exits the bottom of the channel
             tsmear = abs(ttop_ms - tbot_ms) # Time from top to bottom
 
             # Time FRB arrived in this time/frequency cell
