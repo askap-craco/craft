@@ -40,6 +40,32 @@ function dosim() {
     diff /tmp/myvars.before /tmp/myvars.after > varchanges.txt
     cp /tmp/myvars.after allvars.txt
 
+    l=params.txt
+    touch $l
+    echo date `date` >> $l
+    echo frb_idm $frb_idm >> $l
+    echo frb_t0 $t0 >> $l
+    echo frb_amp $frb_amp>> $l
+    echo frb_sn $frb_sn >> $l
+    echo frb_relpos $frb_relpos >> $l
+    echo ncu $ncu >> $l
+    echo fch1 $fch1 >> $l
+    echo nt $nt >> $l
+    echo nd $nd >> $l
+    echo nchan $nchan >> $l
+    echo tint $tint >> $l
+    echo desired_amp $desired_amp >> $l
+    echo threshold $threshold >> $l
+    echo antfile $antfile >> $l
+    echo frb_replos_name $frb_relpos_name >> $l
+    echo tstart $tstart >> $l
+    echo nant $nant >> $l
+    echo nbl $nbl >> $l
+    echo name $name >> $l
+    echo fits $fits >> $l
+    echo raw_image_amp $raw_image_amp >> $l
+    echo scale $scale >> $l
+
     cmd="uvfrbsim.py --fch1 $fch1 --nchan $nchan --antfile $antfile --tint $tint --duration $nt --frb_idm $frb_idm --frb_amp $frb_amp --frb_sn $frb_sn --frb_relpos $frb_relpos -o $fits"
     echo "Running $cmd"
     $cmd

@@ -76,8 +76,14 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
 
             if values.show:
                 fig, ax = pylab.subplots(1,2)
-                ax[0].imshow(abs(dblk[iuv, :, :]))
-                ax[1].imshow(np.angle(dblk[iuv, :, :]))
+                ax[0].imshow(abs(dblk[iuv, :, :]), aspect='auto', origin='lower')
+                ax[0].set_xlabel('Time')
+                ax[0].set_ylabel('IDM')
+                ax[0].set_title('Amplitude iuv={}'.format(iuv))
+                ax[1].imshow(np.angle(dblk[iuv, :, :]), aspect='auto', origin='lower')
+                ax[1].set_xlabel('Time')
+                ax[1].set_ylabel('IDM')
+                ax[1].set_title('Phase iuv={}'.format(iuv))
                 pylab.show()
 
         if values.outfile:
