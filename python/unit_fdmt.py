@@ -214,28 +214,32 @@ class UnitFdmt(sample_fdmt.IndividualFifos):
         niter = len(thefdmt.hist_nf_data)
         dout = np.zeros(thefdmt.max_dt)
 
-        for iterno in xrange(niter):
-            inconfig = IterConfig(self, iterno)
-            outconfig = IterConfig(self, iterno+1)
-            for output_channel in xrange(outconfig.nchan):
-                for out_d in xrange(outconfig.ndm):
-                    # id1, id2, offset are values in the lookup table
-                    try:
-                        in_d1, in_d2, time_offset = inconfig.get_config(output_channel, out_d)
-                        in_chan1 = 2*output_channel
-                        in_chan2 = 2*output_channel+1
-                        
-                        # Read values from FIFOs at d, c read from 
-                        v1 = self.read(iterno, in_d1, in_chan1, 0)
-                        v2 = self.read(iterno, in_d2, in_chan2, time_offset)
-                        vout = v1 + v2
-                        if iterno == niter - 1: # final iteration write to output
-                            dout[out_d] = vout
-                        else:
-                            self.shift(iterno+1, out_d, output_channel, vout)
-                    except IndexError:
-                        # Happens when we do too much DMs for a given channel
-                        pass
+        for d in xrange(MAX_DM_PER_UNIT):
+            for iterno in xrange(niter):
+                inconfig = IterConfig(self, iterno)
+                outconfig = IterConfig(self, iterno+1)
+                for output_channel in xrange(outconfig.nchan):
+                    for iunit in xrange(outconfig.nunit_per_chan):
+                        out_d = iunit*outconfig.ndm_per_unit + d
+                        if out_d >= outconfig.ndm:
+                            break
+
+                        try:
+                            in_d1, in_d2, time_offset = inconfig.get_config(output_channel, out_d)
+                            in_chan1 = 2*output_channel
+                            in_chan2 = 2*output_channel+1
+                            
+                            # Read values from FIFOs at d, c read from 
+                            v1 = self.read(iterno, in_d1, in_chan1, 0)
+                            v2 = self.read(iterno, in_d2, in_chan2, time_offset)
+                            vout = v1 + v2
+                            if iterno == niter - 1: # final iteration write to output
+                                dout[out_d] = vout
+                            else:
+                                self.shift(iterno+1, out_d, output_channel, vout)
+                        except IndexError:
+                            # Thrown by get_config when we do too much DMs for a given channel
+                            pass
                     
         return dout
 
