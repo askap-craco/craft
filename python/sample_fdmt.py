@@ -283,7 +283,7 @@ class IndividualFifos(SampleFdmt):
             fifo = self._get_fifo(iterno, d, c)
             v = fifo[t]
         except:
-            raise ValueError('Could not read value for iterno={} d={} c={} t={} len fifo={}'.format(iterno, d, c, t, len(fifo)))
+            raise ValueError('Could not read value for iterno={} d={} c={} t={} '.format(iterno, d, c, t))
         return v
 
 def _main():
