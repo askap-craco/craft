@@ -25,13 +25,16 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 class TestSampleFdmtsMatchBlock(TestCase):
 
     def setUp(self):
-        self.nf = 256 # number of channels 
-        self.fmax = 1448. +0.5#  Freuency of the top of the band in MHz
-        self.df = 1.0 # Channel bandwidth in MHz
-        self.fmin = self.fmax - self.nf*self.df # Frequency of the bottom of the band in MHz
+        self.nf = 16 # number of channels 
+        #self.fmax = 1448. +0.5#  Freuency of the top of the band in MHz
+        self.df = 1.0e-3 # Channel bandwidth in GHz
+        #self.fmin = self.fmax - self.nf*self.df # Frequency of the bottom of the band in MHz
+        self.fmin = 0.976 # freq in GHz
         self.nd = 1024 # Number of DM trials to do
+        #self.nd = 16
         self.nt = 256 # Number of samples per block
-        self.tsamp = 1.0 # milliseconds
+        #self.nt = 16
+        self.tsamp = 0.864 # milliseconds
         self.thefdmt = fdmt.Fdmt(self.fmin, self.df, self.nf, self.nd, self.nt) # make FDMT - not with history
         self.nbox = 32
         self.doplot = True

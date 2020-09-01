@@ -22,9 +22,10 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 MAX_DM_PER_UNIT = 16
 
 class IterConfig(object):
-    def __init__(self, thefdmt, iterno):
-        ndm = thefdmt.ndm_out_for_iter(iterno)
-        nchan = thefdmt.nchan_out_for_iter(iterno)
+    def __init__(self, unitfdmt, iterno):
+        thefdmt = unitfdmt.thefdmt
+        ndm = thefdmt.ndm_in_for_iter(iterno)
+        nchan = thefdmt.nchan_in_for_iter(iterno)
         nunit_per_chan = (ndm + MAX_DM_PER_UNIT - 1) // MAX_DM_PER_UNIT
         ndm_per_unit = (ndm + nunit_per_chan - 1) // nunit_per_chan
         assert ndm_per_unit*nunit_per_chan >= ndm
@@ -36,10 +37,26 @@ class IterConfig(object):
         self.total_nunit = total_nunit
         self.thefdmt = thefdmt
         self.iterno = iterno
+        self.unitfdmt = unitfdmt
+        self.maxout = min(self.unitfdmt.maxout, self.ndm_per_unit)
 
+    def ndm_out_for_chan(self, chan):
+        # To minimise wastage, this will be channel dependant.
+        try:
+            ndm = len(self.thefdmt.hist_nf_data[self.iterno][chan][-1])
+        except IndexError:
+            raise IndexError('No configuraiton for iterno={} chan={}'.format(iterno, chan))
 
-    def ndm_out_for_iter_chan(self, iterno, chan):
-        return len(self.thefdmt.hist_nf_data[iterno][chan][-1])
+        return ndm
+
+    def ndm_in_for_chan(self, chan):
+        # To minimise wastage, this will be channel dependant.
+        try:
+            ndm = len(self.thefdmt.hist_nf_data[self.iterno-1][chan][-1])
+        except IndexError:
+            raise IndexError('No configuraiton for iterno={} chan={}'.format(iterno, chan))
+
+        return ndm
         
     def get_cff(self, ochan):
         iterno = self.iterno
@@ -65,13 +82,56 @@ class IterConfig(object):
         id2 = odm - offset
 
 
-        cid1, cid2, coffset = self.thefdmt.get_config(iterno, output_channel, odm)
+        cid1, cid2, coffset = self.thefdmt.get_config(self.iterno, ochan, odm)
         assert id1 == cid1
         assert id2 == cid2
         assert offset == coffset
         
         return (id1, id2, offset)
+
+    def state2conf(self, d, iterno, input_channel, unitidx, iout):
+        iunit = input_channel*self.nunit_per_chan + unitidx
+        maxout = self.maxout
+        assert 0<= unitidx < self.nunit_per_chan
+        assert 0<= iunit < self.total_nunit
+        assert 0 <= iout < maxout
         
+        iidx = d*maxout + iout # Index of where we are in the whole state
+        dmidx = iidx % self.ndm_per_unit # which FIFO DM we'll use
+        ioffset = iidx // self.ndm_per_unit # Which offset within that fifo
+        read_dm = dmidx + unitidx*self.ndm_per_unit
+        #if read_dm < inconfig.ndm_out_for_iter_chan(iterno, output_channel):
+        fifo_length = self.unitfdmt.fifo_length(iterno, read_dm, input_channel)
+        toffset = fifo_length - 1 - ioffset # time offset from end of FIFO
+
+        print 'state2conf d=', d, 'iterno', iterno, 'input_channel', input_channel, 'unitidx', unitidx, 'iout', iout, 'fifo_length', fifo_length, 'toffset', toffset, 'read_dm', read_dm
+
+        return read_dm, toffset
+
+    def conf2state(self, ind, inchan, toffset):
+        iiter = self.iterno
+        maxout = self.maxout
+        # Units are in Channel, DM order
+        iunit = inchan*self.nunit_per_chan + ind // self.ndm_per_unit
+        assert 0 <= iunit < self.total_nunit, 'Unexpected iunit {} config={}'.format(iunit, self)
+
+        # the index in [0, NDM_PER_UNIT) for this unit
+        dmidx = ind % self.ndm_per_unit
+        assert 0 <= dmidx < self.ndm_per_unit
+
+        fifo_length = self.unitfdmt.fifo_length(self.iterno, ind, inchan)
+
+        ioffset = fifo_length - 1 - toffset
+        assert 0 <= ioffset <= 3 # Only ever read up to 3 values back from the end of the FIFO
+
+        iout = dmidx % maxout
+        assert 0 <= iout < maxout
+
+        dex = ioffset * maxout + dmidx // maxout
+        assert 0 <= dex < MAX_DM_PER_UNIT
+
+        print 'conf2state', 'ind',ind, 'inchan',inchan, 'toffset', toffset, 'dex',dex, 'iiter', iiter, 'iunit',iunit, 'iout', iout
+        return dex, iiter, iunit, iout
         
     def __str__(self):
         s = 'Iteration {iterno} nchan={nchan} ndm={ndm} ndm_per_unit={ndm_per_unit} nunit_per_chan={nunit_per_chan} nunits={total_nunit}'.format(**vars(self))
@@ -79,7 +139,34 @@ class IterConfig(object):
     
     __repr__ = __str__
 
-class UnitFdmt(sample_fdmt.MaxFifoPerIteration):
+class UnitFdmtState(object):
+    def __init__(self, unitfdmt):
+        self.unitfdmt = unitfdmt
+        niter = len(self.unitfdmt.thefdmt.hist_nf_data)
+        self.state = np.zeros((niter, self.unitfdmt.nunit, self.unitfdmt.maxout))*np.nan
+        self.metastate = np.empty((niter, self.unitfdmt.nunit, self.unitfdmt.maxout), dtype=np.object)
+                
+    def set(self, iterno, iunit, outidx, value, metadata=None):
+        self.state[iterno, iunit, outidx] = value
+        self.metastate[iterno, iunit, outidx] = metadata
+        print 'Set state iterno', iterno, 'iunit', iunit, 'outidx', outidx, value, 'meta=', metadata
+        (iterno, read_dm, input_channel, toffset) = metadata
+        conf = IterConfig(self.unitfdmt, iterno)
+        cdex, ciiter, ciunit, ciout = conf.conf2state(read_dm, input_channel, toffset)
+        assert ciiter == iterno, 'Bad set IITER conf={} iterno={}'.format(ciiter, iterno)
+        assert ciunit == iunit, 'Bad set UNIT conf={} iunit={}'.format(ciunit, iunit)
+        assert ciout == outidx, 'Bad set OUTIDX conf={} outidx={}'.format(ciout, outidx)
+
+    def get(self, iterno, iunit, outidx, metadata=None):
+        v = self.state[iterno, iunit, outidx]
+
+        if metadata is not None:
+            m = self.metastate[iterno, iunit, outidx]
+            assert m == metadata, 'Metadata not equal for iterno={} iunit={} outidx={} expected={} != actual={}'.format(iterno, iunit, outidx, metadata, m)
+
+        return v
+
+class UnitFdmt(sample_fdmt.IndividualFifos):
     '''
     Runs an IndividualFifoFdmt but with a blocke-based parallelisable FDMT execute
     function
@@ -88,6 +175,24 @@ class UnitFdmt(sample_fdmt.MaxFifoPerIteration):
     '''
     def __init__(self, *args, **kwargs):
         super(UnitFdmt, self).__init__(*args, **kwargs)
+        self.maxout = 4
+        self.nunit = self.thefdmt.n_f
+
+
+    def fifo_length(self, iterno, dm, channel):
+        '''
+        Returns size of FIFO - requires IndividualFifos class
+
+        TODO: Make this statically computable - somehow.
+        '''
+        # Sometimes this FIFO is never used, in which case get_fifo returns KEYERROR
+        # and we should return 0
+        try:
+            fifo_length = len(self._get_fifo(iterno, dm, channel))
+        except KeyError:
+            fifo_length = -1;
+
+        return fifo_length
 
     def fdmt_process(self, din):
         '''
@@ -100,56 +205,38 @@ class UnitFdmt(sample_fdmt.MaxFifoPerIteration):
 
         assert din.shape[0] == thefdmt.n_f
         assert din.shape[1] == thefdmt.init_delta_t
-
-        nc = thefdmt.n_f
-        nunit = nc/2 # Max number of units is half the numberof channels
-        maxout = 4
-        niter = len(thefdmt.hist_nf_data)
-        dout = np.zeros(thefdmt.max_dt)
-
-        # Not all of state is used
-        state = np.zeros((niter, nunit, maxout))
         
         # Push the input data in to the iteration 0 FIFOs
         for c in xrange(din.shape[0]):
             for d in xrange(din.shape[1]):
                 self.shift(0, d, c, din[c, d])
 
-        for d in xrange(MAX_DM_PER_UNIT):
-            for iterno, theiter in enumerate(thefdmt.hist_nf_data):
-                iconfig = IterConfig(self.thefdmt, iterno)
-                for output_channel in xrange(iconfig.nchan):
-                    ndm = iconfig.ndm_out_for_iter_chan(iterno, output_channel)
-                    for chanu in xrange(iconfig.nunit_per_chan):
-                        # For each channel we need to update the state, then calculate the
-                        odm = chanu*iconfig.ndm_per_unit + d
-                        iunit = output_channel*iconfig.nunit_per_chan + chanu
-                        assert iunit < nunit
-                        if odm >= ndm: # Because there are extra units, we occasionally overstep the mark.
-                            break
+        niter = len(thefdmt.hist_nf_data)
+        dout = np.zeros(thefdmt.max_dt)
 
-                        for iout in xrange(maxout):
-                            iidx = d*maxout + iout # Index of where we are in the whole state
-                            thedm = iidx % maxout # which FIFO DM we'll use 
-                            ioffset = iidx // maxout # Which offset within that fifo
-                            fifo_length = self.fifo_length(iterno, thedm, output_channel)
-                            toffset = max(fifo_length - ioffset, 0) # time offset from end of FIFO
-                            state[iterno][iunit][iout] = self.read(iterno, d, chan, toffset)
-
-                        try:
-                            in_d1, in_d2, time_offset = iconfig.get_config(output_channel, odm)
-                            in_chan1 = 2*output_channel
-                            in_chan2 = 2*output_channel+1
-                            v1 = self.read(iterno, in_d1, in_chan1, 0)
-                            v2 = self.read(iterno, in_d2, in_chan2, time_offset)
-                            vout = v1 + v2
-                            if iterno == niter - 1: # final iteration write to output
-                                dout[odm] = vout
-                            else:
-                                self.shift(iterno+1, odm, output_channel, vout)
-                        except Exception, e:
-                            print 'Could not calculate', str(e), iterno, output_channel, chanu, d, odm, in_d1, in_d2, time_offset, in_chan1, in_chan2
-
+        for iterno in xrange(niter):
+            inconfig = IterConfig(self, iterno)
+            outconfig = IterConfig(self, iterno+1)
+            for output_channel in xrange(outconfig.nchan):
+                for out_d in xrange(outconfig.ndm):
+                    # id1, id2, offset are values in the lookup table
+                    try:
+                        in_d1, in_d2, time_offset = inconfig.get_config(output_channel, out_d)
+                        in_chan1 = 2*output_channel
+                        in_chan2 = 2*output_channel+1
+                        
+                        # Read values from FIFOs at d, c read from 
+                        v1 = self.read(iterno, in_d1, in_chan1, 0)
+                        v2 = self.read(iterno, in_d2, in_chan2, time_offset)
+                        vout = v1 + v2
+                        if iterno == niter - 1: # final iteration write to output
+                            dout[out_d] = vout
+                        else:
+                            self.shift(iterno+1, out_d, output_channel, vout)
+                    except IndexError:
+                        # Happens when we do too much DMs for a given channel
+                        pass
+                    
         return dout
 
 def _main():
