@@ -82,13 +82,10 @@ class IterConfig(object):
         id2 = odm - offset
 
 
-        try:
-            cid1, cid2, coffset = self.thefdmt.get_config(self.iterno, ochan, odm)
-            assert id1 == cid1
-            assert id2 == cid2
-            assert offset == coffset
-        except:
-            pass
+        cid1, cid2, coffset = self.thefdmt.get_config(self.iterno, ochan, odm)
+        assert id1 == cid1
+        assert id2 == cid2
+        assert offset == coffset
         
         return (id1, id2, offset)
 
@@ -227,18 +224,22 @@ class UnitFdmt(sample_fdmt.IndividualFifos):
                         if out_d >= outconfig.ndm:
                             break
 
-                        in_d1, in_d2, time_offset = inconfig.get_config(output_channel, out_d)
-                        in_chan1 = 2*output_channel
-                        in_chan2 = 2*output_channel+1
-                        
-                        # Read values from FIFOs at d, c read from 
-                        v1 = self.read(iterno, in_d1, in_chan1, 0)
-                        v2 = self.read(iterno, in_d2, in_chan2, time_offset)
-                        vout = v1 + v2
-                        if iterno == niter - 1: # final iteration write to output
-                            dout[out_d] = vout
-                        else:
-                            self.shift(iterno+1, out_d, output_channel, vout)
+                        try:
+                            in_d1, in_d2, time_offset = inconfig.get_config(output_channel, out_d)
+                            in_chan1 = 2*output_channel
+                            in_chan2 = 2*output_channel+1
+                            
+                            # Read values from FIFOs at d, c read from 
+                            v1 = self.read(iterno, in_d1, in_chan1, 0)
+                            v2 = self.read(iterno, in_d2, in_chan2, time_offset)
+                            vout = v1 + v2
+                            if iterno == niter - 1: # final iteration write to output
+                                dout[out_d] = vout
+                            else:
+                                self.shift(iterno+1, out_d, output_channel, vout)
+                        except IndexError:
+                            # Thrown by get_config when we do too much DMs for a given channel
+                            pass
                     
         return dout
 
