@@ -702,12 +702,14 @@ const char* const FDMT_NAME = "{self.root_file_name}";
         np.random.seed(seed)
         din = np.random.randint(-2**3, 2**3, size=(self.thefdmt.n_f, self.thefdmt.n_t)).astype(np.float32)
         dout = self.thefdmt(din)
+        os.makedirs(target_dir, exist_ok=True)
         din.T.tofile(os.path.join(target_dir, self.root_file_name+'.test.rand.in'))
         dout.T.tofile(os.path.join(target_dir, self.root_file_name+'.test.rand.out'))
 
     def write_ones_test_vectors(self, target_dir='.'):
         din = np.ones((self.thefdmt.n_f, self.thefdmt.n_t), dtype=np.float32)
         dout = self.thefdmt(din)
+        os.makedirs(target_dir, exist_ok=True)
         din.T.tofile(os.path.join(target_dir, self.root_file_name+'.test.ones.in'))
         dout.T.tofile(os.path.join(target_dir, self.root_file_name+'.test.ones.out'))
 

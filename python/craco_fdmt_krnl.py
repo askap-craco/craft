@@ -100,10 +100,15 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
         #// in1 is attached to the first block and in2 is attached to the second block
         #// The first half TIME has [1,2, 5,6, 9,10 ...] timestamps
         #// The second half TIME has [3,4, 7,8, 11,12 ...] timestamps
+        # Now the shape is (NUV, NDM, NT/NCU, NCU)
         dblk.shape = (nuv, ndm, nt/values.nfftcu, values.nfftcu)
-        
+
         # Transpose to [NCU, NDM, NT, NUV] order
-        dblk = np.transpose(dblk, (3, 1, 2, 0))
+        #neworder = (3, 1, 2, 0)
+
+        # Xinping wants this order which is (NT/NCU, NUV, NDM, NCU)
+        fileorder = (2, 0, 1, 3)
+        dblk = np.transpose(dblk, fileorder)
 
         # Scale output
         dblk *= values.output_scale

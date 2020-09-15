@@ -236,7 +236,7 @@ def _main():
 
     logging.info('Simulating FRB. values=%s', values)
 
-    f1 = values.fch1
+    fch1 = values.fch1
     Nchan = values.nchan
     Npol = 2 # ASKAP has XX and YY only
     chanbw = values.foff
@@ -256,11 +256,23 @@ def _main():
 
     noiserms = 0 # Need to make independant noise for every baseline/pol - we'll do that shortly.
 
+    fend = values.fch1 + values.foff*(Nchan-1)
+    ddm = np.abs(values.tint / (4.15 * (fch1**-2 - fend**-2)))
+
+    if values.frb_idm:
+        dm = values.frb_idm*ddm
+        print 'Setting DM=', dm, 'ddm=', ddm, values.frb_idm
+    else:
+        dm = values.frb_dm
+        
+    tdelay = 4.15*dm*(fch1**-2 - fend**-2)
+    logging.info('DM is %s fch1=%s tdelay=%sms', dm, fch1, tdelay)
+
     amps = simfrb.mkfrb2(values.fch1, \
                         values.foff, \
                         Nchan, \
                         values.tint, \
-                        values.frb_dm, \
+                        dm, \
                         values.frb_amp, \
                         values.frb_tstart, \
                         noiserms, \

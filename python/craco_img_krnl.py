@@ -121,21 +121,24 @@ def image_pipeline(fname, values):
         d = np.load(fname)
         ncu, nd, nt_on_ncu, nuv = d.shape
         nt = nt_on_ncu * ncu
+        # Output expected to be (nd, nt, nuv)
+        d = np.transpose(d, (1, 2, 0, 3)).reshape(nd, nt, nuv)
     else:
         nuv = uvgrid.shape[0]
         nd = values.ndm
         nt = values.nt
         ncu = values.nfftcu
         nt_on_ncu = nt // ncu
-        d = np.fromfile(fname, dtype=np.complex64).reshape(ncu, nd, nt_on_ncu, nuv)
+        #d = np.fromfile(fname, dtype=np.complex64).reshape(ncu, nd, nt_on_ncu, nuv)
+        # The file order is now: (NT/NCU, NUV, NDM, NCU)
+        d = np.fromfile(fname, dtype=np.complex64).reshape(nt_on_ncu, nuv, nd, ncu)
+        # Transpose back to ND, NT/NCU, NCU, NUV
+        d = np.transpose(d, (2, 0, 3, 1))
+        assert d.shape == (nd, nt_on_ncu, ncu, nuv)
+        d = d.reshape(nd, nt, nuv)
 
     assert uvgrid.shape[0] == nuv
-    assert d.shape == (ncu, nd, nt_on_ncu, nuv)
 
-    # d is in [NCU, ND, NT/NCU, NUV] order
-    # put d back in [ND, NT, NUV] order. We don't care about CUs
-    # First transpose to [ND, NT/NCU, NCU, NUV] then merge the axes
-    d = np.transpose(d, (1, 2, 0, 3)).reshape(nd, nt, nuv)
     assert d.shape == (nd, nt, nuv)
     
     idm = 0
