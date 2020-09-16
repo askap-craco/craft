@@ -11,6 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
+import craco
 from craco import image_fft, printstats
 from boxcar import ImageBoxcar
 
@@ -128,17 +129,13 @@ def image_pipeline(fname, values):
         nd = values.ndm
         nt = values.nt
         ncu = values.nfftcu
-        nt_on_ncu = nt // ncu
-        #d = np.fromfile(fname, dtype=np.complex64).reshape(ncu, nd, nt_on_ncu, nuv)
-        # The file order is now: (NT/NCU, NUV, NDM, NCU)
-        d = np.fromfile(fname, dtype=np.complex64).reshape(nt_on_ncu, nuv, nd, ncu)
-        # Transpose back to ND, NT/NCU, NCU, NUV
-        d = np.transpose(d, (2, 0, 3, 1))
-        assert d.shape == (nd, nt_on_ncu, ncu, nuv)
-        d = d.reshape(nd, nt, nuv)
+        d = np.fromfile(fname, dtype=np.complex64)
+        d = craco.fdmt_transpose_inv(d, ncu=values.nfftcu, ndm=nd, nt=nt, nuv=nuv)
+        # Image transpose outputs (nuv, ndm, nt) - should fix everything to be consistent
+        # But for now we'll transpose to (nd, nt, nuv) as this is what the next code expects
+        d = np.transpose(d, (1, 2, 0))
 
     assert uvgrid.shape[0] == nuv
-
     assert d.shape == (nd, nt, nuv)
     
     idm = 0

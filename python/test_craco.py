@@ -64,6 +64,18 @@ class TestCracoFdmtTranspose(TestCase):
         self.assertTrue(np.all(d == drr))
 
 
+    def test_tranpose_and_inverse_agree_flattened_ncu8(self):
+        ncu = 8
+        nd = 16
+        nt = 32
+        nuv = 318
+        d = np.arange(1, nd*nt*nuv + 1, dtype=np.complex64).reshape(nuv, nd, nt)
+        dr = craco.fdmt_transpose(d, ncu=ncu)
+        drr = craco.fdmt_transpose_inv(dr.flatten(), ncu=ncu, nt=nt, ndm=nd, nuv=nuv)
+        self.assertTrue(np.all(d == drr))
+
+
+
 def _main():
     unittest_main()
     

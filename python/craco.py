@@ -194,24 +194,29 @@ def fdmt_transpose(dblk, ncu=1, nt_per_cu=2):
     
     return oblk
 
-def fdmt_transpose_inv(oblk, ncu=1, nt_per_cu=2):
+def fdmt_transpose_inv(oblk, ncu=1, nt_per_cu=2, nuv=None, ndm=None, nt=None):
     '''
     Transpose the given data from a format suitable for the image kernel back into something sane.
     
-    :oblk: Output block - otuput by fdmt_tarnspose()
+    :oblk: Output block - otuput by fdmt_tarnspose() or a flattened array. If flattend, then ndm and nuv must be specified
     :ncu: Number of processing Compute Units
     :nt_per_cu: Number of times samples processed in parallel by a single FFT compute unit. 
     Usually this = 2 as a CU will grid 2 time samples onto a complex plane to produce 2 FFT outputs (real/imag)
+    
     :returns: Data in sane ordering: (nuv, ndm, nt)
     '''
     assert ncu >= 1
     assert nt_per_cu >= 1
     assert np.iscomplexobj(oblk)
-    (ncu_d, ndm, nt_rest, nuv, nt_per_cu_d) = oblk.shape
 
-    # Check shape agrees with arguments
-    assert ncu == ncu_d
-    assert nt_per_cu_d == nt_per_cu
+    if oblk.ndim == 1:
+        nt_rest = nt // (ncu * nt_per_cu)
+        oblk = oblk.reshape(ncu, ndm, nt_rest, nuv, nt_per_cu)
+    else:
+        (ncu_d, ndm, nt_rest, nuv, nt_per_cu_d) = oblk.shape
+        # Check shape agrees with arguments
+        assert ncu == ncu_d
+        assert nt_per_cu_d == nt_per_cu
 
     nt = nt_rest * ncu * nt_per_cu
     assert nt == ncu*nt_per_cu*nt_rest, 'Invalid tranpose'

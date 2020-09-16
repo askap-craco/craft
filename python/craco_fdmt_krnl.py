@@ -17,6 +17,7 @@ from scipy import constants
 import fdmt
 import warnings
 from craco import *
+import craco
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -94,27 +95,10 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
         fname = '{}.ndm{:d}_nt{:d}.b{:d}.uvdata.{}'.format(outfile, values.ndm, values.nt, blkt, values.format)
         # initial shape is NUV, NDM, NT order
         nuv, ndm, nt = dblk.shape
-        # Add CU axis
-        # // Input order is assumed to be [DM-TIME-UV][DM-TIME-UV]
-        #// Each [DM-TIME-UV] block has all DM and all UV, but only half TIME
-        #// in1 is attached to the first block and in2 is attached to the second block
-        #// The first half TIME has [1,2, 5,6, 9,10 ...] timestamps
-        #// The second half TIME has [3,4, 7,8, 11,12 ...] timestamps
-        # Now the shape is (NUV, NDM, NT/NCU, NCU)
-        nt_parallel = values.nfftcu*2 # Each CU processes 2 timestampes in parallel
-        dblk.shape = (nuv, ndm, nt/nt_parallel, nt_parallel)
-
-        # Transpose to [NCU, NDM, NT, NUV] order
-        #neworder = (3, 1, 2, 0)
-
-        # Xinping wants this order which is (NT/NCU, NUV, NDM, NCU)
-        fileorder = (2, 0, 1, 3)
-        dblk = np.transpose(dblk, fileorder)
-
-        # Scale output
         dblk *= values.output_scale
+        dblk = craco.fdmt_transpose(dblk, ncu=values.nfftcu)
 
-        logging.info('Writing shape (NCU, NDM, NT, NUV)=%s to %s in format=%s num nonozero=%d scaling with %f real/imag mean:%f/%f std:%f/%f',
+        logging.info('Writing shape %s to %s in format=%s num nonozero=%d scaling with %f real/imag mean:%f/%f std:%f/%f',
                      dblk.shape, fname, values.format, np.sum(dblk != 0), values.output_scale,
                      dblk.real.mean(), dblk.imag.mean(),
                      dblk.real.std(), dblk.imag.std())
