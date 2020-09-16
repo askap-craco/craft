@@ -101,7 +101,8 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
         #// The first half TIME has [1,2, 5,6, 9,10 ...] timestamps
         #// The second half TIME has [3,4, 7,8, 11,12 ...] timestamps
         # Now the shape is (NUV, NDM, NT/NCU, NCU)
-        dblk.shape = (nuv, ndm, nt/values.nfftcu, values.nfftcu)
+        nt_parallel = values.nfftcu*2 # Each CU processes 2 timestampes in parallel
+        dblk.shape = (nuv, ndm, nt/nt_parallel, nt_parallel)
 
         # Transpose to [NCU, NDM, NT, NUV] order
         #neworder = (3, 1, 2, 0)
