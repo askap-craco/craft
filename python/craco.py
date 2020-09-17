@@ -186,11 +186,11 @@ def fdmt_transpose(dblk, ncu=1, nt_per_cu=2):
     # this is NUV, NDM, NT/(NCU*NTPERCU), NCU, NTPERCU order
     rblk = dblk.reshape(nuv, ndm, nt_rest, ncu, nt_per_cu)
 
-    # Tranpose to (NCU, NDM, NT/(NCU*NTPERCU), NUV, NTPERCU) order
-    outorder = (3, 1, 2, 0, 4)
+    # Tranpose to (NCU, NDM, NT/(NCU*NTPERCU), NTPERCU, NUV) order
+    outorder = (3, 1, 2, 4, 0)
     oblk = np.transpose(rblk, outorder)
 
-    assert oblk.shape == (ncu, ndm, nt_rest, nuv, nt_per_cu), 'Invalid shape = {}'.format(oblk.shape)
+    assert oblk.shape == (ncu, ndm, nt_rest, nt_per_cu, nuv), 'Invalid shape = {}'.format(oblk.shape)
     
     return oblk
 
@@ -211,9 +211,9 @@ def fdmt_transpose_inv(oblk, ncu=1, nt_per_cu=2, nuv=None, ndm=None, nt=None):
 
     if oblk.ndim == 1:
         nt_rest = nt // (ncu * nt_per_cu)
-        oblk = oblk.reshape(ncu, ndm, nt_rest, nuv, nt_per_cu)
+        oblk = oblk.reshape(ncu, ndm, nt_rest, nt_per_cu, nuv)
     else:
-        (ncu_d, ndm, nt_rest, nuv, nt_per_cu_d) = oblk.shape
+        (ncu_d, ndm, nt_rest, nt_per_cu_d, nuv) = oblk.shape
         # Check shape agrees with arguments
         assert ncu == ncu_d
         assert nt_per_cu_d == nt_per_cu
@@ -221,8 +221,10 @@ def fdmt_transpose_inv(oblk, ncu=1, nt_per_cu=2, nuv=None, ndm=None, nt=None):
     nt = nt_rest * ncu * nt_per_cu
     assert nt == ncu*nt_per_cu*nt_rest, 'Invalid tranpose'
 
+    assert oblk.shape == (ncu, ndm, nt_rest, nt_per_cu, nuv), 'Invalid shape = {}'.format(oblk.shape)
+
     # Reorder back to sane ordering - aiming for NUV, NDM, NT
-    order = (3, 1, 2, 0, 4)
+    order = (4, 1, 2, 0, 3)
     rblk = np.transpose(oblk, order)
     assert rblk.shape == (nuv, ndm, nt_rest, ncu, nt_per_cu), 'Invalid shape={}'.format(rblk.shape)
     
