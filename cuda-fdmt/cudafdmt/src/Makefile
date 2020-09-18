@@ -21,7 +21,7 @@ NVLDFLAGS=--cudart static --relocatable-device-code=true -gencode arch=$(CUDA_AR
 
 # Force rebuild on git change:http://stackoverflow.com/questions/3236145/force-gnu-make-to-rebuild-objects-affected-by-compiler-definition
 
-all: git_version fftbenchapp cudafdmt 
+all: git_version cudafdmt 
 
 .PHONY: all
 
