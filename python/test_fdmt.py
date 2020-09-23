@@ -126,7 +126,7 @@ class TestFdmtWithHistoryHits(TestCase):
         self.df = 1.0 # Channel bandwidth in MHz
         self.fmin = self.fmax - self.nf*self.df # Frequency of the bottom of the band in MHz
         self.nd = 1024 # Number of DM trials to do
-        self.nt = 256 # Number of samples per block
+        self.nt = 64 # Number of samples per block
         self.tsamp = 1.0 # milliseconds
         self.thefdmt = fdmt.Fdmt(self.fmin, self.df, self.nf, self.nd, self.nt, history_dtype=np.float32) # make FDMT
         self.nbox = 32
@@ -217,6 +217,54 @@ class TestFdmtWithHistoryHits(TestCase):
         for idt in xrange(self.nd):
             self._test_self_made_frb(idt)
 
+
+class TestFdmtWithHistoryHits(TestCase):
+
+    def setUp(self):
+        self.fc = 0.860 # center frequency GHz
+        self.bw = 0.288 # bandwidth GHz
+        self.Nd = 64 # number of DM trials
+        self.Nchan= 64
+        self.Nt = 256 # time block size
+        self.Tint = 0.864e-3 # integration time - seconds
+        self.f1 = self.fc - self.bw/2.
+        self.f2 = self.fc + self.bw/2.
+        self.chanbw = 1e-3
+        self.thefdmt = fdmt.Fdmt(self.f1, self.chanbw, self.Nchan, self.Nd, self.Nt)
+        self.nf = self.Nchan
+        self.nt = self.Nt
+        self.nd = self.Nd
+
+
+    def test_ones_all_hit(self):
+        ones = np.ones((self.nf, self.nt), dtype=np.float32)
+        oneout = self.thefdmt(ones)[:, :self.nt]
+        nzero = np.sum(oneout == 0)
+
+        # All times up to nt should be >= 1 for all DMs
+        plot = True
+        if nzero > 0:
+            fig, axs = subplots(1,2)
+            axs[0].imshow(oneout, aspect='auto', origin='lower')
+            axs[1].imshow(oneout == 0, aspect='auto', origin='lower')
+            show()
+        self.assertEqual(nzero, 0)
+
+    def test_initialise_all_hit(self):
+        ones = np.ones((self.nf, self.nt), dtype=np.float32)
+        oneout = self.thefdmt.initialise(ones)
+        nzero = np.sum(oneout == 0)
+        # All times up to nt should be >= 1 for all DMs
+        plot = True
+        if nzero > 0:
+            fig, axs = subplots(1,2)
+            axs[0].imshow(oneout[0,:,:], aspect='auto', origin='lower')
+            axs[1].imshow(oneout[0,:,:] == 0, aspect='auto', origin='lower')
+            show()
+        self.assertEqual(nzero, 0)
+        
+
+        
 
 def _main():
     unittest_main()

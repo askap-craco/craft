@@ -8,6 +8,7 @@ import numpy as np
 import logging
 from numba import njit, jit, prange
 import math
+from IPython import embed
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -117,7 +118,7 @@ def add_offset_kernel2(v1, v2, vout, toff):
     vout[0:toff] = v1[0:toff]
     t += toff
     vout[t:t+nsum] = v1[t:t+nsum] + v2[0:nsum]
-    t+= nsum
+    t += nsum
     nrest = min(nt_in - nsum, nt_out - t)
 
     if nrest > 0:
@@ -129,7 +130,7 @@ def add_offset_kernel2(v1, v2, vout, toff):
     if t < nt_out:
         vout[t:nt_out+1] = 0
 
-    #assert not np.any(np.isnan(vout)), 'Data not written nt_in={} nt_out={} nsum={} toff={} {}'.format(nt_in, nt_out, nsum, toff, vout)
+    assert not np.any(np.isnan(vout)), 'Data not written nt_in={} nt_out={} nsum={} toff={} {}'.format(nt_in, nt_out, nsum, toff, vout)
                  
     return vout
 
@@ -329,19 +330,25 @@ class Fdmt(object):
         for idt in xrange(1, self.init_delta_t):
             state[:, idt, idt:self.n_t] = state[:, idt-1, idt:self.n_t] + din[:, 0:-idt]
 
+        if self.init_history is None:
+            # Make a pretend history which is all zeros
+            history = np.zeros((self.n_f, self.init_delta_t))
+        else:
+            history = self.init_history
 
         # Now do the first few samples:
-        if self.init_history is not None:
-            # we already have state initialised for [:, 0:idt, idt:end]
-            # So we use this to initialise [:, 0:idt, 0:idt]
-            initdt = self.init_delta_t
-            for tback in xrange(1, initdt): # tback number of samples backwards from t=0
-                h = self.init_history[:, -tback]
-                for idt in xrange(tback, initdt):
-                    state[:, idt, idt-tback] = state[:, idt-1, idt-tback] + h
 
+        # we already have state initialised for [:, 0:idt, idt:end]
+        # So we use this to initialise [:, 0:idt, 0:idt]
+        initdt = self.init_delta_t
+        for tback in xrange(1, initdt): # tback number of samples backwards from t=0
+            h = history[:, -tback]
+            for idt in xrange(tback, initdt):
+                state[:, idt, idt-tback] = state[:, idt-1, idt-tback] + h
+                
             # Copy last few samples of input data to init history
-            self.init_history[:, :] = din[:, -self.init_delta_t:]
+            history[:, :] = din[:, -self.init_delta_t:]
+            
 
         return state
         
