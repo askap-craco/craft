@@ -344,10 +344,11 @@ class Fdmt(object):
         for tback in xrange(1, initdt): # tback number of samples backwards from t=0
             h = history[:, -tback]
             for idt in xrange(tback, initdt):
+                print(tback, idt, idt-tback, state.shape, state[0, idt, idt-tback], state[0, idt-1, idt-tback], h[0])
                 state[:, idt, idt-tback] = state[:, idt-1, idt-tback] + h
                 
-            # Copy last few samples of input data to init history
-            history[:, :] = din[:, -self.init_delta_t:]
+        # Copy last few samples of input data to init history
+        history[:, :] = din[:, -self.init_delta_t:]
             
 
         return state

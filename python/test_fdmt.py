@@ -262,7 +262,53 @@ class TestFdmtWithHistoryHits(TestCase):
             axs[1].imshow(oneout[0,:,:] == 0, aspect='auto', origin='lower')
             show()
         self.assertEqual(nzero, 0)
-        
+
+
+class TestFdmtHighDm(TestCase):
+    def setUp(self):
+        self.nf = 256# number of channels 
+        self.df = 1e-3 # Channel bandwidth in GHz
+        self.fmin = 0.716 # Fmin GHz
+        self.nd = 1024 # Number of DM trials to do
+        self.nt = 64 # Number of samples per block
+        self.tsamp = 1.0 # milliseconds
+        self.thefdmt = fdmt.Fdmt(self.fmin, self.df, self.nf, self.nd, self.nt) # make FDMT
+
+    def test_init_ones(self):
+        ones = np.ones((self.nf, self.nt))
+        onei = self.thefdmt.initialise(ones)
+        print(onei.shape)
+        (nf, nd, nt) = onei.shape
+        self.assertEqual(nf, self.nf)
+        t0 = onei[:, :, 0]
+        for c in xrange(nf):
+            self.assertTrue(np.allclose(t0[c, :], np.ones(nd, dtype=float)))
+
+
+    def test_ones(self):
+        ones = np.ones((self.nf, self.nt))
+        oneout = self.thefdmt(ones)
+        print(oneout.shape)
+
+        # Look at the very first time sample
+        t0 = oneout[:, 0]
+
+        # t0 should be monotonically decreasing
+        t0d = t0[1:] = t0[:-1]
+
+        is_decreasing = np.all(t0d >= 0)
+
+        plot = False
+
+        if not is_decreasing and plot:
+            print t0d
+            fig, axs = subplots(1,2)
+            axs[0].imshow(oneout, aspect='auto', origin='lower')
+            axs[1].plot(oneout[:,0].T)
+            show()
+
+            
+        self.assertTrue(is_decreasing, 'the first time sample should be monotonically decreasing with DM')
 
         
 
