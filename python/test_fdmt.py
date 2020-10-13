@@ -274,7 +274,7 @@ class TestFdmtHighDm(TestCase):
         self.tsamp = 1.0 # milliseconds
         self.thefdmt = fdmt.Fdmt(self.fmin, self.df, self.nf, self.nd, self.nt) # make FDMT
 
-    def test_init_ones(self):
+    def test_init_ones_at_t0(self):
         ones = np.ones((self.nf, self.nt))
         onei = self.thefdmt.initialise(ones)
         print(onei.shape)
@@ -284,8 +284,19 @@ class TestFdmtHighDm(TestCase):
         for c in xrange(nf):
             self.assertTrue(np.allclose(t0[c, :], np.ones(nd, dtype=float)))
 
+    def test_init_ones_at_t1(self):
+        ones = np.ones((self.nf, self.nt))
+        onei = self.thefdmt.initialise(ones)
+        print(onei.shape)
+        (nf, nd, nt) = onei.shape
+        self.assertEqual(nf, self.nf)
+        t1 = onei[:, :, 1]
+        for c in xrange(nf):
+            self.assertTrue(np.allclose(t1[c, 0 ], np.ones(1, dtype=float)))
+            self.assertTrue(np.allclose(t1[c, 1:], np.ones(nd-1, dtype=float)*2))
 
-    def test_ones(self):
+
+    def test_ones_at_t0(self):
         ones = np.ones((self.nf, self.nt))
         oneout = self.thefdmt(ones)
         print(oneout.shape)
@@ -309,6 +320,42 @@ class TestFdmtHighDm(TestCase):
 
             
         self.assertTrue(is_decreasing, 'the first time sample should be monotonically decreasing with DM')
+
+    def test_ones_at_t1(self):
+        '''
+        Ones intput at t=1 should be at least 3 for the largest DM
+        '''
+        ones = np.ones((self.nf, self.nt))
+        oneout = self.thefdmt(ones)
+        print(oneout.shape)
+
+        # Look at the very first time sample
+        t1 = oneout[:, 1]
+        plot = True
+
+        if plot:
+            fig, axs = subplots(1,2)
+            idm = self.nd - 1
+            idm = 2
+            lastdm_tf = np.zeros((self.nf, self.nd))
+            lastdm_tf = self.thefdmt.add_frb_track(idm, lastdm_tf)
+            freqs = np.arange(self.nf)*self.df + self.fmin
+            channels = np.arange(self.nf) - 0.5
+            delays = -idm*(freqs**-2 - freqs.max()**-2)/(freqs.max()**-2 - freqs.min()**-2)
+            ny, nx = lastdm_tf.shape
+            xticks = np.arange(nx+1) - 0.5
+            yticks = np.arange(ny+1) - 0.5
+            axs[0].imshow(lastdm_tf, aspect='auto', origin='lower')
+            axs[0].plot(delays, channels)
+            axs[0].set_xticks(xticks, minor=True)
+            axs[0].set_yticks(yticks, minor=True)
+            axs[0].grid(True, 'minor')
+            axs[1].plot(t1)
+            show()
+
+            
+        self.assertEquals(t1[-1], 3.0) #, 'T=1 should have at least 1 smeared channel')
+
 
         
 

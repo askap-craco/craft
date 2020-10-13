@@ -504,11 +504,11 @@ class Fdmt(object):
         offend = nodes[-1][2]
         maxoff = id2end + offend+toffset
         if d is None:
-            d = np.zeros((self.n_f, self.n_t), dtype=np.float32)
+            d = np.zeros((self.n_f, int(idm + toffset+1)), dtype=np.float32)
         
         nf, nsamp = d.shape
         assert nf == self.n_f, 'Input data has incorrect number of channels'
-        assert nsamp >= idm+toffset, 'Input data has insufficient number of samples. Need at least {}'.format(idm)
+        assert nsamp >= idm+toffset, 'Input data has insufficient number of samples. Need at least {}'.format(idm+toffset)
         
         for (inchan1, id1, offset) in nodes:            
             coff1 = offset
