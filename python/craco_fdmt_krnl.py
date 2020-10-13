@@ -17,6 +17,7 @@ from scipy import constants
 import fdmt
 import warnings
 from craco import *
+import craco
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -76,8 +77,14 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
 
             if values.show:
                 fig, ax = pylab.subplots(1,2)
-                ax[0].imshow(abs(dblk[iuv, :, :]))
-                ax[1].imshow(np.angle(dblk[iuv, :, :]))
+                ax[0].imshow(abs(dblk[iuv, :, :]), aspect='auto', origin='lower')
+                ax[0].set_xlabel('Time')
+                ax[0].set_ylabel('IDM')
+                ax[0].set_title('Amplitude iuv={}'.format(iuv))
+                ax[1].imshow(np.angle(dblk[iuv, :, :]), aspect='auto', origin='lower')
+                ax[1].set_xlabel('Time')
+                ax[1].set_ylabel('IDM')
+                ax[1].set_title('Phase iuv={}'.format(iuv))
                 pylab.show()
 
         if values.outfile:
@@ -88,21 +95,10 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
         fname = '{}.ndm{:d}_nt{:d}.b{:d}.uvdata.{}'.format(outfile, values.ndm, values.nt, blkt, values.format)
         # initial shape is NUV, NDM, NT order
         nuv, ndm, nt = dblk.shape
-        # Add CU axis
-        # // Input order is assumed to be [DM-TIME-UV][DM-TIME-UV]
-        #// Each [DM-TIME-UV] block has all DM and all UV, but only half TIME
-        #// in1 is attached to the first block and in2 is attached to the second block
-        #// The first half TIME has [1,2, 5,6, 9,10 ...] timestamps
-        #// The second half TIME has [3,4, 7,8, 11,12 ...] timestamps
-        dblk.shape = (nuv, ndm, nt/values.nfftcu, values.nfftcu)
-        
-        # Transpose to [NCU, NDM, NT, NUV] order
-        dblk = np.transpose(dblk, (3, 1, 2, 0))
-
-        # Scale output
         dblk *= values.output_scale
+        dblk = craco.fdmt_transpose(dblk, ncu=values.nfftcu)
 
-        logging.info('Writing shape (NCU, NDM, NT, NUV)=%s to %s in format=%s num nonozero=%d scaling with %f real/imag mean:%f/%f std:%f/%f',
+        logging.info('Writing shape %s to %s in format=%s num nonozero=%d scaling with %f real/imag mean:%f/%f std:%f/%f',
                      dblk.shape, fname, values.format, np.sum(dblk != 0), values.output_scale,
                      dblk.real.mean(), dblk.imag.mean(),
                      dblk.real.std(), dblk.imag.std())
@@ -168,14 +164,7 @@ def _main():
         #UU, VV WW are in seconds
         ulam = bldata['UU'] * freqs
         vlam = bldata['VV'] * freqs
-<<<<<<< HEAD
-=======
-
-        uvcent = True
->>>>>>> 387047d8b28a52e2c377fe72e1ffb04d65b08027
-        pix_offset = 0
-        if values.fftshift:
-            pix_offset = Npix/2
+        pix_offset = Npix/2
         
         upix = np.round(ulam/ucell + pix_offset).astype(int)
         vpix = np.round(vlam/vcell + pix_offset).astype(int)

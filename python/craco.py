@@ -158,7 +158,81 @@ def grid(uvcells, Npix):
 
     return g
 
+def fdmt_transpose(dblk, ncu=1, nt_per_cu=2):
+    '''
+    Transpose the given data in to a format suitable for the Image kernel
+    
+    :dblk: Data block. Shape = (nuv, ndm, nt) - complex valued. nt >= ncu*nt_per_cu
+    :ncu: Number of processing Compute Units
+    :nt_per_cu: Number of times samples processed in parallel by a single FFT compute unit. 
+    Usually this = 2 as a CU grids 2 time samples onto a complex plane to produce 2 FFT outputs (real/imag)
+    :returns: data reshaped to (nuv, ndm, nt/(ncu*nt_per_cu), ncu, nt_per_cu)
+    '''
+    
+    nuv, ndm, nt = dblk.shape
+    assert ncu >= 1
+    assert nt_per_cu >= 1
+    assert np.iscomplexobj(dblk)
+    assert nt >= ncu*nt_per_cu, 'Invalid tranpose'
+    
+    # Add CU axis
+    # // Input order is assumed to be [DM-TIME-UV][DM-TIME-UV]
+    #// Each [DM-TIME-UV] block has all DM and all UV, but only half TIME
+    #// in1 is attached to the first block and in2 is attached to the second block
+    #// The first half TIME has [1,2, 5,6, 9,10 ...] timestamps
+    #// The second half TIME has [3,4, 7,8, 11,12 ...] timestamps
+    nt_rest = nt//(ncu*nt_per_cu)
 
+    # this is NUV, NDM, NT/(NCU*NTPERCU), NCU, NTPERCU order
+    rblk = dblk.reshape(nuv, ndm, nt_rest, ncu, nt_per_cu)
+
+    # Tranpose to (NCU, NDM, NT/(NCU*NTPERCU), NTPERCU, NUV) order
+    outorder = (3, 1, 2, 4, 0)
+    oblk = np.transpose(rblk, outorder)
+
+    assert oblk.shape == (ncu, ndm, nt_rest, nt_per_cu, nuv), 'Invalid shape = {}'.format(oblk.shape)
+    
+    return oblk
+
+def fdmt_transpose_inv(oblk, ncu=1, nt_per_cu=2, nuv=None, ndm=None, nt=None):
+    '''
+    Transpose the given data from a format suitable for the image kernel back into something sane.
+    
+    :oblk: Output block - otuput by fdmt_tarnspose() or a flattened array. If flattend, then ndm and nuv must be specified
+    :ncu: Number of processing Compute Units
+    :nt_per_cu: Number of times samples processed in parallel by a single FFT compute unit. 
+    Usually this = 2 as a CU will grid 2 time samples onto a complex plane to produce 2 FFT outputs (real/imag)
+    
+    :returns: Data in sane ordering: (nuv, ndm, nt)
+    '''
+    assert ncu >= 1
+    assert nt_per_cu >= 1
+    assert np.iscomplexobj(oblk)
+
+    if oblk.ndim == 1:
+        nt_rest = nt // (ncu * nt_per_cu)
+        oblk = oblk.reshape(ncu, ndm, nt_rest, nt_per_cu, nuv)
+    else:
+        (ncu_d, ndm, nt_rest, nt_per_cu_d, nuv) = oblk.shape
+        # Check shape agrees with arguments
+        assert ncu == ncu_d
+        assert nt_per_cu_d == nt_per_cu
+
+    nt = nt_rest * ncu * nt_per_cu
+    assert nt == ncu*nt_per_cu*nt_rest, 'Invalid tranpose'
+
+    assert oblk.shape == (ncu, ndm, nt_rest, nt_per_cu, nuv), 'Invalid shape = {}'.format(oblk.shape)
+
+    # Reorder back to sane ordering - aiming for NUV, NDM, NT
+    order = (4, 1, 2, 0, 3)
+    rblk = np.transpose(oblk, order)
+    assert rblk.shape == (nuv, ndm, nt_rest, ncu, nt_per_cu), 'Invalid shape={}'.format(rblk.shape)
+    
+    dblk = rblk.reshape(nuv, ndm, nt)
+    assert dblk.shape == (nuv, ndm, nt)
+    
+    return dblk
+    
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)

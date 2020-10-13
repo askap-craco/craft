@@ -126,7 +126,7 @@ class TestFdmtWithHistoryHits(TestCase):
         self.df = 1.0 # Channel bandwidth in MHz
         self.fmin = self.fmax - self.nf*self.df # Frequency of the bottom of the band in MHz
         self.nd = 1024 # Number of DM trials to do
-        self.nt = 256 # Number of samples per block
+        self.nt = 64 # Number of samples per block
         self.tsamp = 1.0 # milliseconds
         self.thefdmt = fdmt.Fdmt(self.fmin, self.df, self.nf, self.nd, self.nt, history_dtype=np.float32) # make FDMT
         self.nbox = 32
@@ -217,6 +217,147 @@ class TestFdmtWithHistoryHits(TestCase):
         for idt in xrange(self.nd):
             self._test_self_made_frb(idt)
 
+
+class TestFdmtWithHistoryHits(TestCase):
+
+    def setUp(self):
+        self.fc = 0.860 # center frequency GHz
+        self.bw = 0.288 # bandwidth GHz
+        self.Nd = 64 # number of DM trials
+        self.Nchan= 64
+        self.Nt = 256 # time block size
+        self.Tint = 0.864e-3 # integration time - seconds
+        self.f1 = self.fc - self.bw/2.
+        self.f2 = self.fc + self.bw/2.
+        self.chanbw = 1e-3
+        self.thefdmt = fdmt.Fdmt(self.f1, self.chanbw, self.Nchan, self.Nd, self.Nt)
+        self.nf = self.Nchan
+        self.nt = self.Nt
+        self.nd = self.Nd
+
+
+    def test_ones_all_hit(self):
+        ones = np.ones((self.nf, self.nt), dtype=np.float32)
+        oneout = self.thefdmt(ones)[:, :self.nt]
+        nzero = np.sum(oneout == 0)
+
+        # All times up to nt should be >= 1 for all DMs
+        plot = True
+        if nzero > 0:
+            fig, axs = subplots(1,2)
+            axs[0].imshow(oneout, aspect='auto', origin='lower')
+            axs[1].imshow(oneout == 0, aspect='auto', origin='lower')
+            show()
+        self.assertEqual(nzero, 0)
+
+    def test_initialise_all_hit(self):
+        ones = np.ones((self.nf, self.nt), dtype=np.float32)
+        oneout = self.thefdmt.initialise(ones)
+        nzero = np.sum(oneout == 0)
+        # All times up to nt should be >= 1 for all DMs
+        plot = True
+        if nzero > 0:
+            fig, axs = subplots(1,2)
+            axs[0].imshow(oneout[0,:,:], aspect='auto', origin='lower')
+            axs[1].imshow(oneout[0,:,:] == 0, aspect='auto', origin='lower')
+            show()
+        self.assertEqual(nzero, 0)
+
+
+class TestFdmtHighDm(TestCase):
+    def setUp(self):
+        self.nf = 256# number of channels 
+        self.df = 1e-3 # Channel bandwidth in GHz
+        self.fmin = 0.716 # Fmin GHz
+        self.nd = 1024 # Number of DM trials to do
+        self.nt = 64 # Number of samples per block
+        self.tsamp = 1.0 # milliseconds
+        self.thefdmt = fdmt.Fdmt(self.fmin, self.df, self.nf, self.nd, self.nt) # make FDMT
+
+    def test_init_ones_at_t0(self):
+        ones = np.ones((self.nf, self.nt))
+        onei = self.thefdmt.initialise(ones)
+        print(onei.shape)
+        (nf, nd, nt) = onei.shape
+        self.assertEqual(nf, self.nf)
+        t0 = onei[:, :, 0]
+        for c in xrange(nf):
+            self.assertTrue(np.allclose(t0[c, :], np.ones(nd, dtype=float)))
+
+    def test_init_ones_at_t1(self):
+        ones = np.ones((self.nf, self.nt))
+        onei = self.thefdmt.initialise(ones)
+        print(onei.shape)
+        (nf, nd, nt) = onei.shape
+        self.assertEqual(nf, self.nf)
+        t1 = onei[:, :, 1]
+        for c in xrange(nf):
+            self.assertTrue(np.allclose(t1[c, 0 ], np.ones(1, dtype=float)))
+            self.assertTrue(np.allclose(t1[c, 1:], np.ones(nd-1, dtype=float)*2))
+
+
+    def test_ones_at_t0(self):
+        ones = np.ones((self.nf, self.nt))
+        oneout = self.thefdmt(ones)
+        print(oneout.shape)
+
+        # Look at the very first time sample
+        t0 = oneout[:, 0]
+
+        # t0 should be monotonically decreasing
+        t0d = t0[1:] = t0[:-1]
+
+        is_decreasing = np.all(t0d >= 0)
+
+        plot = False
+
+        if not is_decreasing and plot:
+            print t0d
+            fig, axs = subplots(1,2)
+            axs[0].imshow(oneout, aspect='auto', origin='lower')
+            axs[1].plot(oneout[:,0].T)
+            show()
+
+            
+        self.assertTrue(is_decreasing, 'the first time sample should be monotonically decreasing with DM')
+
+    def test_ones_at_t1(self):
+        '''
+        Ones intput at t=1 should be at least 3 for the largest DM
+        '''
+        ones = np.ones((self.nf, self.nt))
+        oneout = self.thefdmt(ones)
+        print(oneout.shape)
+
+        # Look at the very first time sample
+        t1 = oneout[:, 1]
+        plot = True
+
+        if plot:
+            fig, axs = subplots(1,2)
+            idm = self.nd - 1
+            idm = 2
+            lastdm_tf = np.zeros((self.nf, self.nd))
+            lastdm_tf = self.thefdmt.add_frb_track(idm, lastdm_tf)
+            freqs = np.arange(self.nf)*self.df + self.fmin
+            channels = np.arange(self.nf) - 0.5
+            delays = -idm*(freqs**-2 - freqs.max()**-2)/(freqs.max()**-2 - freqs.min()**-2)
+            ny, nx = lastdm_tf.shape
+            xticks = np.arange(nx+1) - 0.5
+            yticks = np.arange(ny+1) - 0.5
+            axs[0].imshow(lastdm_tf, aspect='auto', origin='lower')
+            axs[0].plot(delays, channels)
+            axs[0].set_xticks(xticks, minor=True)
+            axs[0].set_yticks(yticks, minor=True)
+            axs[0].grid(True, 'minor')
+            axs[1].plot(t1)
+            show()
+
+            
+        self.assertEquals(t1[-1], 3.0) #, 'T=1 should have at least 1 smeared channel')
+
+
+        
 
 def _main():
     unittest_main()

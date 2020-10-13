@@ -11,6 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
+import craco
 from craco import image_fft, printstats
 from boxcar import ImageBoxcar
 
@@ -121,28 +122,27 @@ def image_pipeline(fname, values):
         d = np.load(fname)
         ncu, nd, nt_on_ncu, nuv = d.shape
         nt = nt_on_ncu * ncu
+        # Output expected to be (nd, nt, nuv)
+        d = np.transpose(d, (1, 2, 0, 3)).reshape(nd, nt, nuv)
     else:
         nuv = uvgrid.shape[0]
         nd = values.ndm
         nt = values.nt
         ncu = values.nfftcu
-        nt_on_ncu = nt // ncu
-        d = np.fromfile(fname, dtype=np.complex64).reshape(ncu, nd, nt_on_ncu, nuv)
+        d = np.fromfile(fname, dtype=np.complex64)
+        d = craco.fdmt_transpose_inv(d, ncu=values.nfftcu, ndm=nd, nt=nt, nuv=nuv)
+        # Image transpose outputs (nuv, ndm, nt) - should fix everything to be consistent
+        # But for now we'll transpose to (nd, nt, nuv) as this is what the next code expects
+        d = np.transpose(d, (1, 2, 0))
 
     assert uvgrid.shape[0] == nuv
-    assert d.shape == (ncu, nd, nt_on_ncu, nuv)
-
-    # d is in [NCU, ND, NT/NCU, NUV] order
-    # put d back in [ND, NT, NUV] order. We don't care about CUs
-    # First transpose to [ND, NT/NCU, NCU, NUV] then merge the axes
-    d = np.transpose(d, (1, 2, 0, 3)).reshape(nd, nt, nuv)
     assert d.shape == (nd, nt, nuv)
     
     idm = 0
     t = 0
     gridder = Gridder(uvgrid, values.npix)
     imager = Imager()
-    boxcar = ImageBoxcar(nd, values.npix, values.nbox, 'sqrt')
+    boxcar = ImageBoxcar(nd, values.npix, values.nbox, values.boxcar_weight)
     grouper = Grouper(values.threshold)
     outfname = fname + '.img.dat'
     outgridname= fname + '.grid.dat'
@@ -157,7 +157,7 @@ def image_pipeline(fname, values):
 
     for idm in xrange(nd):
         for t in xrange(nt/2):
-            g = gridder(d[idm, t, :], d[idm, t+1, :])
+            g = gridder(d[idm, 2*t, :], d[idm, 2*t+1, :])
             g.tofile(gout)
             img = imager(g).astype(np.complex64)
             img.tofile(fout)
@@ -201,6 +201,7 @@ def _main():
     parser.add_argument('--nfftcu', type=int, help='Number of FFT Computing Units for transpose', default=1)
     parser.add_argument('--nbox', type=int, help='Number of boxcars to compute', default=8)
     parser.add_argument('--threshold', type=float, help='Threshold for candidate grouper', default=10)
+    parser.add_argument('--boxcar-weight', choices=('sqrt','avg','sum'), help='Boxcar weight type', default='sqrt')
     parser.add_argument('-s','--show', action='store_true', help='Show plots', default=False)
     parser.add_argument(dest='files', nargs='*')
     parser.set_defaults(verbose=False)
