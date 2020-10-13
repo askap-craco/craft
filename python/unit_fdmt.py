@@ -194,6 +194,15 @@ class UnitFdmt(sample_fdmt.IndividualFifos):
 
         return fifo_length
 
+     def read(self, iterno, d, c, t):
+        # Look up value in a giant array
+        fifo_size = FIFO_SIZE_LOOKUP[iterno, d, c]
+        tback = fifo_size - t
+        assert tback <= 3
+        value = self.buffer[iterno, d, c, fifo_size - tback]
+        
+        return value
+
     def fdmt_process(self, din):
         '''
         Takes in a single initialised time sample and returns the FDMT of it.
@@ -211,20 +220,26 @@ class UnitFdmt(sample_fdmt.IndividualFifos):
             for d in xrange(din.shape[1]):
                 self.shift(0, d, c, din[c, d])
 
-        niter = len(thefdmt.hist_nf_data)
+        niter = len(thefdmt.hist_nf_data) 
         dout = np.zeros(thefdmt.max_dt)
 
-        for d in xrange(MAX_DM_PER_UNIT):
+#        for d in xrange(MAX_DM_PER_UNIT):
             for iterno in xrange(niter):
                 inconfig = IterConfig(self, iterno)
                 outconfig = IterConfig(self, iterno+1)
+
+                #pragma UNROLL 
                 for output_channel in xrange(outconfig.nchan):
                     for iunit in xrange(outconfig.nunit_per_chan):
+                    for out_d in inconfig.ndm_out_for_chan(output_channel):
                         out_d = iunit*outconfig.ndm_per_unit + d
                         if out_d >= inconfig.ndm_out_for_chan(output_channel):
                             break
 
-                        in_d1, in_d2, time_offset = inconfig.get_config(output_channel, out_d)
+                        #in_d1, in_d2, time_offset = inconfig.get_config(output_channel, out_d)
+                        in_d1 = D1_LOOKUP[output_channel][out_d]
+                        in_d2 = D2_LOOKUP[output_channel][out_d]
+                        time_offset = TIME_OFFSET_LOOKUP[output_channel][out_d]
                         in_chan1 = 2*output_channel
                         in_chan2 = 2*output_channel+1
                         

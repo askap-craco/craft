@@ -17,7 +17,10 @@ def isquare(f):
 
 @jit(nopython=True)
 def cff(f1_start, f1_end, f2_start, f2_end):
-    return (isquare(f1_start) - isquare(f1_end))/(isquare(f2_start) - isquare(f2_end))
+    num = (isquare(f1_start) - isquare(f1_end))
+    den = (isquare(f2_start) - isquare(f2_end))
+    ratio = num / den
+    return ratio
 
 @jit(nopython=True)
 def calc_delta_t(f_min, f_max, f_start, f_end, max_dt):
