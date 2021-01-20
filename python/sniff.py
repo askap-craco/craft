@@ -47,7 +47,7 @@ class FileOperations:
             self.reducedcand=bgcand.reshape(-1,len(self.candheader))
             return self.newcandtxt
         else:
-            self.newcandtxt=self.candtxt
+            self.newcandtxt=self.candtxt[1:]
             self.reducedcand=self.cand
 
     def getparams(self,param):
@@ -201,9 +201,9 @@ def freddachecker(hdrf,freddafof,dmerr=10,beamradius=5,beam=1):
         psrs=i[1]
         print(psrs)
         if psrs=='None':
-            candidates.write_frb(idx+1,prnt=True)
+            candidates.write_frb(idx,prnt=True)
         else:
-            candidates.write_psr(idx+1,psrs,prnt=True)
+            candidates.write_psr(idx,psrs,prnt=True)
     candidates.close_files()
 
 def _main():
