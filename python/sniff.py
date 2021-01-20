@@ -14,7 +14,7 @@ __author__ = "CRAFT Harry Qiu <hqiu0129@uni.sydney.edu.au>"
 
 
 class FileOperations:
-    def __init__(self,cands,skip=1):
+    def __init__(self,cands):
         self.cand=np.loadtxt(cands).T
         readcand=open(cands,'r')
         self.candtxt=readcand.readlines()
@@ -201,9 +201,9 @@ def freddachecker(hdrf,freddafof,dmerr=10,beamradius=5,beam=1):
         psrs=i[1]
         print(psrs)
         if psrs=='None':
-            candidates.write_frb(idx,prnt=True)
+            candidates.write_frb(idx+1,prnt=True)
         else:
-            candidates.write_psr(idx,psrs,prnt=True)
+            candidates.write_psr(idx+1,psrs,prnt=True)
     candidates.close_files()
 
 def _main():
