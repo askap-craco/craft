@@ -22,13 +22,14 @@ import craco
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 class BaselineCell(object):
-    def __init__(self, blid, uvpix, chan_start, chan_end, freqs):
+    def __init__(self, blid, uvpix, chan_start, chan_end, freqs, npix):
         self.blid = blid
         self.uvpix = uvpix
         self.chan_start = chan_start
         self.chan_end = chan_end
         self.freqs = freqs
         self.a1, self.a2 = bl2ant(blid)
+        self.npix = npix
 
     @property
     def uvpix_upper(self):
@@ -52,6 +53,16 @@ class BaselineCell(object):
         return retuv
 
     @property
+    def upper_idx(self):
+        '''
+        Returns the triangular upper index of this guy
+        '''
+        u, v = self.uvpix_upper
+        i =  triangular_index(u, v, self.npix)
+        
+        return i
+
+    @property
     def is_lower(self):
         '''
         Returns True if the uvpix coordinates supplied in the constructor
@@ -64,7 +75,7 @@ class BaselineCell(object):
     def is_upper(self):
         '''
         Returns True if the uvpix coordinates supplied in the constructor
-        where in the lower half plane. I.e. if u >= v
+        where in the upper half plane including diagonal. I.e. if u >= v
         '''
         u, v = self.uvpix
         return u >= v
@@ -217,10 +228,10 @@ def _main():
         for istart, iend in runidxs(uvpos):
             uvpix = uvpos[istart]
             assert uvpos[istart] == uvpos[iend]
-            b = BaselineCell(blid, uvpix, istart, iend, freqs[istart:iend+1])
+            b = BaselineCell(blid, uvpix, istart, iend, freqs[istart:iend+1], Npix)
             uvcells.append(b)
 
-    uvcells = sorted(uvcells, key=lambda b:b.uvpix_upper)
+    uvcells = sorted(uvcells, key=lambda b:b.upper_idx)
     d = np.array([(f.a1, f.a2, f.uvpix[0], f.uvpix[1], f.chan_start, f.chan_end) for f in uvcells], dtype=np.uint32)
     
     np.savetxt(values.files+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
