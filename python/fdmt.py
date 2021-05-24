@@ -18,6 +18,10 @@ def isquare(f):
 
 @jit(nopython=True)
 def cff(f1_start, f1_end, f2_start, f2_end):
+    '''
+    returns (f1_start**-2 - f2_start**-2)/(f2_start**-2 - f2_end**-2)
+    '''
+
     num = (isquare(f1_start) - isquare(f1_end))
     den = (isquare(f2_start) - isquare(f2_end))
     ratio = num / den
@@ -228,7 +232,6 @@ class Fdmt(object):
             delta_t = self.max_dt
             
         ndt = delta_t
-
         state_shape = np.array([nf, delta_t, n_t + ndt])
         
         correction = 0.0
@@ -285,10 +288,10 @@ class Fdmt(object):
             
             # for each DM in this subband
             for idt in xrange(delta_t_local):
-                dt_middle = int(round(idt * cff(f_middle, f_start, f_end, f_start))) # DM of the middle
-                dt_middle_index = dt_middle + shift_input # same as dt_middle
-                dt_middle_larger = int(round(idt*cff(f_middle_larger, f_start, f_end, f_start))) # dt at slightly larger freq
-                dt_rest = idt - dt_middle_larger # remaining dt
+                dt_middle = int(round(idt * cff(f_middle, f_start, f_end, f_start))) # id1 = DM of the middle
+                dt_middle_index = dt_middle + shift_input # id1 = same as dt_middle
+                dt_middle_larger = int(round(idt*cff(f_middle_larger, f_start, f_end, f_start))) # offset - dt at slightly larger freq
+                dt_rest = idt - dt_middle_larger # remaining dt = id2
                 dt_rest_index = dt_rest + shift_input # same as dt_rest
 
                 # The sum_* values are the whole point of all this stuff. They're 3 tuples containing

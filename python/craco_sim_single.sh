@@ -28,12 +28,14 @@ nchan=256 # number of channels
 tint=1.728
 desired_amp=500 # desired amplitude a the output of the FFT
 threshold=372
-antfile=/data/craco/ban115/craft/python/askap-ak1-ak30.ant
+antfile=`dirname $0`/askap-ak1-ak30.ant
+echo Antfile is $antfile
+wc -l $antfile
 
 # Calculated parameters
 frb_relpos_frbname=$( echo "$frb_relpos" | sed s/,//)
 frb_tstart=$(echo "scale=6; $t0 * $tint " | bc) # start time in milliseconds
-nant=$(wc -l $antfile | cut -f 1 -d ' ')
+nant=$(wc -l $antfile | awk '{print $1}')
 nbl=$( echo "scale=6; $nant * ($nant -1) / 2" | bc) # number of baselines
 frbname=frb_d${frb_dm}_t${t0}_a${frb_amp}_sn${frb_sn}_lm${frb_relpos_frbname}
 fits=${frbname}.fits
@@ -43,10 +45,13 @@ fits=${frbname}.fits
 raw_image_amp=$( echo "scale=6; $nbl * $nchan * 2" | bc )
 scale=$( echo "scale=6; $desired_amp / $raw_image_amp " | bc )
 
-echo $ncu $nt $nd $frb_amp $nant $nbl $nchan $desired_amp $raw_image_amp scale=$scale
+echo ncu=$ncu nt=$nt nd=$nd frb_amp=$frb_amp nant=$nant nbl=$nbl nchan=$nchan desired_amp=$desired_amp raw_amp=$raw_image_amp scale=$scale
 mkdir $frbname
+cp $antfile $frbname
 pushd $frbname
-cp $antfile .
+
+antfile2=`basename $antfile`
+
 ( set -o posix ; set) > /tmp/myvars.after
 diff /tmp/myvars.before /tmp/myvars.after > varchanges.txt
 cp /tmp/myvars.after allvars.txt
@@ -78,7 +83,7 @@ param fits $fits
 param raw_image_amp $raw_image_amp 
 param scale $scale 
 
-cmd="uvfrbsim.py --fch1 $fch1 --nchan $nchan --antfile $antfile --tint $tint --duration $nt --frb_idm $frb_dm --frb_amp $frb_amp --frb_sn $frb_sn --frb_relpos $frb_relpos --frb_tstart $frb_tstart -o $fits"
+cmd="uvfrbsim.py --fch1 $fch1 --nchan $nchan --antfile $antfile2 --tint $tint --duration $nt --frb_idm $frb_dm --frb_amp $frb_amp --frb_sn $frb_sn --frb_relpos $frb_relpos --frb_tstart $frb_tstart -o $fits"
 echo "Running $cmd"
 #$cmd --show
 $cmd
