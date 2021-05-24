@@ -28,9 +28,8 @@ Module :mod:`askap.time`
 Utilities for manipulating and converting to and from binary atomic time (BAT).
 
 :author: Aaron Chippendale <Aaron.Chippendale@csiro.au>
+
 """
-# todo get DUTC0 from
-# http://hpiers.obspm.fr/eoppc/bul/bulc/UTC-TAI.history
 
 import datetime
 import pytz

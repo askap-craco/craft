@@ -31,6 +31,45 @@ class BaselineCell(object):
         self.a1, self.a2 = bl2ant(blid)
 
     @property
+    def uvpix_upper(self):
+        '''
+        Returns the uv pixel coordinates tuple guaranteed to be in the 
+        upper half plane
+        
+        If the supplied uvpix is in the lower half, then the (u, v)
+        values will be swaped, and 'is_lower()' will return True
+        
+        :returns: (u, v) where u >= v always.
+        '''
+        u, v = self.uvpix
+        if self.is_upper:
+            retuv = (u, v)
+        else:
+            retuv = (v, u)
+
+        assert retuv[0] >= retuv[1], 'Invalid upper UV coordinates'
+
+        return retuv
+
+    @property
+    def is_lower(self):
+        '''
+        Returns True if the uvpix coordinates supplied in the constructor
+        where in the lower half plane. I.e. if u < v
+        '''
+        u, v = self.uvpix
+        return u < v
+
+    @property
+    def is_upper(self):
+        '''
+        Returns True if the uvpix coordinates supplied in the constructor
+        where in the lower half plane. I.e. if u >= v
+        '''
+        u, v = self.uvpix
+        return u >= v
+
+    @property
     def nchan(self):
         return self.chan_end - self.chan_start + 1
 
@@ -181,7 +220,7 @@ def _main():
             b = BaselineCell(blid, uvpix, istart, iend, freqs[istart:iend+1])
             uvcells.append(b)
 
-    uvcells = sorted(uvcells, key=lambda b:b.uvpix)
+    uvcells = sorted(uvcells, key=lambda b:b.uvpix_upper)
     d = np.array([(f.a1, f.a2, f.uvpix[0], f.uvpix[1], f.chan_start, f.chan_end) for f in uvcells], dtype=np.uint32)
     
     np.savetxt(values.files+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')

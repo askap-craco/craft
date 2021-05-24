@@ -28,7 +28,7 @@ nchan=256 # number of channels
 tint=1.728
 desired_amp=500 # desired amplitude a the output of the FFT
 threshold=372
-antfile=/data/craco/ban115/craft/python/askap-ak1-ak20.ant
+antfile=/data/craco/ban115/craft/python/askap-ak1-ak30.ant
 
 # Calculated parameters
 frb_relpos_frbname=$( echo "$frb_relpos" | sed s/,//)

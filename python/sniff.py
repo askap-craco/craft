@@ -1,13 +1,14 @@
-from pylab import *
-import matplotlib as mpl
-import matplotlib.pyplot as plt
+#!/usr/bin/env python
+#from pylab import *
+# import matplotlib as mpl
+#import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
-import logging
+#import logging
 from astropy import units as u
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz
-from astropy.table import QTable, Table, Column
+#from astropy.table import QTable, Table, Column
 
 __author__ = "CRAFT Harry Qiu <hqiu0129@uni.sydney.edu.au>"
 
@@ -19,27 +20,36 @@ class FileOperations:
         self.candtxt=readcand.readlines()
         readcand.close()
         self.candheader=self.candtxt[0].split('#')[1].split('\n')[0].split(',')
-        self.file1 = open(cands+'.psr', 'w')
-        self.file1.write("#PSRname\t"+self.candtxt[0])
-        self.file2 = open(cands+'.frb', 'w')
+        self.file1 = open('sniffy.log', 'w')
+        self.file1.write("#PSRname, "+self.candtxt[0])
+        self.file2 = open('fifi.log', 'w')
         self.file2.write(self.candtxt[0])
     def outputfof(self,param):
         print(self.candheader[param])
         return self.cand[param]
     def collect_multibeam(self):
-        self.times=np.unique(self.cand[1])
-        bgcand=np.array([])
-        self.newcandtxt=[]
-        for i in self.times:
-            idx=np.where(self.cand[1]==i)[0]
-            print(self.cand.T[idx])
-            primarybeam=np.argmax(self.cand[0][idx])
-            print(primarybeam)
-            print(self.cand.T[idx][primarybeam])
-            self.newcandtxt.append(self.candtxt[idx[primarybeam]+1])
-            bgcand=np.append(bgcand,self.cand.T[idx][primarybeam])
-        self.reducedcand=bgcand.reshape(-1,len(self.candheader))
-        return self.newcandtxt
+        if len(self.candtxt)>2:
+            self.times=np.unique(self.cand[1])
+            bgcand=np.array([])
+            self.newcandtxt=[]
+            for i in self.times:
+                idx=np.where(self.cand[1]==i)[0]
+                if len(idx) >1:
+                    dmcheck=np.diff(self.cand[5][idx])
+                    if np.max(dmcheck) > 5:
+                        continue
+                print(self.cand.T[idx])
+                primarybeam=np.argmax(self.cand[0][idx])
+                print(primarybeam)
+                print(self.cand.T[idx][primarybeam])
+                self.newcandtxt.append(self.candtxt[idx[primarybeam]+1])
+                bgcand=np.append(bgcand,self.cand.T[idx][primarybeam])
+            self.reducedcand=bgcand.reshape(-1,len(self.candheader))
+            return self.newcandtxt
+        else:
+            self.newcandtxt=self.candtxt[1:]
+            self.reducedcand=self.cand
+
     def getparams(self,param):
         print(self.candheader[param])
         return self.reducedcand.T[param]
@@ -106,13 +116,30 @@ class PsrPnt:
     def match_all(self,dmerr=5,beamradius=1.5):
         k=0
         printids=[]
-        for i,j in zip(self.coords,self.dm):
+        if isinstance(self.dm,np.float64):
             print ("Candidate "+str(k))
+            i=self.coords
+            j=self.dm
             pmask,psep=self.full_crossmatch(i[0],i[1],j,dmerr,beamradius)
-            print(pmask[np.argmin(psep)])
-            printids.append([k,self.cat_name[pmask][np.argmin(psep)]])
-            k+=1
+            if len(psep)>0:
+                print("preview pulsar")
+                print(self.cat_name[pmask][np.argmin(psep)])
+                printids.append([k,self.cat_name[pmask][np.argmin(psep)]])
+            else:
+                printids.append([k,'None'])
+        else:
+            for i,j in zip(self.coords,self.dm):
+                print ("Candidate "+str(k))
+                pmask,psep=self.full_crossmatch(i[0],i[1],j,dmerr,beamradius)
+                if len(psep)>0:
+                    print("preview pulsar")
+                    print(pmask[np.argmin(psep)])
+                    printids.append([k,self.cat_name[pmask][np.argmin(psep)]])
+                else:
+                    printids.append([k,'None'])
+                k+=1
         return printids
+
 
 
     def readmask(self,mask):
@@ -160,20 +187,23 @@ def freddachecker(hdrf,freddafof,dmerr=10,beamradius=5,beam=1):
     cand_dms=candidates.getparams(5)
     header=hdrfiles(hdrf)
     coords=header.get_beampos(cand_beams)
-    #print(coords)
+    print(coords)
     dmlist=cand_dms
+    print(dmlist)
     sniffer=PsrPnt(coords,dmlist,radius=beam)
     outlist=sniffer.match_all(dmerr,beamradius)
+    print("outlist produced")
     print(outlist)
     for i in outlist:
         # print(idx)
         idx=i[0]
         print(idx)
         psrs=i[1]
-        if len(psrs)==0:
-            candidates.write_frb(idx)
+        print(psrs)
+        if psrs=='None':
+            candidates.write_frb(idx,prnt=True)
         else:
-            candidates.write_psr(idx,psrs)
+            candidates.write_psr(idx,psrs,prnt=True)
     candidates.close_files()
 
 def _main():
@@ -188,7 +218,7 @@ def _main():
     values = parser.parse_args()
     hdrf=values.files[0]
     freddafof=values.candlist
-    freddachecker(hdrf,freddafof,dmerr=values.dmlim,beamradius=values.radius,beam=1)
+    freddachecker(hdrf,freddafof,dmerr=values.dmlim,beamradius=values.radius,beam=0.9)
 
 if __name__ == '__main__':
     _main()
