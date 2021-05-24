@@ -16,6 +16,49 @@ import warnings
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 
+def triangular(n):
+    '''
+    Compute the Nth triangular number including diagaonal.
+    i.e. number of baselines (including autos) with N antennas
+    t = N*(N+1)/2
+    
+    :param: n - n (>= 0)
+    :returns: nth triangular number
+
+    >>> triangular(1)
+    1
+    
+    >>> triangular(2)
+    3
+
+    >>> triangular(6)
+    21
+    '''
+    t = n*(n+1)/2
+
+    return t
+
+def triangular_index(x, y, n):
+    '''
+    Returns the index in the triangle given x and y coordinates (x>=y) and 
+    the size of the array (n)
+
+    >>> triangular_index(1,1,5)
+    5
+
+    >>> triangular_index(4,3,5)
+    13
+
+    >>> triangular_index(106, 71, 256)
+    15726
+    '''
+    assert 0 <= x < n
+    assert 0 <= y < n
+    assert x >= y
+    i = triangular(n) - triangular(n - y) + x - y
+    
+    return i
+
 def bl2ant(bl):
     '''
     Convert baseline to antena numbers according to UV fits convention
