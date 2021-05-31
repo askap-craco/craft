@@ -16,9 +16,10 @@ import uvfits
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
-def get_uvcells(baselines, freqs, Npix):
+def get_uvcells(baselines, uvcell, freqs, Npix):
     uvcells = []
-    
+
+    ucell, vcell = uvcell
     for blid, bldata in baselines.iteritems():
         #UU, VV WW are in seconds
         ulam = bldata['UU'] * freqs
@@ -30,14 +31,14 @@ def get_uvcells(baselines, freqs, Npix):
         if np.any((upix < 0) | (upix >= Npix) | (vpix < 0) | (vpix >= Npix)):
             warnings.warn('Pixel coordinates out of range')
 
-        if values.show:
-            pylab.plot(ulam/1e3, vlam/1e3)
+        #if values.show:
+        #    pylab.plot(ulam/1e3, vlam/1e3)
 
         uvpos = list(zip(upix, vpix))
-        for istart, iend in runidxs(uvpos):
+        for istart, iend in craco.runidxs(uvpos):
             uvpix = uvpos[istart]
             assert uvpos[istart] == uvpos[iend]
-            b = BaselineCell(blid, uvpix, istart, iend, freqs[istart:iend+1], Npix)
+            b = craco.BaselineCell(blid, uvpix, istart, iend, freqs[istart:iend+1], Npix)
             uvcells.append(b)
 
     uvcells = sorted(uvcells, key=lambda b:b.upper_idx)
@@ -78,6 +79,11 @@ def _main():
         
     logging.info('Nbl=%d Fch1=%f foff=%f resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s',
                  nbl, freqs[0], foff, np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos))
+
+    uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix)
+    d = np.array([(f.a1, f.a2, f.uvpix[0], f.uvpix[1], f.chan_start, f.chan_end) for f in uvcells], dtype=np.uint32)
+    np.savetxt(values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
+
 
         
 
