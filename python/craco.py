@@ -101,7 +101,6 @@ def runidxs(x):
 def arcsec2rad(strarcsec):
     return np.radians(float(strarcsec)/3600.)
 
-
 def image_fft(g, scale='none'):
     '''
     Do the complex-to-complex imaging FFT with the correct shifts and correct inverse thingy
@@ -275,6 +274,98 @@ def fdmt_transpose_inv(oblk, ncu=1, nt_per_cu=2, nuv=None, ndm=None, nt=None):
     assert dblk.shape == (nuv, ndm, nt)
     
     return dblk
+
+def get_freqs(hdul):
+    '''
+    Returns a numpy array of channel frequencies in Hz from a UVFITS HDU list
+
+    :returns: Np array length NCHAN
+    '''
+    
+    hdr = hdul[0].header
+    fch1 = hdr['CRVAL4']
+    foff = hdr['CDELT4']
+    ch1 = hdr['CRPIX4']
+    assert ch1 == 1.0, 'Unexpected initial frequency'
+    vis = hdul[0].data
+    nchan = vis[0].data.shape[-3]
+    freqs = np.arange(nchan)*foff + fch1 # Hz
+
+    return freqs
+
+class BaselineCell(object):
+    def __init__(self, blid, uvpix, chan_start, chan_end, freqs, npix):
+        self.blid = blid
+        self.uvpix = uvpix
+        self.chan_start = chan_start
+        self.chan_end = chan_end
+        self.freqs = freqs
+        self.a1, self.a2 = bl2ant(blid)
+        self.npix = npix
+
+    @property
+    def uvpix_upper(self):
+        '''
+        Returns the uv pixel coordinates tuple guaranteed to be in the 
+        upper half plane
+        
+        If the supplied uvpix is in the lower half, then the (u, v)
+        values will be swaped, and 'is_lower()' will return True
+        
+        :returns: (u, v) where u >= v always.
+        '''
+        u, v = self.uvpix
+        if self.is_upper:
+            retuv = (u, v)
+        else:
+            retuv = (v, u)
+
+        assert retuv[0] >= retuv[1], 'Invalid upper UV coordinates'
+
+        return retuv
+
+    @property
+    def upper_idx(self):
+        '''
+        Returns the triangular upper index of this guy
+        '''
+        u, v = self.uvpix_upper
+        i =  triangular_index(u, v, self.npix)
+        
+        return i
+
+    @property
+    def is_lower(self):
+        '''
+        Returns True if the uvpix coordinates supplied in the constructor
+        where in the lower half plane. I.e. if u < v
+        '''
+        u, v = self.uvpix
+        return u < v
+
+    @property
+    def is_upper(self):
+        '''
+        Returns True if the uvpix coordinates supplied in the constructor
+        where in the upper half plane including diagonal. I.e. if u >= v
+        '''
+        u, v = self.uvpix
+        return u >= v
+
+    @property
+    def nchan(self):
+        return self.chan_end - self.chan_start + 1
+
+    def extract(self, baseline_block):
+        cstart = self.chan_start
+        cend = self.chan_end+1
+        # pad with zeros
+        alld = baseline_block[self.blid]
+        padded_d = np.zeros_like(alld)
+        padded_d[cstart:cend, :] = alld[cstart:cend, :]
+        return padded_d
+
+
     
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter

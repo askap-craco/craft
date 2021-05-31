@@ -350,7 +350,7 @@ class Fdmt(object):
         for tback in xrange(1, initdt): # tback number of samples backwards from t=0
             h = history[:, -tback]
             for idt in xrange(tback, initdt):
-                print(tback, idt, idt-tback, state.shape, state[0, idt, idt-tback], state[0, idt-1, idt-tback], h[0])
+                #print(tback, idt, idt-tback, state.shape, state[0, idt, idt-tback], state[0, idt-1, idt-tback], h[0])
                 state[:, idt, idt-tback] = state[:, idt-1, idt-tback] + h
                 
         # Copy last few samples of input data to init history
@@ -436,13 +436,14 @@ class Fdmt(object):
     def __call__(self, din):
         return self.execute(din)
 
-    def trace_dm(self, idm, ichan=0, cumulative_offset=0, iterno=None, nodes=None):
+    def trace_dm(self, idm, final_iter=0, ichan=0, cumulative_offset=0, iterno=None, nodes=None):
         '''
         Traces the given DM recursively backwards through the FDMT iterations down to the input channel resoultion.
         *Only ever specify IDM. Leave all other arguments as is. This fucntio is allso used for the recustion*
         You have been warned.
         
         :idm: The DM (in samples, an integer) that you want to trace
+        :finaliter: Final resultion to go down to. Defaults to 0 which gives frequency resolution at the input
         :returns: A list (length NCHAN) of tuples containing (channel number, time width-1, total offset)
         where 'time width' is the number of time sample averaged across time - 1 (time width=2 = 3 samples across)
         and 'total offset' is the number amount of delay in samples. Note: total_offset is in the opposite sense for
@@ -475,7 +476,7 @@ class Fdmt(object):
         #print 'iterno {} IDM {} for ichan{} = dm={} chan{} + dm{} chan{} at offset {}'.format(iterno, idm, ichan, id1, inchan1, id2, inchan2, offset)
         
         # terminate recursion
-        if iterno == 0:
+        if iterno == final_iter:
             n = (inchan1, id1, inchan2, id2, offset, cumulative_offset)
             n1 = (inchan1, id1, cumulative_offset)
             n2 = (inchan2, id2, cumulative_offset + offset)
@@ -488,7 +489,7 @@ class Fdmt(object):
             
             # For non power of 2 FDMT, idm ==-1 indicates a copy - so we don't go down the line for this guy.
             if id2 != -1:
-                self.trace_dm(id2, inchan2, cumulative_offset+offset, iterno-1, nodes)
+                self.trace_dm(id2, final_iter, inchan2, cumulative_offset+offset, iterno-1, nodes)
             
         return nodes
 
