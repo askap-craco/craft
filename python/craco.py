@@ -52,9 +52,9 @@ def triangular_index(x, y, n):
     >>> triangular_index(106, 71, 256)
     15726
     '''
-    assert 0 <= x < n
-    assert 0 <= y < n
-    assert x >= y
+    assert 0 <= x < n, 'Invalid values 0<= x(%d) < n(%d)'%(x, n)
+    assert 0 <= y < n , 'Invalid values 0<= y(%d) < n(%d)'%(y, n)
+    assert x >= y , 'x(%d) > y(%d)'% (x, y)
     i = triangular(n) - triangular(n - y) + x - y
     
     return i
@@ -287,6 +287,7 @@ def get_freqs(hdul):
     foff = hdr['CDELT4']
     ch1 = hdr['CRPIX4']
     assert ch1 == 1.0, 'Unexpected initial frequency'
+    assert foff > 0, 'cant handle negative frequencies anywhere athe moment foff=%f' % foff
     vis = hdul[0].data
     nchan = vis[0].data.shape[-3]
     freqs = np.arange(nchan)*foff + fch1 # Hz
@@ -299,7 +300,9 @@ class BaselineCell(object):
         self.uvpix = uvpix
         self.chan_start = chan_start
         self.chan_end = chan_end
+        assert self.chan_end >= self.chan_start
         self.freqs = freqs
+        assert len(freqs) == self.chan_end - self.chan_start + 1, 'Invalid frequency mapping channels=%d-%d nfreq=%d'% (chan_start, chan_end, len(freqs))
         self.a1, self.a2 = bl2ant(blid)
         self.npix = npix
 

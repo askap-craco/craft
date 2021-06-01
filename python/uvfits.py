@@ -65,6 +65,21 @@ class UvFits(object):
         ulam_max = max([abs(bldata['UU'])*fmax for bldata in baselines.values()])
         vlam_max = max([abs(bldata['VV'])*fmax for bldata in baselines.values()])
         return (ulam_max, vlam_max)
+
+    
+    def plot_baselines(self):
+        baselines = self.baselines
+        freqs = self.channel_frequencies
+        for blid, bldata in baselines.iteritems():
+            ulam = bldata['UU'] * freqs
+            vlam = bldata['VV'] * freqs
+            
+            pylab.plot(ulam/1e3, vlam/1e3)
+        
+        pylab.xlabel('U (klambda)')
+        pylab.ylabel('V (klambda)')
+        #pylab.show()
+
     
 def open(*args, **kwargs):
     logging.info('Opening file %s', args[0])
