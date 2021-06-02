@@ -307,6 +307,10 @@ class BaselineCell(object):
         self.npix = npix
 
     @property
+    def chan_slice(self):
+        return slice(self.chan_start, self.chan_end+1)
+
+    @property
     def uvpix_upper(self):
         '''
         Returns the uv pixel coordinates tuple guaranteed to be in the 
@@ -367,6 +371,10 @@ class BaselineCell(object):
         padded_d = np.zeros_like(alld)
         padded_d[cstart:cend, :] = alld[cstart:cend, :]
         return padded_d
+
+    def __str__(self):
+        s = 'Cell blid=%s chan=%d-%d freq=%f-%f' % (self.blid, self.chan_start, self.chan_end, self.freqs[0], self.freqs[-1])
+        return s
 
 
     

@@ -45,13 +45,24 @@ class MiniFdmt(Kernel):
         plan = self.plan
 
         dfdmt = np.zeros((plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide), dtype=np.complex64)
-        for irun, fdmtrun in enumerate(plan.fdmt_runs):
+        for irun, fdmtrun in enumerate(plan.fdmt_plan.fdmt_runs):
             fch1 = min([cell.freqs[0] for cell in fdmtrun]) # effective frequency - should have it as a parameter in plan rather than calculating it
-            thefdmt = fdmt.Fdmt(fch1, plan.foff, plan.ncin, plan.nt) # no history for now
+            mincell = min(fdmtrun, key=lambda cell:cell.chan_start)
+            assert mincell.freqs[0] == fch1
+            minchan = mincell.chan_start
+            thefdmt = fdmt.Fdmt(fch1, plan.foff, plan.ncin, plan.ndout, plan.nt) # no history for now
             
             for iuv, uvcell in enumerate(fdmtrun):
                 # Truncating times for the moment, as we don't keep history
-                dfdmt[irun, :, :, iuv] = thefdmt(dblk[irun, :, :plan.nt, iuv]) # Don't keep history
+                tf = dblk.get(uvcell.blid)
+                # tf.shape is (nc, nt)
+                d = np.zeros((self.plan.ncin, self.plan.nt), dtype=np.complex64)
+                subband_start = uvcell.chan_start - minchan
+                assert subband_start >= 0
+                subband_end = subband_start + uvcell.nchan
+                d[subband_start:subband_end, :] = tf[uvcell.chan_slice, :]
+                dout = thefdmt(d) # Don't keep history. Shape=(ndout, ndout+nt)
+                dfdmt[irun, :, :, iuv] = dout[:, :plan.nt].T
                 
         return dfdmt
 

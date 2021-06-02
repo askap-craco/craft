@@ -338,7 +338,7 @@ class Fdmt(object):
 
         if self.init_history is None:
             # Make a pretend history which is all zeros
-            history = np.zeros((self.n_f, self.init_delta_t))
+            history = np.zeros((self.n_f, self.init_delta_t), din.dtype)
         else:
             history = self.init_history
 

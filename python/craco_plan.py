@@ -156,6 +156,7 @@ class PipelinePlan(object):
         self.nuvrest = self.nuvmax / self.nuvwide
         self.ncin = values.ncin
         self.ndout = values.ndout
+        self.foff = foff
         if (self.fdmt_plan.nuvtotal >= values.nuvmax):
             raise ValueError("Too many UVCELLS")
         
@@ -168,14 +169,14 @@ def add_arguments(parser):
     parser.add_argument('--npix', help='Number of pixels in image', type=int, default=256)
     parser.add_argument('--os', help='Number of pixels per beam', default='2.1,2.1')
     parser.add_argument('--cell', help='Image cell size (arcsec). Overrides --os')
-    parser.add_argument('--nt', help='Number of times per block', type=int, default=256)
+    parser.add_argument('--nt', help='Number of times per block', type=int, default=16)
     parser.add_argument('--ndm', help='Number of DM trials', type=int, default=16)
     parser.add_argument('--nbox', help='Number of boxcar trials', type=int, default=4)
     parser.add_argument('--boxcar-weight', help='Boxcar weighting type', choices=('sum','avg','sqrt'), default='sum')
     parser.add_argument('--nuvwide', help='Number of UV processed in parallel', type=int, default=8)
     parser.add_argument('--nuvmax', help='Maximum number of UV allowed.', type=int, default=8192)
     parser.add_argument('--ncin', help='Numer of channels for sub fdmt', type=int, default=32)
-    parser.add_argument('--ndout', help='Number of DM for sub fdmt', type=int, default=186)
+    parser.add_argument('--ndout', help='Number of DM for sub fdmt', type=int, default=32)
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
