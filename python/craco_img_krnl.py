@@ -13,8 +13,8 @@ import sys
 import logging
 import craco
 from craco import image_fft, printstats
+from craco_kernels import Imager
 from boxcar import ImageBoxcar
-
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -61,14 +61,6 @@ class Gridder(object):
             g[npix-vpix, npix-upix] += np.conj(v1) - np.conj(v2)
 
         return g
-
-class Imager(object):
-    '''
-    Takes a grid and makes an image using the FFT
-    '''
-    def __call__(self, g):
-        return image_fft(g)
-
 
 class Grouper(object):
     '''

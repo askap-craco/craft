@@ -52,6 +52,16 @@ def calc_overlap(blcell, minchan, ncin):
     return overlap
 
 def split_cells(cells, minchan, ncin):
+    '''
+    Given a list of UV cells and a channel range given by minchan and ncin, produces 2 lists
+    The first list contains Cells that fint entirely within the chanel range. The second list
+    contains cells outside the channel range
+
+    :cells: List of UV cells
+    :minchan: first channel in channel range
+    :ncin: number of channels in range
+    :returns: Tuple of lists
+    '''
     full_cells = []
     leftover_cells = []
     endchan = minchan + ncin - 1 # final channel, inclusive
@@ -95,18 +105,84 @@ class FdmtPlan(object):
         nuvtotal = nruns*nuvwide
         logging.info('FDMT plan has ntotal=%d of %d runs with packing efficiency %f. requires efficiency of > %f', nuvtotal, nruns, float(len(uvcells))/float(nuvtotal), float(nuvtotal)/8192.0)
         self.fdmt_runs = fdmt_runs
+        self.nruns = nruns
+        self.nuvtotal = nuvtotal
+        self.total_nuvcells = sum([len(p) for p in fdmt_runs])
 
-def _main():
-    from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-    parser = ArgumentParser(description='Plans a CRACO scan', formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-s', '--show', action='store_true', help='Show plots')
+class PipelinePlan(object):
+    def __init__(self, f, values):
+        self.values = values
+        umax, vmax = f.get_max_uv()
+        lres, mres = 1./umax, 1./vmax
+        baselines = f.baselines
+        nbl = len(baselines)
+        freqs = f.channel_frequencies
+        Npix = values.npix
+
+        if values.cell is not None:
+            lcell, mcell = map(craco.arcsec2rad, values.cell.split(','))
+            los, mos = lres/lcell, mres/mcell
+        else:
+            los, mos = map(float, values.os.split(','))
+            lcell = lres/los
+            mcell = mres/mos
+            
+        lfov = lcell*Npix
+        mfov = mcell*Npix
+        ucell, vcell = 1./lfov, 1./mfov
+        fmax = freqs.max()
+        foff = freqs[1] - freqs[0]
+        lambdamin = 3e8/fmax
+        umax_km = umax*lambdamin/1e3
+        vmax_km = vmax*lambdamin/1e3
+        
+        logging.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s',
+                 nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos))
+
+        uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix)
+        logging.info('Got Ncells=%d uvcells', len(uvcells))
+        d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.uint32)
+        np.savetxt(values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
+        self.fdmt_plan = FdmtPlan(uvcells)
+        self.nd = values.ndm
+        self.nt = values.nt
+        self.freqs = freqs
+        self.npix = Npix
+        self.nbox = values.nbox
+        self.boxcar_weight = values.boxcar_weight
+        self.nuvwide = values.nuvwide
+        self.nuvmax = values.nuvmax
+        assert self.nuvmax % self.nuvwide == 0
+        self.nuvrest = self.nuvmax / self.nuvwide
+        self.ncin = values.ncin
+        self.ndout = values.ndout
+        if (self.fdmt_plan.nuvtotal >= values.nuvmax):
+            raise ValueError("Too many UVCELLS")
+        
+
+def add_arguments(parser):
+    '''
+    Add planning arguments
+    '''
     parser.add_argument('--uv', help='Load antenna UVW coordinates from this UV file')
     parser.add_argument('--npix', help='Number of pixels in image', type=int, default=256)
     parser.add_argument('--os', help='Number of pixels per beam', default='2.1,2.1')
     parser.add_argument('--cell', help='Image cell size (arcsec). Overrides --os')
     parser.add_argument('--nt', help='Number of times per block', type=int, default=256)
     parser.add_argument('--ndm', help='Number of DM trials', type=int, default=16)
+    parser.add_argument('--nbox', help='Number of boxcar trials', type=int, default=4)
+    parser.add_argument('--boxcar-weight', help='Boxcar weighting type', choices=('sum','avg','sqrt'), default='sum')
+    parser.add_argument('--nuvwide', help='Number of UV processed in parallel', type=int, default=8)
+    parser.add_argument('--nuvmax', help='Maximum number of UV allowed.', type=int, default=8192)
+    parser.add_argument('--ncin', help='Numer of channels for sub fdmt', type=int, default=32)
+    parser.add_argument('--ndout', help='Number of DM for sub fdmt', type=int, default=186)
+
+def _main():
+    from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+    parser = ArgumentParser(description='Plans a CRACO scan', formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
+    parser.add_argument('-s', '--show', action='store_true', help='Show plots')
+    add_arguments(parser)
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
     if values.verbose:
@@ -116,41 +192,7 @@ def _main():
 
     logging.info('Loading UV coordinates from file %s ', values.uv)
     f = uvfits.open(values.uv)
-    umax, vmax = f.get_max_uv()
-    lres, mres = 1./umax, 1./vmax
-    baselines = f.baselines
-    nbl = len(baselines)
-    freqs = f.channel_frequencies
-    Npix = values.npix
-
-    if values.cell is not None:
-        lcell, mcell = map(craco.arcsec2rad, values.cell.split(','))
-        los, mos = lres/lcell, mres/mcell
-    else:
-        los, mos = map(float, values.os.split(','))
-        lcell = lres/los
-        mcell = mres/mos
-        
-    lfov = lcell*Npix
-    mfov = mcell*Npix
-    ucell, vcell = 1./lfov, 1./mfov
-    fmax = freqs.max()
-    foff = freqs[1] - freqs[0]
-    lambdamin = 3e8/fmax
-    umax_km = umax*lambdamin/1e3
-    vmax_km = vmax*lambdamin/1e3
-
-    logging.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s',
-                 nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos))
-
-    uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix)
-    logging.info('Got Ncells=%d uvcells', len(uvcells))
-    
-
-    d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.uint32)
-    np.savetxt(values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
-
-    plan = FdmtPlan(uvcells)
+    plan = PipelinePlan(f, values)
 
     if values.show:
         f.plot_baselines()

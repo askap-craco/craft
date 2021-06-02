@@ -19,8 +19,6 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 class UvFits(object):
 
-    @classmethod
-    
     def __init__(self, hdulist):
         self.hdulist = hdulist
 
@@ -80,7 +78,12 @@ class UvFits(object):
         pylab.ylabel('V (klambda)')
         #pylab.show()
 
-    
+    def time_blocks(self, nt):
+        '''
+        Returns a sequence of baseline data in blocks of nt
+        '''
+        return craco.time_blocks(self.vis, nt)
+
 def open(*args, **kwargs):
     logging.info('Opening file %s', args[0])
     return UvFits(fits.open(*args, **kwargs))
