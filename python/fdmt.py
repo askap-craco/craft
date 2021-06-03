@@ -466,7 +466,7 @@ class Fdmt(object):
             assert cumulative_offset == 0
             assert nodes == None
             nodes = []
-        
+
         nfd = thefdmt.hist_nf_data[iterno]
         nchan = len(nfd)
         chanconfig = nfd[ichan][-1]
@@ -485,7 +485,7 @@ class Fdmt(object):
         else:
             # Cumulative only aplies to the upper channel
             assert inchan2 > inchan1
-            self.trace_dm(id1, inchan1, cumulative_offset, iterno-1, nodes)
+            self.trace_dm(id1, final_iter, inchan1, cumulative_offset, iterno-1, nodes)
             
             # For non power of 2 FDMT, idm ==-1 indicates a copy - so we don't go down the line for this guy.
             if id2 != -1:

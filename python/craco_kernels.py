@@ -62,7 +62,7 @@ class MiniFdmt(Kernel):
                 subband_end = subband_start + uvcell.nchan
                 d[subband_start:subband_end, :] = tf[uvcell.chan_slice, :]
                 dout = thefdmt(d) # Don't keep history. Shape=(ndout, ndout+nt)
-                dfdmt[irun, :, :, iuv] = dout[:, :plan.nt].T
+                #dfdmt[irun, :, :, iuv] = dout[:, :plan.nt].T
                 
         return dfdmt
 
@@ -96,6 +96,32 @@ class Gridder(Kernel):
             g[npix-vpix, npix-upix] += np.conj(v1) - np.conj(v2)
 
         return g
+
+class FdmtGridReader(Kernel):
+    def __call__(self, idm, t, blk):
+        '''
+        Grids the data assuming the FDMT has only done some of the processing
+        and we need do do the rest of the processing
+        blk shape should be  dfdmt = np.zeros((plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide), dtype=np.complex64)
+        Returns 2 time samples
+        '''
+        assert idm < self.plan.nd
+        assert 2*t+1 < self.plan.nt
+        #g = gridder(d[idm, 2*t, :], d[idm, 2*t+1, :])
+        for irun, fdmtrun in enumerate(plan.fdmt_plan.fdmt_runs):
+            fch1 = min([cell.freqs[0] for cell in fdmtrun]) # effective frequency - should have it as a parameter in plan rather than calculating it
+            mincell = min(fdmtrun, key=lambda cell:cell.chan_start)
+            assert mincell.freqs[0] == fch1
+            minchan = mincell.chan_start
+            #thefdmt = fdmt.Fdmt(fch1, plan.foff, plan.ncin, plan.ndout, plan.nt) # no history for now
+            
+            for iuv, uvcell in enumerate(fdmtrun):
+                #dfdmt[irun, nt, ndout, iuv]
+                
+                pass
+
+        return g
+
 
 class Imager(Kernel):
     '''
@@ -160,15 +186,12 @@ class ImagePipeline(Kernel):
     def __init__(self, *args, **kwargs):
         super(ImagePipeline, self).__init__(*args, **kwargs)
         self.imager = Imager(self.uvsource, self.plan, self.values)
-        self.grider = Gridder(self.uvsource, self.plan, self.values)
+        self.grid_reader = FdmtGridReader(self.uvsource, self.plan, self.values)
+        self.gridder = Gridder(self.uvsource, self.plan, self.values)
         self.boxcar = Boxcar(self.uvsource, self.plan, self.values)
         self.grouper = Grouper(self.uvsource, self.plan, self.values)
 
-    def __call__(self):
-        uvgrid = np.loadtxt(values.uvgrid)
-        if uvgrid.ndim == 1:
-            uvgrid = uvgrid[np.newaxis, :]
-        
+    def load_from_file(self, fname):
         if fname.endswith('.npy'):
             d = np.load(fname)
             ncu, nd, nt_on_ncu, nuv = d.shape
@@ -186,15 +209,17 @@ class ImagePipeline(Kernel):
             # But for now we'll transpose to (nd, nt, nuv) as this is what the next code expects
             d = np.transpose(d, (1, 2, 0))
 
-        assert uvgrid.shape[0] == nuv
-        assert d.shape == (nd, nt, nuv)
-    
-        idm = 0
-        t = 0
+        return d
+
+    def __call__(self, blk):
+        # blk shape should be  dfdmt = np.zeros((plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide), dtype=np.complex64)
+        assert dblk.shape == (plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide)
+        reader = self.reader
         gridder = self.gridder
         imager = self.imager
         boxcar = self.boxcar
         grouper = self.grouper
+        fname = 'testing'
         outfname = fname + '.img.dat'
         outgridname= fname + '.grid.dat'
         candname = fname + '.cand'
@@ -208,13 +233,14 @@ class ImagePipeline(Kernel):
         
         for idm in xrange(nd):
             for t in xrange(nt/2):
-                g = gridder(d[idm, 2*t, :], d[idm, 2*t+1, :])
+                #g = gridder(d[idm, 2*t, :], d[idm, 2*t+1, :])
+                t1, t2 = grid_reader(idm, t, blk)
+                g = gridder(t1, t2)
                 g.tofile(gout)
                 img = imager(g).astype(np.complex64)
                 img.tofile(fout)
                 grouper(idm, 2*t, boxcar(idm, img.real))
                 grouper(idm, 2*t + 1, boxcar(idm, img.imag))
-                
                 rlabel = 'img real idm={} t={}'.format(idm, t)
                 ilabel = 'img imag idm={} t={}'.format(idm, t+1)
                 printstats(img.real, rlabel)
@@ -244,9 +270,8 @@ class CracoPipeline(Kernel):
         uvsource = uvfits.open(values.uv)
         plan = craco_plan.PipelinePlan(uvsource, values)
         super(CracoPipeline, self).__init__(uvsource, plan, values)
-
-        self.image = ImagePipeline(self.uvsource, self.plan, self.values)
         self.fdmt = MiniFdmt(self.uvsource, self.plan, self.values)
+        self.image = ImagePipeline(self.uvsource, self.plan, self.values)
 
     def __call__(self):
         for blkt, d in enumerate(self.uvsource.time_blocks(self.plan.nt)):
