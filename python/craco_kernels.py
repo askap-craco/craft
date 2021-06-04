@@ -20,6 +20,15 @@ from craco import printstats
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+def imshow_complex(axs, d, title=''):
+    axs[0].imshow(d.real, aspect='auto', origin='lower')
+    axs[0].set_title(title + ' real')
+    axs[1].imshow(d.imag, aspect='auto', origin='lower')
+    axs[1].set_title(title + ' imag')
+
+    #logging.debug('%s real %s', title, printstats(d.real))
+    #logging.debug('%s imag %s', title, printstats(d.imag))
+
 class Kernel(object):
     def __init__(self, uvsource, plan, values):
         self.uvsource = uvsource
@@ -56,6 +65,7 @@ class MiniFdmt(Kernel):
             for iuv, uvcell in enumerate(fdmtrun):
                 # Truncating times for the moment, as we don't keep history
                 tf = dblk.get(uvcell.blid)
+                #logging.debug('irun=%d iuv=%d blid=%s real=%s', irun, iuv, uvcell.blid, craco.printstats(tf.real))
                 # tf.shape is (nc, nt)
                 d = np.zeros((self.plan.ncin, self.plan.nt), dtype=np.complex64)
                 subband_start = uvcell.chan_start - minchan
@@ -63,8 +73,23 @@ class MiniFdmt(Kernel):
                 subband_end = subband_start + uvcell.nchan
                 d[subband_start:subband_end, :] = tf[uvcell.chan_slice, :]
                 dout = thefdmt(d) # Don't keep history. Shape=(ndout, ndout+nt)
-                #dfdmt[irun, :, :, iuv] = dout[:, :plan.nt].T
-                
+
+                if self.plan.values.show_fdmt:
+                    fig, axs = pylab.subplots(3,2)
+                    imshow_complex(axs[0,:], tf, 'FDMT TF')
+                    imshow_complex(axs[1,:], d, 'FDMT d')
+                    imshow_complex(axs[2,:], dout, 'FDMT dout')
+                    
+                    #fig.set_title('irun={} iuv={} blid={}'.format(irun, iuv, uvcell.blid))
+                    pylab.show()
+                    
+                dfdmt[irun, :, :, iuv] = dout[:, :plan.nt].T
+
+        # rescale for ... goodness
+        scale_factor = self.plan.fdmt_scale / float(self.plan.nf) # the 2 I think happens becuase of the complex->real gridding
+
+        dfdmt *= scale_factor
+        
         return dfdmt
 
 class Gridder(Kernel):
@@ -159,18 +184,19 @@ class FdmtGridder(Kernel):
             blkdm = int(np.round(idm*idm_cff(fch1, plan)))
             toff = int(np.round(idm*offset_cff(fch1, plan)))
             blkt = 2*t - toff
+            logging.debug('Fdmtgrider idm=%d t=%d irun=%d fch1=%0.1f blkdm=%d toff=%d blkt=%d', idm, t, irun, fch1, blkdm, toff, blkt)
             for iuv, uvcell in enumerate(fdmtrun):
                 upix, vpix = uvcell.uvpix
                 if (blkt >= 0):
-                    v1 = blk[irun, blkdm, blkt+0, iuv]
+                    v1 = blk[irun, blkt+0, blkdm, iuv]
                 else:
                     v1 = complex(0,0)
 
                 if (blkt+1 >= 0):
-                    v2 = blk[irun, blkdm, blkt+1, iuv]
+                    v2 = blk[irun, blkt+1, blkdm, iuv]
                 else:
                     v2 = complex(0,0)
-                    
+
                 # This is summing because some UV Cells get split to do the FDMT and we need to recombine them
                 g[vpix, upix] += v1 + v2
                 g[npix-vpix, npix-upix] += np.conj(v1) - np.conj(v2)
@@ -183,7 +209,10 @@ class Imager(Kernel):
     Takes a grid and makes an image using the FFT
     '''
     def __call__(self, g):
-        return craco.image_fft(g)
+        img = craco.image_fft(g)
+        scale_factor = self.plan.fft_scale/(self.plan.nbl * 2.0) # factor of 2 is becauseo complex-to-real.
+        img *= scale_factor
+        return img
 
 class Boxcar(Kernel):
     def __init__(self, *args, **kwargs):
@@ -292,27 +321,21 @@ class ImagePipeline(Kernel):
             for t in xrange(nt/2):
                 #g = gridder(d[idm, 2*t, :], d[idm, 2*t+1, :])
                 g = gridder(idm, t, blk)
-                g.tofile(gout)
+                #g.tofile(gout)
                 img = imager(g).astype(np.complex64)
-                img.tofile(fout)
+                #img.tofile(fout)
                 grouper(idm, 2*t, boxcar(idm, img.real))
                 grouper(idm, 2*t + 1, boxcar(idm, img.imag))
-                rlabel = 'img real idm={} t={}'.format(idm, t)
-                ilabel = 'img imag idm={} t={}'.format(idm, t+1)
-                printstats(img.real, rlabel)
-                printstats(img.imag, ilabel)
-                printstats(g.real, 'grid.real')
-                printstats(g.imag, 'grid.imag')
-                if self.values.show:
+                rlabel = 'imag idm={} t={}'.format(idm, t)
+                ilabel = 'real idm={} t={}'.format(idm, t)
+                logging.debug('img.real idm=%d t=%d %s', idm, t, printstats(img.real, rlabel))
+                logging.debug('img.imag idm=%d t=%d %s', idm, t, printstats(img.imag, ilabel))
+                logging.debug('grid.real idm=%d t=%d %s', idm, t, printstats(g.real, 'grid.real'))
+                logging.debug('grid.imag idm=%d t=%d %s', idm, t, printstats(g.imag, 'grid.imag'))
+                if self.values.show_image:
                     fig, ax = pylab.subplots(2,2)
-                    ax[0,0].imshow(img.real, aspect='auto', origin='lower')
-                    ax[0,1].imshow(img.imag, aspect='auto', origin='lower')
-                    ax[1,0].imshow(g.real, aspect='auto', origin='lower')
-                    ax[1,1].imshow(g.imag, aspect='auto', origin='lower')
-                    ax[0,0].set_title(rlabel)
-                    ax[0,1].set_title(ilabel)
-                    ax[1,0].set_title('real(UV plane)')
-                    ax[1,1].set_title('imag(UV plane)')
+                    imshow_complex(ax[0,:], img, 'image idm={} t={}'.format(idm, t))
+                    imshow_complex(ax[1,:], g, 'grid idm={} t={}'.format(idm, t))
                     pylab.show()
 
             logging.info("Wrote output images to %s shape=%s (nd,nt,npix,npix)=dtype=%s", outfname, outshape, img.dtype)
@@ -320,6 +343,10 @@ class ImagePipeline(Kernel):
         grouper.to_file(candname)
         fout.close()
         gout.close()
+
+def savefile(fname, arr):
+    logging.info('Saving file %s shape=%s dtype=%s', fname, arr.shape, arr.dtype)
+    np.save(fname, arr)
 
 class CracoPipeline(Kernel):
     def __init__(self, values):
@@ -331,13 +358,15 @@ class CracoPipeline(Kernel):
 
     def __call__(self):
         for blkt, d in enumerate(self.uvsource.time_blocks(self.plan.nt)):
-            logging.debug('blkt=%d real=%s', blkt, craco.printstats(d.real))
-            logging.debug('blkt=%d imag=%s', blkt, craco.printstats(d.imag))
-            logging.debug('blkt=%d abs=%s', blkt, craco.printstats(abs(d)))
-            blk = self.fdmt(d)
-            dout = self.image(blk)
-            return dout
+            if self.plan.values.save:
+                savefile('blk_{}_input.npy'.format(blkt), craco.bl2array(d))
 
+            blk = self.fdmt(d)
+
+            if self.plan.values.save:
+                savefile('blk_{}_fdmt.npy'.format(blkt), blk)
+
+            dout = self.image(blk)
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter

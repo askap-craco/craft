@@ -90,7 +90,7 @@ class FdmtPlan(object):
         fdmt_runs = []
         while len(uvcells_remaining) > 0:
             logging.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
-            minchan = min(uvcells_remaining, key=lambda uv:uv.chan_start).chan_start
+            minchan = min(uvcells_remaining, key=lambda uv:(uv.chan_start, uv.blid)).chan_start
             possible_cells = filter(lambda uv:calc_overlap(uv, minchan, ncin) > 0, uvcells_remaining)
             best_cells = sorted(possible_cells, key=lambda uv:calc_overlap(uv, minchan, ncin), reverse=True)
             used_cells = best_cells[0:min(nuvwide, len(best_cells))]
@@ -118,7 +118,7 @@ class PipelinePlan(object):
         nbl = len(baselines)
         freqs = f.channel_frequencies
 
-        # Cant handle inverted bands - this is all over the code. It's boring
+        # Cant handle inverted bands - this is assumed all over the code. It's boring
         assert freqs.min() == freqs[0]
         assert freqs.max() == freqs[-1]
         Npix = values.npix
@@ -163,9 +163,18 @@ class PipelinePlan(object):
         self.foff = foff
         self.dtype = np.complex64 # working data type
         self.threshold = values.threshold
+        self.nbl = nbl
+        self.fdmt_scale = self.values.fdmt_scale
+        self.fft_scale = self.values.fft_scale
         assert self.threshold >= 0, 'Invalid threshold'
         if (self.fdmt_plan.nuvtotal >= values.nuvmax):
             raise ValueError("Too many UVCELLS")
+
+    @property
+    def nf(self):
+        '''Returns number of frequency channels'''
+        return len(self.freqs)
+
 
     @property
     def fmin(self):
@@ -199,7 +208,12 @@ def add_arguments(parser):
     parser.add_argument('--ncin', help='Numer of channels for sub fdmt', type=int, default=32)
     parser.add_argument('--ndout', help='Number of DM for sub fdmt', type=int, default=32)
     parser.add_argument('--threshold', type=float, help='Threshold for candidate grouper', default=10)
-    parser.add_argument('--show', action='store_true', help='Show plots')
+    parser.add_argument('--fdmt_scale', type=float, help='Scale FDMT output by this amount', default=1.0)
+    parser.add_argument('--fft_scale', type=float, help='Scale FFT output by this amount. If both scales are 1, the output equals the value of frb_amp for crauvfrbsim.py', default=10.0)
+    parser.add_argument('--show-image', action='store_true', help='Show image plots')
+    parser.add_argument('--show-fdmt', action='store_true', help='Show FDMT plots')
+    parser.add_argument('--save', action='store_true',  help='Save data as .npy for input, FDMT and image pipeline')
+
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
