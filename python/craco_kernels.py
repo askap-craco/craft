@@ -331,6 +331,9 @@ class CracoPipeline(Kernel):
 
     def __call__(self):
         for blkt, d in enumerate(self.uvsource.time_blocks(self.plan.nt)):
+            logging.debug('blkt=%d real=%s', blkt, craco.printstats(d.real))
+            logging.debug('blkt=%d imag=%s', blkt, craco.printstats(d.imag))
+            logging.debug('blkt=%d abs=%s', blkt, craco.printstats(abs(d)))
             blk = self.fdmt(d)
             dout = self.image(blk)
             return dout
