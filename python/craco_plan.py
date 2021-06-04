@@ -112,6 +112,8 @@ class FdmtPlan(object):
 class PipelinePlan(object):
     def __init__(self, f, values):
         self.values = values
+        logging.info('making Plan values=%s', values)
+
         umax, vmax = f.get_max_uv()
         lres, mres = 1./umax, 1./vmax
         baselines = f.baselines
@@ -147,7 +149,7 @@ class PipelinePlan(object):
         logging.info('Got Ncells=%d uvcells', len(uvcells))
         d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.uint32)
         np.savetxt(values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
-        self.fdmt_plan = FdmtPlan(uvcells)
+        self.fdmt_plan = FdmtPlan(uvcells, values.nuvwide, values.ncin)
         self.nd = values.ndm
         self.nt = values.nt
         self.freqs = freqs

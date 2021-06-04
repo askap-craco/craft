@@ -28,6 +28,8 @@ nchan=256 # number of channels
 tint=1.728
 desired_amp=500 # desired amplitude a the output of the FFT
 threshold=372
+ncin=32
+ndout=8
 antfile=`dirname $0`/askap-ak1-ak30.ant
 echo Antfile is $antfile
 wc -l $antfile
@@ -81,14 +83,18 @@ param nbl $nbl
 param frbname $frbname 
 param fits $fits 
 param raw_image_amp $raw_image_amp 
-param scale $scale 
+param scale $scale
+param ncin $ncin
 
 cmd="uvfrbsim.py --fch1 $fch1 --nchan $nchan --antfile $antfile2 --tint $tint --duration $nt --frb_idm $frb_dm --frb_amp $frb_amp --frb_sn $frb_sn --frb_relpos $frb_relpos --frb_tstart $frb_tstart -o $fits"
 echo "Running $cmd"
 #$cmd --show
 $cmd
 
-craco_fdmt_krnl.py --nt $nt --ndm $nd --format raw --nfftcu $ncu --output-scale $scale $fits
-craco_img_krnl.py --ndm $nd --uvgrid $fits.uvgrid.txt --nfftcu $ncu --nt $nt  $fits.ndm${nd}_nt${nt}.b0.uvdata.raw --threshold $threshold
+#craco_fdmt_krnl.py --nt $nt --ndm $nd --format raw --nfftcu $ncu --output-scale $scale $fits
+#craco_img_krnl.py --ndm $nd --uvgrid $fits.uvgrid.txt --nfftcu $ncu --nt $nt  $fits.ndm${nd}_nt${nt}.b0.uvdata.raw --threshold $threshold
+
+craco_pipeline.py --nt $nt --ndm $nd --ncin $ncin --ndout $ndout --uv $fits --save
 
 popd
+

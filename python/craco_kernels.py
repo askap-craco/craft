@@ -184,6 +184,8 @@ class FdmtGridder(Kernel):
             blkdm = int(np.round(idm*idm_cff(fch1, plan)))
             toff = int(np.round(idm*offset_cff(fch1, plan)))
             blkt = 2*t - toff
+            logging.debug('Gridder idm=%s t=%s irun=%s  minchan=%s blkdm=%s toff=%s blkt=%s', idm, t, irun, minchan, blkdm, toff,  blkt)
+
             for iuv, uvcell in enumerate(fdmtrun):
                 upix, vpix = uvcell.uvpix
                 if (blkt >= 0):
@@ -192,7 +194,7 @@ class FdmtGridder(Kernel):
                     v1 = complex(0,0)
 
                 if (blkt+1 >= 0):
-                    v2 = blk[irun, blkt+1, blkdm, iuv]
+                    v2 = blk[irun, blkt+1, blkdm, iuv]*1j
                 else:
                     v2 = complex(0,0)
 
@@ -318,7 +320,7 @@ class ImagePipeline(Kernel):
 
         dosave = self.plan.values.save
         if dosave:
-            dall = np.zeros((plan.nd, plan.nt/2, plan.npix, plan.npix), dtype=np.complex64)
+            dall = np.zeros(outshape, dtype=np.complex64)
         else:
             dall = None
         
@@ -333,8 +335,8 @@ class ImagePipeline(Kernel):
                 #img.tofile(fout)
                 c1 = grouper(idm, 2*t, boxcar(idm, img.real))
                 c2 = grouper(idm, 2*t + 1, boxcar(idm, img.imag))
-                rlabel = 'imag idm={} t={}'.format(idm, t)
-                ilabel = 'real idm={} t={}'.format(idm, t)
+                rlabel = 'real idm={} t={}'.format(idm, t)
+                ilabel = 'imag idm={} t={}'.format(idm, t)
                 logging.debug('img.real idm=%d t=%d %s', idm, t, printstats(img.real, rlabel))
                 logging.debug('img.imag idm=%d t=%d %s', idm, t, printstats(img.imag, ilabel))
                 logging.debug('grid.real idm=%d t=%d %s', idm, t, printstats(g.real, 'grid.real'))
