@@ -295,6 +295,15 @@ def get_freqs(hdul):
     return freqs
 
 class BaselineCell(object):
+    '''
+    Tells you which baseline is going to end up in a uv cell
+
+    :blid: Baslined ID - see blid2ant
+    :uvpix: (2 tuple) of (u, v) integer pixels
+    :chan_start, chan_end: First and last channels
+    :freqs: array of frequencies
+    :npix: Number of pixles (probably superfluous
+    '''
     def __init__(self, blid, uvpix, chan_start, chan_end, freqs, npix):
         self.blid = blid
         self.uvpix = uvpix

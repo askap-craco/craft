@@ -16,6 +16,7 @@ import craco
 import boxcar
 import uvfits
 import craco_plan
+from craco import printstats
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -97,29 +98,83 @@ class Gridder(Kernel):
 
         return g
 
-class FdmtGridReader(Kernel):
+def idm_cff(fch1, plan):
+    '''
+    Calculate the CFF coefficient to calculate the requred IDM inside an FDMT
+    Multiply by the desired IDT and round to get an index
+
+
+    :idt: Overall IDT we're trying to calculate
+    :fch1: Frequency of the bottom of the FDMT channels
+    :plan: craco plan
+    '''
+    fdmt_band = plan.ncin*plan.foff # Bandwidth of FDMT
+    f1 = fch1
+    f2 = f1 + fdmt_band
+    fmin = plan.fmin
+    fmax = plan.fmax
+    dmcff = fdmt.cff(f2, f1, fmax, fmin)
+    assert dmcff >= 0
+    return dmcff
+
+def offset_cff(fch1, plan):
+    '''
+    Calculate the CFF coefficient to calculate the required OFFSET inside an FDMT
+    Multiply by the desired IDT and round to get an index
+
+    :idt: Overall IDT we're trying to calculate
+    :fch1: Frequency of the bottom of the FDMT channels
+    :plan: craco plan
+    '''
+    f1 = fch1
+    fmin = plan.fmin
+    fmax = plan.fmax
+    ocff = fdmt.cff(f1, fmin, fmax, fmin) + 0.5/float(plan.nd) # Need to add a bit extra. not sure why.
+    assert ocff >= 0
+    return ocff
+
+class FdmtGridder(Kernel):
+    '''
+    Grids the data assuming the FDMT has only done some of the dedispersion
+    and we need do do the rest of the processing
+    blk shape should be  dfdmt = np.zeros((plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide), dtype=np.complex64)
+    Also sums into uv pixels which are duplicated
+    Returns a uvgrid size (npix, npix) dtype=complex64
+    '''
+    
     def __call__(self, idm, t, blk):
-        '''
-        Grids the data assuming the FDMT has only done some of the processing
-        and we need do do the rest of the processing
-        blk shape should be  dfdmt = np.zeros((plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide), dtype=np.complex64)
-        Returns 2 time samples
-        '''
         assert idm < self.plan.nd
         assert 2*t+1 < self.plan.nt
+        plan = self.plan
         #g = gridder(d[idm, 2*t, :], d[idm, 2*t+1, :])
-        for irun, fdmtrun in enumerate(plan.fdmt_plan.fdmt_runs):
-            fch1 = min([cell.freqs[0] for cell in fdmtrun]) # effective frequency - should have it as a parameter in plan rather than calculating it
-            mincell = min(fdmtrun, key=lambda cell:cell.chan_start)
-            assert mincell.freqs[0] == fch1
-            minchan = mincell.chan_start
-            #thefdmt = fdmt.Fdmt(fch1, plan.foff, plan.ncin, plan.ndout, plan.nt) # no history for now
-            
-            for iuv, uvcell in enumerate(fdmtrun):
-                #dfdmt[irun, nt, ndout, iuv]
-                
-                pass
+        assert blk.shape == (plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide)
+        npix = self.plan.npix
+        g = np.zeros((npix, npix), dtype=self.plan.dtype)
+        fdmt_band = plan.ncin*plan.foff # Bandwidth of FDMT
 
+        for irun, fdmtrun in enumerate(plan.fdmt_plan.fdmt_runs):
+            mincell = min(fdmtrun, key=lambda cell:cell.chan_start)
+            minchan = mincell.chan_start
+            fch1 = mincell.freqs[0]
+            blkdm = int(np.round(idm*idm_cff(fch1, plan)))
+            toff = int(np.round(idm*offset_cff(fch1, plan)))
+            blkt = 2*t - toff
+            for iuv, uvcell in enumerate(fdmtrun):
+                upix, vpix = uvcell.uvpix
+                if (blkt >= 0):
+                    v1 = blk[irun, blkdm, blkt+0, iuv]
+                else:
+                    v1 = complex(0,0)
+
+                if (blkt+1 >= 0):
+                    v2 = blk[irun, blkdm, blkt+1, iuv]
+                else:
+                    v2 = complex(0,0)
+                    
+                # This is summing because some UV Cells get split to do the FDMT and we need to recombine them
+                g[vpix, upix] += v1 + v2
+                g[npix-vpix, npix-upix] += np.conj(v1) - np.conj(v2)
+                
         return g
 
 
@@ -128,7 +183,7 @@ class Imager(Kernel):
     Takes a grid and makes an image using the FFT
     '''
     def __call__(self, g):
-        return image_fft(g)
+        return craco.image_fft(g)
 
 class Boxcar(Kernel):
     def __init__(self, *args, **kwargs):
@@ -136,8 +191,8 @@ class Boxcar(Kernel):
         plan = self.plan
         self.bc = boxcar.ImageBoxcar(plan.nd, plan.npix, plan.nbox, plan.boxcar_weight)
         
-    def __call__(self, img):
-        return self.bc(img)
+    def __call__(self, idm, img):
+        return self.bc(idm, img)
 
 class Grouper(Kernel):
     '''
@@ -162,9 +217,10 @@ class Grouper(Kernel):
         # See https://stackoverflow.com/questions/42519475/python-numpy-argmax-to-max-in-multidimensional-array
         max_box = np.argmax(boxout, axis=2)
         i,j = np.indices(max_box.shape)
+        threshold = self.plan.threshold
         
         # Find pixels where the largest boxcar is larger than the threshold
-        pys, pxs = np.where(boxout[i,j,max_box] >= self.threshold)
+        pys, pxs = np.where(boxout[i,j,max_box] >= threshold)
 
         cands = []
         for xpix, ypix in zip(pxs, pys):
@@ -186,8 +242,7 @@ class ImagePipeline(Kernel):
     def __init__(self, *args, **kwargs):
         super(ImagePipeline, self).__init__(*args, **kwargs)
         self.imager = Imager(self.uvsource, self.plan, self.values)
-        self.grid_reader = FdmtGridReader(self.uvsource, self.plan, self.values)
-        self.gridder = Gridder(self.uvsource, self.plan, self.values)
+        self.gridder = FdmtGridder(self.uvsource, self.plan, self.values)
         self.boxcar = Boxcar(self.uvsource, self.plan, self.values)
         self.grouper = Grouper(self.uvsource, self.plan, self.values)
 
@@ -213,8 +268,8 @@ class ImagePipeline(Kernel):
 
     def __call__(self, blk):
         # blk shape should be  dfdmt = np.zeros((plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide), dtype=np.complex64)
-        assert dblk.shape == (plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide)
-        reader = self.reader
+        plan = self.plan
+        assert blk.shape == (plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide)
         gridder = self.gridder
         imager = self.imager
         boxcar = self.boxcar
@@ -223,9 +278,11 @@ class ImagePipeline(Kernel):
         outfname = fname + '.img.dat'
         outgridname= fname + '.grid.dat'
         candname = fname + '.cand'
-        npix = self.plan.values.npix
+        npix = self.plan.npix
+        nd = self.plan.nd
+        nt = self.plan.nt
         outshape = (nd, nt/2, npix, npix)
-        logging.info("Input shape is %s. Writing output data to %s shape is (nd,nt/2,npix,npix)=%s", d.shape, outfname, outshape)
+        logging.info("Input shape is %s. Writing output data to %s shape is (nd,nt/2,npix,npix)=%s", blk.shape, outfname, outshape)
         fout = open(outfname, 'w')
         gout = open(outgridname, 'w')
         
@@ -234,8 +291,7 @@ class ImagePipeline(Kernel):
         for idm in xrange(nd):
             for t in xrange(nt/2):
                 #g = gridder(d[idm, 2*t, :], d[idm, 2*t+1, :])
-                t1, t2 = grid_reader(idm, t, blk)
-                g = gridder(t1, t2)
+                g = gridder(idm, t, blk)
                 g.tofile(gout)
                 img = imager(g).astype(np.complex64)
                 img.tofile(fout)
@@ -247,7 +303,7 @@ class ImagePipeline(Kernel):
                 printstats(img.imag, ilabel)
                 printstats(g.real, 'grid.real')
                 printstats(g.imag, 'grid.imag')
-                if values.show:
+                if self.values.show:
                     fig, ax = pylab.subplots(2,2)
                     ax[0,0].imshow(img.real, aspect='auto', origin='lower')
                     ax[0,1].imshow(img.imag, aspect='auto', origin='lower')

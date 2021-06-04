@@ -117,6 +117,10 @@ class PipelinePlan(object):
         baselines = f.baselines
         nbl = len(baselines)
         freqs = f.channel_frequencies
+
+        # Cant handle inverted bands - this is all over the code. It's boring
+        assert freqs.min() == freqs[0]
+        assert freqs.max() == freqs[-1]
         Npix = values.npix
 
         if values.cell is not None:
@@ -157,8 +161,25 @@ class PipelinePlan(object):
         self.ncin = values.ncin
         self.ndout = values.ndout
         self.foff = foff
+        self.dtype = np.complex64 # working data type
+        self.threshold = values.threshold
+        assert self.threshold >= 0, 'Invalid threshold'
         if (self.fdmt_plan.nuvtotal >= values.nuvmax):
             raise ValueError("Too many UVCELLS")
+
+    @property
+    def fmin(self):
+        '''
+        Returns maximum frequency
+        '''
+        return self.freqs[0]
+
+    @property
+    def fmax(self):
+        '''
+        Returns minimum frequency
+        '''
+        return self.freqs[-1]
         
 
 def add_arguments(parser):
@@ -177,6 +198,8 @@ def add_arguments(parser):
     parser.add_argument('--nuvmax', help='Maximum number of UV allowed.', type=int, default=8192)
     parser.add_argument('--ncin', help='Numer of channels for sub fdmt', type=int, default=32)
     parser.add_argument('--ndout', help='Number of DM for sub fdmt', type=int, default=32)
+    parser.add_argument('--threshold', type=float, help='Threshold for candidate grouper', default=10)
+    parser.add_argument('--show', action='store_true', help='Show plots')
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
