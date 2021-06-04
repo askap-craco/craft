@@ -154,7 +154,7 @@ def printstats(d, prefix=''):
     dmin = d.min()
     dmean = d.mean()
     dstd = d.std()
-    sn = np.inf if dstd == 0 else dmax/dstd
+    sn = 0 if dstd == 0 else dmax/dstd
     s = '{prefix} max/min/mean/rms = {dmax:.2e}/{dmin:0.2e}/{dmean:0.2e}/{dstd:0.2e} peak S/N={sn:0.1f} at {maxpos}'.format(**locals())
     #print s
     return s

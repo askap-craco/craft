@@ -28,7 +28,7 @@ nchan=256 # number of channels
 tint=1.728
 desired_amp=500 # desired amplitude a the output of the FFT
 threshold=372
-antfile=`dirname $0`/askap-ak1-ak3.ant
+antfile=`dirname $0`/askap-ak1-ak30.ant
 echo Antfile is $antfile
 wc -l $antfile
 
