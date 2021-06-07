@@ -184,7 +184,7 @@ class FdmtGridder(Kernel):
             blkdm = int(np.round(idm*idm_cff(fch1, plan)))
             toff = int(np.round(idm*offset_cff(fch1, plan)))
             blkt = 2*t - toff
-            logging.debug('Gridder idm=%s t=%s irun=%s  minchan=%s blkdm=%s toff=%s blkt=%s', idm, t, irun, minchan, blkdm, toff,  blkt)
+            #logging.debug('Gridder idm=%s t=%s irun=%s  minchan=%s blkdm=%s toff=%s blkt=%s', idm, t, irun, minchan, blkdm, toff,  blkt)
 
             for iuv, uvcell in enumerate(fdmtrun):
                 upix, vpix = uvcell.uvpix

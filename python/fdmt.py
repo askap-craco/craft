@@ -514,7 +514,7 @@ class Fdmt(object):
             d = np.zeros((self.n_f, int(idm + toffset+1)), dtype=np.float32)
         
         nf, nsamp = d.shape
-        assert nf == self.n_f, 'Input data has incorrect number of channels'
+        assert nf == self.n_f, 'Input data has incorrect number of channels. Expected={} inpput shape={}'.format(self.n_f, d.shape)
         assert nsamp >= idm+toffset, 'Input data has insufficient number of samples. Need at least {}'.format(idm+toffset)
         
         for (inchan1, id1, offset) in nodes:            

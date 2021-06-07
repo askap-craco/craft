@@ -226,6 +226,7 @@ def _main():
     parser.add_argument('--frb_amp', type=float, help='FRB amplitude', default=1)
     parser.add_argument('--frb_sn', type=float, help='FRB S/N in the image', default=np.inf)
     parser.add_argument('--frb_relpos', help='FRB relative position - dra,dec in arcseconds', default='0,0')
+    parser.add_argument('--sim-method', help='Simulation method. see functions in simfrb.py', choices=('mkfrb','mkfrb2','mkfrb_fdmt'), default='mkfrb_fdmt')
     parser.add_argument('--show', help='Show plots', action='store_true')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -260,23 +261,26 @@ def _main():
     ddm = np.abs(values.tint / (4.15 * (fch1**-2 - fend**-2)))
 
     if values.frb_idm:
-        dm = values.frb_idm*ddm
-        print 'Setting DM=', dm, 'ddm=', ddm, values.frb_idm
+        idm = values.frb_idm
+        dm = idm*ddm
     else:
+        idm = values.frb_dm/ddm
         dm = values.frb_dm
         
     tdelay = 4.15*dm*(fch1**-2 - fend**-2)
-    logging.info('DM is %s fch1=%s tdelay=%sms', dm, fch1, tdelay)
+    logging.info('DM is %s idm=%s fch1=%s tdelay=%sms', dm, idm, fch1, tdelay)
 
-    amps = simfrb.mkfrb2(values.fch1, \
-                        values.foff, \
-                        Nchan, \
-                        values.tint, \
-                        dm, \
-                        values.frb_amp, \
-                        values.frb_tstart, \
-                        noiserms, \
-                        values.duration)
+    simfunc = getattr(simfrb, values.sim_method)
+    amps = simfunc(values.fch1, \
+            values.foff, \
+            Nchan, \
+            values.tint, \
+            dm, \
+            values.frb_amp, \
+            values.frb_tstart, \
+            noiserms, \
+            values.duration)
+
 
     if values.show:
         pylab.imshow(amps.T, aspect='auto', origin='lower', interpolation='nearest')

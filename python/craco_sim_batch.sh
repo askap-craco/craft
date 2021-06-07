@@ -16,7 +16,7 @@ craco_sim_single.sh 2 0 1 inf 0,0 # canonical + dm=2
 craco_sim_single.sh 3 7 1 inf 0,0 # canonical + dm=2
 craco_sim_single.sh 0 0 2 inf 0,0 # canonical + amplitude=2
 craco_sim_single.sh 0 0 1 inf 100,200 # canonical + position offset = 100" in ra and 200" in dec
-craco_sim_single.sh 0 0 1 10 0,0 # Canonical + S/N = 10
+craco_sim_single.sh 0 0 1 10 0,0 # Canonical + S/N = 12
 craco_sim_single.sh 2 4 1 inf 300,400 # Everything with infinite S/N
-craco_sim_single.sh 2 4 1 10 300,400 # Everything with S/N=10
+craco_sim_single.sh 2 4 1 10 300,400 # Everything with S/N=12
 

@@ -27,10 +27,10 @@ nd=4
 nchan=256 # number of channels
 tint=1.728
 desired_amp=500 # desired amplitude a the output of the FFT
-threshold=372
+threshold=12
 ncin=32
 ndout=8
-antfile=`dirname $0`/askap-ak1-ak30.ant
+antfile=`dirname $0`/askap-ak1-ak3.ant
 echo Antfile is $antfile
 wc -l $antfile
 
@@ -94,7 +94,7 @@ $cmd
 #craco_fdmt_krnl.py --nt $nt --ndm $nd --format raw --nfftcu $ncu --output-scale $scale $fits
 #craco_img_krnl.py --ndm $nd --uvgrid $fits.uvgrid.txt --nfftcu $ncu --nt $nt  $fits.ndm${nd}_nt${nt}.b0.uvdata.raw --threshold $threshold
 
-craco_pipeline.py --nt $nt --ndm $nd --ncin $ncin --ndout $ndout --uv $fits --save
+craco_pipeline.py --nt $nt --ndm $nd --ncin $ncin --ndout $ndout --uv $fits --boxcar-weight sqrt --threshold $threshold
 
 popd
 
