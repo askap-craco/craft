@@ -202,7 +202,7 @@ def mkfrb2(f1, foff, nchans, tsamp, dm, amp=1, toffset=0, noiserms=0, ntimes=409
     :tsamp: sampleing time, in milliseconds
     :dm: dispersion measure - in PC/CM3
     :amp: Amplitude
-    :offset: Time offset in samples
+    :offset: Time offset in ms
     :noiserms: RMS of noise to add
     :ntimes: block size
     :dclevel: DC level
@@ -227,8 +227,8 @@ def mkfrb2(f1, foff, nchans, tsamp, dm, amp=1, toffset=0, noiserms=0, ntimes=409
         tstart_ms = t*tsamp # Beginnignof this integration
         tend_ms = (t+1)*tsamp # end of this integration
         for ic, f in enumerate(freqs):
-            ttop_ms = dmdelay(dm, f+0.5*foff, ftop) + toffset*tsamp # time FRB enters the top of this channel
-            tbot_ms = dmdelay(dm, f-0.5*foff, ftop) + toffset*tsamp # time FRB exits the bottom of the channel
+            ttop_ms = dmdelay(dm, f+0.5*foff, ftop) + toffset # time FRB enters the top of this channel
+            tbot_ms = dmdelay(dm, f-0.5*foff, ftop) + toffset # time FRB exits the bottom of the channel
             tsmear = abs(ttop_ms - tbot_ms) # Time from top to bottom
 
             # Time FRB arrived in this time/frequency cell
@@ -277,7 +277,7 @@ def mkfrb_fdmt(f1, foff, nchans, tsamp, dm, amp=1, toffset=0, noiserms=0, ntimes
     d.shape = shape
     import fdmt
     thefdmt = fdmt.Fdmt(f1, foff, nchans, max_dt=idm+1, n_t=ntimes)
-    toffset_samp = int(np.round(toffset))
+    toffset_samp = int(np.round(float(toffset)/float(tsamp)))
     d = thefdmt.add_frb_track(idm, d.T, amp, toffset_samp)
     return d.T
 
