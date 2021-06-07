@@ -258,14 +258,15 @@ def _main():
     noiserms = 0 # Need to make independant noise for every baseline/pol - we'll do that shortly.
 
     fend = values.fch1 + values.foff*(Nchan-1)
-    ddm = np.abs(values.tint / (4.15 * (fch1**-2 - fend**-2)))
+    ddm = simfrb.calc_delta_dm(fch1, values.foff, Nchan, values.tint)
 
     if values.frb_idm:
         idm = values.frb_idm
-        dm = idm*ddm
+        dm = simfrb.idm2dm(fch1, values.foff, Nchan, values.tint, idm)
     else:
-        idm = values.frb_dm/ddm
         dm = values.frb_dm
+        idm = simfrb.dm2idm(fch1, values.foff, Nchan, values.tint, dm)
+
         
     tdelay = 4.15*dm*(fch1**-2 - fend**-2)
     logging.info('DM is %s idm=%s fch1=%s tdelay=%sms', dm, idm, fch1, tdelay)

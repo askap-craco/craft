@@ -41,6 +41,7 @@ nant=$(wc -l $antfile | awk '{print $1}')
 nbl=$( echo "scale=6; $nant * ($nant -1) / 2" | bc) # number of baselines
 frbname=frb_d${frb_dm}_t${t0}_a${frb_amp}_sn${frb_sn}_lm${frb_relpos_frbname}
 fits=${frbname}.fits
+sim_method=mkfrb_fdmt
 
 # Expected output of the FFT amplitude
 # Not sure where the factor of 2 is coming from
@@ -85,8 +86,9 @@ param fits $fits
 param raw_image_amp $raw_image_amp 
 param scale $scale
 param ncin $ncin
+param sim_method $sim_method
 
-cmd="uvfrbsim.py --fch1 $fch1 --nchan $nchan --antfile $antfile2 --tint $tint --duration $nt --frb_idm $frb_dm --frb_amp $frb_amp --frb_sn $frb_sn --frb_relpos $frb_relpos --frb_tstart $frb_tstart -o $fits"
+cmd="uvfrbsim.py --fch1 $fch1 --nchan $nchan --antfile $antfile2 --tint $tint --duration $nt --frb_idm $frb_dm --frb_amp $frb_amp --frb_sn $frb_sn --frb_relpos $frb_relpos --frb_tstart $frb_tstart -o $fits --sim-method $sim_method"
 echo "Running $cmd"
 #$cmd --show
 $cmd
@@ -94,7 +96,7 @@ $cmd
 #craco_fdmt_krnl.py --nt $nt --ndm $nd --format raw --nfftcu $ncu --output-scale $scale $fits
 #craco_img_krnl.py --ndm $nd --uvgrid $fits.uvgrid.txt --nfftcu $ncu --nt $nt  $fits.ndm${nd}_nt${nt}.b0.uvdata.raw --threshold $threshold
 
-craco_pipeline.py --nt $nt --ndm $nd --ncin $ncin --ndout $ndout --uv $fits --boxcar-weight sqrt --threshold $threshold
+craco_pipeline.py --nt $nt --ndm $nd --ncin $ncin --ndout $ndout --uv $fits --boxcar-weight sqrt --threshold $threshold --save
 
 popd
 

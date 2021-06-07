@@ -244,7 +244,6 @@ class Grouper(Kernel):
         '''
 
         # Find the boxcar with the largest value for each pixel
-        # See https://stackoverflow.com/questions/42519475/python-numpy-argmax-to-max-in-multidimensional-array
         max_box = np.argmax(boxout, axis=2)
         i,j = np.indices(max_box.shape)
         threshold = self.plan.threshold

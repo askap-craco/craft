@@ -42,6 +42,69 @@ def dmdelay(dm, f1, f2):
     return 4.15*dm*(f1**-2 - f2**-2)
 
 
+def calc_delta_dm(fch1, foff, nchans, tsamp):
+    '''
+    Calculates the DM resolution in PC/CM3 given the system parameters
+    
+    Assumes DM constant of 4.15
+
+    :fch1: First channel center frequency (GHz)
+    :foff: Channel offset (GHz)
+    :nchans: Number of channels
+    :tsamp: samplign time (ms)'
+    :returns: Delta DM in PC/CM3
+
+    >>> calc_delta_dm(0.736, 0.001, 256, 1.7)
+    0.4948473447941156
+    '''
+    fend = fch1 + foff*float(nchans - 1)
+    ddm = np.abs(tsamp / dmdelay(1.0, fch1, fend))
+    return ddm
+
+def dm2idm(fch1, foff, nchans, tsamp, dm):
+    '''
+    Calculate the DM index in samples of a given DM in PC/CM3
+
+    Assumes DM constant of 4.15
+
+    :fch1: First channel center frequency (GHz)
+    :foff: Channel offset (GHz)
+    :nchans: Number of channels
+    :tsamp: samplign time (ms)
+    :dm: Dipserison measure in PC/CM3
+    :returns: Delta DM index in samples as a float. you mayneed to round/cast if you want an in
+
+    >>> int(np.round(dm2idm(0.736, 0.001, 256, 1.7, 100)))
+    202
+    '''
+    ddm = calc_delta_dm(fch1, foff, nchans, tsamp)
+    idm = dm/ddm
+    return idm
+
+def idm2dm(fch1, foff, nchans, tsamp, idm):
+    '''
+    Calculates DM in pc/cm3 given a dm index in samples
+
+    Assumes DM constant of 4.15
+
+    :fch1: First channel center frequency (GHz)
+    :foff: Channel offset (GHz)
+    :nchans: Number of channels
+    :tsamp: samplign time (ms)
+    :idm: DM index in samples
+
+    :returns: DM in pc/cm3
+
+    >>> int(np.round(idm2dm(0.736, 0.001, 256, 1.7, 202)))
+    100
+    
+    '''
+    ddm = calc_delta_dm(fch1, foff, nchans, tsamp)
+    dm = idm*ddm
+    return dm
+
+
+
 def mkfrb(f1, foff, nchans, tsamp, dm, amp=1, offset=0, noiserms=0, ntimes=4096, dclevel=0):
     '''
     Make a simple time-frequency waterfall plot containing a width=1 FRB.
@@ -160,7 +223,6 @@ def mkfrb2(f1, foff, nchans, tsamp, dm, amp=1, toffset=0, noiserms=0, ntimes=409
     d = np.random.randn(np.prod(shape))*noiserms + dclevel
     d.shape = shape
 
-
     for t in xrange(ntimes):
         tstart_ms = t*tsamp # Beginnignof this integration
         tend_ms = (t+1)*tsamp # end of this integration
@@ -191,71 +253,10 @@ def mkfrb2(f1, foff, nchans, tsamp, dm, amp=1, toffset=0, noiserms=0, ntimes=409
 
     return d
 
-def calc_delta_dm(fch1, foff, nchans, tsamp):
-    '''
-    Calculates the DM resolution in PC/CM3 given the system parameters
-    
-    Assumes DM constant of 4.15
-
-    :fch1: First channel center frequency (GHz)
-    :foff: Channel offset (GHz)
-    :nchans: Number of channels
-    :tsamp: samplign time (ms)'
-    :returns: Delta DM in PC/CM3
-
-    >>> calc_delta_dm(0.736, 0.001, 256, 1.7)
-    0.4948473447941156
-    '''
-    fend = fch1 + foff*float(nchans - 1)
-    ddm = np.abs(tsamp / dmdelay(1.0, fch1, fend))
-    return ddm
-
-def dm2idm(fch1, foff, nchans, tsamp, dm):
-    '''
-    Calculate the DM index in samples of a given DM in PC/CM3
-
-    Assumes DM constant of 4.15
-
-    :fch1: First channel center frequency (GHz)
-    :foff: Channel offset (GHz)
-    :nchans: Number of channels
-    :tsamp: samplign time (ms)
-    :dm: Dipserison measure in PC/CM3
-    :returns: Delta DM index in samples as a float. you mayneed to round/cast if you want an in
-
-    >>> int(np.round(dm2idm(0.736, 0.001, 256, 1.7, 100)))
-    202
-    '''
-    ddm = calc_delta_dm(fch1, foff, nchans, tsamp)
-    idm = dm/ddm
-    return idm
-
-def idm2dm(fch1, foff, nchans, tsamp, idm):
-    '''
-    Calculates DM in pc/cm3 given a dm index in samples
-
-    Assumes DM constant of 4.15
-
-    :fch1: First channel center frequency (GHz)
-    :foff: Channel offset (GHz)
-    :nchans: Number of channels
-    :tsamp: samplign time (ms)
-    :idm: DM index in samples
-
-    :returns: DM in pc/cm3
-
-    >>> int(np.round(idm2dm(0.736, 0.001, 256, 1.7, 202)))
-    100
-    
-    '''
-    ddm = calc_delta_dm(fch1, foff, nchans, tsamp)
-    dm = idm*ddm
-    return dm
-
 
 def mkfrb_fdmt(f1, foff, nchans, tsamp, dm, amp=1, toffset=0, noiserms=0, ntimes=4096, dclevel=0):
     '''
-    Note: DM is not in PC/CM3 - it's in samples!
+
     '''
 
 
@@ -266,17 +267,19 @@ def mkfrb_fdmt(f1, foff, nchans, tsamp, dm, amp=1, toffset=0, noiserms=0, ntimes
         warnings.warn('You probably have the wrong units for tsamp. Its in milliseconds. tsamp={}'.format(tsamp))
 
 
+    idm = int(np.round(dm2idm(f1, foff, nchans, tsamp, dm)))
     ntimes = int(ntimes)
     nchans = int(nchans)
-
+    toffset = int(toffset)
+    assert idm < ntimes
     freqs = f1 + np.arange(nchans)*foff
-    ftop = freqs.max()
     shape = (ntimes, nchans)
     d = np.random.randn(np.prod(shape))*noiserms + dclevel
     d.shape = shape
     import fdmt
-    thefdmt = fdmt.Fdmt(f1, foff, nchans, max_dt=dm+1, n_t=dm+1)
-    d = thefdmt.add_frb_track(dm, d.T, amp, toffset)
+    thefdmt = fdmt.Fdmt(f1, foff, nchans, max_dt=idm+1, n_t=ntimes)
+    toffset_samp = int(np.round(toffset / tsamp))
+    d = thefdmt.add_frb_track(idm, d.T, amp, toffset_samp - idm)
     return d.T
 
 

@@ -156,7 +156,7 @@ def printstats(d, prefix=''):
     dstd = d.std()
     dsum = d.sum()
     sn = 0 if dstd == 0 else dmax/dstd
-    s = '{prefix} max/min/mean/rms/sum = {dmax:.2e}/{dmin:0.2e}/{dmean:0.2e}/{dstd:0.2e}/{dsum:0.2e} peak S/N={sn:0.1f} at {maxpos}'.format(**locals())
+    s = '{prefix} max/min/mean/rms/sum/S/N = {dmax:.2e}/{dmin:0.2e}/{dmean:0.2e}/{dstd:0.2e}/{dsum:0.2e}/{sn:0.1f} peak at {maxpos}'.format(**locals())
     #print s
     return s
 
