@@ -340,6 +340,10 @@ class BaselineCell(object):
         return slice(self.chan_start, self.chan_end+1)
 
     @property
+    def fch1(self):
+        return self.freqs[0]
+
+    @property
     def uvpix_upper(self):
         '''
         Returns the uv pixel coordinates tuple guaranteed to be in the 

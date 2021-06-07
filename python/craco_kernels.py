@@ -37,15 +37,20 @@ class Kernel(object):
 
 class Prepare(Kernel):
     def __call__(self, dblk):
+        plan = self.plan
         dprep = np.zeros((plan.nuvrest, plan.nt, plan.ncin, plan.nuvwide), dtype=np.complex64) # Needs to be zeros otherwise badness?
         
         # prepare data - at this point its just transposing the block
-        for irun, fdmtrun in enumerate(plan.fdmt_runs):
-            for iuv, uvcell in enmuerate(fdmtrun):
-                cell_data = uvd.extract(dblk)
-                logging.debug('blkt %s iuv %s cell_data shape=%s', blkt, iuv, cell_data.shape)
-                # Truncating times for the moment, as we don't keep history
-                dblk[irun, :, :, iuv] = cell_data
+        for irun, fdmtrun in enumerate(plan.fdmt_plan.fdmt_runs):
+            minchan = plan.fdmt_plan.run_chan_starts[irun]
+            for iuv, uvcell in enumerate(fdmtrun):
+                tf = dblk.get(uvcell.blid) # lookup in dictionary - shape=(nchan, nt)
+                subband_start = uvcell.chan_start - minchan
+                assert subband_start >= 0
+                subband_end = subband_start + uvcell.nchan
+                assert subband_end <= self.plan.ncin
+                subband_slice = slice(subband_start, subband_end)
+                dprep[irun, :, subband_slice, iuv] = tf[uvcell.chan_slice, :].T
 
         return dprep
 
@@ -53,37 +58,27 @@ class Prepare(Kernel):
 class MiniFdmt(Kernel):
     def __call__(self, dblk):
         plan = self.plan
+        assert dblk.shape == (plan.nuvrest, plan.nt, plan.ncin, plan.nuvwide)
 
         dfdmt = np.zeros((plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide), dtype=np.complex64)
         for irun, fdmtrun in enumerate(plan.fdmt_plan.fdmt_runs):
-            fch1 = min([cell.freqs[0] for cell in fdmtrun]) # effective frequency - should have it as a parameter in plan rather than calculating it
-            mincell = min(fdmtrun, key=lambda cell:cell.chan_start)
-            assert mincell.freqs[0] == fch1
-            minchan = mincell.chan_start
+            fch1 = self.plan.fdmt_plan.run_fch1[irun] # lookup lookup table
             thefdmt = fdmt.Fdmt(fch1, plan.foff, plan.ncin, plan.ndout, plan.nt) # no history for now
             
             for iuv, uvcell in enumerate(fdmtrun):
                 # Truncating times for the moment, as we don't keep history
-                tf = dblk.get(uvcell.blid)
-                #logging.debug('irun=%d iuv=%d blid=%s real=%s', irun, iuv, uvcell.blid, craco.printstats(tf.real))
-                # tf.shape is (nc, nt)
-                d = np.zeros((self.plan.ncin, self.plan.nt), dtype=np.complex64)
-                subband_start = uvcell.chan_start - minchan
-                assert subband_start >= 0
-                subband_end = subband_start + uvcell.nchan
-                d[subband_start:subband_end, :] = tf[uvcell.chan_slice, :]
-                dout = thefdmt(d) # Don't keep history. Shape=(ndout, ndout+nt)
+                d = dblk[irun, :, :, iuv]
+                dout = thefdmt(d.T).T # Don't keep history. Shape=(ndout, ndout+nt)
 
                 if self.plan.values.show_fdmt:
-                    fig, axs = pylab.subplots(3,2)
-                    imshow_complex(axs[0,:], tf, 'FDMT TF')
-                    imshow_complex(axs[1,:], d, 'FDMT d')
-                    imshow_complex(axs[2,:], dout, 'FDMT dout')
+                    fig, axs = pylab.subplots(2,2)
+                    imshow_complex(axs[0,:], d.T, 'FDMT d')
+                    imshow_complex(axs[1,:], dout.T, 'FDMT dout')
                     
                     #fig.set_title('irun={} iuv={} blid={}'.format(irun, iuv, uvcell.blid))
                     pylab.show()
                     
-                dfdmt[irun, :, :, iuv] = dout[:, :plan.nt].T
+                dfdmt[irun, :, :, iuv] = dout[:plan.nt, :]
 
         # rescale for ... goodness
         scale_factor = self.plan.fdmt_scale / float(self.plan.nf) # the 2 I think happens becuase of the complex->real gridding
@@ -364,6 +359,7 @@ class CracoPipeline(Kernel):
         uvsource = uvfits.open(values.uv)
         plan = craco_plan.PipelinePlan(uvsource, values)
         super(CracoPipeline, self).__init__(uvsource, plan, values)
+        self.prepare = Prepare(self.uvsource, self.plan, self.values)
         self.fdmt = MiniFdmt(self.uvsource, self.plan, self.values)
         self.image = ImagePipeline(self.uvsource, self.plan, self.values)
 
@@ -372,7 +368,9 @@ class CracoPipeline(Kernel):
             if self.plan.values.save:
                 savefile('blk_{}_input.npy'.format(blkt), craco.bl2array(d))
 
-            blk = self.fdmt(d)
+            dprep = self.prepare(d)
+
+            blk = self.fdmt(dprep)
 
             if self.plan.values.save:
                 savefile('blk_{}_fdmt.npy'.format(blkt), blk)

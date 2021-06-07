@@ -88,6 +88,8 @@ class FdmtPlan(object):
     def __init__(self, uvcells, nuvwide=8, ncin=32):
         uvcells_remaining = set(uvcells)# copy array
         fdmt_runs = []
+        run_chan_starts = []
+        run_fch1 = []
         while len(uvcells_remaining) > 0:
             logging.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
             minchan = min(uvcells_remaining, key=lambda uv:(uv.chan_start, uv.blid)).chan_start
@@ -95,7 +97,12 @@ class FdmtPlan(object):
             best_cells = sorted(possible_cells, key=lambda uv:calc_overlap(uv, minchan, ncin), reverse=True)
             used_cells = best_cells[0:min(nuvwide, len(best_cells))]
             full_cells, leftover_cells = split_cells(used_cells, minchan, ncin)
+            mincell = min(full_cells, key=lambda cell:cell.chan_start)
+            
+            run_chan_starts.append(mincell.chan_start)
+            run_fch1.append(mincell.fch1)
             fdmt_runs.append(full_cells)
+
             total_overlap = sum([calc_overlap(uv, minchan, ncin) for uv in full_cells])
             logging.debug('minchan=%d npossible=%d used=%d full=%d leftover=%d total_overlap=%d', minchan, len(possible_cells), len(used_cells), len(full_cells), len(leftover_cells), total_overlap)
             uvcells_remaining -= set(used_cells)
@@ -105,9 +112,13 @@ class FdmtPlan(object):
         nuvtotal = nruns*nuvwide
         logging.info('FDMT plan has ntotal=%d of %d runs with packing efficiency %f. requires efficiency of > %f', nuvtotal, nruns, float(len(uvcells))/float(nuvtotal), float(nuvtotal)/8192.0)
         self.fdmt_runs = fdmt_runs
+        self.run_chan_starts = run_chan_starts
+        self.run_fch1 = run_fch1
+
         self.nruns = nruns
         self.nuvtotal = nuvtotal
         self.total_nuvcells = sum([len(p) for p in fdmt_runs])
+
 
 class PipelinePlan(object):
     def __init__(self, f, values):

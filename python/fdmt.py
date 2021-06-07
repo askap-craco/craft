@@ -521,7 +521,10 @@ class Fdmt(object):
             coff1 = offset
             l1 = id1
             if frbmode:
-                d[inchan1, maxoff-coff1-l1+toffset:maxoff-coff1+1+toffset] += amplitude
+                t1 = maxoff-coff1-l1
+                t2 = maxoff-coff1+1
+                #print 'addfrb', inchan1, id1, offset, toffset, t1, t2
+                d[inchan1, t1:t2] += amplitude
             else:
                 d[inchan1, coff1+toffset:coff1+l1+1+toffset] += amplitude
             
