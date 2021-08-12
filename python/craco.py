@@ -320,7 +320,7 @@ class BaselineCell(object):
 
     :blid: Baslined ID - see blid2ant
     :uvpix: (2 tuple) of (u, v) integer pixels
-    :chan_start, chan_end: First and last channels
+    :chan_start, chan_end: First and last channels inclusive
     :freqs: array of frequencies
     :npix: Number of pixles (probably superfluous
     '''
@@ -375,6 +375,16 @@ class BaselineCell(object):
         return i
 
     @property
+    def lower_idx(self):
+        '''
+        Returns the triangular index of the lower coordinates
+        '''
+        u, v = self.uvpix_upper
+        i = triangular_index(v, u, self.npix)
+        
+        return i
+
+    @property
     def is_lower(self):
         '''
         Returns True if the uvpix coordinates supplied in the constructor
@@ -396,6 +406,14 @@ class BaselineCell(object):
     def nchan(self):
         return self.chan_end - self.chan_start + 1
 
+    @property
+    def chan_slice(self):
+        '''
+        Returnns a slice that you can use to slice out the channels of interest
+        i.e. start:end+1
+        '''
+        return slice(self.chan_start, self.chan_end+1)
+
     def extract(self, baseline_block):
         cstart = self.chan_start
         cend = self.chan_end+1
@@ -406,8 +424,10 @@ class BaselineCell(object):
         return padded_d
 
     def __str__(self):
-        s = 'Cell blid=%s chan=%d-%d freq=%f-%f' % (self.blid, self.chan_start, self.chan_end, self.freqs[0], self.freqs[-1])
+        s = 'Cell blid=%s chan=%d-%d freq=%f-%f uvpix=%s upper_idx=%s uvpix_upper=%s' % (self.blid, self.chan_start, self.chan_end, self.freqs[0], self.freqs[-1], self.uvpix, self.upper_idx, self.uvpix_upper)
         return s
+
+    __repr__ = __str__
 
 
     

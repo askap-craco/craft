@@ -23,14 +23,14 @@ frb_relpos=$5
 ncu=2
 fch1=0.736 # GHz
 nt=16
-nd=4
+nd=8
 nchan=256 # number of channels
 tint=1.728
 desired_amp=500 # desired amplitude a the output of the FFT
 threshold=12
 ncin=32
 ndout=8
-antfile=`dirname $0`/askap-ak1-ak3.ant
+antfile=`dirname $0`/askap-ak1-ak30.ant
 echo Antfile is $antfile
 wc -l $antfile
 

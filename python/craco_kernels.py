@@ -153,6 +153,23 @@ def offset_cff(fch1, plan):
     assert ocff >= 0
     return ocff
 
+'''
+                    if t == 1 and idm==2:
+                        thisblk = blk[irun, :,:, iuv]
+                        pylab.imshow(thisblk.real, aspect='auto', origin='lower', interpolation='nearest')
+                        pylab.plot(blkdm,blkt, 'x')
+                        maxt,maxdm = np.unravel_index(np.argmax(thisblk.real), thisblk.shape)
+                        pylab.plot(maxdm, maxt, '+')
+                        sum_max += thisblk.real[maxt, maxdm]
+                        sum_predict += thisblk.real[blkt, blkdm]
+                        diff = thisblk.real[blkt, blkdm] - thisblk.real[maxt, maxdm]
+                        msg = 'EQUAL' if (maxt == blkt and maxdm == blkdm) else 'WRONG'
+                        logging.debug('iuv=%s predicted=%s at %s,%s max=%s at %s,%s diff=%s %s', iuv, thisblk.real[blkt, blkdm], blkt, blkdm, thisblk.real[maxt, maxdm], maxt, maxdm, diff, msg)
+                        pylab.xlabel('IDM')
+                        pylab.ylabel('T')
+                        pylab.show()
+'''
+
 class FdmtGridder(Kernel):
     '''
     Grids the data assuming the FDMT has only done some of the dedispersion
@@ -171,6 +188,8 @@ class FdmtGridder(Kernel):
         npix = self.plan.npix
         g = np.zeros((npix, npix), dtype=self.plan.dtype)
         fdmt_band = plan.ncin*plan.foff # Bandwidth of FDMT
+        sum_max = 0
+        sum_predict = 0
 
         for irun, fdmtrun in enumerate(plan.fdmt_plan.fdmt_runs):
             mincell = min(fdmtrun, key=lambda cell:cell.chan_start)
@@ -179,7 +198,7 @@ class FdmtGridder(Kernel):
             blkdm = int(np.round(idm*idm_cff(fch1, plan)))
             toff = int(np.round(idm*offset_cff(fch1, plan)))
             blkt = 2*t - toff
-            #logging.debug('Gridder idm=%s t=%s irun=%s  minchan=%s blkdm=%s toff=%s blkt=%s', idm, t, irun, minchan, blkdm, toff,  blkt)
+            logging.debug('Gridder idm=%s t=%s irun=%s  minchan=%s blkdm=%s toff=%s blkt=%s fch1=%s idm_cff=%s off_cff', idm, t, irun, minchan, blkdm, toff,  blkt, fch1, idm*idm_cff(fch1, plan), idm*offset_cff(fch1, plan))
 
             for iuv, uvcell in enumerate(fdmtrun):
                 upix, vpix = uvcell.uvpix
@@ -193,9 +212,13 @@ class FdmtGridder(Kernel):
                 else:
                     v2 = complex(0,0)
 
+
+
                 # This is summing because some UV Cells get split to do the FDMT and we need to recombine them
                 g[vpix, upix] += v1 + v2
                 g[npix-vpix, npix-upix] += np.conj(v1) - np.conj(v2)
+
+        logging.debug('Gridding idm=%s t=%s sum_max=%s sum_predict=%s', idm, t, sum_max, sum_predict)
                 
         return g
 
@@ -342,7 +365,7 @@ class ImagePipeline(Kernel):
                     imshow_complex(ax[1,:], g, 'grid idm={} t={}'.format(idm, t))
                     pylab.show()
 
-            logging.info("Wrote output images to %s shape=%s (nd,nt,npix,npix)=dtype=%s", outfname, outshape, img.dtype)
+            logging.info('Finished idm=%s', idm)
     
         grouper.to_file(candname)
         fout.close()
@@ -369,6 +392,9 @@ class CracoPipeline(Kernel):
                 savefile('blk_{}_input.npy'.format(blkt), craco.bl2array(d))
 
             dprep = self.prepare(d)
+
+            if self.plan.values.save:
+                savefile('blk_{}_prepare.npy'.format(blkt), dprep)
 
             blk = self.fdmt(dprep)
 
