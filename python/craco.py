@@ -34,14 +34,25 @@ def triangular(n):
     >>> triangular(6)
     21
     '''
-    t = n*(n+1)/2
+    t = n*(n+1)//2
 
     return t
 
-def triangular_index(x, y, n):
+def triangular_index(x, y, n, raster='xy'):
     '''
     Returns the index in the triangle given x and y coordinates (x>=y) and 
     the size of the array (n)
+
+    If raster ='xy' (the default) - it assumes we raster accross x first, then down y
+    if raster = 'yx', its the opposite raster order. I.e. y first, then x
+
+    Assumes 0,0 is the top-left of the image
+
+    >>> triangular_index(0,0,5)
+    0
+
+    >>> triangular_index(3,0,5)
+    3
 
     >>> triangular_index(1,1,5)
     5
@@ -49,15 +60,65 @@ def triangular_index(x, y, n):
     >>> triangular_index(4,3,5)
     13
 
+    >>> triangular_index(4,4,5)
+    14
+
     >>> triangular_index(106, 71, 256)
     15726
+
+    >>> triangular_index(0,0,5, 'yx')
+    0
+
+    >>> triangular_index(3,0,5,'yx')
+    6
+
+    >>> triangular_index(1,1,5,'yx')
+    2
+
+    >>> triangular_index(4,3,5,'yx')
+    13
+
+    >>> triangular_index(4,4,5,'yx')
+    14
+
+
+
     '''
+    assert raster in ('xy','yx'), 'Invalid raster value:{}'.foramt(raster)
+
     assert 0 <= x < n, 'Invalid values 0<= x(%d) < n(%d)'%(x, n)
     assert 0 <= y < n , 'Invalid values 0<= y(%d) < n(%d)'%(y, n)
     assert x >= y , 'x(%d) > y(%d)'% (x, y)
-    i = triangular(n) - triangular(n - y) + x - y
+
+    if raster == 'xy':
+        i = triangular(n) - triangular(n - y) + x - y
+    else:
+        i = triangular(x) + y
+        
     
     return i
+
+def make_upper(uvpix):
+    '''
+    Make the given uvpix tuple upper hermetian.
+    i.e. always returns a tuple with u >= v
+    
+    >>> make_upper((2,1))
+    (2, 1)
+    
+    >>> make_upper((1,1))
+    (1, 1)
+
+    >>> make_upper((1,3))
+    (3, 1)
+    '''
+    
+    u, v = uvpix
+    if u >= v:
+        return (u, v)
+    else:
+        return (v, u)
+
 
 def bl2ant(bl):
     '''
@@ -363,6 +424,15 @@ class BaselineCell(object):
         assert retuv[0] >= retuv[1], 'Invalid upper UV coordinates'
 
         return retuv
+
+    @property
+    def uvpix_lower(self):
+        '''
+        Returns uV pixel coordinates tuple guaranteed to be in the lower half plane
+        '''
+        u,v = self.uvpix_upper
+        return (v,u)
+    
 
     @property
     def upper_idx(self):

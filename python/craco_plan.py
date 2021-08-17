@@ -15,9 +15,10 @@ import craco
 import uvfits
 import warnings
 import craco_kernels
-from craco import triangular_index
+from craco import triangular_index, make_upper
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
+
 
 def get_uvcells(baselines, uvcell, freqs, Npix):
     uvcells = []
@@ -134,7 +135,9 @@ class FdmtPlan(object):
             logging.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
             minchan = min(uvcells_remaining, key=lambda uv:(uv.chan_start, uv.blid)).chan_start
             possible_cells = filter(lambda uv:calc_overlap(uv, minchan, ncin) > 0, uvcells_remaining)
-            best_cells = sorted(possible_cells, key=lambda uv:calc_overlap(uv, minchan, ncin), reverse=True)
+
+            # sort as best we can so that it's stable - I.e. we get hte same answer every time
+            best_cells = sorted(possible_cells, key=lambda uv:(calc_overlap(uv, minchan, ncin), uv.uvpix_upper, uv.blid), reverse=True)
             used_cells = best_cells[0:min(nuvwide, len(best_cells))]
             full_cells, leftover_cells = split_cells(used_cells, minchan, ncin)
             run = FdmtRun(full_cells, self)
@@ -156,7 +159,7 @@ class FdmtPlan(object):
         #square_history_size = ndout*nuvtotal*(nt + nd)
         square_history_size = sum(nuvwide*(nd + nt)*ndout for run in runs)
         minimal_history_size = sum(nuvwide*(run.max_offset+ nt)*run.max_idm for run in runs)
-        
+
         
         logging.info('FDMT plan has ntotal=%d of %d runs with packing efficiency %f. requires efficiency of > %f. History size square=%d minimal=%d =%d 256MB HBM banks', nuvtotal, nruns, float(len(uvcells))/float(nuvtotal), float(nuvtotal)/8192.0, square_history_size, minimal_history_size, minimal_history_size*4/256/1024/1024)
         self.fdmt_runs = fdmt_runs
@@ -171,22 +174,28 @@ class FdmtPlan(object):
         # find a cell with zero in it
         self.zero_cell = None
         for irun, run in enumerate(self.runs):
+            print(irun, len(run.cells))
             if len(run.cells) < nuvwide:
                 self.zero_cell = (irun, len(run.cells))
-                break
+
+        if self.zero_cell is None:
+            self.zero_cell = (len(self.runs), 0)
 
         assert self.zero_cell != None
+        assert self.zero_cell[0] < self.pipeline_plan.nuvrest, 'Not enough room for FDMT zero cell'
+        assert self.zero_cell[1] < nuvwide
+
         assert self.zero_cell[0] < self.nruns
         assert self.zero_cell[1] < ncin
         #assert self.get_cell(self.zero_cell) != None
 
-        logging.info("FDMT zero cell is %s", self.zero_cell)
-        
-            
+        logging.info("FDMT zero cell is %s=%s", self.zero_cell, self.zero_cell[0]*nuvwide+self.zero_cell[1])
 
     def find_uv(self, uvpix):
         '''
         Returns the run and cell index of FDMT Cells that have the given UV pixel
+
+        uvpix must be upper hermetian
         
         Returns a list of tuples
         irun = run index
@@ -198,6 +207,8 @@ class FdmtPlan(object):
         :uvpix: 2-tuple of (u, v)
         :returns: 2-typle (irun, icell)
         '''
+
+        assert uvpix[0] >= uvpix[1], 'Uvpix must be upper hermetian'
         
         cell_coords = []
         for irun, run in enumerate(self.runs):
@@ -215,10 +226,11 @@ class FdmtPlan(object):
             return self.runs[irun].cells[icell]
 
 class AddInstruction(object):
-    def __init__(self, plan, target_slot, cell_coords):
+    def __init__(self, plan, target_slot, cell_coords, uvpix):
         self.plan = plan
         self.target_slot = target_slot
         self.cell_coords = cell_coords
+        self.uvpix = uvpix
         self.shift = False
 
     @property
@@ -226,7 +238,7 @@ class AddInstruction(object):
         return 1 if self.shift else 0
 
     @property
-    def uvcoord(self):
+    def uvidx(self):
         irun, icell = self.cell_coords
         c = icell + self.plan.nuvwide*irun
         return c
@@ -238,27 +250,37 @@ class AddInstruction(object):
 
     __repr__ = __str__
 
-def calc_grid_luts(plan):
+def calc_grid_luts(plan, upper=True):
     uvcells = plan.uvcells
 
-    unique_uvcoords = set([cell.uvpix_upper for cell in uvcells])
-    unique_uvcoords = sorted(unique_uvcoords, key=lambda c: triangular_index(c[0],c[1], plan.npix))
+    # Calculate upper or lower pixel positions but always sort in the same raster order left-to-right, top-to-bottom
+    if upper:
+        uvpix_list = [cell.uvpix_upper for cell in uvcells]
+        sorter = lambda c: triangular_index(c[0],c[1], plan.npix)
+    else:
+        uvpix_list = [cell.uvpix_lower for cell in uvcells]
+        sorter = lambda c: triangular_index(c[1],c[0], plan.npix, raster='yx') # triangular_index requires upper_triangular coordinates
+        
+    unique_uvcoords = set(uvpix_list)
+    # sorts in raster order
+
+    unique_uvcoords = sorted(unique_uvcoords, key=sorter)
     ncoord = len(unique_uvcoords)
-    logging.info('Got %d unique UV coords', ncoord)
+    logging.info('Got %d unique UV coords. Upper=%s', ncoord, upper)
 
     # check
     check = False
     if check:
         grid = np.zeros((plan.npix, plan.npix))
         for i, (u, v) in enumerate(unique_uvcoords):
-            grid[v,u] = i
+            grid[v,u] = i+1
 
-        pylab.imshow(grid)
+        pylab.imshow(np.ma.masked_equal(grid, 0), interpolation='none')
         pylab.show()
     
     fplan = plan.fdmt_plan
     fruns = fplan.runs
-    remaining_fdmt_cells = []
+    remaining_fdmt_cells = [] # this is ana rray we keep for self-testing to make sure we used everything
     for run in fruns:
         remaining_fdmt_cells.extend(run.cells)
 
@@ -266,27 +288,33 @@ def calc_grid_luts(plan):
     all_instructions = []
 
     nwrites = (ncoord + ngridreg - 1) // ngridreg # number of writes
+    assert nwrites <= 4096*2, 'Not enough clocks to write data in! nwrites={}'.format(nwrites)
     logging.info('Need to write %d groups of %d register to pad function', nwrites, ngridreg)
 
     for iwrite in xrange(nwrites):
         # Add available cells
         n = min(ngridreg, ncoord - iwrite*ngridreg)
 
-        slots = unique_uvcoords[iwrite*ngridreg:iwrite*ngridreg + n]
+        slot_uv_coords = unique_uvcoords[iwrite*ngridreg:iwrite*ngridreg + n]
         instructions = []
 
-        for islot, slot in enumerate(slots):
-            logging.debug('Considering islot=%d slot=%s', islot, slot)
-            for cell_coord in fplan.find_uv(slot):
-                cell = fplan.get_cell(cell_coord)
+        for islot, slot_uv_coord in enumerate(slot_uv_coords):
+            logging.debug('Considering islot=%d slot=%s', islot, slot_uv_coord)
+            # The FDMT has all its data in the upper hermetian - so we always use upper hermetian coordinates
+            upper_slot_uv_coord = make_upper(slot_uv_coord)
+             # Find irun and icell 
+            for cell_coord in fplan.find_uv(upper_slot_uv_coord):
+                # cell_coord is the location in the FDMT output buffer
+                cell = fplan.get_cell(cell_coord) # this is the actual baseline cell. Don't use it other than to remove it form our check buffer
                 logging.debug('removing cell %s %s', cell, cell_coord)
                 remaining_fdmt_cells.remove(cell)
-                inst = AddInstruction(plan, islot, cell_coord)
+
+                inst = AddInstruction(plan, islot, cell_coord, slot_uv_coord)
                 instructions.append(inst)
 
         # Grid reading reads 2 UV/clk, so we need to add a dummy add instruction
         if len(instructions) % 2 == 1: # if odd
-            instructions.append(AddInstruction(plan, ngridreg-1, fplan.zero_cell))
+            instructions.append(AddInstruction(plan, ngridreg-1, fplan.zero_cell, (-1,-1)))
 
         # See shift marker for last 2 instruction, as we read 2UV/clk and I don't know which mattes
         instructions[-2].shift = True
@@ -303,7 +331,7 @@ def calc_grid_luts(plan):
 
     num_shifts =  sum(map(lambda inst:inst.shift == True, all_instructions))
 
-    unique_uvidxs = set([inst.uvcoord for inst in all_instructions])
+    unique_uvidxs = set([inst.uvidx for inst in all_instructions])
     #assert len(unique_uvidxs) == len(uvcells), 'Got {} unique UV indexces != len(uvcels) = {}'.format(len(unique_uvidxs), len(uvcells))
 
     assert num_shifts == nwrites*2, 'num_shifts={num_shifts} != nwrites={nwrites}'.format(**locals())
@@ -349,7 +377,7 @@ class PipelinePlan(object):
 
         uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix)
         logging.info('Got Ncells=%d uvcells', len(uvcells))
-        d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.uint32)
+        d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.int32)
         np.savetxt(values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
         self.uvcells = uvcells
         self.nd = values.ndm
@@ -376,10 +404,18 @@ class PipelinePlan(object):
         if self.fdmt_plan.nuvtotal >= values.nuvmax:
             raise ValueError("Too many UVCELLS")
 
-        self.instructions = calc_grid_luts(self)
-        logging.info('Got %d grid instructions', len(self.instructions))
-        d = np.array([[i.target_slot, i.uvcoord, i.shift_flag] for i in self.instructions], dtype=np.uint32)
-        np.savetxt(values.uv+'.gridlut.txt', d, fmt='%d', header='target_slot, uvcoord, shift_flag')
+        self.upper_instructions = calc_grid_luts(self, True)
+        self.lower_instructions = calc_grid_luts(self, False)
+        self.save_instructions(self.upper_instructions, 'upper')
+        self.save_instructions(self.lower_instructions, 'lower')
+                
+        
+    def save_instructions(self, instructions, name):
+        logging.info('Got %d %s grid instructions', len(instructions), name)
+        d = np.array([[i.target_slot, i.uvidx, i.shift_flag, i.uvpix[0], i.uvpix[1]] for i in instructions], dtype=np.uint32)
+        filename = '{uvfile}.gridlut.{postfix}.txt'.format(uvfile=self.values.uv, postfix=name)
+        header ='target_slot, uvidx, shift_flag, upix, vpix'
+        np.savetxt(filename, d, fmt='%d', header=header)
 
     @property
     def nf(self):
