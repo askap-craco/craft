@@ -48,11 +48,52 @@ def get_uvcells(baselines, uvcell, freqs, Npix):
     uvcells = sorted(uvcells, key=lambda b:b.upper_idx)
     return uvcells
 
-def calc_overlap(blcell, minchan, ncin):
-    assert blcell.chan_start >= minchan, 'invalid minimum chan {} {}'.format(blcell.chan_start, minchan)
-    maxchan = minchan + ncin
-    overlap = maxchan - blcell.chan_start
+def calc_overlap_channels(chan_start, chan_end, minchan, ncin):
+    '''
+    Calculate overlap between 2 sets of channels:
+
+    :chan_start: first channel of baseline. Must be >= minchan
+    :chan_end: last_cahnenl of baseline (inclusive)
+    :minchan: First channel in range
+    :nchan: Number of chanenls in range
+
+    >>> calc_overlap_channels(0,31,0,32)
+    32
+
+    >>> calc_overlap_channels(0,30,0,32)
+    31
+
+    >>> calc_overlap_channels(0,33,0,32)
+    32
+
+    >>> calc_overlap_channels(0+1,31+1,0,32)
+    31
+
+    >>> calc_overlap_channels(31,64,0,32)
+    1
+
+    >>> calc_overlap_channels(32,64,0,32)
+    0
+
+    >>> calc_overlap_channels(33,64,0,32)
+    -1
+
+    '''
+    assert chan_end >= chan_start
+    assert chan_start >= minchan, 'invalid minimum chan {} {}'.format(chan_start, minchan)
+    maxchan = minchan + ncin # top end of channels - inclusive
+
+    if chan_end < maxchan:
+        overlap = chan_end - chan_start + 1
+    else:
+        overlap = maxchan - chan_start
+
+    #print(chan_start, chan_end, minchan, maxchan, ncin, overlap)
+
     return overlap
+
+def calc_overlap(blcell, minchan, ncin):
+    return calc_overlap_channels(blcell.chan_start, blcell.chan_end, minchan, ncin)
 
 def split_cells(cells, minchan, ncin):
     '''
@@ -93,7 +134,13 @@ class FdmtRun(object):
         self.cells = cells
         self.chan_start = mincell.chan_start
         self.fch1 = mincell.fch1
-        self.total_overlap = sum([calc_overlap(uv, self.chan_start, plan.pipeline_plan.ncin) for uv in cells])
+        self.total_overlap = 0
+        for uv in cells:
+            overlap = calc_overlap(uv, self.chan_start, plan.pipeline_plan.ncin)
+            logging.debug('Cell chan_start %s %s %s-%s overlap=%d', self.chan_start, uv, uv.chan_start, uv.chan_end, overlap)
+            assert overlap > 0
+            self.total_overlap += overlap
+
         assert self.max_idm <= plan.pipeline_plan.ndout, 'NDOUT is too small - needs to be at least %s' % self.max_idm
 
     @property
@@ -126,7 +173,7 @@ class FdmtPlan(object):
         self.pipeline_plan = pipeline_plan
         nuvwide = self.pipeline_plan.nuvwide
         ncin = self.pipeline_plan.ncin
-        uvcells_remaining = set(uvcells)# copy array
+        uvcells_remaining = uvcells[:] # copy array
         fdmt_runs = []
         run_chan_starts = []
         run_fch1 = []
@@ -135,9 +182,11 @@ class FdmtPlan(object):
             logging.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
             minchan = min(uvcells_remaining, key=lambda uv:(uv.chan_start, uv.blid)).chan_start
             possible_cells = filter(lambda uv:calc_overlap(uv, minchan, ncin) > 0, uvcells_remaining)
+            logging.debug('Got %d possible cells', len(possible_cells))
 
             # sort as best we can so that it's stable - I.e. we get hte same answer every time
-            best_cells = sorted(possible_cells, key=lambda uv:(calc_overlap(uv, minchan, ncin), uv.uvpix_upper, uv.blid), reverse=True)
+            best_cells = sorted(possible_cells, key=lambda uv:(calc_overlap(uv, minchan, ncin), uv.blid, uv.upper_idx), reverse=True)
+            logging.debug('Got %d best cells. Best=%s overlap=%s', len(best_cells), best_cells[0], calc_overlap(best_cells[0], minchan, ncin))
             used_cells = best_cells[0:min(nuvwide, len(best_cells))]
             full_cells, leftover_cells = split_cells(used_cells, minchan, ncin)
             run = FdmtRun(full_cells, self)
@@ -147,8 +196,12 @@ class FdmtPlan(object):
             runs.append(run)
             total_overlap = run.total_overlap
             logging.debug('minchan=%d npossible=%d used=%d full=%d leftover=%d total_overlap=%d', minchan, len(possible_cells), len(used_cells), len(full_cells), len(leftover_cells), total_overlap)
-            uvcells_remaining -= set(used_cells)
-            uvcells_remaining.update(leftover_cells)
+            
+            # Remove used cells
+            uvcells_remaining = [cell for cell in uvcells_remaining if cell not in used_cells]
+
+            # Add split cells
+            uvcells_remaining.extend(leftover_cells)
             
         nruns = len(fdmt_runs)
         nuvtotal = nruns*nuvwide
@@ -159,9 +212,10 @@ class FdmtPlan(object):
         #square_history_size = ndout*nuvtotal*(nt + nd)
         square_history_size = sum(nuvwide*(nd + nt)*ndout for run in runs)
         minimal_history_size = sum(nuvwide*(run.max_offset+ nt)*run.max_idm for run in runs)
-
+        efficiency = float(len(uvcells))/float(nuvtotal)
+        required_efficiency = float(nuvtotal)/8192.0
         
-        logging.info('FDMT plan has ntotal=%d of %d runs with packing efficiency %f. requires efficiency of > %f. History size square=%d minimal=%d =%d 256MB HBM banks', nuvtotal, nruns, float(len(uvcells))/float(nuvtotal), float(nuvtotal)/8192.0, square_history_size, minimal_history_size, minimal_history_size*4/256/1024/1024)
+        logging.info('FDMT plan has ntotal=%d of %d runs with packing efficiency %f. Grid read requires efficiency of > %f of NUV=8192. History size square=%d minimal=%d =%d 256MB HBM banks', nuvtotal, nruns, efficiency, required_efficiency, square_history_size, minimal_history_size, minimal_history_size*4/256/1024/1024)
         self.fdmt_runs = fdmt_runs
         self.run_chan_starts = run_chan_starts
         self.run_fch1 = run_fch1
@@ -318,7 +372,6 @@ def calc_grid_luts(plan, upper=True):
         n = min(ngridreg, ncoord - iwrite*ngridreg)
 
         slot_uv_coords = unique_uvcoords[iwrite*ngridreg:iwrite*ngridreg + n]
-        print('slots', iwrite, n, slot_uv_coords)
         instructions = []
 
         for islot, slot_uv_coord in enumerate(slot_uv_coords):
@@ -405,18 +458,15 @@ def calc_pad_lut(plan, ssr=16):
     lower_idxs = []
 
     npix = plan.npix
-    print('upper', upper_registers)
     
     for v in xrange(npix):
         for ublk in xrange(npix/ssr):
             lower_shift = False
             upper_shift = False
-            print(v, ublk, upper_registers)
             for iu in xrange(ssr):
                 u = iu + ublk*ssr
                 uv = (u,v)
                 if u >= v: # upper hermetian
-                    print('Checking', uv)
                     if (u,v) in uvpix_set:
                         # it better be in the current register
                         i = upper_registers.index(uv)
@@ -427,7 +477,6 @@ def calc_pad_lut(plan, ssr=16):
                         i = -1 # which means 0
 
                     upper_idxs.append((u,v,i))
-                    print(iu, upper_shift, uv,i)
                 else: # lower hermeitan
                     if (v,u) in uvpix_set:
                         i = lower_registers.index(uv)
@@ -444,8 +493,7 @@ def calc_pad_lut(plan, ssr=16):
                     upper_registers[ssr:] = upper_inputs.next()
                 except StopIteration:
                     upper_finished = True
-                    print('No more data')
-                print('Shifted. upper=', upper_registers)
+
 
             if lower_shift:
                 lower_registers[:ssr] = lower_registers[ssr:]
@@ -453,8 +501,6 @@ def calc_pad_lut(plan, ssr=16):
                     lower_registers[ssr:] = lower_inputs.next()
                 except StopIteration:
                     lower_finished = True
-                    print('No more lower data')
-                    
 
             upper_shifts.append(upper_shift)
             lower_shifts.append(lower_shift)
@@ -574,7 +620,7 @@ class PipelinePlan(object):
 
         d = np.array(d)
 
-        header='ant1, ant2, u(pix), v(pix), chan1, chan2, irun, icell, total_overlap, offset_cff, idm_cff, max_idm, max_offset, fch1'
+        header='ant1, ant2, u(pix), v(pix), chan1, chan2, irun, icell, total_overlap, max_idm, max_offset, offset_cff, idm_cff, fch1'
         fmt = '%d ' * 8 + ' %d '*3 + ' %f '*3
         self.save_lut(d, 'uvgrid.split', header, fmt=fmt)
         
