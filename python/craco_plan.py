@@ -174,7 +174,6 @@ class FdmtPlan(object):
         # find a cell with zero in it
         self.zero_cell = None
         for irun, run in enumerate(self.runs):
-            print(irun, len(run.cells))
             if len(run.cells) < nuvwide:
                 self.zero_cell = (irun, len(run.cells))
 
@@ -190,6 +189,23 @@ class FdmtPlan(object):
         #assert self.get_cell(self.zero_cell) != None
 
         logging.info("FDMT zero cell is %s=%s", self.zero_cell, self.zero_cell[0]*nuvwide+self.zero_cell[1])
+
+        uvmap = {}
+        for irun, run in enumerate(self.runs):
+            for icell, cell in enumerate(run.cells):
+                irc = (irun, icell)
+                uvmap[cell.uvpix_upper] = uvmap.get(cell.uvpix_upper, [])
+                uvmap[cell.uvpix_upper].append(irc)
+
+        self.__uvmap = uvmap
+
+    def cell_iter(self):
+        '''
+        Iteration over all the cells
+        '''
+        for run in self.runs:
+            for cell in run.cells:
+                yield cell
 
     def find_uv(self, uvpix):
         '''
@@ -209,14 +225,20 @@ class FdmtPlan(object):
         '''
 
         assert uvpix[0] >= uvpix[1], 'Uvpix must be upper hermetian'
+        # speed optimisation
+        cell_coords2 = self.__uvmap.get(uvpix,[])
         
-        cell_coords = []
-        for irun, run in enumerate(self.runs):
-            for icell, cell in enumerate(run.cells):
-                if cell.uvpix_upper == uvpix:
-                    cell_coords.append((irun, icell))
+        #cell_coords = []
+        #for irun, run in enumerate(self.runs):
+        #    for icell, cell in enumerate(run.cells):
+        #        if cell.uvpix_upper == uvpix:
+        #            cell_coords.append((irun, icell))
 
-        return cell_coords
+
+        #print(uvpix, 'Version1', cell_coords, 'Verion2', cell_coords2)
+        #assert cell_coords == cell_coords2
+
+        return cell_coords2
 
     def get_cell(self, cell_coord):
         irun, icell = cell_coord
@@ -296,6 +318,7 @@ def calc_grid_luts(plan, upper=True):
         n = min(ngridreg, ncoord - iwrite*ngridreg)
 
         slot_uv_coords = unique_uvcoords[iwrite*ngridreg:iwrite*ngridreg + n]
+        print('slots', iwrite, n, slot_uv_coords)
         instructions = []
 
         for islot, slot_uv_coord in enumerate(slot_uv_coords):
@@ -317,7 +340,7 @@ def calc_grid_luts(plan, upper=True):
             instructions.append(AddInstruction(plan, ngridreg-1, fplan.zero_cell, (-1,-1)))
 
         # See shift marker for last 2 instruction, as we read 2UV/clk and I don't know which mattes
-        instructions[-2].shift = True
+        #instructions[-2].shift = True
         instructions[-1].shift = True
 
         all_instructions.extend(instructions)
@@ -326,7 +349,7 @@ def calc_grid_luts(plan, upper=True):
     # Check instructions
 
     assert all_instructions[-1].shift == True
-    assert all_instructions[-2].shift == True
+    #assert all_instructions[-2].shift == True
     assert len(remaining_fdmt_cells) == 0
 
     num_shifts =  sum(map(lambda inst:inst.shift == True, all_instructions))
@@ -334,9 +357,116 @@ def calc_grid_luts(plan, upper=True):
     unique_uvidxs = set([inst.uvidx for inst in all_instructions])
     #assert len(unique_uvidxs) == len(uvcells), 'Got {} unique UV indexces != len(uvcels) = {}'.format(len(unique_uvidxs), len(uvcells))
 
-    assert num_shifts == nwrites*2, 'num_shifts={num_shifts} != nwrites={nwrites}'.format(**locals())
+    assert num_shifts == nwrites, 'num_shifts={num_shifts} != nwrites={nwrites}'.format(**locals())
+
+    all_uvpixs = set([inst.uvpix for inst in all_instructions])
+    #assert len(all_uvpixs) == len(all_instructions), 'Got %d unique uvpixels and %d instructions' % (len(all_uvpixs), len(all_instructions))
 
     return all_instructions
+
+def get_pad_input_registers(instr, ssr=16):
+    ''' 
+    Groups the inputs by the .shift attribute adn returns the value of of the uvpix attribute
+    And returns the groups - only the uvpix part of the register
+    '''
+
+    curr = [None for i in xrange(ssr)]
+    for i, instruction in enumerate(instr):
+        if instruction.uvpix == (-1,-1):
+            # add zero instruction. just pass
+            pass
+        else:
+            assert curr[instruction.target_slot] is None or curr[instruction.target_slot] == instruction.uvpix, 'Invalid instruction i={} curr={} instruction={}'.format(i, curr, instruction)
+            curr[instruction.target_slot] = instruction.uvpix
+            
+        if instruction.shift:
+            yield curr
+            curr = [None for i in xrange(ssr)]
+
+def calc_pad_lut(plan, ssr=16):
+    upper_inst = plan.upper_instructions
+    lower_inst  = plan.lower_instructions
+    upper_inputs = get_pad_input_registers(upper_inst)
+    lower_inputs = get_pad_input_registers(lower_inst)
+    uvpix_set = set([cell.uvpix_upper for cell in plan.uvcells])
+
+    lut = []
+    upper_registers = []
+    lower_registers = []
+    upper_registers.extend(upper_inputs.next())
+    upper_registers.extend(upper_inputs.next())
+
+    lower_registers.extend(lower_inputs.next())
+    lower_registers.extend(lower_inputs.next())
+
+    upper_shifts = []
+    lower_shifts = []
+    upper_idxs = []
+    lower_idxs = []
+
+    npix = plan.npix
+    print('upper', upper_registers)
+    
+    for v in xrange(npix):
+        for ublk in xrange(npix/ssr):
+            lower_shift = False
+            upper_shift = False
+            print(v, ublk, upper_registers)
+            for iu in xrange(ssr):
+                u = iu + ublk*ssr
+                uv = (u,v)
+                if u >= v: # upper hermetian
+                    print('Checking', uv)
+                    if (u,v) in uvpix_set:
+                        # it better be in the current register
+                        i = upper_registers.index(uv)
+                        # For debugging
+                        upper_registers[i] = 'USED'
+                        upper_shift |= i >= ssr - 1
+                    else:
+                        i = -1 # which means 0
+
+                    upper_idxs.append((u,v,i))
+                    print(iu, upper_shift, uv,i)
+                else: # lower hermeitan
+                    if (v,u) in uvpix_set:
+                        i = lower_registers.index(uv)
+                        lower_shift |= i >= ssr - 1
+                    else:
+                        i = -1
+                        
+                    lower_idxs.append((u,v,i))
+
+
+            if upper_shift:
+                upper_registers[:ssr] = upper_registers[ssr:]
+                try:
+                    upper_registers[ssr:] = upper_inputs.next()
+                except StopIteration:
+                    upper_finished = True
+                    print('No more data')
+                print('Shifted. upper=', upper_registers)
+
+            if lower_shift:
+                lower_registers[:ssr] = lower_registers[ssr:]
+                try:
+                    lower_registers[ssr:] = lower_inputs.next()
+                except StopIteration:
+                    lower_finished = True
+                    print('No more lower data')
+                    
+
+            upper_shifts.append(upper_shift)
+            lower_shifts.append(lower_shift)
+
+
+    assert upper_finished, 'Upper inputs not empty'
+    assert lower_finished, 'Lower inputs not empty'
+
+
+    assert len(upper_shifts) == npix*npix/ssr
+
+    return (upper_idxs, upper_shifts, lower_idxs, lower_shifts)
 
 
 class PipelinePlan(object):
@@ -379,6 +509,7 @@ class PipelinePlan(object):
         logging.info('Got Ncells=%d uvcells', len(uvcells))
         d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.int32)
         np.savetxt(values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
+
         self.uvcells = uvcells
         self.nd = values.ndm
         self.nt = values.nt
@@ -398,24 +529,73 @@ class PipelinePlan(object):
         self.nbl = nbl
         self.fdmt_scale = self.values.fdmt_scale
         self.fft_scale = self.values.fft_scale
+        self.fft_ssr = 16 # number of FFT pixels per clock - "super sample rate"
         self.ngridreg = 16 # number of grid registers to do
         assert self.threshold >= 0, 'Invalid threshold'
         self.fdmt_plan = FdmtPlan(uvcells, self)
+        self.save_fdmt_plan_lut()
+
+        
         if self.fdmt_plan.nuvtotal >= values.nuvmax:
             raise ValueError("Too many UVCELLS")
 
         self.upper_instructions = calc_grid_luts(self, True)
         self.lower_instructions = calc_grid_luts(self, False)
-        self.save_instructions(self.upper_instructions, 'upper')
-        self.save_instructions(self.lower_instructions, 'lower')
-                
+        self.save_grid_instructions(self.upper_instructions, 'upper')
+        self.save_grid_instructions(self.lower_instructions, 'lower')
+        self.upper_idxs, self.upper_shifts, self.lower_idxs, self.lower_shifts = calc_pad_lut(self, self.fft_ssr)
+        self.save_pad_lut(self.upper_idxs, self.upper_shifts, 'upper')
+        self.save_pad_lut(self.lower_idxs, self.lower_shifts, 'lower')
+
+    def save_lut(self, data, lutname, header, fmt='%d'):
+        filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
+        logging.info('Saving {lutname} shape={d.shape} type={d.dtype} to {filename} header={header}'.format(lutname=lutname, d=data, filename=filename, header=header))
+        np.savetxt(filename, data, fmt=fmt, header=header)
+
+    def save_fdmt_plan_lut(self):
+        fruns = self.fdmt_plan.runs
+        d = []
+        for irun, run in enumerate(fruns):
+            for icell, cell in enumerate(run.cells):
+                d.append([cell.a1,
+                          cell.a2,
+                          cell.uvpix[0],
+                          cell.uvpix[1],
+                          cell.chan_start,
+                          cell.chan_end,
+                          irun,
+                          icell,
+                          run.total_overlap,
+                          run.max_idm,
+                          run.max_offset,
+                          run.offset_cff,
+                          run.idm_cff,
+                          run.fch1])
+
+        d = np.array(d)
+
+        header='ant1, ant2, u(pix), v(pix), chan1, chan2, irun, icell, total_overlap, offset_cff, idm_cff, max_idm, max_offset, fch1'
+        fmt = '%d ' * 8 + ' %d '*3 + ' %f '*3
+        self.save_lut(d, 'uvgrid.split', header, fmt=fmt)
         
-    def save_instructions(self, instructions, name):
+
+        
+    def save_grid_instructions(self, instructions, name):
         logging.info('Got %d %s grid instructions', len(instructions), name)
-        d = np.array([[i.target_slot, i.uvidx, i.shift_flag, i.uvpix[0], i.uvpix[1]] for i in instructions], dtype=np.uint32)
-        filename = '{uvfile}.gridlut.{postfix}.txt'.format(uvfile=self.values.uv, postfix=name)
+        d = np.array([[i.target_slot, i.uvidx, i.shift_flag, i.uvpix[0], i.uvpix[1]] for i in instructions], dtype=np.int32)
         header ='target_slot, uvidx, shift_flag, upix, vpix'
-        np.savetxt(filename, d, fmt='%d', header=header)
+        self.save_lut(d, 'gridlut.'+name, header)
+
+    def save_pad_lut(self, idxs, shifts, name):
+        d = np.array(idxs, dtype=np.int32)
+        header ='upix, vpix, regidx'
+        self.save_lut(d, 'padlut.'+name, header)
+
+        d = np.array(shifts, dtype=np.int32)
+        header = 'doshift'
+        self.save_lut(d, 'doshift.'+name, header)
+        
+
 
     @property
     def nf(self):
