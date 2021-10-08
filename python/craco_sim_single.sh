@@ -30,7 +30,8 @@ desired_amp=500 # desired amplitude a the output of the FFT
 threshold=12
 ncin=32
 ndout=8
-antfile=`dirname $0`/askap-ak1-ak30.ant
+#antfile=`dirname $0`/askap-ak1-ak30.ant
+antfile=`dirname $0`/askap-ak1-ak3.ant
 echo Antfile is $antfile
 wc -l $antfile
 

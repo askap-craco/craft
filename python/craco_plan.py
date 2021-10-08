@@ -20,10 +20,14 @@ from craco import triangular_index, make_upper
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 
-def get_uvcells(baselines, uvcell, freqs, Npix):
+def get_uvcells(baselines, uvcell, freqs, Npix, plot=True):
     uvcells = []
 
     ucell, vcell = uvcell
+
+    if plot:
+        grid = np.zeros((Npix, Npix))
+    
     for blid, bldata in baselines.iteritems():
         #UU, VV WW are in seconds
         ulam = bldata['UU'] * freqs
@@ -35,8 +39,9 @@ def get_uvcells(baselines, uvcell, freqs, Npix):
         if np.any((upix < 0) | (upix >= Npix) | (vpix < 0) | (vpix >= Npix)):
             warnings.warn('Pixel coordinates out of range')
 
-        #if values.show:
-        #    pylab.plot(ulam/1e3, vlam/1e3)
+        if plot:
+            #pylab.plot(ulam/1e3, vlam/1e3)
+            pylab.plot(ulam/ucell + pix_offset, vlam/vcell+pix_offset)
 
         uvpos = list(zip(upix, vpix))
         for istart, iend in craco.runidxs(uvpos):
@@ -44,6 +49,12 @@ def get_uvcells(baselines, uvcell, freqs, Npix):
             assert uvpos[istart] == uvpos[iend]
             b = craco.BaselineCell(blid, uvpix, istart, iend, freqs[istart:iend+1], Npix)
             uvcells.append(b)
+            grid[uvpix[1],uvpix[0]] += len(b.freqs)
+
+
+    if plot:
+        pylab.imshow(grid)
+        pylab.show()
 
     uvcells = sorted(uvcells, key=lambda b:b.upper_idx)
     return uvcells
@@ -334,7 +345,7 @@ def calc_grid_luts(plan, upper=True):
         uvpix_list = [cell.uvpix_upper for cell in uvcells]
         sorter = lambda c: triangular_index(c[0],c[1], plan.npix)
     else:
-        uvpix_list = [cell.uvpix_lower for cell in uvcells]
+        uvpix_list = [cell.uvpix_lower for cell in uvcells if cell.uvpix[0] != cell.uvpix[1]] # don't include diagonal
         sorter = lambda c: triangular_index(c[1],c[0], plan.npix, raster='yx') # triangular_index requires upper_triangular coordinates
         
     unique_uvcoords = set(uvpix_list)
@@ -403,7 +414,8 @@ def calc_grid_luts(plan, upper=True):
 
     assert all_instructions[-1].shift == True
     #assert all_instructions[-2].shift == True
-    assert len(remaining_fdmt_cells) == 0
+    if upper:
+        assert len(remaining_fdmt_cells) == 0
 
     num_shifts =  sum(map(lambda inst:inst.shift == True, all_instructions))
 
@@ -566,7 +578,7 @@ class PipelinePlan(object):
         self.nuvwide = values.nuvwide
         self.nuvmax = values.nuvmax
         assert self.nuvmax % self.nuvwide == 0
-        self.nuvrest = self.nuvmax / self.nuvwide
+        self.nuvrest = self.nuvmax // self.nuvwide
         self.ncin = values.ncin
         self.ndout = values.ndout
         self.foff = foff
