@@ -16,8 +16,53 @@ import numpy as np
 from pylab import *
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
-    
 
+class TestFdmtLookupTableGeneration(TestCase):
+
+    def setUp(self):
+        self.nf = 32 # number of channels
+        self.fmin = 760.
+        self.df = 1.0 # Channel bandwidth in MHz
+        self.fmax = 760 + self.df*self.nf
+        self.nd = 186 # Number of DM trials to do
+        self.nt = 256 # Number of samples per block
+        self.tsamp = 1.0 # milliseconds
+        self.thefdmt = fdmt.Fdmt(self.fmin, self.df, self.nf, self.nd, self.nt) # make FDMT
+
+    def test_fres(self):
+        self.assertEqual(self.thefdmt.fres_for_iter(0), 1.0)
+        self.assertEqual(self.thefdmt.fres_for_iter(1), 1.0*2.0)
+        self.assertEqual(self.thefdmt.fres_for_iter(2), 1.0*4.0)
+        self.assertEqual(self.thefdmt.fres_for_iter(3), 1.0*8.0)
+
+    def test_freq_of_chan(self):
+        self.assertEqual(self.thefdmt.freq_of_chan(0, 0), 760)
+        self.assertEqual(self.thefdmt.freq_of_chan(0, 1), 760+1)
+        self.assertEqual(self.thefdmt.freq_of_chan(0, 20), 760+20)
+        self.assertEqual(self.thefdmt.freq_of_chan(1, 0), 760)
+        self.assertEqual(self.thefdmt.freq_of_chan(1, 1), 760+1*2)
+        self.assertEqual(self.thefdmt.freq_of_chan(1, 2), 760+2*2)
+        self.assertEqual(self.thefdmt.freq_of_chan(2, 2), 760+4*2)
+        
+
+    def test_calc_cff(self):
+        for iterno in xrange(self.thefdmt.niter):
+            for c in xrange(self.thefdmt.nchan_out_for_iter(iterno)):
+                id1_cff = self.thefdmt.calc_id1_cff(iterno, c)
+                off_cff = self.thefdmt.calc_offset_cff(iterno, c)
+                chanconfig = self.thefdmt.hist_nf_data[iterno][c][-1]
+                print('Iterno', iterno, 'c', c, 'id1_cff', id1_cff, 'offset_cff', off_cff, int(np.round(id1_cff*(1<<16))), int(np.round(off_cff*(1<<16))))
+                for idm in xrange(len(chanconfig)):
+                    _, id1, offset, id2, _, _, _ = chanconfig[idm]
+                    self.assertEquals(id1, int(np.round(idm*id1_cff)))
+                    self.assertEquals(offset, int(np.round(idm*off_cff)))
+
+    def test_cal_lookup_table(self):
+        # just checks it works fo rnow
+
+        lut = self.thefdmt.calc_lookup_table()
+
+    
 class TestFdmtSimple(TestCase):
 
     def setUp(self):
