@@ -389,7 +389,7 @@ class Fdmt(object):
             for idt in xrange(len(chanconfig)):
                 config = chanconfig[idt]
                 # TODO: Make this config a little easier to grok than just a tuple
-                _, id1, offset, id2, _, _, _ = config
+                _, id1, offset, id2, _, _, _ = chanconfig
 
                 # TODO: for those interested in caching, id1 and id2 are
 
@@ -629,6 +629,59 @@ class Fdmt(object):
     def nchan_in_for_iter(self, iterno):
         return self.hist_state_shape[iterno][0]
 
+    def freq_of_chan(self, iterno, c):
+        '''
+        Returns the frequency of the given channel number in the given iteration
+        :iterno: iteration
+        :c: channel
+        '''
+        fres = self.fres_for_iter(iterno)
+        f_start = self.f_min + float(c)*fres
+        return f_start
+
+    def fres_for_iter(self, iterno):
+        '''
+        Returns frequency resolution of input channel given iteration number
+        '''
+        fres = self.d_f*(1<<iterno)
+        return fres
+
+    def calc_id1_cff(self, iterno, c):
+        '''
+        Calculate the ID1 CFF constant given the given iteration and chanel number
+
+        :iterno: Iteration number
+        :c: Channel numberp
+        '''
+        fres = self.fres_for_iter(iterno+1)
+        correction = self.d_f*0.5
+        nc = self.nchan_in_for_iter(iterno)
+        f_start = self.freq_of_chan(iterno+1, c)
+        f_end = self.freq_of_chan(iterno+1, c+1)
+        f_middle = f_start + fres*0.5 - correction
+        f_middle_larger = f_middle + 2.0*correction
+        id1_cff = cff(f_middle, f_start, f_end, f_start)
+
+        return id1_cff
+
+    def calc_offset_cff(self, iterno, c):
+        '''
+        Calculate the offset CFF constant given the iteration and channel number
+        
+        :iterno: iteration number
+        :c: Channel number
+        '''
+        fres = self.fres_for_iter(iterno+1)
+        correction = self.d_f*0.5
+        nc = self.nchan_in_for_iter(iterno)
+        f_start = self.freq_of_chan(iterno+1, c)
+        f_end = self.freq_of_chan(iterno+1, c+1)
+        f_middle = f_start + fres*0.5 - correction
+        f_middle_larger = f_middle + 2.0*correction
+        offset_cff = cff(f_middle_larger, f_start, f_end, f_start)
+
+        return offset_cff
+
     def get_config(self, iterno, ichan, idm):
         '''
         Returns input dm1, input dm2 and offset for the given iteration umber, channel and idt
@@ -642,7 +695,33 @@ class Fdmt(object):
         _ , id1, offset, id2, _, _, _ = chanconfig[idm]
 
         return (id1, id2, offset)
-    
+
+    def calc_lookup_table(self):
+        '''
+        Calculates the hardware lookup table for this FDMT
+        
+        Returns a lookup table that has type np.uint16 that is scaled
+        assumign the HW has fixed point with the poitn on the left
+
+        returned LUT has shape [NITER, NCHAN -1]
+
+        IN the hardware, LUT has the shape [NUREST, NITER, NCHAN - 1, NUVWIDE]
+        But you'll need to organise that yourself
+        
+        The pipeline let's you specifiy differnt LUTS for each of the NUVWIDE but you
+        can't do this in practice, as you ahve to use the same freqeucny for each NUREST
+        otherwise pain
+        
+        '''
+        lut = np.zeros((self.niter, self.n_f-1, 2), dtype=np.uint16)
+        for iterno in xrange(self.niter):
+            for cout in xrange(self.nchan_out_for_iter(iterno)):
+                id1_cff = self.calc_id1_cff(iterno, cout)
+                off_cff = self.calc_offset_cff(iterno, cout)
+                lut[iterno, cout, 0] = int(np.round(id1_cff))
+                lut[iterno, cout, 1] = int(np.round(off_cff))
+
+        return lut
 
 class OverlapAndSum(object):
     '''
