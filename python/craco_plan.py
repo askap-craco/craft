@@ -11,6 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
+import pickle 
 import craco
 import uvfits
 import warnings
@@ -605,6 +606,10 @@ class PipelinePlan(object):
         self.save_pad_lut(self.upper_idxs, self.upper_shifts, 'upper')
         self.save_pad_lut(self.lower_idxs, self.lower_shifts, 'lower')
 
+        filehandler = open("pipeline.obj", 'w') 
+        pickle.dump(self, filehandler)
+        filehandler.close()
+        
     def save_lut(self, data, lutname, header, fmt='%d'):
         filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
         logging.info('Saving {lutname} shape={d.shape} type={d.dtype} to {filename} header={header}'.format(lutname=lutname, d=data, filename=filename, header=header))
@@ -736,10 +741,10 @@ def _main():
 
         pylab.show()
 
-
-
-
-        
+    filename = "pipeline.obj"
+    filehandler = open(filename, 'r') 
+    object = pickle.load(filehandler)
+    print(object.values)
 
 if __name__ == '__main__':
     _main()

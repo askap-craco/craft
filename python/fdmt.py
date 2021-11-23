@@ -6,17 +6,17 @@ Copyright (C) CSIRO 2017
 """
 import numpy as np
 import logging
-from numba import njit, jit, prange
+#from numba import njit, jit, prange
 import math
 from IPython import embed
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def isquare(f):
     return 1./(f*f)
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def cff(f1_start, f1_end, f2_start, f2_end):
     '''
     returns (f1_start**-2 - f2_start**-2)/(f2_start**-2 - f2_end**-2)
@@ -27,7 +27,7 @@ def cff(f1_start, f1_end, f2_start, f2_end):
     ratio = num / den
     return ratio
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def calc_delta_t(f_min, f_max, f_start, f_end, max_dt):
     rf = cff(f_start, f_end, f_min, f_max)
     delta_tf = (float(max_dt) - 1.0)*rf
@@ -191,7 +191,7 @@ class Fdmt(object):
     def _calc_delta_t(self, f_start, f_end):
         return calc_delta_t(self.f_min, self.f_max, f_start, f_end, self.max_dt)
 
-    @jit(nopython=False, parallel=True)
+    #@jit(nopython=False, parallel=True)
     def _save_iteration(self, intnum):
         '''
         Appends the iteration description to self.hist_nf_data
