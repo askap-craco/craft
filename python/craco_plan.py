@@ -212,6 +212,8 @@ class FdmtPlan(object):
             run_fch1.append(run.fch1)
             fdmt_runs.append(full_cells)
             runs.append(run)
+            # create lookup table for each run
+            
             total_overlap = run.total_overlap
             #logging.debug('minchan=%d npossible=%d used=%d full=%d leftover=%d total_overlap=%d', minchan, len(possible_cells), len(used_cells), len(full_cells), len(leftover_cells), total_overlap)
             

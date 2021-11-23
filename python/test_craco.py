@@ -34,11 +34,11 @@ class TestCracoFdmtTranspose(TestCase):
         nuv = 1
         d = np.arange(1, nd*nt*nuv + 1, dtype=np.complex64).reshape(nuv, nd, nt)
         dr = craco.fdmt_transpose(d, ncu=ncu)
-        print 'Input', d.real.astype(int).flatten()
-        print 'Transposed', dr.real.astype(int).flatten()
+        print ('Input', d.real.astype(int).flatten())
+        print ('Transposed', dr.real.astype(int).flatten())
         expected = np.array([1, 2, 5, 6, 3, 4, 7, 8], dtype=int)
-        print 'expected', expected
-        print 'test', expected == dr.real.flatten().astype(int)
+        print ('expected', expected)
+        print ('test', expected == dr.real.flatten().astype(int))
         self.assertTrue(np.all(expected == dr.flatten().real.astype(int)))
 
     def test_tranpose_and_inverse_agree_ncu2(self):
@@ -50,7 +50,7 @@ class TestCracoFdmtTranspose(TestCase):
         dr = craco.fdmt_transpose(d, ncu=ncu)
         drr = craco.fdmt_transpose_inv(dr, ncu=ncu)
 
-        #print 'drr', drr.real.astype(int).flatten()
+        #print ('drr', drr.real.astype(int).flatten())
         self.assertTrue(np.all(d == drr))
 
     def test_tranpose_and_inverse_agree_ncu8(self):
