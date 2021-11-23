@@ -196,10 +196,8 @@ class FdmtPlan(object):
             logging.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
             minchan = min(uvcells_remaining, key=lambda uv:(uv.chan_start, uv.blid)).chan_start
             possible_cells = filter(lambda uv:calc_overlap(uv, minchan, ncin) > 0, uvcells_remaining)
-            #possible_cells_copy = []
 
-            #possible_cells_copy[:] = possible_cells
-            
+            # Do not know how to get a length of iterator in python3, comment it out here
             #logging.debug('Got %d possible cells', len(possible_cells))
 
             # sort as best we can so that it's stable - I.e. we get hte same answer every time
@@ -215,6 +213,7 @@ class FdmtPlan(object):
             # create lookup table for each run
             
             total_overlap = run.total_overlap
+            # Do not know how to get a length of iterator in python3, comment it out here
             #logging.debug('minchan=%d npossible=%d used=%d full=%d leftover=%d total_overlap=%d', minchan, len(possible_cells), len(used_cells), len(full_cells), len(leftover_cells), total_overlap)
             
             # Remove used cells
