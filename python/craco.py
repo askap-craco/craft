@@ -171,7 +171,8 @@ def runidxs(x):
 
     '''
     istart = 0
-    for i in xrange(1, len(x)):
+    #for i in xrange(1, len(x)):
+    for i in range(1, len(x)):
         if x[i] != x[istart]:
             yield (istart, i-1)
             istart = i
@@ -238,7 +239,8 @@ def time_blocks(vis, nt):
     t = 0
     d0 = vis[0]['DATE']
     first_blid = vis[0]['BASELINE']
-    for irow in xrange(nrows):
+    #for irow in xrange(nrows):
+    for irow in range(nrows):
         row = vis[irow]
         blid = row['BASELINE']
         #logging.(irow, blid, bl2ant(blid), row['DATE'], d0, t)

@@ -11,6 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
+import pickle 
 import craco
 import uvfits
 import warnings
@@ -27,8 +28,10 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=True):
 
     if plot:
         grid = np.zeros((Npix, Npix))
-    
-    for blid, bldata in baselines.iteritems():
+
+    # Updated for python 3
+    #for blid, bldata in baselines.iteritems():
+    for blid, bldata in baselines.items():
         #UU, VV WW are in seconds
         ulam = bldata['UU'] * freqs
         vlam = bldata['VV'] * freqs
@@ -193,7 +196,11 @@ class FdmtPlan(object):
             logging.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
             minchan = min(uvcells_remaining, key=lambda uv:(uv.chan_start, uv.blid)).chan_start
             possible_cells = filter(lambda uv:calc_overlap(uv, minchan, ncin) > 0, uvcells_remaining)
-            logging.debug('Got %d possible cells', len(possible_cells))
+            #possible_cells_copy = []
+
+            #possible_cells_copy[:] = possible_cells
+            
+            #logging.debug('Got %d possible cells', len(possible_cells))
 
             # sort as best we can so that it's stable - I.e. we get hte same answer every time
             best_cells = sorted(possible_cells, key=lambda uv:(calc_overlap(uv, minchan, ncin), uv.blid, uv.upper_idx), reverse=True)
@@ -206,7 +213,7 @@ class FdmtPlan(object):
             fdmt_runs.append(full_cells)
             runs.append(run)
             total_overlap = run.total_overlap
-            logging.debug('minchan=%d npossible=%d used=%d full=%d leftover=%d total_overlap=%d', minchan, len(possible_cells), len(used_cells), len(full_cells), len(leftover_cells), total_overlap)
+            #logging.debug('minchan=%d npossible=%d used=%d full=%d leftover=%d total_overlap=%d', minchan, len(possible_cells), len(used_cells), len(full_cells), len(leftover_cells), total_overlap)
             
             # Remove used cells
             uvcells_remaining = [cell for cell in uvcells_remaining if cell not in used_cells]
@@ -378,7 +385,8 @@ def calc_grid_luts(plan, upper=True):
     assert nwrites <= 4096*2, 'Not enough clocks to write data in! nwrites={}'.format(nwrites)
     logging.info('Need to write %d groups of %d register to pad function', nwrites, ngridreg)
 
-    for iwrite in xrange(nwrites):
+    #for iwrite in xrange(nwrites):
+    for iwrite in range(nwrites):
         # Add available cells
         n = min(ngridreg, ncoord - iwrite*ngridreg)
 
@@ -435,7 +443,8 @@ def get_pad_input_registers(instr, ssr=16):
     And returns the groups - only the uvpix part of the register
     '''
 
-    curr = [None for i in xrange(ssr)]
+    #curr = [None for i in xrange(ssr)]
+    curr = [None for i in range(ssr)]
     for i, instruction in enumerate(instr):
         if instruction.uvpix == (-1,-1):
             # add zero instruction. just pass
@@ -446,7 +455,8 @@ def get_pad_input_registers(instr, ssr=16):
             
         if instruction.shift:
             yield curr
-            curr = [None for i in xrange(ssr)]
+            #curr = [None for i in xrange(ssr)]
+            curr = [None for i in range(ssr)]
 
 def calc_pad_lut(plan, ssr=16):
     upper_inst = plan.upper_instructions
@@ -458,12 +468,20 @@ def calc_pad_lut(plan, ssr=16):
     lut = []
     upper_registers = []
     lower_registers = []
-    upper_registers.extend(upper_inputs.next())
-    upper_registers.extend(upper_inputs.next())
 
-    lower_registers.extend(lower_inputs.next())
-    lower_registers.extend(lower_inputs.next())
+    # Update for python 3
+    #upper_registers.extend(upper_inputs.next())
+    #upper_registers.extend(upper_inputs.next())
+    #
+    #lower_registers.extend(lower_inputs.next())
+    #lower_registers.extend(lower_inputs.next())
 
+    upper_registers.extend(next(upper_inputs))
+    upper_registers.extend(next(upper_inputs))
+                                            
+    lower_registers.extend(next(lower_inputs))
+    lower_registers.extend(next(lower_inputs))
+    
     upper_shifts = []
     lower_shifts = []
     upper_idxs = []
@@ -471,11 +489,14 @@ def calc_pad_lut(plan, ssr=16):
 
     npix = plan.npix
     
-    for v in xrange(npix):
-        for ublk in xrange(npix/ssr):
+    #for v in xrange(npix):
+    for v in range(npix):
+        #for ublk in xrange(npix/ssr):
+        for ublk in range(npix//ssr):
             lower_shift = False
             upper_shift = False
-            for iu in xrange(ssr):
+            #for iu in xrange(ssr):
+            for iu in range(ssr):
                 u = iu + ublk*ssr
                 uv = (u,v)
                 if u >= v: # upper hermetian
@@ -502,7 +523,9 @@ def calc_pad_lut(plan, ssr=16):
             if upper_shift:
                 upper_registers[:ssr] = upper_registers[ssr:]
                 try:
-                    upper_registers[ssr:] = upper_inputs.next()
+                    # update for python 3
+                    #upper_registers[ssr:] = upper_inputs.next()
+                    upper_registers[ssr:] = next(upper_inputs)
                 except StopIteration:
                     upper_finished = True
 
@@ -510,7 +533,9 @@ def calc_pad_lut(plan, ssr=16):
             if lower_shift:
                 lower_registers[:ssr] = lower_registers[ssr:]
                 try:
-                    lower_registers[ssr:] = lower_inputs.next()
+                    # Update for python 3
+                    #lower_registers[ssr:] = lower_inputs.next()
+                    lower_registers[ssr:] = next(lower_inputs)
                 except StopIteration:
                     lower_finished = True
 
@@ -563,6 +588,8 @@ class PipelinePlan(object):
         logging.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s',
                  nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos))
 
+        #print(baselines)
+        
         uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix)
         logging.info('Got Ncells=%d uvcells', len(uvcells))
         d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.int32)
@@ -605,6 +632,10 @@ class PipelinePlan(object):
         self.save_pad_lut(self.upper_idxs, self.upper_shifts, 'upper')
         self.save_pad_lut(self.lower_idxs, self.lower_shifts, 'lower')
 
+        filehandler = open("pipeline.obj", 'wb') 
+        pickle.dump(self, filehandler)
+        filehandler.close()
+        
     def save_lut(self, data, lutname, header, fmt='%d'):
         filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
         logging.info('Saving {lutname} shape={d.shape} type={d.dtype} to {filename} header={header}'.format(lutname=lutname, d=data, filename=filename, header=header))
@@ -736,10 +767,10 @@ def _main():
 
         pylab.show()
 
-
-
-
-        
+    filename = "pipeline.obj"
+    filehandler = open(filename, 'rb') 
+    object = pickle.load(filehandler)
+    print(object.values)
 
 if __name__ == '__main__':
     _main()
