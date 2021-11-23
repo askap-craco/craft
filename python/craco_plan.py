@@ -17,6 +17,7 @@ import uvfits
 import warnings
 import craco_kernels
 from craco import triangular_index, make_upper
+import fdmt
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -238,6 +239,20 @@ class FdmtPlan(object):
         self.run_chan_starts = run_chan_starts
         self.run_fch1 = run_fch1
         self.runs = runs
+
+        # create an FDMT object for each run so  we can use it to calculate the lookup tbales
+        #     def __init__(self, f_min, f_off, n_f, max_dt, n_t, history_dtype=None):
+
+        fdmts = [fdmt.Fdmt(fch1, self.pipeline_plan.foff, ncin, self.pipeline_plan.ndout, 1) for fch1 in self.run_fch1]
+        fdmt_luts = np.array([thefdmt.calc_lookup_table() for thefdmt in fdmts])
+        niter = int(np.log2(ncin))
+        assert 1<<niter == ncin
+        # final LUTs we need to copy teh same LUT for every NUVWIDE
+        assert fdmt_luts.shape == (nruns, niter, ncin-1, 2)
+        self.fdmt_lut = np.repeat(fdmt_luts[:,:,:,np.newaxis, :], nuvwide, axis=3)
+        expected_lut_shape = (nruns, niter, ncin-1, nuvwide, 2)
+        assert self.fdmt_lut.shape == expected_lut_shape, 'Incorrect shape for LUT=%s expected %s' % (self.fdmt_lut.shape, expected_lut_shape)
+        
 
         self.nruns = nruns
         self.nuvtotal = nuvtotal
