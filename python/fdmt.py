@@ -389,7 +389,7 @@ class Fdmt(object):
             for idt in xrange(len(chanconfig)):
                 config = chanconfig[idt]
                 # TODO: Make this config a little easier to grok than just a tuple
-                _, id1, offset, id2, _, _, _ = chanconfig
+                _, id1, offset, id2, _, _, _ = config
 
                 # TODO: for those interested in caching, id1 and id2 are
 
@@ -701,11 +701,15 @@ class Fdmt(object):
         Calculates the hardware lookup table for this FDMT
         
         Returns a lookup table that has type np.uint16 that is scaled
-        assumign the HW has fixed point with the poitn on the left
+        assumign the HW has fixed point with the poitn on the left.
 
-        returned LUT has shape [NITER, NCHAN -1]
 
-        IN the hardware, LUT has the shape [NUREST, NITER, NCHAN - 1, NUVWIDE]
+        returned LUT has shape [NCHAN-1, 2] with the 2 being the 2 different values
+        (ID1 and offset CFF values). NCHAN - 1 is the sum of the number of output 
+        channels per iteration: e.g. for NCHAN=32, the number of output channels
+        is 16 + 8 + 4 + 2 + 1 = 31 = NCHAN - 1
+
+        IN the hardware, LUT has the shape [NUREST,  NCHAN - 1, NUVWIDE]
         But you'll need to organise that yourself
         
         The pipeline let's you specifiy differnt LUTS for each of the NUVWIDE but you
@@ -713,13 +717,17 @@ class Fdmt(object):
         otherwise pain
         
         '''
-        lut = np.zeros((self.niter, self.n_f-1, 2), dtype=np.uint16)
+        lut = np.zeros((self.n_f-1, 2), dtype=np.uint16)
+        cout = 0
         for iterno in xrange(self.niter):
-            for cout in xrange(self.nchan_out_for_iter(iterno)):
+            for c in xrange(self.nchan_out_for_iter(iterno)):
                 id1_cff = self.calc_id1_cff(iterno, cout)
                 off_cff = self.calc_offset_cff(iterno, cout)
-                lut[iterno, cout, 0] = int(np.round(id1_cff))
-                lut[iterno, cout, 1] = int(np.round(off_cff))
+                lut[cout, 0] = int(np.round(id1_cff))
+                lut[cout, 1] = int(np.round(off_cff))
+                cout += 1
+
+        assert cout == self.n_f - 1, 'Didnt finish lookup table correctly'
 
         return lut
 
