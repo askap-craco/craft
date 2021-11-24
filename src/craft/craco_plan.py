@@ -629,7 +629,6 @@ class PipelinePlan(object):
         self.nbl = nbl
         self.fdmt_scale = self.values.fdmt_scale
         self.fft_scale  = self.values.fft_scale
-        self.pickle_fname = self.values.pickle_fname
         
         self.fft_ssr = 16 # number of FFT pixels per clock - "super sample rate"
         self.ngridreg = 16 # number of grid registers to do
@@ -648,13 +647,13 @@ class PipelinePlan(object):
         self.save_pad_lut(self.upper_idxs, self.upper_shifts, 'upper')
         self.save_pad_lut(self.lower_idxs, self.lower_shifts, 'lower')
 
-    def dump_plan(self):
-        filehandler = open(self.pickle_fname, 'wb') 
+    def dump_plan(self, pickle_fname):
+        filehandler = open(pickle_fname, 'wb') 
         pickle.dump(self, filehandler)
         filehandler.close()
 
-    def load_plan(self):        
-        filehandler = open(self.pickle_fname, 'rb')
+    def load_plan(pickle_fname):        
+        filehandler = open(pickle_fname, 'rb')
         plan = pickle.load(filehandler)
         filehandler.close()
         
@@ -792,8 +791,8 @@ def _main():
 
         pylab.show()
 
-    plan.dump_plan()
-    print(plan.load_plan())
+    plan.dump_plan(values.pickle_fname)
+    print(plan.load_plan(values.pickle_fname))
     
 if __name__ == '__main__':
     _main()
