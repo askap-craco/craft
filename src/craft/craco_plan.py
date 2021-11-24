@@ -12,12 +12,12 @@ import os
 import sys
 import logging
 import pickle 
-import craco
-import uvfits
 import warnings
-import craco_kernels
-from craco import triangular_index, make_upper
-import fdmt
+
+from craft import uvfits
+from craft import craco_kernels
+from craft import craco
+from craft import fdmt
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -365,10 +365,10 @@ def calc_grid_luts(plan, upper=True):
     # Calculate upper or lower pixel positions but always sort in the same raster order left-to-right, top-to-bottom
     if upper:
         uvpix_list = [cell.uvpix_upper for cell in uvcells]
-        sorter = lambda c: triangular_index(c[0],c[1], plan.npix)
+        sorter = lambda c: craco.triangular_index(c[0],c[1], plan.npix)
     else:
         uvpix_list = [cell.uvpix_lower for cell in uvcells if cell.uvpix[0] != cell.uvpix[1]] # don't include diagonal
-        sorter = lambda c: triangular_index(c[1],c[0], plan.npix, raster='yx') # triangular_index requires upper_triangular coordinates
+        sorter = lambda c: craco.triangular_index(c[1],c[0], plan.npix, raster='yx') # triangular_index requires upper_triangular coordinates
         
     unique_uvcoords = set(uvpix_list)
     # sorts in raster order
@@ -411,7 +411,7 @@ def calc_grid_luts(plan, upper=True):
         for islot, slot_uv_coord in enumerate(slot_uv_coords):
             logging.debug('Considering islot=%d slot=%s', islot, slot_uv_coord)
             # The FDMT has all its data in the upper hermetian - so we always use upper hermetian coordinates
-            upper_slot_uv_coord = make_upper(slot_uv_coord)
+            upper_slot_uv_coord = craco.make_upper(slot_uv_coord)
              # Find irun and icell 
             for cell_coord in fplan.find_uv(upper_slot_uv_coord):
                 # cell_coord is the location in the FDMT output buffer
