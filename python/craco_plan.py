@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-import pickle 
+import dill 
 import craco
 import uvfits
 import warnings
@@ -647,8 +647,8 @@ class PipelinePlan(object):
         self.save_pad_lut(self.upper_idxs, self.upper_shifts, 'upper')
         self.save_pad_lut(self.lower_idxs, self.lower_shifts, 'lower')
 
-        filehandler = open("pipeline.obj", 'wb') 
-        pickle.dump(self, filehandler)
+        filehandler = open("pipeline.pickle", 'wb') 
+        dill.dump(self, filehandler)
         filehandler.close()
         
     def save_lut(self, data, lutname, header, fmt='%d'):
@@ -782,9 +782,9 @@ def _main():
 
         pylab.show()
 
-    filename = "pipeline.obj"
+    filename = "pipeline.pickle"
     filehandler = open(filename, 'rb') 
-    object = pickle.load(filehandler)
+    object = dill.load(filehandler)
     print(object.values)
 
 if __name__ == '__main__':
