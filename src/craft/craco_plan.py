@@ -21,6 +21,18 @@ from craft import fdmt
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+def dump_plan(plan, pickle_fname):
+    filehandler = open(pickle_fname, 'wb') 
+    pickle.dump(plan, filehandler)
+    filehandler.close()
+
+def load_plan(pickle_fname):        
+    filehandler = open(pickle_fname, 'rb')
+    plan = pickle.load(filehandler)
+    filehandler.close()
+    
+    return plan
+
 
 def get_uvcells(baselines, uvcell, freqs, Npix, plot=True):
     uvcells = []
@@ -646,18 +658,6 @@ class PipelinePlan(object):
         self.upper_idxs, self.upper_shifts, self.lower_idxs, self.lower_shifts = calc_pad_lut(self, self.fft_ssr)
         self.save_pad_lut(self.upper_idxs, self.upper_shifts, 'upper')
         self.save_pad_lut(self.lower_idxs, self.lower_shifts, 'lower')
-
-    def dump_plan(self, pickle_fname):
-        filehandler = open(pickle_fname, 'wb') 
-        pickle.dump(self, filehandler)
-        filehandler.close()
-
-    def load_plan(pickle_fname):        
-        filehandler = open(pickle_fname, 'rb')
-        plan = pickle.load(filehandler)
-        filehandler.close()
-        
-        return plan
         
     def save_lut(self, data, lutname, header, fmt='%d'):
         filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
@@ -791,8 +791,8 @@ def _main():
 
         pylab.show()
 
-    plan.dump_plan(values.pickle_fname)
-    print(plan.load_plan(values.pickle_fname))
+    dump_plan(plan, values.pickle_fname)
+    print(load_plan(values.pickle_fname))
     
 if __name__ == '__main__':
     _main()
