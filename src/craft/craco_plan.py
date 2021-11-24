@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-import dill 
+import pickle 
 import craco
 import uvfits
 import warnings
@@ -570,7 +570,7 @@ def calc_pad_lut(plan, ssr=16):
 class PipelinePlan(object):
     def __init__(self, f, values):
         self.values = values
-        logging.info('making Plan values=%s', values)
+        logging.info('making Plan values=%s', self.values)
 
         umax, vmax = f.get_max_uv()
         lres, mres = 1./umax, 1./vmax
@@ -581,13 +581,13 @@ class PipelinePlan(object):
         # Cant handle inverted bands - this is assumed all over the code. It's boring
         assert freqs.min() == freqs[0]
         assert freqs.max() == freqs[-1]
-        Npix = values.npix
+        Npix = self.values.npix
 
-        if values.cell is not None:
-            lcell, mcell = map(craco.arcsec2rad, values.cell.split(','))
+        if self.values.cell is not None:
+            lcell, mcell = map(craco.arcsec2rad, self.values.cell.split(','))
             los, mos = lres/lcell, mres/mcell
         else:
-            los, mos = map(float, values.os.split(','))
+            los, mos = map(float, self.values.os.split(','))
             lcell = lres/los
             mcell = mres/mos
             
@@ -608,35 +608,36 @@ class PipelinePlan(object):
         uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix)
         logging.info('Got Ncells=%d uvcells', len(uvcells))
         d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.int32)
-        np.savetxt(values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
+        np.savetxt(self.values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
 
         self.uvcells = uvcells
-        self.nd = values.ndm
-        self.nt = values.nt
+        self.nd = self.values.ndm
+        self.nt = self.values.nt
         self.freqs = freqs
         self.npix = Npix
-        self.nbox = values.nbox
-        self.boxcar_weight = values.boxcar_weight
-        self.nuvwide = values.nuvwide
-        self.nuvmax = values.nuvmax
+        self.nbox = self.values.nbox
+        self.boxcar_weight = self.values.boxcar_weight
+        self.nuvwide = self.values.nuvwide
+        self.nuvmax  = self.values.nuvmax
         assert self.nuvmax % self.nuvwide == 0
         self.nuvrest = self.nuvmax // self.nuvwide
-        self.ncin = values.ncin
-        self.ndout = values.ndout
+        self.ncin  = self.values.ncin
+        self.ndout = self.values.ndout
         self.foff = foff
         self.dtype = np.complex64 # working data type
-        self.threshold = values.threshold
+        self.threshold = self.values.threshold
         self.nbl = nbl
         self.fdmt_scale = self.values.fdmt_scale
-        self.fft_scale = self.values.fft_scale
+        self.fft_scale  = self.values.fft_scale
+        self.pickle_fname = self.values.pickle_fname
+        
         self.fft_ssr = 16 # number of FFT pixels per clock - "super sample rate"
         self.ngridreg = 16 # number of grid registers to do
         assert self.threshold >= 0, 'Invalid threshold'
         self.fdmt_plan = FdmtPlan(uvcells, self)
         self.save_fdmt_plan_lut()
-
         
-        if self.fdmt_plan.nuvtotal >= values.nuvmax:
+        if self.fdmt_plan.nuvtotal >= self.values.nuvmax:
             raise ValueError("Too many UVCELLS")
 
         self.upper_instructions = calc_grid_luts(self, True)
@@ -647,9 +648,17 @@ class PipelinePlan(object):
         self.save_pad_lut(self.upper_idxs, self.upper_shifts, 'upper')
         self.save_pad_lut(self.lower_idxs, self.lower_shifts, 'lower')
 
-        filehandler = open("pipeline.pickle", 'wb') 
-        dill.dump(self, filehandler)
+    def dump_plan(self):
+        filehandler = open(self.pickle_fname, 'wb') 
+        pickle.dump(self, filehandler)
         filehandler.close()
+
+    def load_plan(self):        
+        filehandler = open(self.pickle_fname, 'rb')
+        plan = pickle.load(filehandler)
+        filehandler.close()
+        
+        return plan
         
     def save_lut(self, data, lutname, header, fmt='%d'):
         filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
@@ -736,6 +745,7 @@ def add_arguments(parser):
     Add planning arguments
     '''
     parser.add_argument('--uv', help='Load antenna UVW coordinates from this UV file')
+    parser.add_argument('--pickle_fname', default='pipeline.pickle', help='File to dump and load pickle file')
     parser.add_argument('--npix', help='Number of pixels in image', type=int, default=256)
     parser.add_argument('--os', help='Number of pixels per beam', default='2.1,2.1')
     parser.add_argument('--cell', help='Image cell size (arcsec). Overrides --os')
@@ -782,10 +792,8 @@ def _main():
 
         pylab.show()
 
-    filename = "pipeline.pickle"
-    filehandler = open(filename, 'rb') 
-    object = dill.load(filehandler)
-    print(object.values)
-
+    plan.dump_plan()
+    print(plan.load_plan())
+    
 if __name__ == '__main__':
     _main()
