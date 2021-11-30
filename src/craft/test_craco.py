@@ -79,7 +79,8 @@ class TestCracoFdmtTranspose(TestCase):
 
 
 class TestBaseline2Uv(TestCase):
-    def test_baseline2uv_works(self):
+
+    def setUp(self):
         from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
         parser = ArgumentParser(description='Plans a CRACO scan', formatter_class=ArgumentDefaultsHelpFormatter)
         craco_plan.add_arguments(parser)
@@ -93,13 +94,36 @@ class TestBaseline2Uv(TestCase):
         uv_shape = (plan.nuvrest, plan.nt, plan.ncin, plan.nuvwide)
         input_data = next(f.time_blocks(plan.nt)) # get first block of data
         print(f'uv_shape={uv_shape}')
-        dout = np.zeros(uv_shape, dtype=np.complex64)
+        self.input_data = input_data
+        self.plan = plan
+        self.uv_shape = uv_shape
+        f.close()
+
+        
+    def test_baseline2uv_works(self):
+        dout = np.zeros(self.uv_shape, dtype=np.complex64)
         start = time.time()
-        craco.baseline2uv(plan, input_data, dout)
+        craco.baseline2uv(self.plan, self.input_data, dout)
         end = time.time()
         duration = end - start
         print(f'Baseline2uv took {duration} seconds')
 
+    def test_baseline2uv_and_fast_version_agree(self):
+        dout = np.zeros(self.uv_shape, dtype=np.complex64)
+        craco.baseline2uv(self.plan, self.input_data, dout)
+        fast_version = craco.FastBaseline2Uv(self.plan)
+        input_flat = craco.bl2array(self.input_data)
+        dout2 = np.zeros_like(dout)
+        fast_version(input_flat, dout2)
+
+        start = time.time()
+        fast_version(input_flat, dout2)
+        end = time.time()
+        duration = end - start
+        print(f'fast version of Baseline2uv took {duration} seconds')
+        
+        self.assertTrue(np.all(dout == dout2))
+        
 
 def _main():
     unittest_main()
@@ -107,3 +131,4 @@ def _main():
 
 if __name__ == '__main__':
     _main()
+

@@ -588,6 +588,7 @@ class PipelinePlan(object):
         umax, vmax = f.get_max_uv()
         lres, mres = 1./umax, 1./vmax
         baselines = f.baselines
+        self.baselines = baselines
         nbl = len(baselines)
         freqs = f.channel_frequencies
 

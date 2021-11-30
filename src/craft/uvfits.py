@@ -87,6 +87,9 @@ class UvFits(object):
         '''
         return craco.time_blocks(self.vis, nt)
 
+    def close(self):
+        return self.hdulist.close()
+
 def open(*args, **kwargs):
     logging.info('Opening file %s', args[0])
     return UvFits(fits.open(*args, **kwargs))
