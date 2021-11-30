@@ -12,7 +12,7 @@ import os
 import sys
 import logging
 from astropy.io import fits
-from craft import craco
+import craco
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -41,6 +41,9 @@ class UvFits(object):
     def baselines(self):
         '''
         Returns all data from first integration
+        
+        :returns: dictionary, keyed by baseline ID of all basesline data with a timestamp
+        equal to the first timestamp in the file
         '''
             
         d0 = self.start_date

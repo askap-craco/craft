@@ -12,8 +12,11 @@ except ImportError:
     from mock import Mock, MagicMock
 
 import craco
+import craco_plan
 import numpy as np
+import uvfits
 from pylab import *
+
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
     
@@ -74,6 +77,28 @@ class TestCracoFdmtTranspose(TestCase):
         drr = craco.fdmt_transpose_inv(dr.flatten(), ncu=ncu, nt=nt, ndm=nd, nuv=nuv)
         self.assertTrue(np.all(d == drr))
 
+
+class TestBaseline2Uv(TestCase):
+    def test_baseline2uv_works(self):
+        from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+        parser = ArgumentParser(description='Plans a CRACO scan', formatter_class=ArgumentDefaultsHelpFormatter)
+        craco_plan.add_arguments(parser)
+        values = parser.parse_args()
+        s = '/data/craco/ban115/test_data/frb_d0_t0_a1_sninf_lm100200/frb_d0_t0_a1_sninf_lm100200.fits'
+        values.uv = s
+        logging.info('Loading UV coordinates from file %s ', values.uv)
+        f = uvfits.open(values.uv)
+        plan = craco_plan.PipelinePlan(f, values)
+        baseline_shape = (plan.nt, plan.nbl, plan.nf)
+        uv_shape = (plan.nuvrest, plan.nt, plan.ncin, plan.nuvwide)
+        input_data = next(f.time_blocks(plan.nt)) # get first block of data
+        print(f'uv_shape={uv_shape}')
+        dout = np.zeros(uv_shape, dtype=np.complex64)
+        start = time.time()
+        craco.baseline2uv(plan, input_data, dout)
+        end = time.time()
+        duration = end - start
+        print(f'Baseline2uv took {duration} seconds')
 
 
 def _main():

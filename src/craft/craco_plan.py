@@ -14,10 +14,10 @@ import logging
 import pickle 
 import warnings
 
-from craft import uvfits
-from craft import craco_kernels
-from craft import craco
-from craft import fdmt
+import uvfits
+import craco_kernels
+import craco
+import fdmt
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -34,7 +34,7 @@ def load_plan(pickle_fname):
     return plan
 
 
-def get_uvcells(baselines, uvcell, freqs, Npix, plot=True):
+def get_uvcells(baselines, uvcell, freqs, Npix, plot=False):
     uvcells = []
 
     ucell, vcell = uvcell
@@ -65,7 +65,8 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=True):
             assert uvpos[istart] == uvpos[iend]
             b = craco.BaselineCell(blid, uvpix, istart, iend, freqs[istart:iend+1], Npix)
             uvcells.append(b)
-            grid[uvpix[1],uvpix[0]] += len(b.freqs)
+            if plot:
+                grid[uvpix[1],uvpix[0]] += len(b.freqs)
 
 
     if plot:
@@ -617,7 +618,7 @@ class PipelinePlan(object):
 
         #print(baselines)
         
-        uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix)
+        uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix, values.show)
         logging.info('Got Ncells=%d uvcells', len(uvcells))
         d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.int32)
         np.savetxt(self.values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
@@ -759,16 +760,15 @@ def add_arguments(parser):
     parser.add_argument('--threshold', type=float, help='Threshold for candidate grouper', default=3)
     parser.add_argument('--fdmt_scale', type=float, help='Scale FDMT output by this amount', default=1.0)
     parser.add_argument('--fft_scale', type=float, help='Scale FFT output by this amount. If both scales are 1, the output equals the value of frb_amp for crauvfrbsim.py', default=10.0)
-    parser.add_argument('--show-image', action='store_true', help='Show image plots')
-    parser.add_argument('--show-fdmt', action='store_true', help='Show FDMT plots')
+    parser.add_argument('--show-image', action='store_true', help='Show image plots', default=False)
+    parser.add_argument('--show-fdmt', action='store_true', help='Show FDMT plots', default=False)
     parser.add_argument('--save', action='store_true',  help='Save data as .npy for input, FDMT and image pipeline')
-
+    parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
+    parser.add_argument('-s', '--show', action='store_true', help='Show plots')
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Plans a CRACO scan', formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-s', '--show', action='store_true', help='Show plots')
     add_arguments(parser)
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
