@@ -616,8 +616,6 @@ class PipelinePlan(object):
         
         logging.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s',
                  nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos))
-
-        #print(baselines)
         
         uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix, values.show)
         logging.info('Got Ncells=%d uvcells', len(uvcells))
