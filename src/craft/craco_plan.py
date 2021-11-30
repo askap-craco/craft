@@ -281,7 +281,7 @@ class FdmtPlan(object):
             self.zero_cell = (len(self.runs), 0)
 
         assert self.zero_cell != None
-        assert self.zero_cell[0] < self.pipeline_plan.nuvrest, 'Not enough room for FDMT zero cell'
+        assert self.zero_cell[0] < self.pipeline_plan.nuvrest_max, 'Not enough room for FDMT zero cell'
         assert self.zero_cell[1] < nuvwide
 
         assert self.zero_cell[0] < self.nruns
@@ -632,7 +632,7 @@ class PipelinePlan(object):
         self.nuvwide = self.values.nuvwide
         self.nuvmax  = self.values.nuvmax
         assert self.nuvmax % self.nuvwide == 0
-        #self.nuvrest = self.nuvmax // self.nuvwide
+        self.nuvrest_max = self.nuvmax // self.nuvwide
         self.ncin  = self.values.ncin
         self.ndout = self.values.ndout
         self.foff = foff
