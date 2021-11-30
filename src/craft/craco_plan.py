@@ -632,7 +632,7 @@ class PipelinePlan(object):
         self.nuvwide = self.values.nuvwide
         self.nuvmax  = self.values.nuvmax
         assert self.nuvmax % self.nuvwide == 0
-        self.nuvrest = self.nuvmax // self.nuvwide
+        #self.nuvrest = self.nuvmax // self.nuvwide
         self.ncin  = self.values.ncin
         self.ndout = self.values.ndout
         self.foff = foff
@@ -651,6 +651,8 @@ class PipelinePlan(object):
         if self.fdmt_plan.nuvtotal >= self.values.nuvmax:
             raise ValueError("Too many UVCELLS")
 
+        self.nuvrest = self.fdmt_plan.nuvtotal // self.nuvwide
+        
         self.upper_instructions = calc_grid_luts(self, True)
         self.lower_instructions = calc_grid_luts(self, False)
         self.save_grid_instructions(self.upper_instructions, 'upper')
