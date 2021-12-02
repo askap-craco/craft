@@ -14,10 +14,10 @@ import logging
 import pickle 
 import warnings
 
-import uvfits
-import craco_kernels
-import craco
-import fdmt
+from . import uvfits
+from . import craco_kernels
+from . import craco
+from . import fdmt
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 

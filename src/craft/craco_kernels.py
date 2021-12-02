@@ -12,11 +12,11 @@ import os
 import sys
 import logging
 
-import fdmt
-import craco
-import boxcar
-import uvfits
-import craco_plan
+from . import fdmt
+from . import craco
+from . import boxcar
+from . import uvfits
+from . import craco_plan
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 

@@ -12,7 +12,7 @@ import os
 import sys
 import logging
 from astropy.io import fits
-import craco
+from . import craco
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
