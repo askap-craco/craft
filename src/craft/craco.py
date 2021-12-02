@@ -564,7 +564,7 @@ class FastBaseline2Uv:
         Numba-compiled version of baseline2uv assuming data has been smashed with bl2array  pre-compiled indexes
 
         :plan:PipelinePLan to operate on
-        :do_conjugation: If True, conjugate lower UV data
+        :conjugate_lower_uvs: If True, conjugate lower UV data
         '''
         self.plan = plan
         # initialise with -1 - if those values are -1 in the execution code, then we quite the loop
