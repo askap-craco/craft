@@ -121,9 +121,30 @@ class TestBaseline2Uv(TestCase):
         end = time.time()
         duration = end - start
         print(f'fast version of Baseline2uv took {duration} seconds')
-        
         self.assertTrue(np.all(dout == dout2))
-        
+
+    def test_conjugate_lower(self):
+        dout = np.zeros(self.uv_shape, dtype=np.complex64)
+        craco.baseline2uv(self.plan, self.input_data, dout)
+        fast_version = craco.FastBaseline2Uv(self.plan, conjugate_lower_uvs=True)
+        input_flat = craco.bl2array(self.input_data)
+        dout2 = np.zeros_like(dout)
+        fast_version(input_flat, dout2)
+        start = time.time()
+        fast_version(input_flat, dout2)
+        end = time.time()
+        duration = end - start
+        plan = self.plan
+        print(f'fast version with conjugation Baseline2uv took {duration} seconds')
+        for irun, run in enumerate(plan.fdmt_plan.runs):
+            for iuv, uv in enumerate(run.cells):
+                if uv.is_lower:
+                    self.assertTrue(np.all(dout[irun,:,:,iuv] == np.conj(dout2[irun,:,:,iuv])))
+                else:
+                    self.assertTrue(np.all(dout[irun,:,:,iuv] == dout2[irun,:,:,iuv]))
+
+
+
 
 def _main():
     unittest_main()

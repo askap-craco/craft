@@ -652,6 +652,12 @@ class PipelinePlan(object):
             raise ValueError("Too many UVCELLS")
 
         self.nuvrest = self.fdmt_plan.nuvtotal // self.nuvwide
+        self.uv_shape = (self.nuvrest, self.nt, self.ncin, self.nuvwide)
+        self.baseline_shape = (self.nbl, self.nf, self.nt)
+
+        # List of basleine IDs sorted
+        # THis is the ordering of baselines once you've done bl2array
+        self.baseline_order = sorted(self.baselines.keys())
         
         self.upper_instructions = calc_grid_luts(self, True)
         self.lower_instructions = calc_grid_luts(self, False)
@@ -708,9 +714,18 @@ class PipelinePlan(object):
         d = np.array(shifts, dtype=np.int32)
         header = 'doshift'
         self.save_lut(d, 'doshift.'+name, header)
+
+    def get_uv(self, blid):
+        '''
+        Returns the UV coordinates (in ns) of the given baseline ID
         
-
-
+        :blid: Baseline ID
+        :returns: (u, v) tuple in ns
+        '''
+        bldata = self.baselines(blid)
+        return (bldata['UU'], bldata['VV'])
+        
+        
     @property
     def nf(self):
         '''Returns number of frequency channels'''

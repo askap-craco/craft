@@ -549,23 +549,27 @@ def baseline2uv_numba(lut, baseline_data, uv_data):
     nrun, nuvwide, _ = lut.shape
     for irun in prange(nrun):
         for iuv in prange(nuvwide):
-            blidx, cstart, cend, out_cstart, out_cend = lut[irun, iuv, :]
+            blidx, cstart, cend, out_cstart, out_cend, do_conj = lut[irun, iuv, :]
             if blidx == -1:
                 break
-            
-            uv_data[irun, :, out_cstart:out_cend, iuv] = baseline_data[blidx, cstart:cend, :].T
+
+            if do_conj:
+                uv_data[irun, :, out_cstart:out_cend, iuv] = np.conj(baseline_data[blidx, cstart:cend, :].T)
+            else:
+                uv_data[irun, :, out_cstart:out_cend, iuv] = baseline_data[blidx, cstart:cend, :].T
 
 class FastBaseline2Uv:
-    def __init__(self, plan):
+    def __init__(self, plan, conjugate_lower_uvs=False):
         '''
         Numba-compiled version of baseline2uv assuming data has been smashed with bl2array  pre-compiled indexes
+
+        :plan:PipelinePLan to operate on
+        :do_conjugation: If True, conjugate lower UV data
         '''
         self.plan = plan
         # initialise with -1 - if those values are -1 in the execution code, then we quite the loop
-        self.lut = np.ones((len(plan.fdmt_plan.runs), plan.nuvwide, 5), np.int16)*-1
+        self.lut = np.ones((len(plan.fdmt_plan.runs), plan.nuvwide, 6), np.int16)*-1
         blids = sorted(plan.baselines.keys())
-        self.baseline_shape = (plan.nbl, plan.nf, plan.nt)
-        self.uv_shape = (plan.nuvrest, plan.nt, plan.ncin, plan.nuvwide)
 
         for irun, run in enumerate(plan.fdmt_plan.runs):
             for iuv, uv in enumerate(run.cells):
@@ -586,21 +590,23 @@ class FastBaseline2Uv:
                 #bldata = plan.baselines[blid]
                 #assert bldata.shape == (plan.nf, plan.nt)
                 #uv_data[urest, :, out_cstart:out_cend, u] = bldata[cstart:cend, :].T
-                self.lut[irun, iuv, :] = [blidx, cstart, cend, out_cstart, out_cend]
+                do_conj = int(conjugate_lower_uvs and uv.is_lower)
+                self.lut[irun, iuv, :] = [blidx, cstart, cend, out_cstart, out_cend, do_conj]
 
     def __call__(self, baseline_data, uv_data):
         '''
         Convert baselines to UV data
 
-        :baseline_data: basline data sorted into an array: see bl2array. Shape=(nbl, nc, nt)
+        :baseline_data: baseline data sorted into an array: see bl2array. Shape=(nbl, nc, nt)
         :uv_data: output uv data shape  (nurest, nt, ncin, nuvwide)
         '''
 
-        assert uv_data.shape == self.uv_shape, f'Invalid uv_data shape. Was {uv_data.shape} expected {self.uv_shape}'
-        assert baseline_data.shape == self.baseline_shape, f'Invalid basline_data shape. Was {baseline_data.shape} expected {self.baseline_shape}'
+        assert uv_data.shape == self.plan.uv_shape, f'Invalid uv_data shape. Was {uv_data.shape} expected {self.uv_shape}'
+        assert baseline_data.shape == self.plan.baseline_shape, f'Invalid basline_data shape. Was {baseline_data.shape} expected {self.baseline_shape}'
 
         baseline2uv_numba(self.lut, baseline_data, uv_data)
-            
+
+
     
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
