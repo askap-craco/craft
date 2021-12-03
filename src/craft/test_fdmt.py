@@ -56,8 +56,9 @@ class TestFdmtLookupTableGeneration(TestCase):
                 print('Iterno', iterno, 'c', c, 'id1_cff', id1_cff, 'offset_cff', off_cff, int(np.round(id1_cff*(1<<16))), int(np.round(off_cff*(1<<16))))
                 for idm in range(len(chanconfig)):
                     _, id1, offset, id2, _, _, _ = chanconfig[idm]
-                    self.assertEquals(id1, int(np.round(idm*id1_cff)))
-                    self.assertEquals(offset, int(np.round(idm*off_cff)))
+                    self.assertEqual(id1, int(np.round(idm*id1_cff)))
+                    self.assertEqual(offset, int(np.round(idm*off_cff)))
+
 
     def test_cal_lookup_table(self):
         # just checks it works fo rnow
@@ -302,7 +303,7 @@ class TestFdmtWithHistoryHits(TestCase):
         oneout = self.thefdmt.initialise(ones)
         nzero = np.sum(oneout == 0)
         # All times up to nt should be >= 1 for all DMs
-        plot = True
+        plot = False
         if nzero > 0:
             fig, axs = subplots(1,2)
             axs[0].imshow(oneout[0,:,:], aspect='auto', origin='lower')
@@ -375,15 +376,14 @@ class TestFdmtHighDm(TestCase):
         ones = np.ones((self.nf, self.nt))
         oneout = self.thefdmt(ones)
         print(oneout.shape)
-
+        
         # Look at the very first time sample
         t1 = oneout[:, 1]
-        plot = True
+        plot = False
 
         if plot:
             fig, axs = subplots(1,2)
             idm = self.nd - 1
-            idm = 2
             lastdm_tf = np.zeros((self.nf, self.nd))
             lastdm_tf = self.thefdmt.add_frb_track(idm, lastdm_tf)
             freqs = np.arange(self.nf)*self.df + self.fmin
@@ -401,7 +401,7 @@ class TestFdmtHighDm(TestCase):
             show()
 
             
-        self.assertEquals(t1[-1], 3.0) #, 'T=1 should have at least 1 smeared channel')
+        self.assertEqual(t1[-1], 3.0) #, 'T=1 should have at least 1 smeared channel'# KB did this ever pass? I'm not sure.
 
 
         

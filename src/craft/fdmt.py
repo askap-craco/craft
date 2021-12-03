@@ -725,8 +725,8 @@ class Fdmt(object):
             for c in range(self.nchan_out_for_iter(iterno)):
                 id1_cff = self.calc_id1_cff(iterno, cout)
                 off_cff = self.calc_offset_cff(iterno, cout)
-                lut[cout, 0] = int(np.round(id1_cff))
-                lut[cout, 1] = int(np.round(off_cff))
+                lut[cout, 0] = int(np.round(id1_cff*(1<<16)))
+                lut[cout, 1] = int(np.round(off_cff*(1<<16)))
                 cout += 1
 
         assert cout == self.n_f - 1, 'Didnt finish lookup table correctly'
