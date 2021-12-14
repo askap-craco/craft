@@ -625,6 +625,8 @@ class PipelinePlan(object):
         self.uvcells = uvcells
         self.nd = self.values.ndm
         self.nt = self.values.nt
+        self.ncu = 4 # hard coded
+        self.nchunk_time = self.values.nt // (2*self.ncu)
         self.freqs = freqs
         self.npix = Npix
         self.nbox = self.values.nbox
