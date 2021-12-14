@@ -2,6 +2,7 @@ matplotlib
 astropy
 IPython
 dill
+numba
 #alabaster==0.7.12
 #anyio==3.4.0
 #argon2-cffi==21.1.0
