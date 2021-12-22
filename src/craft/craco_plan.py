@@ -12,17 +12,29 @@ import os
 import sys
 import logging
 import pickle 
-import craco
-import uvfits
 import warnings
-import craco_kernels
-from craco import triangular_index, make_upper
-import fdmt
+
+from . import uvfits
+from . import craco_kernels
+from . import craco
+from . import fdmt
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+def dump_plan(plan, pickle_fname):
+    filehandler = open(pickle_fname, 'wb') 
+    pickle.dump(plan, filehandler)
+    filehandler.close()
 
-def get_uvcells(baselines, uvcell, freqs, Npix, plot=True):
+def load_plan(pickle_fname):        
+    filehandler = open(pickle_fname, 'rb')
+    plan = pickle.load(filehandler)
+    filehandler.close()
+    
+    return plan
+
+
+def get_uvcells(baselines, uvcell, freqs, Npix, plot=False):
     uvcells = []
 
     ucell, vcell = uvcell
@@ -53,7 +65,8 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=True):
             assert uvpos[istart] == uvpos[iend]
             b = craco.BaselineCell(blid, uvpix, istart, iend, freqs[istart:iend+1], Npix)
             uvcells.append(b)
-            grid[uvpix[1],uvpix[0]] += len(b.freqs)
+            if plot:
+                grid[uvpix[1],uvpix[0]] += len(b.freqs)
 
 
     if plot:
@@ -268,7 +281,7 @@ class FdmtPlan(object):
             self.zero_cell = (len(self.runs), 0)
 
         assert self.zero_cell != None
-        assert self.zero_cell[0] < self.pipeline_plan.nuvrest, 'Not enough room for FDMT zero cell'
+        assert self.zero_cell[0] < self.pipeline_plan.nuvrest_max, 'Not enough room for FDMT zero cell'
         assert self.zero_cell[1] < nuvwide
 
         assert self.zero_cell[0] < self.nruns
@@ -365,10 +378,10 @@ def calc_grid_luts(plan, upper=True):
     # Calculate upper or lower pixel positions but always sort in the same raster order left-to-right, top-to-bottom
     if upper:
         uvpix_list = [cell.uvpix_upper for cell in uvcells]
-        sorter = lambda c: triangular_index(c[0],c[1], plan.npix)
+        sorter = lambda c: craco.triangular_index(c[0],c[1], plan.npix)
     else:
         uvpix_list = [cell.uvpix_lower for cell in uvcells if cell.uvpix[0] != cell.uvpix[1]] # don't include diagonal
-        sorter = lambda c: triangular_index(c[1],c[0], plan.npix, raster='yx') # triangular_index requires upper_triangular coordinates
+        sorter = lambda c: craco.triangular_index(c[1],c[0], plan.npix, raster='yx') # triangular_index requires upper_triangular coordinates
         
     unique_uvcoords = set(uvpix_list)
     # sorts in raster order
@@ -411,7 +424,7 @@ def calc_grid_luts(plan, upper=True):
         for islot, slot_uv_coord in enumerate(slot_uv_coords):
             logging.debug('Considering islot=%d slot=%s', islot, slot_uv_coord)
             # The FDMT has all its data in the upper hermetian - so we always use upper hermetian coordinates
-            upper_slot_uv_coord = make_upper(slot_uv_coord)
+            upper_slot_uv_coord = craco.make_upper(slot_uv_coord)
              # Find irun and icell 
             for cell_coord in fplan.find_uv(upper_slot_uv_coord):
                 # cell_coord is the location in the FDMT output buffer
@@ -570,24 +583,25 @@ def calc_pad_lut(plan, ssr=16):
 class PipelinePlan(object):
     def __init__(self, f, values):
         self.values = values
-        logging.info('making Plan values=%s', values)
+        logging.info('making Plan values=%s', self.values)
 
         umax, vmax = f.get_max_uv()
         lres, mres = 1./umax, 1./vmax
         baselines = f.baselines
+        self.baselines = baselines
         nbl = len(baselines)
         freqs = f.channel_frequencies
 
         # Cant handle inverted bands - this is assumed all over the code. It's boring
         assert freqs.min() == freqs[0]
         assert freqs.max() == freqs[-1]
-        Npix = values.npix
+        Npix = self.values.npix
 
-        if values.cell is not None:
-            lcell, mcell = map(craco.arcsec2rad, values.cell.split(','))
+        if self.values.cell is not None:
+            lcell, mcell = map(craco.arcsec2rad, self.values.cell.split(','))
             los, mos = lres/lcell, mres/mcell
         else:
-            los, mos = map(float, values.os.split(','))
+            los, mos = map(float, self.values.os.split(','))
             lcell = lres/los
             mcell = mres/mos
             
@@ -602,43 +616,51 @@ class PipelinePlan(object):
         
         logging.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s',
                  nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos))
-
-        #print(baselines)
         
-        uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix)
+        uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix, values.show)
         logging.info('Got Ncells=%d uvcells', len(uvcells))
         d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.int32)
-        np.savetxt(values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
+        np.savetxt(self.values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
 
         self.uvcells = uvcells
-        self.nd = values.ndm
-        self.nt = values.nt
+        self.nd = self.values.ndm
+        self.nt = self.values.nt
+        self.ncu = 4 # hard coded
+        self.nchunk_time = self.values.nt // (2*self.ncu)
         self.freqs = freqs
         self.npix = Npix
-        self.nbox = values.nbox
-        self.boxcar_weight = values.boxcar_weight
-        self.nuvwide = values.nuvwide
-        self.nuvmax = values.nuvmax
+        self.nbox = self.values.nbox
+        self.boxcar_weight = self.values.boxcar_weight
+        self.nuvwide = self.values.nuvwide
+        self.nuvmax  = self.values.nuvmax
         assert self.nuvmax % self.nuvwide == 0
-        self.nuvrest = self.nuvmax // self.nuvwide
-        self.ncin = values.ncin
-        self.ndout = values.ndout
+        self.nuvrest_max = self.nuvmax // self.nuvwide
+        self.ncin  = self.values.ncin
+        self.ndout = self.values.ndout
         self.foff = foff
         self.dtype = np.complex64 # working data type
-        self.threshold = values.threshold
+        self.threshold = self.values.threshold
         self.nbl = nbl
         self.fdmt_scale = self.values.fdmt_scale
-        self.fft_scale = self.values.fft_scale
+        self.fft_scale  = self.values.fft_scale
+        
         self.fft_ssr = 16 # number of FFT pixels per clock - "super sample rate"
         self.ngridreg = 16 # number of grid registers to do
         assert self.threshold >= 0, 'Invalid threshold'
         self.fdmt_plan = FdmtPlan(uvcells, self)
         self.save_fdmt_plan_lut()
-
         
-        if self.fdmt_plan.nuvtotal >= values.nuvmax:
+        if self.fdmt_plan.nuvtotal >= self.values.nuvmax:
             raise ValueError("Too many UVCELLS")
 
+        self.nuvrest = self.fdmt_plan.nuvtotal // self.nuvwide
+        self.uv_shape = (self.nuvrest, self.nt, self.ncin, self.nuvwide)
+        self.baseline_shape = (self.nbl, self.nf, self.nt)
+
+        # List of basleine IDs sorted
+        # THis is the ordering of baselines once you've done bl2array
+        self.baseline_order = sorted(self.baselines.keys())
+        
         self.upper_instructions = calc_grid_luts(self, True)
         self.lower_instructions = calc_grid_luts(self, False)
         self.save_grid_instructions(self.upper_instructions, 'upper')
@@ -646,10 +668,6 @@ class PipelinePlan(object):
         self.upper_idxs, self.upper_shifts, self.lower_idxs, self.lower_shifts = calc_pad_lut(self, self.fft_ssr)
         self.save_pad_lut(self.upper_idxs, self.upper_shifts, 'upper')
         self.save_pad_lut(self.lower_idxs, self.lower_shifts, 'lower')
-
-        filehandler = open("pipeline.obj", 'wb') 
-        pickle.dump(self, filehandler)
-        filehandler.close()
         
     def save_lut(self, data, lutname, header, fmt='%d'):
         filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
@@ -698,9 +716,18 @@ class PipelinePlan(object):
         d = np.array(shifts, dtype=np.int32)
         header = 'doshift'
         self.save_lut(d, 'doshift.'+name, header)
+
+    def get_uv(self, blid):
+        '''
+        Returns the UV coordinates (in ns) of the given baseline ID
         
-
-
+        :blid: Baseline ID
+        :returns: (u, v) tuple in ns
+        '''
+        bldata = self.baselines(blid)
+        return (bldata['UU'], bldata['VV'])
+        
+        
     @property
     def nf(self):
         '''Returns number of frequency channels'''
@@ -736,30 +763,30 @@ def add_arguments(parser):
     Add planning arguments
     '''
     parser.add_argument('--uv', help='Load antenna UVW coordinates from this UV file')
+    parser.add_argument('--pickle_fname', default='pipeline.pickle', help='File to dump and load pickle file')
     parser.add_argument('--npix', help='Number of pixels in image', type=int, default=256)
     parser.add_argument('--os', help='Number of pixels per beam', default='2.1,2.1')
     parser.add_argument('--cell', help='Image cell size (arcsec). Overrides --os')
-    parser.add_argument('--nt', help='Number of times per block', type=int, default=16)
-    parser.add_argument('--ndm', help='Number of DM trials', type=int, default=16)
-    parser.add_argument('--nbox', help='Number of boxcar trials', type=int, default=4)
+    parser.add_argument('--nt', help='Number of times per block', type=int, default=256)
+    parser.add_argument('--ndm', help='Number of DM trials', type=int, default=2)
+    parser.add_argument('--nbox', help='Number of boxcar trials', type=int, default=8)
     parser.add_argument('--boxcar-weight', help='Boxcar weighting type', choices=('sum','avg','sqrt'), default='sum')
     parser.add_argument('--nuvwide', help='Number of UV processed in parallel', type=int, default=8)
     parser.add_argument('--nuvmax', help='Maximum number of UV allowed.', type=int, default=8192)
     parser.add_argument('--ncin', help='Numer of channels for sub fdmt', type=int, default=32)
     parser.add_argument('--ndout', help='Number of DM for sub fdmt', type=int, default=32)
-    parser.add_argument('--threshold', type=float, help='Threshold for candidate grouper', default=10)
+    parser.add_argument('--threshold', type=float, help='Threshold for candidate grouper', default=3)
     parser.add_argument('--fdmt_scale', type=float, help='Scale FDMT output by this amount', default=1.0)
     parser.add_argument('--fft_scale', type=float, help='Scale FFT output by this amount. If both scales are 1, the output equals the value of frb_amp for crauvfrbsim.py', default=10.0)
-    parser.add_argument('--show-image', action='store_true', help='Show image plots')
-    parser.add_argument('--show-fdmt', action='store_true', help='Show FDMT plots')
+    parser.add_argument('--show-image', action='store_true', help='Show image plots', default=False)
+    parser.add_argument('--show-fdmt', action='store_true', help='Show FDMT plots', default=False)
     parser.add_argument('--save', action='store_true',  help='Save data as .npy for input, FDMT and image pipeline')
-
+    parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
+    parser.add_argument('-s', '--show', action='store_true', help='Show plots')
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Plans a CRACO scan', formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-s', '--show', action='store_true', help='Show plots')
     add_arguments(parser)
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -782,10 +809,8 @@ def _main():
 
         pylab.show()
 
-    filename = "pipeline.obj"
-    filehandler = open(filename, 'rb') 
-    object = pickle.load(filehandler)
-    print(object.values)
-
+    dump_plan(plan, values.pickle_fname)
+    print(load_plan(values.pickle_fname))
+    
 if __name__ == '__main__':
     _main()

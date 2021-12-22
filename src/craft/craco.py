@@ -12,6 +12,7 @@ import os
 import sys
 import logging
 import warnings
+from numba import njit, prange
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -385,7 +386,7 @@ class BaselineCell(object):
     :uvpix: (2 tuple) of (u, v) integer pixels
     :chan_start, chan_end: First and last channels inclusive
     :freqs: array of frequencies
-    :npix: Number of pixles (probably superfluous
+    :npix: Number of pixles (probably superfluous)
     '''
     def __init__(self, blid, uvpix, chan_start, chan_end, freqs, npix):
         self.blid = blid
@@ -500,6 +501,110 @@ class BaselineCell(object):
         return s
 
     __repr__ = __str__
+
+def baseline2uv(plan, baseline_data, uv_data):
+    '''
+    Create UV data from baseline data given the plan
+    Asumes uv_data is zeroed appropriately.
+
+    :plan: PipelinePlan from fdmt_plan
+    :baseline_data: dict keyed by baselineId, each containing (nchan, nt) nparray - see time_blocks()
+    :uv_data: np array shape (plan.nuvrest, plan.nt, plan.ncin, plan.nuvwide)
+
+    i.e. if plan is new or changed, set uv_data to zero. Otherwise you can re-use it.
+
+    '''
+    
+    uv_shape = (plan.nuvrest, plan.nt, plan.ncin, plan.nuvwide)
+    assert uv_data.shape == uv_shape, f'Invalid uv_data shape. Was {uv_data.shape} expected {uv_shape}'
+
+    for irun, run in enumerate(plan.fdmt_plan.runs):
+        for iuv, uv in enumerate(run.cells):
+            #print(f'run {irun}/{len(plan.fdmt_plan.runs)}')
+            blid = uv.blid
+            cstart = uv.chan_start
+            cend = uv.chan_end+1
+            nchan = cend - cstart # number of channels being copied from this baseline
+            run_cstart = run.chan_start # first channel in this run
+            out_cstart = cstart - run_cstart # The channel in this run that the data will be copied into
+            out_cend = out_cstart + nchan
+            u = iuv
+            urest = irun
+            bldata = baseline_data[blid] # get the baseline
+
+            #print(blid, u, urest, cstart, cend,  nchan, run_cstart, out_cstart, out_cend)
+            
+            assert 0 <= out_cstart <= plan.ncin
+            assert out_cstart <= out_cend <= plan.ncin
+            assert bldata.shape == (plan.nf, plan.nt)
+
+            # copy all nt from the baseline at the give cstart:cend channel range
+            # into out_cstart:out_cend in the uv_data
+            uv_data[urest, :, out_cstart:out_cend, u] = bldata[cstart:cend, :].T
+
+    return uv_data
+
+@njit
+def baseline2uv_numba(lut, baseline_data, uv_data):
+    nrun, nuvwide, _ = lut.shape
+    for irun in prange(nrun):
+        for iuv in prange(nuvwide):
+            blidx, cstart, cend, out_cstart, out_cend, do_conj = lut[irun, iuv, :]
+            if blidx == -1:
+                break
+
+            if do_conj:
+                uv_data[irun, :, out_cstart:out_cend, iuv] = np.conj(baseline_data[blidx, cstart:cend, :].T)
+            else:
+                uv_data[irun, :, out_cstart:out_cend, iuv] = baseline_data[blidx, cstart:cend, :].T
+
+class FastBaseline2Uv:
+    def __init__(self, plan, conjugate_lower_uvs=False):
+        '''
+        Numba-compiled version of baseline2uv assuming data has been smashed with bl2array  pre-compiled indexes
+
+        :plan:PipelinePLan to operate on
+        :conjugate_lower_uvs: If True, conjugate lower UV data
+        '''
+        self.plan = plan
+        # initialise with -1 - if those values are -1 in the execution code, then we quite the loop
+        self.lut = np.ones((len(plan.fdmt_plan.runs), plan.nuvwide, 6), np.int16)*-1
+        blids = sorted(plan.baselines.keys())
+
+        for irun, run in enumerate(plan.fdmt_plan.runs):
+            for iuv, uv in enumerate(run.cells):
+                #print(f'run {irun}/{len(plan.fdmt_plan.runs)}')
+                blid = uv.blid
+                cstart = uv.chan_start
+                cend = uv.chan_end+1
+                nchan = cend - cstart # number of channels being copied from this baseline
+                run_cstart = run.chan_start # first channel in this run
+                out_cstart = cstart - run_cstart # The channel in this run that the data will be copied into
+                out_cend = out_cstart + nchan
+                u = iuv
+                urest = irun
+                blidx = blids.index(blid) 
+            
+                assert 0 <= out_cstart <= plan.ncin
+                assert out_cstart <= out_cend <= plan.ncin
+                #bldata = plan.baselines[blid]
+                #assert bldata.shape == (plan.nf, plan.nt)
+                #uv_data[urest, :, out_cstart:out_cend, u] = bldata[cstart:cend, :].T
+                do_conj = int(conjugate_lower_uvs and uv.is_lower)
+                self.lut[irun, iuv, :] = [blidx, cstart, cend, out_cstart, out_cend, do_conj]
+
+    def __call__(self, baseline_data, uv_data):
+        '''
+        Convert baselines to UV data
+
+        :baseline_data: baseline data sorted into an array: see bl2array. Shape=(nbl, nc, nt)
+        :uv_data: output uv data shape  (nurest, nt, ncin, nuvwide)
+        '''
+
+        assert uv_data.shape == self.plan.uv_shape, f'Invalid uv_data shape. Was {uv_data.shape} expected {self.uv_shape}'
+        assert baseline_data.shape == self.plan.baseline_shape, f'Invalid basline_data shape. Was {baseline_data.shape} expected {self.baseline_shape}'
+
+        baseline2uv_numba(self.lut, baseline_data, uv_data)
 
 
     

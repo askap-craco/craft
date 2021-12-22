@@ -12,7 +12,7 @@ import os
 import sys
 import logging
 from astropy.io import fits
-import craco
+from . import craco
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -41,6 +41,9 @@ class UvFits(object):
     def baselines(self):
         '''
         Returns all data from first integration
+        
+        :returns: dictionary, keyed by baseline ID of all basesline data with a timestamp
+        equal to the first timestamp in the file
         '''
             
         d0 = self.start_date
@@ -83,6 +86,9 @@ class UvFits(object):
         Returns a sequence of baseline data in blocks of nt
         '''
         return craco.time_blocks(self.vis, nt)
+
+    def close(self):
+        return self.hdulist.close()
 
 def open(*args, **kwargs):
     logging.info('Opening file %s', args[0])

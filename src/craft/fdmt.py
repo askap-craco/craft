@@ -12,6 +12,8 @@ from IPython import embed
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+# change xrange to range for python3
+
 #@jit(nopython=True)
 def isquare(f):
     return 1./(f*f)
@@ -185,7 +187,7 @@ class Fdmt(object):
         self._ndt_top = self.init_delta_t
 
         # make the plan by pretend running through the iterations
-        for i in xrange(1, self.niter+1):
+        for i in range(1, self.niter+1):
             self._save_iteration(i)
 
     def _calc_delta_t(self, f_start, f_end):
@@ -252,7 +254,7 @@ class Fdmt(object):
         #s, state_shape)
 
         # for each ouput subband
-        for iif in xrange(nf):
+        for iif in range(nf):
             is_top_subband = iif == nf - 1 # True if it's the final subband
             f_start = fres * float(iif) + self.f_min # frequency at the bottom of the subband
             copy_subband = False
@@ -287,7 +289,7 @@ class Fdmt(object):
             nf_data.append((f_start, f_end, f_middle, f_middle_larger, delta_t_local, idt_data))
             
             # for each DM in this subband
-            for idt in xrange(delta_t_local):
+            for idt in range(delta_t_local):
                 dt_middle = int(round(idt * cff(f_middle, f_start, f_end, f_start))) # id1 = DM of the middle
                 dt_middle_index = dt_middle + shift_input # id1 = same as dt_middle
                 dt_middle_larger = int(round(idt*cff(f_middle_larger, f_start, f_end, f_start))) # offset - dt at slightly larger freq
@@ -333,7 +335,7 @@ class Fdmt(object):
         idt = 0
         state[:, 0, 0:self.n_t] = din
 
-        for idt in xrange(1, self.init_delta_t):
+        for idt in range(1, self.init_delta_t):
             state[:, idt, idt:self.n_t] = state[:, idt-1, idt:self.n_t] + din[:, 0:-idt]
 
         if self.init_history is None:
@@ -347,9 +349,9 @@ class Fdmt(object):
         # we already have state initialised for [:, 0:idt, idt:end]
         # So we use this to initialise [:, 0:idt, 0:idt]
         initdt = self.init_delta_t
-        for tback in xrange(1, initdt): # tback number of samples backwards from t=0
+        for tback in range(1, initdt): # tback number of samples backwards from t=0
             h = history[:, -tback]
-            for idt in xrange(tback, initdt):
+            for idt in range(tback, initdt):
                 #print(tback, idt, idt-tback, state.shape, state[0, idt, idt-tback], state[0, idt-1, idt-tback], h[0])
                 state[:, idt, idt-tback] = state[:, idt-1, idt-tback] + h
                 
@@ -381,12 +383,12 @@ class Fdmt(object):
         # Size of input vector in samples
         nt_in = din.shape[2]
 
-        for ichan in xrange(nchan):
+        for ichan in range(nchan):
             chanconfig = self.hist_nf_data[iterno][ichan][-1]
             assert ndt >= len(chanconfig)
             # Only do idt up to len(chanconfig) - even though this is less than ndt - this saves on flops
             
-            for idt in xrange(len(chanconfig)):
+            for idt in range(len(chanconfig)):
                 config = chanconfig[idt]
                 # TODO: Make this config a little easier to grok than just a tuple
                 _, id1, offset, id2, _, _, _ = config
@@ -420,7 +422,7 @@ class Fdmt(object):
 
         # This naieve loop does a new malloc every iteration. Ideally you'd malloc 2 buffers and pingpong
         # between them, but numpy doesn't really like doing that, as the size of the state changes between iterations.
-        for i in xrange(niter):
+        for i in range(niter):
             state = self._execute_iteration(i, state)
 
         # final state has a single 'channel' - remove this axis
@@ -548,7 +550,7 @@ class Fdmt(object):
         nodes = thefdmt.trace_dm(idt)
         smearing = [n[1]+1 for n in nodes]
         total_var = 0
-        for chan in xrange(nchan):
+        for chan in range(nchan):
             if smearing[chan] > width:
                 H = smearing[chan]
                 L = width
@@ -719,12 +721,12 @@ class Fdmt(object):
         '''
         lut = np.zeros((self.n_f-1, 2), dtype=np.uint16)
         cout = 0
-        for iterno in xrange(self.niter):
-            for c in xrange(self.nchan_out_for_iter(iterno)):
+        for iterno in range(self.niter):
+            for c in range(self.nchan_out_for_iter(iterno)):
                 id1_cff = self.calc_id1_cff(iterno, cout)
                 off_cff = self.calc_offset_cff(iterno, cout)
-                lut[cout, 0] = int(np.round(id1_cff))
-                lut[cout, 1] = int(np.round(off_cff))
+                lut[cout, 0] = int(np.round(id1_cff*(1<<16)))
+                lut[cout, 1] = int(np.round(off_cff*(1<<16)))
                 cout += 1
 
         assert cout == self.n_f - 1, 'Didnt finish lookup table correctly'

@@ -11,12 +11,12 @@ import numpy as np
 import os
 import sys
 import logging
-import fdmt
-import craco
-import boxcar
-import uvfits
-import craco_plan
-from craco import printstats
+
+from . import fdmt
+from . import craco
+from . import boxcar
+from . import uvfits
+from . import craco_plan
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -26,8 +26,8 @@ def imshow_complex(axs, d, title=''):
     axs[1].imshow(d.imag, aspect='auto', origin='lower')
     axs[1].set_title(title + ' imag')
 
-    #logging.debug('%s real %s', title, printstats(d.real))
-    #logging.debug('%s imag %s', title, printstats(d.imag))
+    #logging.debug('%s real %s', title, craco.printstats(d.real))
+    #logging.debug('%s imag %s', title, craco.printstats(d.imag))
 
 class Kernel(object):
     def __init__(self, uvsource, plan, values):
@@ -354,10 +354,10 @@ class ImagePipeline(Kernel):
                 c2 = grouper(idm, 2*t + 1, boxcar(idm, img.imag))
                 rlabel = 'real idm={} t={}'.format(idm, t)
                 ilabel = 'imag idm={} t={}'.format(idm, t)
-                logging.debug('img.real idm=%d t=%d %s', idm, t, printstats(img.real, rlabel))
-                logging.debug('img.imag idm=%d t=%d %s', idm, t, printstats(img.imag, ilabel))
-                logging.debug('grid.real idm=%d t=%d %s', idm, t, printstats(g.real, 'grid.real'))
-                logging.debug('grid.imag idm=%d t=%d %s', idm, t, printstats(g.imag, 'grid.imag'))
+                logging.debug('img.real idm=%d t=%d %s', idm, t, craco.printstats(img.real, rlabel))
+                logging.debug('img.imag idm=%d t=%d %s', idm, t, craco.printstats(img.imag, ilabel))
+                logging.debug('grid.real idm=%d t=%d %s', idm, t, craco.printstats(g.real, 'grid.real'))
+                logging.debug('grid.imag idm=%d t=%d %s', idm, t, craco.printstats(g.imag, 'grid.imag'))
                 logging.debug('idm=%s t=%d t1 candidates=%d t2 candidates=%d', idm, t, len(c1), len(c2))
                 if self.values.show_image:
                     fig, ax = pylab.subplots(2,2)
