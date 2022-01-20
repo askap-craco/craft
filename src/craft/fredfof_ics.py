@@ -61,7 +61,7 @@ def load(fin, values):
         if line.strip() == '':
             continue
 
-        bits = map(float, line.split())
+        bits = list(map(float, line.split()))
         # filter for width
         if bits[3] < values.wmax and bits[4] > values.dmmin and bits[0] > values.snmin and bits[bno] != 35:
             d.append(bits)

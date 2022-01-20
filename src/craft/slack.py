@@ -34,7 +34,7 @@ def _main():
     fields = []
     
     for s in values.fields:
-        print s
+        print(s)
         bits = s.split('=')
         k,v = bits
         f = {'title':k,
@@ -57,14 +57,14 @@ def _main():
     
     if (values.attachment != None):
             image_key = values.attachment
-            print "Supplied attachment image is",image_key
+            print("Supplied attachment image is",image_key)
             
             client = boto3.client('s3',aws_access_key_id=ACCESS_KEY,aws_secret_access_key=SECRET_KEY)
             client.upload_file(image_key, BUCKET, image_key,ExtraArgs={'ContentType': "image/png", 'ACL': "public-read",\
                                                                        'Expires': expires})
             url = client.generate_presigned_url(ClientMethod='get_object',ExpiresIn=604800,Params={'Bucket':BUCKET,'Key':image_key})
     else:
-            print "No attachement is provided"
+            print("No attachement is provided")
             url = None
             
 

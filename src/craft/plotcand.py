@@ -12,9 +12,9 @@ import os
 import sys
 import logging
 import re
-import craftobs
+from . import craftobs
 import glob
-import heimdall
+from . import heimdall
 
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -82,7 +82,7 @@ class CandidatePlotter(object):
         dm = cand[mask, 5]
         t = cand[mask, 2]
         width = cand[mask, 3]
-        print 'plotting', len(snr), 'candidates from', cand.shape
+        print('plotting', len(snr), 'candidates from', cand.shape)
         if len(snr) == 0:
             return
 

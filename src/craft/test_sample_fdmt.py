@@ -11,12 +11,12 @@ try:
 except ImportError:
     from mock import Mock, MagicMock
 
-import fdmt
-import sample_fdmt
-import unit_fdmt
+from . import fdmt
+from . import sample_fdmt
+from . import unit_fdmt
 import numpy as np
 from pylab import *
-from craco import printstats
+from .craco import printstats
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -47,7 +47,7 @@ class TestSampleFdmtsMatchBlock(TestCase):
         goldout = self.thefdmt(blockin)
         sampfdmt = sampfdmt_class(self.thefdmt)
         sampout = sampfdmt(blockin)
-        print goldout.shape, sampout.shape
+        print(goldout.shape, sampout.shape)
         g = goldout[:,:self.nt]
         ok = np.allclose(g, sampout)
 

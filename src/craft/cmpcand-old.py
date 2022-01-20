@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-import sigproc
+from . import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -57,7 +57,7 @@ def _main():
         mjd = d[:, 7]
         if mjd0 is None:
             mjd0 = mjd[0]
-        print d.shape
+        print(d.shape)
         secoff = (mjd - mjd0)*86400
         ax1.plot(sec,sn, label=f)
         dall.append(d)

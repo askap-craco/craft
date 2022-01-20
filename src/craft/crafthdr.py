@@ -22,7 +22,7 @@ class DadaHeader(OrderedDict):
         return self
 
     def get_value(self, item, default=None):
-        if item in self.keys():
+        if item in list(self.keys()):
             return self[item][0]
         else:
             return default
@@ -33,7 +33,7 @@ class DadaHeader(OrderedDict):
         return self[item]
 
     def get_comment(self, item):
-        if item in self.keys():
+        if item in list(self.keys()):
             comment = self[item][1]
         else:
             comment = ''
@@ -52,7 +52,7 @@ class DadaHeader(OrderedDict):
         '''Convert to string, without checks'''
 
         s = ''
-        for name, (value, comment) in self.iteritems():
+        for name, (value, comment) in self.items():
             if self.add_comment and comment is not None:
                 s += '%s %s # %s\n' % (name, value, comment)
             else:
@@ -106,7 +106,7 @@ class DadaHeader(OrderedDict):
     @staticmethod
     def fromfile(filename, init_size=4096):
         d = DadaHeader._fromfile(filename, init_size)
-        if 'HDR_SIZE' in d.keys():
+        if 'HDR_SIZE' in list(d.keys()):
             hdr_size = int(d.get_value('HDR_SIZE'))
         else:
             hdr_size = os.path.getsize(filename)
@@ -208,7 +208,7 @@ def _main():
     tsamp = float(int_time)/samp_rate
 
     bufmode_map = {16:0, 8:1, 4:2, 1:3}
-    assert values.buffer_mode in bufmode_map.keys(), 'Invalid buffer mode'
+    assert values.buffer_mode in list(bufmode_map.keys()), 'Invalid buffer mode'
     bufmode = bufmode_map[values.buffer_mode]
 
     if values.beam_number is None:
@@ -253,7 +253,7 @@ def _main():
     resolution = (nbit/8)*nchan*nbeams
     
     for (h, v, c) in hdr:
-        print h, v
+        print(h, v)
 
 
 if __name__ == '__main__':

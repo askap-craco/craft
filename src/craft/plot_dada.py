@@ -7,11 +7,11 @@ Copyright (C) CSIRO 2016
 __author__ = 'Keith Bannister <keith.bannister@csiro.au>'
 
 import logging
-import dada
+from . import dada
 import pylab
 import numpy as np
-from cmdline import strrange
-from crafthdr import DadaHeader
+from .cmdline import strrange
+from .crafthdr import DadaHeader
 
 class Formatter(object):
     def __init__(self, im):
@@ -47,7 +47,7 @@ def _main():
     nbeam = int(hdr['NBEAM'][0])
     nchan = int(hdr['NCHAN'][0])
     npol = int(hdr['NPOL'][0])
-    tstart, nint = map(int, values.time.split(','))
+    tstart, nint = list(map(int, values.time.split(',')))
     dtype = np.dtype(hdr.get_value('DTYPE', '<f4'))
     if values.order is not None:
         order = values.order
@@ -70,7 +70,7 @@ def _main():
     else:
         raise ValueError('Unknown order {}'.format(order))
 
-    print nbeam, nchan, npol, tstart, nint, dtype, order, nint, shape, transpose
+    print(nbeam, nchan, npol, tstart, nint, dtype, order, nint, shape, transpose)
     
     f = dada.DadaFile(values.files[0], shape=shape)
     for b in f.blocks():
@@ -81,21 +81,21 @@ def _main():
         b = np.ma.masked_where(abs(b) <= values.mask_limit, b)
 
         # At this point b.shape is (Time, Chan, Beam, Pol)
-        print b.shape, shape, transpose, orig_shape
+        print(b.shape, shape, transpose, orig_shape)
         tscrunch = values.tscrunch
         fscrunch = values.fscrunch
         nint_out = nint/tscrunch
         nchan_out = nchan/fscrunch
         b = b.reshape(nint_out, tscrunch, nchan, nbeam, npol).mean(axis=1)
         b = b.reshape(nint_out, nchan_out, fscrunch, nbeam, npol).mean(axis=2)
-        print b.shape, shape, transpose, orig_shape
+        print(b.shape, shape, transpose, orig_shape)
         plot(b, nint_out, nbeam, nchan_out, npol, values)
 
 
 def plot(v, nint, nbeam, nchan, npol, values):
-    fig, axes = pylab.subplots(*map(int, values.nxy.split(',')), sharex=True, sharey=True)
+    fig, axes = pylab.subplots(*list(map(int, values.nxy.split(','))), sharex=True, sharey=True)
     if values.imrange:
-        vmin, vmax = map(float, values.imrange.split(','))
+        vmin, vmax = list(map(float, values.imrange.split(',')))
     else:
         vmin = None
         vmax = None
@@ -113,7 +113,7 @@ def plot(v, nint, nbeam, nchan, npol, values):
         if values.rescale:
             img -= img.mean(axis=0)
             img /= img.std(axis=0)
-            print 'RESCALED beam', beam, 'pol', pol,'max/min/mean/rms {}/{}/{}/{}'.format(img.max(), img.min(), img.mean(), img.std()), img.shape
+            print('RESCALED beam', beam, 'pol', pol,'max/min/mean/rms {}/{}/{}/{}'.format(img.max(), img.min(), img.mean(), img.std()), img.shape)
             
         im = ax.imshow(img.T, aspect='auto', vmin=vmin, vmax=vmax, interpolation='none', origin='lower')
         ax.text(0, 0, 'beam %d pol %d' % (beam, pol), va='top', ha='left') 

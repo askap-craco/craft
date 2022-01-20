@@ -40,9 +40,9 @@ def _main():
         datec = h.columns['DATE']
         twholec = datec.array
         tnew = tall - t0.jd
-        print 'Column = {} twhole={} twholec={} tpart={} tall={} t0={} tnew={}'.format(datec, twhole[0], twholec[0], tpart[0], tall[0], t0, tnew[0])
+        print('Column = {} twhole={} twholec={} tpart={} tall={} t0={} tnew={}'.format(datec, twhole[0], twholec[0], tpart[0], tall[0], t0, tnew[0]))
         if datec.bzero == 0 and fix_bzero:
-            print 'Fixing DATE bzero'
+            print('Fixing DATE bzero')
             t0.format = 'fits'
             #h.header.set('DATE-OBS', t0.value, 'Fixed by fixuvfits.py')
             #h.header.set('DATE_OBS', t0.value, 'Fixed by fixuvfits.py')
@@ -54,7 +54,7 @@ def _main():
                 h.data['_DATE'] = 0
                 
 
-            print 'New data', h.data['DATE'].min(), h.data['_DATE'].min(), 'writing to', fout, h.header['DATE_OBS']
+            print('New data', h.data['DATE'].min(), h.data['_DATE'].min(), 'writing to', fout, h.header['DATE_OBS'])
             
 
         del hdu[0].header['DATE_OBS']

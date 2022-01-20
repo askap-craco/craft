@@ -12,22 +12,22 @@ import os
 import sys
 import logging
 import itertools
-from craftobs import load_beams
-from plotutil import subplots
+from .craftobs import load_beams
+from .plotutil import subplots
 import matplotlib.gridspec as gridspec
-import sigproc
+from . import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 
 def commasep(s):
-    return map(int, s.split(','))
+    return list(map(int, s.split(',')))
 
 def floatcommasep(s):
-    return map(float, s.split(','))
+    return list(map(float, s.split(',')))
 
 def next_divisor(x, n):
-    for t in xrange(x, n/2):
+    for t in range(x, n/2):
         if n % t == 0:
             return t
 
@@ -59,7 +59,7 @@ def _main():
 
     for filename in values.files:
         try:
-            print filename
+            print(filename)
             get_meas(filename, client, influxout, values)
         except:
             logging.exception('Blah exception in get_meas')
@@ -70,7 +70,7 @@ def _main():
 def get_meas(filename, client, influxout, values):
     fullpath  = os.path.abspath(filename)
     pathbits = fullpath.split('/') # hacky way of getting sbid, scanid and ant
-    print len(pathbits), pathbits
+    print(len(pathbits), pathbits)
     sbid = pathbits[-5]
     scanid = pathbits[-4]
     ant = pathbits[-3]
@@ -88,11 +88,11 @@ def get_meas(filename, client, influxout, values):
         # nanoseconds since unix epoch
         unix_nanosec = int(np.round(unix_start * 1e9))
         outs = 'craftstat,sbid={},scanid={},ant={},beam={} '.format(sbid, scanid, ant, b)
-        statbits = ['{}={}'.format(statname, stat) for (statname, stat) in s.iteritems()]
+        statbits = ['{}={}'.format(statname, stat) for (statname, stat) in s.items()]
         outs += ','.join(statbits)
         outs += ' {}\n'.format(unix_nanosec)
         field_dict = {'sbid':sbid,'scanid':scanid}
-        for sname, v in s.iteritems():
+        for sname, v in s.items():
             field_dict[sname] = v
 
         body = {'measurement':'craftstat',

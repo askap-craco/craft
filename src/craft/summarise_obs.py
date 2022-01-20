@@ -11,8 +11,8 @@ import numpy as np
 import os
 import sys
 import logging
-from plot_fredda_cand import find_files
-from crafthdr import DadaHeader
+from .plot_fredda_cand import find_files
+from .crafthdr import DadaHeader
 import glob
 import re
 from astropy.coordinates import SkyCoord
@@ -49,13 +49,13 @@ class FreddaStats(object):
                 if line.startswith('Found'):
                     stats.ncand = int(bits[1])
                 elif line.startswith('Processed'):
-                    stats.nblocks, stats.nsamples = map(int, (bits[1], bits[4]))
+                    stats.nblocks, stats.nsamples = list(map(int, (bits[1], bits[4])))
                     stats.nseconds = float(bits[7])
                     stats.nreal_time = float(bits[-3].replace('x',''))
                 elif line.startswith('Freq auto-flagged'):
-                    stats.freq_flag, stats.freq_total = map(int, bits[2].split('/'))
+                    stats.freq_flag, stats.freq_total = list(map(int, bits[2].split('/')))
                 elif line.startswith('DM0 auto-flagged'):
-                    stats.dm0_flag, stats.dm0_total = map(int, bits[2].split('/'))
+                    stats.dm0_flag, stats.dm0_total = list(map(int, bits[2].split('/')))
                 else:
                     pass
 
@@ -113,7 +113,7 @@ class TargetParset(object):
         return sources
 
     def _add_field_directions(self):
-        for src, data in self.sources.iteritems():
+        for src, data in self.sources.items():
             if 'field_direction' not in data:
                 continue
 
@@ -125,7 +125,7 @@ class TargetParset(object):
             data['skycoord'] = skycoord
             data['skypos'] = sp
 
-            print fdstr, rastr, decstr, skycoord, sp
+            print(fdstr, rastr, decstr, skycoord, sp)
 
             pastr = data['pol_axis']
             pol_type, pol_angle = pastr.replace('[','').replace(']','').split(',')
@@ -137,7 +137,7 @@ class TargetParset(object):
             data['footprint'] = fp
 
     def get_nearest_source(self, pos):
-        sources = [s for s in self.sources.values() if 'skycoord' in s]
+        sources = [s for s in list(self.sources.values()) if 'skycoord' in s]
         nearest = min(sources, key=lambda p: mysep(p['skycoord'], pos))
         #for p in sources:
         #print p['field_name'], p['skycoord'], pos, pos.separation(p['skycoord']), np.degrees(mysep(pos, p['skycoord']))
@@ -176,7 +176,7 @@ def _main():
             else:
                 s = all_stats[field][0]
                 s += stats
-                print log_file, field, s
+                print(log_file, field, s)
         except:
             logging.exception('COuld not load log file %s', log_file)
             raise
@@ -191,19 +191,19 @@ def _main():
         for field in sorted(all_stats.keys()):
             (stats, hdr) = all_stats[field]
             total_stats += stats
-            statlist = map(str, stats.values_aslist())
+            statlist = list(map(str, stats.values_aslist()))
             ra = float(hdr['RA'][0])
             dec = float(hdr['DEC'][0])
             fname = hdr['SOURCE'][0]
-            beam_ra = map(float, hdr['BEAM_RA'][0].split(','))
-            beam_dec = map(float, hdr['BEAM_DEC'][0].split(','))
-            dout = map(str, [fname, ra, dec])
+            beam_ra = list(map(float, hdr['BEAM_RA'][0].split(',')))
+            beam_dec = list(map(float, hdr['BEAM_DEC'][0].split(',')))
+            dout = list(map(str, [fname, ra, dec]))
             dout.extend(statlist)
             fout.write(' '.join(dout))
             fout.write('\n')
 
             for bra, bdec in zip(beam_ra, beam_dec):
-                dout = map(str, [fname, ra, dec, bra, bdec])
+                dout = list(map(str, [fname, ra, dec, bra, bdec]))
                 dout.extend(statlist)
                 fbybeam.write(' '.join(dout))
                 fbybeam.write('\n')
@@ -211,7 +211,7 @@ def _main():
         fout.write('# TOTALS %s\n' % total_stats)
         fbybeam.write('# TOTALS %s\n' % total_stats)
         
-        print 'TOTALS', total_stats
+        print('TOTALS', total_stats)
 
 if __name__ == '__main__':
     _main()

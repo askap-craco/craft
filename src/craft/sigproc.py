@@ -95,7 +95,7 @@ def write(f, v, struct_format):
     try:
         f.write(struct.pack(struct_format, v))
     except:
-        print 'Could not write value %s to %s with format %s' %( v, f, struct_format)
+        print('Could not write value %s to %s with format %s' %( v, f, struct_format))
         raise 
 
 class SigprocFile(object):
@@ -119,7 +119,7 @@ class SigprocFile(object):
         f.seek(0)
         write_str(f, 'HEADER_START')
 
-        for k, v in header.iteritems():
+        for k, v in header.items():
             if v is None:
                 continue
             if k in STRING_PARAMS:
@@ -132,7 +132,7 @@ class SigprocFile(object):
                 write_str(f, k)
                 write(f, v, DOUBLE_FORMAT)
             else:
-                print 'Cannot write header', k
+                print('Cannot write header', k)
 
         write_str(f, 'HEADER_END')
         self.data_start_idx = f.tell()
@@ -160,7 +160,7 @@ class SigprocFile(object):
         for p in DOUBLE_PARAMS:
             header[p] = unpack(hdr, p, DOUBLE_FORMAT)
 
-        for k,v in self.header.iteritems():
+        for k,v in self.header.items():
             setattr(self, k, v)
             
 
@@ -268,7 +268,7 @@ class SigprocFile(object):
         if self.nbits == 2:
             data2 = np.zeros(num_elements*samps_per_element, dtype=np.int8)
 
-            print 'samp', num_samples, 'nelem', num_elements, 'ndtypes', num_dtypes, len(data), len(data2)
+            print('samp', num_samples, 'nelem', num_elements, 'ndtypes', num_dtypes, len(data), len(data2))
 
             data2[0::4] = (data & 0b00000011)*2 - 3
             data2[1::4] = (data & 0b00001100)/2 - 3
@@ -286,11 +286,11 @@ class SigprocFile(object):
         return self.get_data(slice_list, 0, 0)
         
     def print_header(self):
-        for k,v, in self.header.iteritems():
+        for k,v, in self.header.items():
             if isinstance(v, float):
-                print '{}:{:0.15f}'.format(k,v)
+                print('{}:{:0.15f}'.format(k,v))
             else:
-                print k, ':', v
+                print(k, ':', v)
         
 
 def _main():
@@ -307,11 +307,11 @@ def _main():
     for filename in args:
         fin = SigprocFile(filename)
         fin.print_header()
-        print 'RADEC DEG', fin.src_raj_deg, fin.src_dej_deg
-        print "Header size", fin.header_size_bytes
-        print "Data size", fin.data_size_bytes
-        print "Number of elements", fin.file_size_elements
-        print 'Duration (seconds)', fin.observation_duration
+        print('RADEC DEG', fin.src_raj_deg, fin.src_dej_deg)
+        print("Header size", fin.header_size_bytes)
+        print("Data size", fin.data_size_bytes)
+        print("Number of elements", fin.file_size_elements)
+        print('Duration (seconds)', fin.observation_duration)
     
 
 if __name__ == '__main__':

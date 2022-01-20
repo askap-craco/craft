@@ -8,7 +8,7 @@ __author__ = 'Keith Bannister <keith.bannister@csiro.au>'
 
 import logging
 import numpy as np
-from crafthdr import DadaHeader
+from .crafthdr import DadaHeader
 import os
 
 class DadaFile(object):
@@ -19,7 +19,7 @@ class DadaFile(object):
         self.hdr_size = int(self.hdr.get_value('HDR_SIZE'))
         if shape is None:
             self.shape = self.hdr.get_value('SHAPE') # throws exception if not defined
-            self.shape = np.array(map(int, self.shape.split(',')))
+            self.shape = np.array(list(map(int, self.shape.split(','))))
         else:
             self.shape = shape
 
@@ -49,10 +49,10 @@ class DadaFile(object):
         self.fin.seek(offset)
         v = np.fromfile(self.fin, count=count, dtype=self.dtype)
         v.shape = self.shape
-        print self.filename, v.shape, len(v), 'All zeros?', np.all(v == 0), \
+        print(self.filename, v.shape, len(v), 'All zeros?', np.all(v == 0), \
             'max/min/mean/sum/nz {}/{}/{}/{}/{}'.format(v.max(), v.min(), v.mean(), v.sum(), (v.flatten() == 0).sum()), \
             'max at', \
-            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
+            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v)))
 
         return np.ma.masked_invalid(v)
 

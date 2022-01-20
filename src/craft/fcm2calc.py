@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-from calc11 import CalcFile
+from .calc11 import CalcFile
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -52,7 +52,7 @@ def load_parset(fcmfile, prefix='common.antenna.ant'):
         if line.startswith(prefix):
             bits = key.split('.')
             antname = bits[2]
-            print line, antname
+            print(line, antname)
             if len(antname) <= 3:
                 continue
 
@@ -62,7 +62,7 @@ def load_parset(fcmfile, prefix='common.antenna.ant'):
             d[smallkey] = value
             ant_data[antno] = d
         if key == 'common.antennas':
-            antnos = map(lambda x: int(x.replace('ant','')), value.replace('[','').replace(']','').split(','))
+            antnos = [int(x.replace('ant','')) for x in value.replace('[','').replace(']','').split(',')]
 
 
 

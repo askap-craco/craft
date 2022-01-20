@@ -7,11 +7,11 @@ Copyright (C) CSIRO 2015
 import os
 import sys
 import logging
-from crafthdr import DadaHeader
+from .crafthdr import DadaHeader
 import glob
 import json
 from astropy.time import Time
-from sigproc import SigprocFile
+from .sigproc import SigprocFile
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -55,7 +55,7 @@ def write_filterbank_meta_file(f, summary, fb, values):
 
     metafile = open(metaname, 'w+')
     metafile.write('[asset]\n')
-    for k, v in asset.iteritems():
+    for k, v in asset.items():
         metafile.write('{} = "{}"\n'.format(k, str(v)))
 
 
@@ -64,7 +64,7 @@ def write_filterbank_meta_file(f, summary, fb, values):
         filterbank[c] = fb[c]
 
     metafile.write('\n\n[filterbank]\n')
-    for k, v in filterbank.iteritems():
+    for k, v in filterbank.items():
         metafile.write('{} = "{}"\n'.format(k, str(v)))
     
     logging.debug('wrote metafile %s', metaname)
@@ -124,11 +124,11 @@ def summarise_scan(f):
     hdr = DadaHeader.fromfile(f)
     d = {}
     d['dada_header'] = str(d)
-    for key, (v, comment) in hdr.iteritems():
+    for key, (v, comment) in hdr.items():
         if 'CHANMAP' in key or key == 'BEAM_ID':
-            d[key.lower()] = map(int, v.split(','))
+            d[key.lower()] = list(map(int, v.split(',')))
         elif (key.startswith('BEAMFORMER') and 'FREQMAP' in key) or key == "BEAM_RA" or key=='BEAM_DEC':
-            d[key.lower()] = map(float, v.split(','))
+            d[key.lower()] = list(map(float, v.split(',')))
         elif key == 'FREQ':
             d['freq'] = float(v)
         elif key == 'BEAM_POL':
@@ -146,7 +146,7 @@ def summarise_scan(f):
     del d['beam_ra']
     del d['beam_dec']
     # convention for elasticsearch is lat, lon, latitude first.
-    d['beam_directions'] = zip(map(fixlon, beam_ra), beam_dec)
+    d['beam_directions'] = list(zip(list(map(fixlon, beam_ra)), beam_dec))
     d['scanname'] = os.path.abspath(f).split('/')[-4]
     assert d['scanname'].startswith('201')
 
@@ -167,7 +167,7 @@ def summarise_scan(f):
         f['filesize'] = int(os.path.getsize(ff))
 
         fpfile = SigprocFile(ff)
-        for hname, value in fpfile.header.iteritems():
+        for hname, value in fpfile.header.items():
             f[hname.lower().replace('.','_')] = value
             
         

@@ -73,9 +73,9 @@ def slack(text,sb,scan,cid,ant,alias,attachment):
     plot_dir = '/data/TETHYS_1/bha03n/test/auto_plots'
 
     data = sys.stdin.readlines()
-    print type(data)
-    print data[0]
-    print "The contents of snoopy.log are", data[1]
+    print(type(data))
+    print(data[0])
+    print("The contents of snoopy.log are", data[1])
     line = data[1]
     values = line.split(" ")
     snr = values[0]
@@ -101,13 +101,13 @@ def slack(text,sb,scan,cid,ant,alias,attachment):
 
     if (attachment != None):
         image_key = attachment
-        print "Supplied attachment image is",image_key
+        print("Supplied attachment image is",image_key)
         client = boto3.client('s3',aws_access_key_id=ACCESS_KEY,aws_secret_access_key=SECRET_KEY)
         client.upload_file(image_key, BUCKET, image_key,ExtraArgs={'ContentType': "image/png", 'ACL': "public-read",'Expires': expires})
         url = client.generate_presigned_url(ClientMethod='get_object',ExpiresIn=604800,Params={'Bucket':BUCKET,'Key':image_key})
 
     else:
-        print "No attachement is provided"
+        print("No attachement is provided")
         url = None
     '''    
     client = boto3.client('s3',aws_access_key_id=ACCESS_KEY,aws_secret_access_key=SECRET_KEY)

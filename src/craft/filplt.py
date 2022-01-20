@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-import sigproc
+from . import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -46,7 +46,7 @@ def _main():
             
         ncand = candidates.shape[0]
 
-        for c in xrange(ncand):
+        for c in range(ncand):
             # 103.02 70298 60.9747 11 685 475.36 15 58374.2622446670 694.09
             mjd=candidates[c,7]
             dm=candidates[c,5]
@@ -55,10 +55,10 @@ def _main():
                 beam_files = values.files
             else:
                 beam_files = [f for f in values.files if int(f.split('.')[-2]) == beam]
-            print beam_files
+            print(beam_files)
 
             for f in beam_files:
-                print f, mjd, dm, beam
+                print(f, mjd, dm, beam)
                 plot(f, values, mjd, dm)
 
 def plot(f, values, mjd=None, dm=None):
@@ -81,12 +81,12 @@ def plot(f, values, mjd=None, dm=None):
     else:
         samp_start = int(np.round((values.mjd -tstart)*86400.0/tsamp)) - nsamp/2
 
-        print values.mjd, tstart, tsamp, samp_start
+        print(values.mjd, tstart, tsamp, samp_start)
             
         if samp_start < 0:
-            raise ValueError, 'Start sample is before start of filterbank'
+            raise ValueError('Start sample is before start of filterbank')
         if samp_start > s.nsamples:
-            raise ValueError, 'End sample is after end of filterbank'
+            raise ValueError('End sample is after end of filterbank')
 
     d = s[samp_start:samp_start+nsamp]
     # rescale to roughly 0 mean and 1 variance

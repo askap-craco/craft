@@ -73,11 +73,11 @@ class aipscor(object):
                 elif 'beam'+"{:02d}".format(self.pol2beam['y']) in vf:
                     vfiles_y += [vf]
                 else:
-                    print('ERROR, cannot identify polarization of: '+vf)
+                    print(('ERROR, cannot identify polarization of: '+vf))
             self.vfiles = [vfiles_x,vfiles_y]
             ntotf = len(vfiles_x)+len(vfiles_y)
             if ntotf != len(all_vfiles):
-                print('ERROR, file lost in the sorting process. expected: ',len(all_vfiles),', received: ', ntotf)
+                print(('ERROR, file lost in the sorting process. expected: ',len(all_vfiles),', received: ', ntotf))
         else:
             print('ERROR, there should be either 1 or 2 polarizations')
 
@@ -87,7 +87,7 @@ class aipscor(object):
             try:
                 self.an_name[n] = self.map_an_name(n)
             except:
-                print('Error in maping names for iant',n)
+                print(('Error in maping names for iant',n))
             
         # frequency information for vcraft files
         self.freqs = {}
@@ -301,7 +301,7 @@ class aipscor(object):
                     phase_fring_imag = float(data.split()[delay_ind+1]) # FRING imag phase
             phase_fring = phase_fring_real + 1j*phase_fring_imag
             if (abs(phase_fring)-1)>1e-3:
-                print("WARNING: amplitude of FRING phase is not 1 but "+str(abs(phase_fring)))
+                print(("WARNING: amplitude of FRING phase is not 1 but "+str(abs(phase_fring))))
         return phase_fring
     
     def get_phase_selfcal(self, an_ind, pol):

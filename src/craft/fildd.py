@@ -8,7 +8,7 @@ import numpy as np
 import os
 import sys
 import logging
-import sigproc
+from . import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -31,9 +31,9 @@ def _main():
     mjd_mid = None
     nsec = None
     if values.mjd:
-        mjd_mid, nsec = map(float, values.mjd.split(','))
+        mjd_mid, nsec = list(map(float, values.mjd.split(',')))
     elif values.times:
-        samp_start, nsamps = map(int, values.times.split(','))
+        samp_start, nsamps = list(map(int, values.times.split(',')))
 
     block_nsamps = 1024
 
@@ -62,7 +62,7 @@ def _main():
         fin.seek_sample(samp_start)
         nblocks = int((nsamps + block_nsamps +11)/block_nsamps)
         block_size = fin.nchans * fin.nifs * fin.nbits*block_nsamps/8
-        for blk in xrange(nblocks):
+        for blk in range(nblocks):
             b = fin.fin.read(block_size)
             fout.fin.write(b)
 

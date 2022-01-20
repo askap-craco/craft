@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-import sigproc
+from . import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -44,11 +44,11 @@ def _main():
         #d = file.readthismeanyseconds(t)
         nsamp = int(t*1000/tsamp)
         d = (np.random.randn(nchan, nsamp)*18 + 128).astype(np.uint8)
-        print t
+        print(t)
 
         frb = np.zeros((nchan, nsamp))
         times = np.arange(nsamp)
-        for c in xrange(nchan):
+        for c in range(nchan):
             freq = fch1 + c*foff
             dispersion_delay_ms = 4.15*dm*(fch1**-2 - freq**-2)
             dispersion_delay_samp = abs(dispersion_delay_ms/tsamp) + 50 # offset by a bit so the first few samples aren't off the end of the thing
@@ -60,7 +60,7 @@ def _main():
             total_width = np.sqrt(total_width2)
             amplitude = 1.
 
-            print amplitude, dm, widthms, widthsamp, freq, dispersion_delay_ms, dispersion_delay_samp, total_width2
+            print(amplitude, dm, widthms, widthsamp, freq, dispersion_delay_ms, dispersion_delay_samp, total_width2)
             x = amplitude*np.exp(-(times-dispersion_delay_samp)**2/total_width2/2.)
             tstart = int(dispersion_delay_samp - total_width)
             tend = int(dispersion_delay_samp + total_width)

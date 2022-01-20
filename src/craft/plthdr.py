@@ -13,7 +13,7 @@ import sys
 import logging
 from astropy.coordinates import SkyCoord
 from astropy import units as u
-from crafthdr import DadaHeader
+from .crafthdr import DadaHeader
 from aces.footprint_class import Footprint
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -51,10 +51,10 @@ def _main():
     for f in values.files:
         pylab.clf()
         hdr = DadaHeader.fromfile(f)
-        beamra = np.array(map(float, hdr['BEAM_RA'][0].split(',')))
+        beamra = np.array(list(map(float, hdr['BEAM_RA'][0].split(','))))
         nbeams = len(beamra)/2
         beamra = beamra[0:nbeams]
-        beamdec = np.array(map(float, hdr['BEAM_DEC'][0].split(','))[0:nbeams])
+        beamdec = np.array(list(map(float, hdr['BEAM_DEC'][0].split(',')))[0:nbeams])
         beampos = [SkyCoord(ra=bra, dec=bdec, frame='icrs', unit='deg') for (bra, bdec) in zip(beamra, beamdec)]
 
         ra = float(hdr['RA'][0])
@@ -84,9 +84,9 @@ def _main():
             nearest_beams.append((beamra[nearest_beam], beamdec[nearest_beam]))
 
             for ib, bm in enumerate(beampos):
-                print 'Beam {} {} separation {} nearest? {}'.format(ib, bm.to_string('hmsdms'), distances[ib], ib ==nearest_beam)
+                print('Beam {} {} separation {} nearest? {}'.format(ib, bm.to_string('hmsdms'), distances[ib], ib ==nearest_beam))
         
-            print f, 'antcoord', antpos.to_string('hmsdms'), antra, antdec, 'parang %0.1f'%ant_parangle,'Nearest beam', nearest_beam, 'Distance', distances[nearest_beam], 'or', psr.separation(beampos[nearest_beam]).arcsec, 'arcsec', 'beam RA/dec', beampos[nearest_beam].to_string('hmsdms'), psr.to_string('hmsdms')
+            print(f, 'antcoord', antpos.to_string('hmsdms'), antra, antdec, 'parang %0.1f'%ant_parangle,'Nearest beam', nearest_beam, 'Distance', distances[nearest_beam], 'or', psr.separation(beampos[nearest_beam]).arcsec, 'arcsec', 'beam RA/dec', beampos[nearest_beam].to_string('hmsdms'), psr.to_string('hmsdms'))
             try:
                 psrbeamno = int(hdr['FIELD_NAME'][0].split('_')[2].replace('beam',''))
                 psr_beam_numbers.append(psrbeamno)

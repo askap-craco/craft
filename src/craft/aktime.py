@@ -116,7 +116,7 @@ def bat2utc(bat, dutc=DUTC0):
 
 def bat_now():
     """Return current time as  (long value) BAT"""    
-    return long(utcDt2batStr(datetime.datetime.now(pytz.utc)), 16)
+    return int(utcDt2batStr(datetime.datetime.now(pytz.utc)), 16)
 
 
 def utc2bat(utc, dutc=DUTC0):
@@ -133,14 +133,14 @@ def utc2bat(utc, dutc=DUTC0):
     """
     # utcDJDs = 86400.0*utc
     utcMJDs = 86400.0*(utc+15019.5)  # in seconds
-    bat = long(utcMJDs + dutc)*1000000L
+    bat = int(utcMJDs + dutc)*1000000
     return bat
 
 
 def utcdjd2bat(utcDJD, dutc=DUTC0):
     utcDJDs = utcDJD*86400.0
     utcMJDs = utcDJDs + 86400.0*15019.5
-    bat = long(utcMJDs + dutc)*1000000L
+    bat = int(utcMJDs + dutc)*1000000
     return bat
 
 
@@ -155,7 +155,7 @@ def bat2utcDt(bat, dutc=DUTC0):
 
     """
     if type(bat) is str:
-        bat = long(bat, base=16)
+        bat = int(bat, base=16)
     # elif not(isinstance(bat, numbers.Number)):
     # elif not((type(bat) is int) or (type(bat) is long)):
     #    print('Argument bat must be a string or a number, not %s'% type(bat))

@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-import crafthdr
+from . import crafthdr
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -33,7 +33,7 @@ def _main():
         with open(f, 'r') as fin:
             fin.seek(sz)
             d = np.fromfile(fin, dtype=np.uint8)
-            print('{} contains {} zeros and {} nonzeros'.format(f, (d==0).sum(), (d!=0).sum()))
+            print(('{} contains {} zeros and {} nonzeros'.format(f, (d==0).sum(), (d!=0).sum())))
             
     
 

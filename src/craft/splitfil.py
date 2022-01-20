@@ -8,12 +8,12 @@ import numpy as np
 import os
 import sys
 import logging
-import sigproc
+from . import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 def parse_array(line):
-    return map(float, line.split(' ')[1].split(','))
+    return list(map(float, line.split(' ')[1].split(',')))
 
 def load_dada_beams(f):
     with open(f, 'rU') as fin:
@@ -52,7 +52,7 @@ def _main():
     if values.dada_header:
         radecs = load_dada_beams(values.dada_header)
     else:
-        radecs = [(header['src_raj'], header['src_dej']) for i in xrange(nbeams)]
+        radecs = [(header['src_raj'], header['src_dej']) for i in range(nbeams)]
 
     if fin.nbits == 8:
         dtype = np.uint8

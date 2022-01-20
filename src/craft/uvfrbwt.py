@@ -9,7 +9,7 @@ import os
 import sys
 import logging
 from astropy.io import fits
-from uvfits2fil import get_antname
+from .uvfits2fil import get_antname
 import shutil
 import pylab
 
@@ -94,7 +94,7 @@ def _main():
     if candidates.ndim == 1:
         candidates.shape = (1, -1)
 
-    print candidates.shape
+    print(candidates.shape)
 
     if candidates.shape[0] > 1:
         raise ValueError('Can\'t handle more than one candidate')
@@ -108,7 +108,7 @@ def _main():
         
     reader = UvFitsReader(fout)
     freqs = reader.freqs/1e3 # GHz
-    print 'FREQS max/min/mean,0,-1', freqs.max(), freqs.min(), freqs.mean(), freqs[0], freqs[-1]
+    print('FREQS max/min/mean,0,-1', freqs.max(), freqs.min(), freqs.mean(), freqs[0], freqs[-1])
     cdm = cand[5]
     cmjd = cand[7]
     cboxcar = cand[3]
@@ -179,10 +179,10 @@ def _main():
 
 def apply_weight2():
         
-    for irow in xrange(row_start, row_end):
+    for irow in range(row_start, row_end):
         a1, a2, mjd, spec, weights = reader[irow]
         if irow % 1000 == 0:
-            print 'Row {} of {} = {:0.1f}% Updated {}'.format(irow, len(reader), float(irow - row_start)/float(row_range)*100., total_update)
+            print('Row {} of {} = {:0.1f}% Updated {}'.format(irow, len(reader), float(irow - row_start)/float(row_range)*100., total_update))
 
         tdiff_ms = (cmjd - mjd)*86400.*1e3
         frb_weights = np.exp(-(tdiff_ms - dm_delay_ms)**2/(2*c**2))

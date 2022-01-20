@@ -126,12 +126,12 @@ def _main():
 
     # parse the reference direcotry:
     ref_files = group_by_ant(glob.glob(os.path.join(values.refdir, '*.cal.hdf5')))
-    logging.debug('Got reference files for antennas %s', str(ref_files.keys()))
+    logging.debug('Got reference files for antennas %s', str(list(ref_files.keys())))
 
     ant_files = group_by_ant(values.files)
 
 
-    for ant, ant_files in ant_files.iteritems():
+    for ant, ant_files in ant_files.items():
         logging.debug('Processing files %s', ant_files)
         ref_odc = ref_files.get(ant, [])
         if len(ref_odc) > 0:
@@ -156,15 +156,15 @@ def summarise_ref(ant_files, ref_odc, values):
         ref_freq, ref_data = ref_odc.data(0)
         ref_freq = ref_freq[chanrange]
         ref_data = ref_data[chanrange]
-        print 'Running', odcf.fname
+        print('Running', odcf.fname)
 
 
-        for i in xrange(nint):
+        for i in range(nint):
             freq, data = odcf.data(i)
             if np.any(freq != ref_freq):
                 #print 'Bleach freqs to match!', (freq - ref_freq)
-                print freq
-                print ref_freq
+                print(freq)
+                print(ref_freq)
                 fig,ax = pylab.subplots(1,1)
                 mask = freq != ref_freq
                 ax.plot(freq, ref_freq)
@@ -186,7 +186,7 @@ def summarise_ref(ant_files, ref_odc, values):
             dofilter = False
             if dofilter:
                 dnorm4 = norm_data.copy()
-                for prt in xrange(npaf):
+                for prt in range(npaf):
                     d = data[:, prt]
                     delayfit = delayfits.get(prt, None)
                     if delayfit is None:
@@ -232,7 +232,7 @@ def summarise_ref(ant_files, ref_odc, values):
     #normd = fild
     normd /= normd[-1, :, :]
 
-    print 'Fild', fild.shape, 'normd', normd.shape
+    print('Fild', fild.shape, 'normd', normd.shape)
     
     bats = np.array([m['bat'] for m in all_metadata])
     times = (bats - bats[0])/1e6/60

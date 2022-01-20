@@ -13,7 +13,7 @@ import logging
 import os
 import numpy as np
 from scipy import constants
-import fdmt # you'll need to have ../python in  you PYTHONPATH
+from . import fdmt # you'll need to have ../python in  you PYTHONPATH
 from graphviz import Digraph
 import datetime
 
@@ -135,8 +135,8 @@ class FdmtDag(object):
         dot = Digraph(name='cluster_iter0')
         dot.attr(label='Iteration 0')
         maindot.subgraph(dot)
-        for c in xrange(ishape[0]):
-            for d in xrange(ishape[1]):
+        for c in range(ishape[0]):
+            for d in range(ishape[1]):
                 maindot.node(fmt(0, c, d))
                 nnodes += 1
                 nplotnodes += 1
@@ -151,7 +151,7 @@ class FdmtDag(object):
             dot.attr(label='Iteration {}'.format(iterno+1))
             maindot.subgraph(dot)
 
-            for ochan in xrange(nchan):
+            for ochan in range(nchan):
                 chanconfig = thefdmt.hist_nf_data[iterno][ochan][-1]
                 #print '\tOut channel {}'.format(ochan)
                 last_id1 = -1
@@ -194,39 +194,39 @@ class FdmtDag(object):
 
     @property
     def nfifo_outputs(self):
-        return {k:max(ff) for k, ff in output_fifo_sizes.iteritems()}
+        return {k:max(ff) for k, ff in output_fifo_sizes.items()}
 
     @property
     def bulk_fifo_sizes(self):
-        return {k:min(ff) for k, ff in output_fifo_sizes.iteritems()}
+        return {k:min(ff) for k, ff in output_fifo_sizes.items()}
 
     @property
     def fanout_fifo_sizes(self):
-        return {k:max(ff) - min(ff) for k, ff in output_fifo_sizes.iteritems()}
+        return {k:max(ff) - min(ff) for k, ff in output_fifo_sizes.items()}
 
     @property
     def num_outputs(self):
-        return [len(ff) for ff in self.output_fifo_sizes.values()]
+        return [len(ff) for ff in list(self.output_fifo_sizes.values())]
 
     @property
     def max_ff_length(self):
-        return [max(ff) for ff in self.output_fifo_sizes.values()]
+        return [max(ff) for ff in list(self.output_fifo_sizes.values())]
 
     @property
     def ff_length_range(self):
-        return [max(ff) - min(ff) for ff in self.output_fifo_sizes.values()]
+        return [max(ff) - min(ff) for ff in list(self.output_fifo_sizes.values())]
 
     @property
     def total_offsets(self):
-        return np.array(self.nfifo_outputs.values())
+        return np.array(list(self.nfifo_outputs.values()))
 
     @property
     def bulk_sizes(self):
-        return np.array(self.bulk_fifo_sizes.values())
+        return np.array(list(self.bulk_fifo_sizes.values()))
 
     @property
     def fanout_sizes(self):
-        return np.array(self.fanout_fifo_sizes.values())
+        return np.array(list(self.fanout_fifo_sizes.values()))
 
     def print_stats(self):
         output_fifo_sizes = self.output_fifo_sizes
@@ -234,25 +234,25 @@ class FdmtDag(object):
         bulk_fifo_sizes = self.bulk_fifo_sizes
         fanout_fifo_sizes = self.fanout_fifo_sizes
         all_offsets = self.all_offsets
-        print 'Total offsets', sum(all_offsets), 'nfifo outputs', sum(nfifo_outputs.values()), 'largest fifo', max(nfifo_outputs.values()), 'total nodes', nnodes
+        print('Total offsets', sum(all_offsets), 'nfifo outputs', sum(nfifo_outputs.values()), 'largest fifo', max(nfifo_outputs.values()), 'total nodes', nnodes)
 
 
     def print_sr_stats(self, all_offsets):
         all_offsets = self.all_offsets
-        print "num FIFOs", len(all_offsets)
-        print 'Total SR entries', sum(all_offsets)
-        print 'Number of SR length ==0', sum(all_offsets == 0)
-        print 'Number of SR length ==1', sum(all_offsets == 1)
-        print 'Number of SR length ==2', sum(all_offsets == 2)
-        print 'Number of SR length >=1', sum(all_offsets >= 1)
-        print 'Number of SR length <=16', sum(all_offsets <= 16)
-        print 'Number of SR length <=32', sum(all_offsets <= 32)
-        print 'Number of SR length <=64', sum(all_offsets <= 64)
-        print 'Number of SR length >64', sum(all_offsets >64)
-        print 'Number of SR length >128', sum(all_offsets >128)
-        print 'Number of SR length >256', sum(all_offsets >256)
-        print 'Number of SR length >512', sum(all_offsets >512)
-        print 'Max SR length', max(all_offsets)
+        print("num FIFOs", len(all_offsets))
+        print('Total SR entries', sum(all_offsets))
+        print('Number of SR length ==0', sum(all_offsets == 0))
+        print('Number of SR length ==1', sum(all_offsets == 1))
+        print('Number of SR length ==2', sum(all_offsets == 2))
+        print('Number of SR length >=1', sum(all_offsets >= 1))
+        print('Number of SR length <=16', sum(all_offsets <= 16))
+        print('Number of SR length <=32', sum(all_offsets <= 32))
+        print('Number of SR length <=64', sum(all_offsets <= 64))
+        print('Number of SR length >64', sum(all_offsets >64))
+        print('Number of SR length >128', sum(all_offsets >128))
+        print('Number of SR length >256', sum(all_offsets >256))
+        print('Number of SR length >512', sum(all_offsets >512))
+        print('Max SR length', max(all_offsets))
 
 
     def print_transfer_stats(self):
@@ -267,24 +267,24 @@ class FdmtDag(object):
         best_case_load_nclk = float(min(longest_fifo, transfer_clocks))
         nfifos_by_size, fsize= np.histogram(total_offsets, bins=np.arange(0, max(total_offsets) + 1))
 
-        print 'Entries per transfer', entries_per_transfer, 'processing clocks_per_block', clocks_per_block
-        print 'longest_fifo', longest_fifo, 'transfer_clocks', transfer_clocks, 'worst case load nclks', worst_case_load_nclk
-        print 'Worst case Processing efficiency', clocks_per_block/(worst_case_load_nclk + clocks_per_block)
-        print 'Best possible efficiency', clocks_per_block/(best_case_load_nclk + clocks_per_block)
-        print 'Entry cache Num BRAMS', sum(total_offsets)*8/18e3*2 # 1 for input + 1 for output
-        print 'Number of entries that can be loaded from memory while clocking largest fifo', longest_fifo*entries_per_transfer, '=', longest_fifo*entries_per_transfer/float(sum(total_offsets))*100, '%'
+        print('Entries per transfer', entries_per_transfer, 'processing clocks_per_block', clocks_per_block)
+        print('longest_fifo', longest_fifo, 'transfer_clocks', transfer_clocks, 'worst case load nclks', worst_case_load_nclk)
+        print('Worst case Processing efficiency', clocks_per_block/(worst_case_load_nclk + clocks_per_block))
+        print('Best possible efficiency', clocks_per_block/(best_case_load_nclk + clocks_per_block))
+        print('Entry cache Num BRAMS', sum(total_offsets)*8/18e3*2) # 1 for input + 1 for output
+        print('Number of entries that can be loaded from memory while clocking largest fifo', longest_fifo*entries_per_transfer, '=', longest_fifo*entries_per_transfer/float(sum(total_offsets))*100, '%')
 
     def print_all_sr_stats(self):
-        print '*'*8, 'total'
+        print('*'*8, 'total')
         self.print_sr_stats(self.total_offsets)
 
-        print '*'*8, 'bulk'
+        print('*'*8, 'bulk')
         self.print_sr_stats(self.bulk_sizes)
 
-        print '*'*8, 'fanout'
+        print('*'*8, 'fanout')
         self.print_sr_stats(self.fanout_sizes)
 
-        print 'Total offsets', sum(self.total_offsets), ' total sum operations', len(self.all_offsets)
+        print('Total offsets', sum(self.total_offsets), ' total sum operations', len(self.all_offsets))
 
 
     def plot_fifo_sizes(self):
@@ -381,11 +381,11 @@ class FdmtDagFileIter3(object):
             queuepush = '// FIFO push statements\n\n'
             do_sums = ''
             read = ' '*4 + '// Read inputs\n'
-            for c in xrange(ncin):
-                for d in xrange(ndin):
+            for c in range(ncin):
+                for d in range(ndin):
                     read += '    fdmt_t {} = in[{}][{}];\n'.format(fmt(iterno, c, d), d,c)
 
-            for ochan in xrange(nchan):
+            for ochan in range(nchan):
                 chanconfig = thefdmt.hist_nf_data[iterno][ochan][-1]
                 #print '\tOut channel {}'.format(ochan)
                 last_id1 = -1
@@ -420,7 +420,7 @@ class FdmtDagFileIter3(object):
 
 
             # Find FIFOS for this iteration
-            myfifos = filter(lambda f: f.startswith('I{}'.format(iterno)), output_fifo_sizes)
+            myfifos = [f for f in output_fifo_sizes if f.startswith('I{}'.format(iterno))]
             for infmt in myfifos:
                 #ff_sizes = output_fifo_sizes[infmt]
                 #queuedecl += 'static fdmt_fifo<{},{}> {}_fifo;\n'.format(min(ff_sizes), max(ff_sizes), infmt)
@@ -432,8 +432,8 @@ class FdmtDagFileIter3(object):
             oshape = thefdmt.hist_state_shape[iterno+1]
 
             write = '\n\n// Write outputs\n\n'
-            for c in xrange(ncout):
-                for d in xrange(ndout):
+            for c in range(ncout):
+                for d in range(ndout):
                     if (c, d) in sums_done: # if the sum was actually done - load it into the array
                         vout = fmt(iterno+1, c, d);
                     else:
@@ -448,7 +448,7 @@ class FdmtDagFileIter3(object):
             iters += iterstart + read  + do_sums + queuepush + write + '}\n\n'
 
         # sort queues by size
-        sorted_queues = sorted(output_fifo_sizes.items(), key=lambda fsz: max(fsz[1]))
+        sorted_queues = sorted(list(output_fifo_sizes.items()), key=lambda fsz: max(fsz[1]))
         nfifos = len(output_fifo_sizes)
         ngroups = int(np.ceil(float(nfifos)/float(fifos_per_group)))
         npad = ngroups*fifos_per_group - nfifos # number of FIFOS not to include in the first group
@@ -475,7 +475,7 @@ class FdmtDagFileIter3(object):
             if fifo_size >= compound_threshold:
                 num_bram += (fifo_size + bram_depth -1 )//bram_depth
                 
-            print(fifo_name, fifo_size, nlut, num_bram)
+            print((fifo_name, fifo_size, nlut, num_bram))
 
             num_lut16 += nlut
             queuedecl += 'static FdmtFifo<{}, {}, {}> {}_fifo;\n'.format(fifo_size, group_id, group_offset, fifo_name);
@@ -505,7 +505,7 @@ void fdmt_load_fifos_from_cache(const group_cache_t input_cache[NUM_CACHES], gro
 #pragma HLS INLINE OFF
 '''
 
-        for group_id, fifos in group_fifos.iteritems():
+        for group_id, fifos in group_fifos.items():
             # Work out cache sizes
             groupsz = group_sizes[group_id]
             if this_cache_depth + groupsz > max_cache_depth:
@@ -704,15 +704,15 @@ const char* const FDMT_NAME = "{self.root_file_name}";
 
 
     def write_files(self, target_dir='.'):
-        print('Writing to ', target_dir)
+        print(('Writing to ', target_dir))
         hout = os.path.join(target_dir, self.header_file_name)
         with open(hout, 'w') as fout:
-            print("Writing to", hout)
+            print(("Writing to", hout))
             fout.write(self.hfile)
 
         cout = os.path.join(target_dir, self.code_file_name)
         with open(cout, 'w') as fout:
-            print("Writing to", cout);
+            print(("Writing to", cout));
             fout.write(self.cfile)
 
     def write_random_test_vectors(self, target_dir='.', seed=42):

@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-import sigproc
+from . import sigproc
 import itertools
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -21,7 +21,7 @@ def onpick(event):
     xdata, ydata = thisline.get_data()
     ind = event.ind
 
-    print thisline.get_label(), xdata[ind], ydata[ind]
+    print(thisline.get_label(), xdata[ind], ydata[ind])
 
 def _main():
     from argparse import ArgumentParser
@@ -37,7 +37,7 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     if values.times:
-        bits = map(int, values.times.split(','))
+        bits = list(map(int, values.times.split(',')))
         if len(bits) == 1:
             tstart = bits[0]
             ntimes = 128*8
@@ -54,7 +54,7 @@ def _main():
     antnos = [int(f.split('ak')[1][0:2]) for f in values.files]
     
     unique_antnos = sorted(set(antnos))
-    print len(unique_antnos), 'unique Antenna numbers', antnos
+    print(len(unique_antnos), 'unique Antenna numbers', antnos)
     nrows = 3
     ncols = 4
 
@@ -80,7 +80,7 @@ def _main():
             dtype = np.float32
         v = np.fromfile(f.fin, dtype=dtype, count=nelements )
         v = v.astype(np.float)
-        print 'Nelements', nelements, 'Ntimes', ntimes, 'nchans', f.nchans, 'nifs', f.nifs, dtype, 'Actual length', len(v), 'Tsamp', f.tsamp
+        print('Nelements', nelements, 'Ntimes', ntimes, 'nchans', f.nchans, 'nifs', f.nifs, dtype, 'Actual length', len(v), 'Tsamp', f.tsamp)
     
         v.shape = (ntimes, f.nifs, f.nchans)
         beam = 0
@@ -126,11 +126,11 @@ def _main():
         ax2.semilogy(freqs[1:], ffts[:, 1:].T)
         ax2.set_title('AK%02d' % ant)
 
-        maxfreqs = [freqs[np.argmax(ffts[i, 1:])] for i in xrange(ffts.shape[0])]
+        maxfreqs = [freqs[np.argmax(ffts[i, 1:])] for i in range(ffts.shape[0])]
 
         t = (times - t0)*24*60.
 
-        pylab.plot(t, maxfreqs, label='AK%02d'%ant, marker=marker.next(), alpha=0.5, ms=10)
+        pylab.plot(t, maxfreqs, label='AK%02d'%ant, marker=next(marker), alpha=0.5, ms=10)
 
         
     pylab.legend()

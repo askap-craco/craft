@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-import sigproc
+from . import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -35,7 +35,7 @@ def _main():
     tstarts = np.array([f.tstart for f in infiles])
     tstart_max = max(tstarts)
     sampoffs = np.round((tstart_max - tstarts)*86400.0/s0.tsamp).astype(int)
-    print 'Sample offsets', sampoffs
+    print('Sample offsets', sampoffs)
     nin = len(infiles)
     foff_out = s0.foff 
     # If you average N channels together, the center frequency moves.

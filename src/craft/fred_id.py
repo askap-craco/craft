@@ -139,7 +139,7 @@ def xmatch_astropy(i,ra,dec,blist,foflines,idio,psrname,cat1,radius,rdm):
 ##i,ra,dec,bm_list,foflines[fline_list],idio,cat_name,cat_dm,psr_select,dmlim
 def xmatch(beamno,blist,foflines,idio,psrname,psrdm,poslimits,rdm,rec):
     dm_values=blist.T[6]
-    print beamno
+    print(beamno)
 
     #single_tracer=False
     if len(foflines)==1:
@@ -150,8 +150,8 @@ def xmatch(beamno,blist,foflines,idio,psrname,psrdm,poslimits,rdm,rec):
     namelist=psrname[poslimits]
     dmlist=psrdm[poslimits]
     errorbar=rdm
-    print namelist
-    print dmlist+errorbar,dmlist-errorbar
+    print(namelist)
+    print(dmlist+errorbar,dmlist-errorbar)
     for n,i in enumerate(dm_values):
         #foflines[i]
         dmlimit=np.intersect1d(np.where(dmlist+errorbar>i),np.where(dmlist-errorbar<i))
@@ -176,7 +176,7 @@ def xmatch(beamno,blist,foflines,idio,psrname,psrdm,poslimits,rdm,rec):
             #print(mainpsr)
             idio.write_psr(mainpsr+' '+foflines[n][:-1]+' '+writename+'\n')
             #print 'write psr'
-            print(mainpsr+' '+foflines[n][:-1]+' '+writename+'\n')
+            print((mainpsr+' '+foflines[n][:-1]+' '+writename+'\n'))
             #print i,dmlist2[np.argmin(rec2)],dmlist2[np.argmin(dmlist2delta)]
         else:
             #print 'write frb'
@@ -285,7 +285,7 @@ def _main():
     parser.add_argument(dest='files', nargs='+',help=' hdr file here') ####hdr file name here
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
-    print values.files
+    print(values.files)
     if values.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
@@ -298,7 +298,7 @@ def _main():
     fof_loc=''
     dmlim=values.dmlim
     cs=values.shift
-    print("Search Radius: %f DM error range: %f"%(radius,dmlim))
+    print(("Search Radius: %f DM error range: %f"%(radius,dmlim)))
     ############ Generating psrcat database
     if os.path.exists(psrcat):
         print("reading data from psrcat")
@@ -315,10 +315,10 @@ def _main():
         newcat=open("psrcat.csv",'w')
         for i in range(len(ra)):
             if ra[i]=="*":
-                print (name[i],ra[i],dec[i])
+                print((name[i],ra[i],dec[i]))
                 continue
             if dec[i]=='*':
-                print (name[i],ra[i],dec[i])
+                print((name[i],ra[i],dec[i]))
                 continue
             c = SkyCoord(ra[i]+' '+dec[i], unit=(u.hourangle, u.deg))
             newcat.write(name[i]+";"+p0[i]+";"+dm[i]+';'+str(c.ra.deg)+';'+str(c.dec.deg)+";\n")

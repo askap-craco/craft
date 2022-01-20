@@ -12,7 +12,7 @@ import os
 import sys
 import logging
 import subprocess
-import crafthdr
+from . import crafthdr
 import itertools
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -22,7 +22,7 @@ def load_headers(hdr_files):
     hdrs.sort(key=lambda h: (int(h.get_value('ANTENNA_NO'), int(h.get_value('CARD_NO')), int(h.get_value('FPGA_ID')))))
     group_hdrs = itertools.groupby(hdrs, key=lambda h:h.get_value('ANT'))
     ant_hdrs = {ant:hdrs for ant, hdrs in group_hdrs}
-    print ant_hdrs.keys()
+    print(list(ant_hdrs.keys()))
     return ant_hdrs
 
 def _main():
@@ -52,7 +52,7 @@ def _main():
         assert rdata.shape == idata.shape
         xaxis_all = rdata[:, 0]
         xaxis_all.shape = (nant, -1) # should be the same for all antennas
-        for a in xrange(nant):
+        for a in range(nant):
             xaxis = xaxis_all[a, :]
             assert np.all(xaxis == xaxis_all[0, :])
 
@@ -64,13 +64,13 @@ def _main():
         fulld.imag = idata[:, 1]
         #fulld.shape = (nant, -1)
         #pylab.plot(xaxis, np.angle(fulld.T))
-        print 'FULLDSHAPE', fulld.shape
+        print('FULLDSHAPE', fulld.shape)
         fulld.shape = (nant, -1, nchan)
         delayspec = np.fft.fftshift(np.fft.fft(fulld, axis=2), axes=2)
-        print 'DElayspec', delayspec.shape, delayspec.dtype
+        print('DElayspec', delayspec.shape, delayspec.dtype)
         ncol = int(np.ceil(np.sqrt(nant)))
         nrow = (nant)//ncol + 1
-        print 'NROW, NCOL', nrow, ncol
+        print('NROW, NCOL', nrow, ncol)
 
         fig, ax = pylab.subplots(nrow, ncol)
         ax = ax.flatten()
@@ -79,7 +79,7 @@ def _main():
         #ax2 = ax2.flatten()
         xaxis_reshape = xaxis.reshape(-1, nchan).mean(axis=1)
         extent = (xaxis[0], xaxis[-1], -nchan/2 + 0.5, nchan/2 + 0.5)
-        for a in xrange(nant):
+        for a in range(nant):
             ax[a].imshow(np.log10(abs(delayspec[a, :, :].T)), aspect='auto', extent=extent)
             if a == 0:
                 ax[a].set_ylabel('delay (samples)')

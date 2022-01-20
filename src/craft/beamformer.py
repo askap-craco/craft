@@ -86,7 +86,7 @@ class CraftBeamformer(Beamformer):
         # for emulator, we increment port number
         # on same host so set incrementPortNum to True
         rbtype = RBType.RBTYPE_BEAMFORMER
-        print self.ctrl_addr, self.data_addr, rbtype
+        print(self.ctrl_addr, self.data_addr, rbtype)
         # NB: Beamformer.cc Boost wrapper doesn't have the port number in it
         Beamformer.__init__(self, self.ctrl_addr, self.data_addr, rbtype)
 
@@ -139,7 +139,7 @@ class CraftBeamformer(Beamformer):
             timeout += 1
                 
             if timeout == 10:
-                print 'Timout - no BAT captured'
+                print('Timout - no BAT captured')
                 return
 
     def start_craft(self):
@@ -193,10 +193,10 @@ class CraftBeamformer(Beamformer):
 
     def check_craft_enabled(self):
         all_enabled = True
-        for fpga in xrange(6):
+        for fpga in range(6):
             bits = self.get_capability_register(fpga+1)
             craft_enable = (bits & 0x10) == 0x10
-            print 'FPGA %d capabilities 0x%x CRAFT enabled? %s' % (fpga, bits, craft_enable)
+            print('FPGA %d capabilities 0x%x CRAFT enabled? %s' % (fpga, bits, craft_enable))
             all_enabled &= craft_enable
 
         assert all_enabled, 'CRAFT not enabled on this beamformer'
@@ -219,7 +219,7 @@ class CraftConsole(object):
         pass
 
     def input(self, msg):
-        return raw_input(msg)
+        return input(msg)
 
     def output(self, msg):
         sys.stdout.write(msg)

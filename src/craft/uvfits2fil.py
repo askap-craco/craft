@@ -10,7 +10,7 @@ import numpy as np
 import os
 import sys
 import logging
-import sigproc
+from . import sigproc
 from astropy.io import fits
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -69,7 +69,7 @@ def _main():
             pylab.plot(spec.imag)
             pylab.show()
 
-        if bl not in outfiles.keys() and len(outfiles) < values.maxfiles:
+        if bl not in list(outfiles.keys()) and len(outfiles) < values.maxfiles:
             if ia1 == ia2:
                 extra = 'auto'
             else:
@@ -85,10 +85,10 @@ def _main():
             #dayfrac = row['_DATE']
             fulljd = float(jd) 
             mjd = fulljd - 2400000.5
-            print 'dates', jd,  fulljd, '{:15}'.format(mjd)
+            print('dates', jd,  fulljd, '{:15}'.format(mjd))
             fch1 = fcent - foff*(nchan - ref_channel)
             hdr = {'fch1':fch1, 'foff':foff,'tsamp':inttime, 'tstart':mjd, 'nbits':32, 'nifs':1, 'nchans':nchan, 'src_raj':0.0, 'src_dej':0.0}
-            print 'Opening', bl, outf, hdr
+            print('Opening', bl, outf, hdr)
             fout = sigproc.SigprocFile(outf, 'w', hdr)
             outfiles[bl] = fout
 
@@ -96,7 +96,7 @@ def _main():
             fout = outfiles[bl]
             abs(spec).tofile(fout.fin)
 
-    for k,fout in outfiles.iteritems():
+    for k,fout in outfiles.items():
         fout.fin.close()
         
     

@@ -17,7 +17,7 @@ from askap.adbe import Beamformer, adbe_msg_str, FilterTypes, ZoomModes, AdbeSta
 from askap.craft.sigproc import SigprocFile
 import askap.craft.pktdump as pktdump
 import askap.time
-import cPickle as pickle
+import pickle as pickle
 import atexit
 import numpy as np
 import time
@@ -29,7 +29,7 @@ import datetime
 import threading
 import select
 
-from craft_fil import TxHeader, RxHeaderV2
+from .craft_fil import TxHeader, RxHeaderV2
 
 
 NBEAMS = 72
@@ -71,8 +71,8 @@ class Emulator(object):
             logging.debug('Makeing beamforer sockets for  beamforemrs: (%s), %s', len(bfs), bfs)
             for bfnum in bfs:
                 addr = hdr['BEAMFORMER%d_ADDR' % bfnum]
-                f = np.array(map(float, hdr['BEAMFORMER%d_FREQMAP' % bfnum].split(','))) # MHz
-                c = map(float, hdr['BEAMFORMER%d_CHANMAP'% bfnum].split(','))
+                f = np.array(list(map(float, hdr['BEAMFORMER%d_FREQMAP' % bfnum].split(',')))) # MHz
+                c = list(map(float, hdr['BEAMFORMER%d_CHANMAP'% bfnum].split(',')))
                 p = int(hdr['BEAMFORMER%d_PORT' % bfnum])
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 rxaddr = ("127.0.0.1", p)
@@ -101,7 +101,7 @@ class Emulator(object):
         rsocks, wsocks, xsocks = select.select(self.socks, [], [])
         sock = rsocks[0]
 
-        print 'Got data from socket', sock, self.socks, rsocks
+        print('Got data from socket', sock, self.socks, rsocks)
 
         data, addr = sock.recvfrom(9000)
         hdr = TxHeader.make_from_buffer(data)
@@ -156,7 +156,7 @@ class Emulator(object):
     def _make_times(self):
         ic = self.int_cycles
         times = np.zeros(4*ic, dtype=np.uint64)
-        for cyc in xrange(self.int_cycles):
+        for cyc in range(self.int_cycles):
             times[2*cyc+0] = self.curr_frameno # start frame
             times[2*cyc+1] = self.curr_frameno + self.int_time - 1 # stop frame
             self.curr_frameno += self.frame_increment
@@ -190,15 +190,15 @@ class Emulator(object):
         tsamp = self.int_time / SAMP_RATE # seconds
         tsamp_ms = tsamp*1e3
 
-        for b in xrange(NBEAMS):
+        for b in range(NBEAMS):
             dm = 10.*float(b) 
 
-            for t in xrange(ic):
+            for t in range(ic):
                 tnow = inum + t # integrations
                 ipulse = tnow / pulse_interval
                 tpulse_start = ipulse*pulse_interval
                 
-                for c in xrange(NCHANS):
+                for c in range(NCHANS):
                     c2 = fpga*NCHANS + c
                     f = self.freqs[c2]/1e3 # GHz
             
@@ -224,8 +224,8 @@ class Emulator(object):
         ic = self.int_cycles
         im = self.intnum
         data = np.zeros((NCHANS, ic, NBEAMS))
-        for c in xrange(NCHANS):
-            for t in xrange(ic):
+        for c in range(NCHANS):
+            for t in range(ic):
                 tmod = (im + t) % 256
                 data[c, t, :] = np.arange(NBEAMS) + tmod + self.freqs[fpga*NCHANS + c]
 
@@ -235,7 +235,7 @@ class Emulator(object):
     def make_packet(self):
         ic = self.int_cycles
         times = self._make_times()
-        for fpga in xrange(NFPGAS):
+        for fpga in range(NFPGAS):
             # According to beamformer.cc it should be FTB with beam fastest
             data = self.get_data_pulses(fpga)
                 #data = self.get_data_ramps(fpga)
@@ -254,10 +254,10 @@ class Emulator(object):
         assert self.pktfile is not None
         
         while True:
-            hdr, address, data, dt  = self.pktfile.next()
+            hdr, address, data, dt  = next(self.pktfile)
             rxhd = RxHeaderV2(**hdr)
             cardno = int(address[0].split('.')[3])
-            if cardno in self.tx_addr.keys():
+            if cardno in list(self.tx_addr.keys()):
                 break;
 
 

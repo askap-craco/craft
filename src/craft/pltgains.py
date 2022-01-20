@@ -54,7 +54,7 @@ def load_gains(f):
     nrows = len(real)
     reald = []
     imagd = []
-    for row in xrange(nrows):
+    for row in range(nrows):
         assert len(real[row][2]) == len(imag[row][2])
         reald.append(real[row][2])
         imagd.append(imag[row][2])
@@ -76,7 +76,7 @@ def load_all(files, values):
     data = {}
     for f in files:
         time, card, beam, g = load_file(f, values)
-        if (card, beam) not in data.keys():
+        if (card, beam) not in list(data.keys()):
             data[(card,beam)] = []
             
         data[(card, beam)].append((time, g[0, :]))
@@ -87,18 +87,18 @@ def load_all(files, values):
 def plot(data, values):
     lines = []
     labels = []
-    size = map(int, values.nxy.split(','))
+    size = list(map(int, values.nxy.split(',')))
     fig, ax = pylab.subplots(size[0],size[1], sharex=True, sharey=True)
     ax = ax.flatten()
 
     plt.locator_params(axis='x', nbins=3)
-    for card, beam in data.keys():
+    for card, beam in list(data.keys()):
         alld = data[(card, beam)]
         all_times = np.array([d[0] for d in alld])
         all_g = np.array([d[1] for d in alld])
 
         nsamp, nant = all_g.shape
-        for iant in xrange(nant):
+        for iant in range(nant):
             g = all_g[:, iant]
             gdelta = g / g[0]
             l, = ax[iant].plot(all_times, np.angle(gdelta, deg=True), marker='o', ls='-')
@@ -110,7 +110,7 @@ def plot(data, values):
         labels.append('{} {}'.format(card, beam))
 
 
-    print lines, labels
+    print(lines, labels)
     fig.legend(lines, labels)
     fig.text(0.01, 0.5, 'Phase change (deg)', rotation=90, va='center', ha='left')
     fig.text(0.5, 0.01, 'Time (HH:MM)', va='bottom', ha='center')

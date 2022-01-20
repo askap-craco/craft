@@ -14,8 +14,8 @@ import numpy as np
 import os
 import sys
 import logging
-import fdmt
-import sample_fdmt
+from . import fdmt
+from . import sample_fdmt
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -104,7 +104,7 @@ class IterConfig(object):
         fifo_length = self.unitfdmt.fifo_length(iterno, read_dm, input_channel)
         toffset = fifo_length - 1 - ioffset # time offset from end of FIFO
 
-        print 'state2conf d=', d, 'iterno', iterno, 'input_channel', input_channel, 'unitidx', unitidx, 'iout', iout, 'fifo_length', fifo_length, 'toffset', toffset, 'read_dm', read_dm
+        print('state2conf d=', d, 'iterno', iterno, 'input_channel', input_channel, 'unitidx', unitidx, 'iout', iout, 'fifo_length', fifo_length, 'toffset', toffset, 'read_dm', read_dm)
 
         return read_dm, toffset
 
@@ -130,7 +130,7 @@ class IterConfig(object):
         dex = ioffset * maxout + dmidx // maxout
         assert 0 <= dex < MAX_DM_PER_UNIT
 
-        print 'conf2state', 'ind',ind, 'inchan',inchan, 'toffset', toffset, 'dex',dex, 'iiter', iiter, 'iunit',iunit, 'iout', iout
+        print('conf2state', 'ind',ind, 'inchan',inchan, 'toffset', toffset, 'dex',dex, 'iiter', iiter, 'iunit',iunit, 'iout', iout)
         return dex, iiter, iunit, iout
         
     def __str__(self):
@@ -149,7 +149,7 @@ class UnitFdmtState(object):
     def set(self, iterno, iunit, outidx, value, metadata=None):
         self.state[iterno, iunit, outidx] = value
         self.metastate[iterno, iunit, outidx] = metadata
-        print 'Set state iterno', iterno, 'iunit', iunit, 'outidx', outidx, value, 'meta=', metadata
+        print('Set state iterno', iterno, 'iunit', iunit, 'outidx', outidx, value, 'meta=', metadata)
         (iterno, read_dm, input_channel, toffset) = metadata
         conf = IterConfig(self.unitfdmt, iterno)
         cdex, ciiter, ciunit, ciout = conf.conf2state(read_dm, input_channel, toffset)
@@ -213,11 +213,11 @@ class UnitFdmt(sample_fdmt.IndividualFifos):
 
         
         # Push the input data in to the iteration 0 FIFOs
-        for c in xrange(din.shape[0]):
-            for d in xrange(din.shape[1]):
+        for c in range(din.shape[0]):
+            for d in range(din.shape[1]):
                 self.shift(0, d, c, din[c, d])
 
-        for d in xrange(MAX_DM_PER_UNIT): # "d" is less about DMs and more about a state machine
+        for d in range(MAX_DM_PER_UNIT): # "d" is less about DMs and more about a state machine
             # Not all of state is used
             state = UnitFdmtState(self)
 
@@ -227,13 +227,13 @@ class UnitFdmt(sample_fdmt.IndividualFifos):
             # Loop through the state and set the outputs appropriately for this d
             for iterno, theiter in enumerate(thefdmt.hist_nf_data):
                 inconfig = IterConfig(self, iterno)
-                print 'd=', d, 'interno', iterno, 'inconfig', inconfig
-                for input_channel in xrange(inconfig.nchan):
-                    for unitidx in xrange(inconfig.nunit_per_chan):
+                print('d=', d, 'interno', iterno, 'inconfig', inconfig)
+                for input_channel in range(inconfig.nchan):
+                    for unitidx in range(inconfig.nunit_per_chan):
                         # For each channel we need to update the state, then calculate the
                         iunit = input_channel*inconfig.nunit_per_chan + unitidx
                         # Copy data from FIFOs to state
-                        for iout in xrange(inconfig.maxout):
+                        for iout in range(inconfig.maxout):
                             read_dm, toffset = inconfig.state2conf(d, iterno, input_channel, unitidx, iout)
                             if toffset >= 0:
                                 v = self.read(iterno, read_dm, input_channel, toffset)
@@ -243,19 +243,19 @@ class UnitFdmt(sample_fdmt.IndividualFifos):
             for iterno, theiter in enumerate(thefdmt.hist_nf_data):
                 inconfig = IterConfig(self, iterno)
                 outconfig = IterConfig(self, iterno+1)
-                print 'Finished writing state. Now calculating inputs to FIFOs', d, iterno, outconfig
-                for output_channel in xrange(outconfig.nchan):
+                print('Finished writing state. Now calculating inputs to FIFOs', d, iterno, outconfig)
+                for output_channel in range(outconfig.nchan):
                     ndm = outconfig.ndm_in_for_chan(output_channel)
-                    print 'Channel', output_channel, 'ndm', ndm
-                    for unitidx in xrange(outconfig.nunit_per_chan):
+                    print('Channel', output_channel, 'ndm', ndm)
+                    for unitidx in range(outconfig.nunit_per_chan):
                         # For each channel we need to update the state, then calculate the
                         iunit = output_channel*outconfig.nunit_per_chan + unitidx
                         assert iunit < nunit
                                     
-                        for idm in xrange(outconfig.ndm_per_unit): # For each DM this unit is responsible for
+                        for idm in range(outconfig.ndm_per_unit): # For each DM this unit is responsible for
                             odm = unitidx*outconfig.ndm_per_unit + d
                             if odm >= ndm:
-                                print 'ODM', odm, 'ndm', ndm, 'Breaking out of loop'
+                                print('ODM', odm, 'ndm', ndm, 'Breaking out of loop')
                                 break
 
                             # OK so we need to convert odm, output_channel into id1, id2, offset, ichan1 and ichan2
@@ -267,9 +267,9 @@ class UnitFdmt(sample_fdmt.IndividualFifos):
                             dex1, iter1, iunit1, iout1 = inconfig.conf2state(in_d1, in_chan1, 0)
                             dex2, iter2, iunit2, iout2 = inconfig.conf2state(in_d2, in_chan2, time_offset)
 
-                            print 'Calc', d, iterno, output_channel, unitidx, odm,
-                            print dex1, iter1, iunit1, iout1, in_d1, in_chan1
-                            print dex2, iter2, iunit2, iout2, in_d2, in_chan2, time_offset
+                            print('Calc', d, iterno, output_channel, unitidx, odm, end=' ')
+                            print(dex1, iter1, iunit1, iout1, in_d1, in_chan1)
+                            print(dex2, iter2, iunit2, iout2, in_d2, in_chan2, time_offset)
                             
                             # If current d == expected d, then read value from state
                             if d == dex1:

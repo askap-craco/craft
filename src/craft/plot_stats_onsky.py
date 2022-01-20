@@ -34,7 +34,7 @@ def _main():
 
     underlay = values.files[0]
     stats = np.genfromtxt(values.files[1], dtype=None)
-    print stats
+    print(stats)
     cmap = plt.cm.get_cmap('viridis')
     nhrs = np.array([s[6]/3600. for s in stats])
 
@@ -46,8 +46,8 @@ def _main():
 
     hdulist = fits.open(underlay)
     hdr = hdulist[0].header
-    print str(hdr)
-    print hdulist.info()
+    print(str(hdr))
+    print(hdulist.info())
     d = hdulist[0].data
     fig, ax = plt.subplots()
     rapix = hdr['CRPIX1']
@@ -56,17 +56,17 @@ def _main():
     assert hdr['CTYPE1'] == 'RA---CAR'
     decpix,decdelt,decval = hdr['CRPIX2'], hdr['CDELT2'], hdr['CRVAL2']
     assert hdr['CTYPE2'] == 'DEC--CAR'
-    print d.shape
+    print(d.shape)
     ny, nx = d.shape
     left = (0 - rapix)*radelt + raval
     right = (nx - rapix)*radelt + raval
     
     bottom = (0 - decpix)*decdelt + decval
     top = (ny - decpix)*decdelt + decval
-    print 'top', top, d.shape[0], decpix, decdelt, decval
+    print('top', top, d.shape[0], decpix, decdelt, decval)
     extents = (left, right, bottom, top)
 
-    print extents
+    print(extents)
     #$aspect = 1./abs((right-left)*15/(top - bottom))
 
     ax.imshow(d, vmin=3400, vmax=6600, cmap='gray_r', origin='bottom', extent=extents)
@@ -85,7 +85,7 @@ def _main():
     
 
     for ifield, field in enumerate(stats):
-        print ifield, field
+        print(ifield, field)
         ra = field[1]
         dec = field[2]
         hrs = nhrs[ifield]
@@ -93,7 +93,7 @@ def _main():
         circ = plt.Circle((ra, dec), 5.5/2., alpha=0.6, facecolor=color, edgecolor=color)
         height = np.sqrt(32.)
         width = abs(height/np.cos(np.radians(dec)))
-        print height, width
+        print(height, width)
         if dec < -30:
             rot = 0
         else:

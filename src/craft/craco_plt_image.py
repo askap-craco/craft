@@ -18,7 +18,7 @@ def plot(f, values):
     nd = values.nd
     nt = values.nt
     npix = values.npix
-    xpix, ypix = map(int, values.pix.split(','))
+    xpix, ypix = list(map(int, values.pix.split(',')))
     
     d = np.fromfile(f, dtype=np.complex64).reshape(nd, nt/2, npix, npix)
     imgs = np.zeros((nd, nt, npix, npix))
@@ -26,7 +26,7 @@ def plot(f, values):
     imgs[:, 1::2, :, :] = d.imag
     maxidx = np.argmax(imgs)
     dmax, tmax, ymax, xmax = np.unravel_index(maxidx, imgs.shape)
-    print 'max at', maxidx, dmax, tmax, ymax, xmax, imgs.flat[maxidx]
+    print('max at', maxidx, dmax, tmax, ymax, xmax, imgs.flat[maxidx])
     fig,ax = pylab.subplots(1,2)
     ax[0].imshow(imgs[dmax, tmax, :, :], aspect='auto', origin='lower')
     ax[1].plot(imgs[:, :, ymax, xmax].T)

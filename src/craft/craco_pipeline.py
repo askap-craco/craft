@@ -11,10 +11,10 @@ import numpy as np
 import os
 import sys
 import logging
-import craco
-import craco_plan
-import craco_kernels
-import uvfits
+from . import craco
+from . import craco_plan
+from . import craco_kernels
+from . import uvfits
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 

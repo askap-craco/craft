@@ -12,7 +12,7 @@ from . crafthdr import DadaHeader
 from . beamformer import RxHeaderV1, RxHeaderV2, TxHeader, NamedStruct, buffer_to_header
 import socket
 import datetime
-import cPickle as pickle
+import pickle as pickle
 
 CraftSpectrum_struct = struct.Struct('<QQQQ576f')
 
@@ -27,7 +27,7 @@ class PicklePacketFile(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         try:
             pkt = pickle.load(self.fin)
             # usually RxHeaderV2, address (IP string , port), pktdata (bytes), datetime
@@ -43,7 +43,7 @@ class RawPacketFile(object):
         dada_hdr = DadaHeader.fromfile(filename)
         self.hdr = {}
         self.dada_hdr = dada_hdr
-        for k, (v, comment) in dada_hdr.iteritems():
+        for k, (v, comment) in dada_hdr.items():
             self.hdr[k] =v
 
         # Fix up some headers
@@ -53,7 +53,7 @@ class RawPacketFile(object):
 
         nbf = int(self.hdr['NUM_BEAMFORMERS'])
         cards = []
-        for i in xrange(nbf):
+        for i in range(nbf):
             addr = self.hdr['BEAMFORMER{}_ADDR'.format(i)]
             card = addr.split('.')[3]
             cards.append(card)
@@ -69,7 +69,7 @@ class RawPacketFile(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         import binascii
 
         addr = '\x00\x00\x00\x00'
@@ -105,7 +105,7 @@ def pktopen(filename):
 
     try:
         pktfile = PicklePacketFile(filename)
-    except pickle.PickleError, EOFError:
+    except pickle.PickleError as EOFError:
         pktfile = RawPacketFile(filename)
 
     return pktfile

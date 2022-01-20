@@ -68,12 +68,12 @@ class PolyphaseFilterbank(object):
         stride = self.stride
         K = self.K
 
-        for f in xrange(nframes):
+        for f in range(nframes):
             afin[stride:K] = afin[0:off]
             afin[0:stride] = x[off+(f+1)*stride:off+f*stride:-1]
             reg1 = mreshape(afin, (self.paths, self.taps))
             
-            for k in xrange(self.paths):
+            for k in range(self.paths):
                 v1[k] = np.dot(reg1[k, :], self.hh1[k, :])
 
             v1 = v1[::-1]
@@ -95,12 +95,12 @@ class PolyphaseFilterbank(object):
         sf_state = np.zeros(self.K + self.stride*(nframes - 1), dtype=np.complex)
         sf_out = np.zeros((nframes-1)*self.stride, dtype=np.complex)
 
-        for f in xrange(nframes):
+        for f in range(nframes):
             ind = x[:, f]
             temp = np.fft.ifft(ind)
             shift_indx = self.fft_shifts_rev[f % len(self.fft_shifts_rev)]
             temp = np.roll(temp, -shift_indx)
-            for lp1 in xrange(self.taps): # Could this be implemented as a tile & reshape?
+            for lp1 in range(self.taps): # Could this be implemented as a tile & reshape?
                 reg[lp1*self.paths:(lp1+1)*self.paths] = temp 
 
             reg *= self.h2
@@ -160,7 +160,7 @@ class ResampleFilterbank(object):
         nframes = len(x)/self.N
         xout = np.reshape(x, (nframes, self.N))
         dout = np.fft.fft(xout, axis=1).T
-        for c in xrange(dout.shape[0]):
+        for c in range(dout.shape[0]):
             df = scipy.signal.resample_poly(dout[c, :], self.num, self.den, window=self.window)
             start = len(df) - dout.shape[1]
             dout[c, :] = df[start:] # discard first few samples
@@ -180,7 +180,7 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     fb = AdeFilterbank()
-    print fb
+    print(fb)
     pylab.figure()
     pylab.plot(fb.c)
     pylab.figure()
@@ -195,8 +195,8 @@ def _main():
     xfb = fb.analysis(x, x.dtype)
     spec = np.real(xfb*np.conj(xfb)).sum(axis=1)
     
-    print xfb.shape, xfb
-    print spec.shape, spec
+    print(xfb.shape, xfb)
+    print(spec.shape, spec)
     pylab.figure()
     pylab.plot(spec)
     fb2 = ResampleFilterbank(fb.paths, 32, 27)

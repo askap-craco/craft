@@ -13,9 +13,9 @@ import sys
 import logging
 import itertools
 import re
-from craftobs import load_beams
-from plotutil import subplots as mysubplots
-import plotutil
+from .craftobs import load_beams
+from .plotutil import subplots as mysubplots
+from . import plotutil
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -34,7 +34,7 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     if values.times:
-        bits = map(int, values.times.split(','))
+        bits = list(map(int, values.times.split(',')))
         if len(bits) == 1:
             tstart = bits[0]
             ntimes = 128*8
@@ -72,21 +72,21 @@ def _main():
     fs = 1e6*32./27.
     tint = 1500./fs # seconds
     fint = 1./tint
-    print 'fs', fs, 'Tint', tint, fint
+    print('fs', fs, 'Tint', tint, fint)
 
     
     for i, antdir in enumerate(values.files):
         antpath = os.path.join(antdir, 'C000/')
         try:
             beams = load_beams(antpath, tstart, ntimes)
-            print 'Loaded beams', beams.shape, i, antdir
+            print('Loaded beams', beams.shape, i, antdir)
         except:
             logging.exception('Could not load beams at path %s', antdir)
             continue
         
         # shape is time, beam, freq
         
-        print beams.shape
+        print(beams.shape)
         ntimes, nbeams, nfreqs = beams.shape
         #dm0 = beams.mean(axis=2)
 
@@ -101,7 +101,7 @@ def _main():
 
         ax2 = axes2.flat[i]
         mean_bandpass = beams.mean(axis=0).T
-        print 'mean bp', mean_bandpass.shape
+        print('mean bp', mean_bandpass.shape)
         ax2.plot(mean_bandpass)
         ax2.set_title(antname)
 
@@ -109,7 +109,7 @@ def _main():
 
         ax3 = axes3.flat[i]
         beam_std = beams.std(axis=0).T
-        for b in xrange(nbeams):
+        for b in range(nbeams):
             ax3.plot(beam_std[:, b], label='Beam %d' % b, picker=3)
 
         ax3.set_title(antname)
@@ -118,15 +118,15 @@ def _main():
         df = np.abs(np.fft.rfft(dm0, axis=0))**2
         nft = df.shape[0]
         freqs = np.arange(nft)/float(nft)*fint/2.
-        print 'Freqs', freqs.shape, df.shape
-        for b in xrange(nbeams):
+        print('Freqs', freqs.shape, df.shape)
+        for b in range(nbeams):
             ax4.loglog(freqs[1:], df[1:, b], label='Beam %d' % b, picker=3)
 
         ax4.set_title(antname)
 
         ax5 = axes5.flat[i]
         b0 = beams[:, beamno, :]
-        print b0.shape
+        print(b0.shape)
         ax5.imshow(b0.T, aspect='auto')
         ax5.set_title(antname)
 

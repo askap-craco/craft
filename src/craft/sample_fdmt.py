@@ -14,7 +14,7 @@ def is_power_of_2(x):
     return math.log(x, 2).is_integer()
 
     
-class SampleFdmt(object):
+class SampleFdmt(object, metaclass=ABCMeta):
     '''
     Abstract base class (ABC) representing  a sample based FDMT based on the supplied block-based FDMT.
 
@@ -26,7 +26,6 @@ class SampleFdmt(object):
     - execute() - which takes in a block of data, initialises it, and runs fdmt_process on each time sample
 
     '''
-    __metaclass__ = ABCMeta
     
     def __init__(self, thefdmt):
         '''
@@ -84,15 +83,15 @@ class SampleFdmt(object):
         assert din.shape[1] == thefdmt.init_delta_t
         
         # Push the input data in to the iteration 0 FIFOs
-        for c in xrange(din.shape[0]):
-            for d in xrange(din.shape[1]):
+        for c in range(din.shape[0]):
+            for d in range(din.shape[1]):
                 self.shift(0, d, c, din[c, d])
 
         niter = len(thefdmt.hist_nf_data)
         dout = np.zeros(thefdmt.max_dt)
 
         for iterno, theiter in enumerate(thefdmt.hist_nf_data):
-            for output_channel in xrange(len(theiter)):
+            for output_channel in range(len(theiter)):
                 chanconfig = thefdmt.hist_nf_data[iterno][output_channel][-1]
                 for out_d, config in enumerate(chanconfig):
                     # id1, id2, offset are values in the lookup table
@@ -128,7 +127,7 @@ class SampleFdmt(object):
         # Dinit shape is nf, nd, nt
         ntout = dinit.shape[2]
         out = np.zeros((thefdmt.max_dt, ntout))
-        for t in xrange(ntout):
+        for t in range(ntout):
             out[:, t] = self.fdmt_process(dinit[:, :, t])
 
         return out
@@ -192,7 +191,7 @@ class MaxFifoPerIteration(SampleFdmt):
             nc = state_shape[0] # number of output channels in this iteration
             nd = state_shape[1] # maximum number of DMs in this iteration
             buf = self.make_buffer(nd, nc, fifo_sizes)            
-            print 'Iteration', curr_iterno, 'buffer ', buf.shape, 'size', buf.size, ' maxbuf', fifo_sizes.max(), 'state_shape', state_shape
+            print('Iteration', curr_iterno, 'buffer ', buf.shape, 'size', buf.size, ' maxbuf', fifo_sizes.max(), 'state_shape', state_shape)
             self.buffers.append(buf)
             
     def buffer_size(self):
@@ -225,7 +224,7 @@ class IndividualFifos(SampleFdmt):
         self.fifos = {} # Dictionary of FIFOS (cheater) key=(iterno, d, c) 
         self.__buffer_size = 0
         for curr_iterno, theiter in enumerate(thefdmt.hist_nf_data):
-            for output_channel in xrange(len(theiter)):
+            for output_channel in range(len(theiter)):
                 chanconfig = thefdmt.hist_nf_data[curr_iterno][output_channel][-1]
                 for idt, config in enumerate(chanconfig):
                     in_d1 = config[1]

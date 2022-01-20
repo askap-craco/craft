@@ -3,7 +3,7 @@
 import sys, os, glob
 
 if len(sys.argv) != 3:
-    print("Usage: {} <SSID1> <SSID2>".format(sys.argv[0]))
+    print(("Usage: {} <SSID1> <SSID2>".format(sys.argv[0])))
     sys.exit()
 
 SSID1path = sys.argv[1]
@@ -17,16 +17,16 @@ outdir = "{}-{}".format(SSID1,SSID2)
 # Check directories exists
 
 if not os.path.exists(SSID1path):
-    print("{} does not exist! Exiting".format(SSID1))
+    print(("{} does not exist! Exiting".format(SSID1)))
     sys.exit()
 if not os.path.isdir(SSID1path):
-    print("{} is not a directory. Exiting".format(SSID1))
+    print(("{} is not a directory. Exiting".format(SSID1)))
     sys.exit()
 if not os.path.exists(SSID2path):
-    print("{} does not exist! Exiting".format(SSID2))
+    print(("{} does not exist! Exiting".format(SSID2)))
     sys.exit()
 if not os.path.isdir(SSID2path):
-    print("{} is not a directory. Exiting".format(SSID2))
+    print(("{} is not a directory. Exiting".format(SSID2)))
     sys.exit()
 
 
@@ -36,7 +36,7 @@ ants2 = [os.path.basename(i) for i in glob.glob("{}/ak*".format(SSID2path))]
 ants2.sort()
 
 if not ants1 == ants2:
-    print("Error: {} and {} do not contain the same antennas!!".format(SSID1, SSID2))
+    print(("Error: {} and {} do not contain the same antennas!!".format(SSID1, SSID2)))
     sys.exit()
 
 # Check the antennas themselves are directories
@@ -44,7 +44,7 @@ if not ants1 == ants2:
 for s in [SSID1path, SSID2path]:
     for a in ants1:
         if not os.path.isdir("{}/{}".format(s,a)):
-            print("{}/{} is not a directory. Exiting".format(s,a))
+            print(("{}/{} is not a directory. Exiting".format(s,a)))
             sys.exit()
 
 # Create a new directory locally and add symlinks
@@ -52,7 +52,7 @@ for s in [SSID1path, SSID2path]:
 try:
     os.mkdir(outdir)
 except OSError:  # May could continue if directory already exists
-    print ("Creation of the directory {} failed".format(outdir))
+    print(("Creation of the directory {} failed".format(outdir)))
     sys.exit()
 
 #try:
@@ -65,10 +65,10 @@ except OSError:  # May could continue if directory already exists
 def getBeam(ssidpath, ant):
     beam = glob.glob("{}/{}/beam*".format(ssidpath, ant))
     if len(beam)==0:
-        print("Error no beams in {}/{}".format(ssidpath, a))
+        print(("Error no beams in {}/{}".format(ssidpath, a)))
         sys.exit()
     if len(beam)>1:
-        print("Error multiple beams in {}/{}".format(ssidpath, a))
+        print(("Error multiple beams in {}/{}".format(ssidpath, a)))
         sys.exit()
     return(os.path.basename(beam[0]))
 
@@ -82,7 +82,7 @@ for a in ants1:
     try:
         os.mkdir("{}/{}".format(outdir,a))
     except OSError: 
-        print ("Creation of the directory {} failed".format(a))
+        print(("Creation of the directory {} failed".format(a)))
         sys.exit()
 
     beam1 = getBeam(SSID1path, a)

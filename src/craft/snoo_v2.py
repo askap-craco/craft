@@ -73,7 +73,7 @@ def _main():
                     latency_ms = (now.mjd - cand_mjd)*86400.0*1e3
                     best_beam = int(beamno)
                     s = 'Found CANDIDATE: sn={} width={} dm={} mjd={} latency={}ms beam={}'.format(sn, width, dm, cand_mjd, latency_ms, best_beam)
-                    print s
+                    print(s)
                     cand_list = list(best_cand)
                     cand_list.append(latency_ms)
 

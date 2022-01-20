@@ -11,10 +11,10 @@ import os
 import sys
 import logging
 import itertools
-from crafthdr import DadaHeader
-import freqconfig
+from .crafthdr import DadaHeader
+from . import freqconfig
 import warnings
-import unpack_vcraft
+from . import unpack_vcraft
 log = logging.getLogger(__name__)
 
 bat_cards = ('START_WRITE_BAT40','STOP_WRITE_BAT40','TRIGGER_BAT40')
@@ -52,7 +52,7 @@ def unpack_craft(fin, nsamp_per_word):
     bitshift = 32/nsamp_per_word
     assert nsamp_per_word*bitshift == 32
 
-    for samp in xrange(nsamp_per_word):
+    for samp in range(nsamp_per_word):
         # convert from 4-bit two's complement to int8
         d[samp::4, :, 0] = (dwords & 0xf) - (dwords & 0x8)*2 # real
         dwords >> 4
@@ -77,7 +77,7 @@ class VcraftFile(object):
         self.infsamp = float(hdr['SAMP_RATE'][0]) # samples per second
         # TODO: Calculate frequencies a bit better - tricky because individual
         # files have freqs with gaps, which makes life a little wierd in sigprocland
-        self.freqs = np.array(map(float, hdr['FREQS'][0].split(',')))
+        self.freqs = np.array(list(map(float, hdr['FREQS'][0].split(','))))
 
         # TODO: Get tstart from BATs. This is the easy way
         #self.tstart = float(hdr['ANT_MJD'][0])
@@ -133,9 +133,9 @@ class VcraftFile(object):
         bats = self.bats
         frames = self.frames
 
-        print 'BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6
+        print('BAT duration (s)', (bats[0] - bats[1])/1e6,'offset', (bats[2] - bats[0])/1e6, 'file offset', (bat0_40 - bats[0])/1e6)
         # lowest 32 bits of bat from the time the file was written
-        print 'FRAMES duration', (frames[0] - frames[1])/infsamp,'offset', (frames[2] - frames[0])/infsamp
+        print('FRAMES duration', (frames[0] - frames[1])/infsamp,'offset', (frames[2] - frames[0])/infsamp)
 
     def _cache_put(self, startsamp, requested_nsamp, d):
         log.debug('Putting cache %s %s %s', startsamp, requested_nsamp, d.shape)
@@ -277,7 +277,7 @@ class VcraftFile(object):
             dwords.shape = (nwordsamps, nchan)
             nsamps = nsamp
             d = np.empty((nwordsamps*16, nchan, 2), dtype=np.int8)
-            for samp in xrange(16):
+            for samp in range(16):
                 # Convert 0 into +1 and 1 into -1
                 d[samp::16, :, 0] = 1 - 2*(dwords & 0x1) # real
                 dwords >>= 1
@@ -302,10 +302,10 @@ class VcraftFile(object):
         bats = np.array([int(self.hdr[b][0], base=16) for b in bat_cards])
         frames = np.array([int(self.hdr[b][0], base=10) for b in frame_cards])
         for b, bc in zip(bat_cards, bats):
-            print b,  self.hdr[b][0], bc, bc-bats[0], (bc-bats[0])/1e6, 's'
+            print(b,  self.hdr[b][0], bc, bc-bats[0], (bc-bats[0])/1e6, 's')
 
         for b, bc in zip(frame_cards, frames):
-            print b,  self.hdr[b][0], bc, bc-frames[0], (bc-frames[0])/(1e6*32/27), 's'
+            print(b,  self.hdr[b][0], bc, bc-frames[0], (bc-frames[0])/(1e6*32/27), 's')
 
 
 class VcraftMux(object):
@@ -332,7 +332,7 @@ class VcraftMux(object):
         assert self.data_type == 'CRAFT_VOLTAGES'
         self.samp_rate = float(self.hdr_identical('SAMP_RATE'))
         freq_str = self.allhdr('FREQS')
-        freqs = np.array([map(float, flist.split(',')) for flist in freq_str])
+        freqs = np.array([list(map(float, flist.split(','))) for flist in freq_str])
 
         # there was traditionally a frequency offset of + 1inserted in the header
         # See craft-232
@@ -350,8 +350,8 @@ class VcraftMux(object):
         self.all_samps = [f.nsamps for f in self._files]
         self.nsamps = min(self.all_samps)
 
-        self.trigger_frameids = np.array(map(int, self.allhdr('TRIGGER_FRAMEID')))
-        self.trigger_mjds = np.array(map(float, self.allhdr('TRIGGER_MJD')))
+        self.trigger_frameids = np.array(list(map(int, self.allhdr('TRIGGER_FRAMEID'))))
+        self.trigger_mjds = np.array(list(map(float, self.allhdr('TRIGGER_MJD'))))
         
         self.start_mjds = np.array([f.start_mjd for f in self._files])
         self.start_mjd = max(self.start_mjds)
@@ -364,14 +364,14 @@ class VcraftMux(object):
         self.all_overlap_samps = [f.nsamps - self.sample_offsets[i] for i,f in enumerate(self._files)]
         self.overlap_nsamps = min(self.all_overlap_samps)
 
-        print 'SAMPLE OFFSETS', self.sample_offsets, 'FILE DELAYS', self.file_delays
+        print('SAMPLE OFFSETS', self.sample_offsets, 'FILE DELAYS', self.file_delays)
         assert np.all(self.sample_offsets >= 0)
         assert np.all(self.sample_offsets < self.nsamps)
         self.start_mjd = self.start_mjds[np.argmin(self.sample_offsets)]
         assert np.all(abs(self.start_mjds - self.trigger_mjds) < 1), 'MJD adjustment should be << 1 day'
 
-        beam_ra = np.array(map(float, self.allhdr('BEAM_RA', -99))).mean() # TODO: make craft_vdump write same BEAM_RA for all card/fpgas
-        beam_dec = np.array(map(float, self.allhdr('BEAM_DEC',-99))).mean()
+        beam_ra = np.array(list(map(float, self.allhdr('BEAM_RA', -99)))).mean() # TODO: make craft_vdump write same BEAM_RA for all card/fpgas
+        beam_dec = np.array(list(map(float, self.allhdr('BEAM_DEC',-99)))).mean()
         #self.beam_pos = SkyCoord(beam_ra, beam_dec, frame='icrs', unit=('deg','deg'))
         self.beam_pos = (beam_ra, beam_dec)
         self.hdr = self._files[0].hdr
@@ -466,7 +466,7 @@ def _main():
 
     all_files = []
     for f in values.files:
-        print f
+        print(f)
         vf = VcraftFile(f)
         vf.print_summary()
         all_files.append(vf)
@@ -484,7 +484,7 @@ def _main():
         #print mux.freqs
         mjd = mux.start_mjd
         secofday = (mjd - int(mjd))*86400.0
-        print str(mux), mux.ant, 'STARTMJD', '%0.10f'%mux.start_mjd, secofday
+        print(str(mux), mux.ant, 'STARTMJD', '%0.10f'%mux.start_mjd, secofday)
 
 if __name__ == '__main__':
     _main()

@@ -51,7 +51,7 @@ class FreqConfig(object):
         self.chanmaps = np.empty((nbf, nfreqsperbf), dtype=np.int32)
         self.freqmaps = np.empty((nbf, nfreqsperbf), dtype=np.float32)
 
-        for ibf in xrange(nbf):
+        for ibf in range(nbf):
             bf_freq = freqs[ibf, :]
             bfsort = np.sort(bf_freq)
             if reverse:
@@ -86,16 +86,16 @@ class FreqConfig(object):
 
     @staticmethod
     def load_from_dada_header(dada_header, cards=None, freqname='FREQS'):
-        from crafthdr import DadaHeader
+        from .crafthdr import DadaHeader
 
         h = dada_header
         nbf = int(h.get_value('NUM_BEAMFORMERS'))
         freqs = []
         card_data = {}
-        for i in xrange(nbf):
+        for i in range(nbf):
             addr = h.get_value('BEAMFORMER{}_ADDR'.format(i))
             cardno = int(h.get_value('BEAMFORMER{}_CARDNO'.format(i)))
-            myfreqs = map(float, h.get_value('BEAMFORMER{}_{}'.format(i, freqname)).split(','))
+            myfreqs = list(map(float, h.get_value('BEAMFORMER{}_{}'.format(i, freqname)).split(',')))
 
             if len(myfreqs) == 0:
                 raise ValueError('no frequencies for beamformerer ibf {}'.format(i))
@@ -132,11 +132,11 @@ class FreqConfig(object):
             
             # Now read that puppy
             subbandpv = PV(pvname)
-            for i in xrange(10):
+            for i in range(10):
                 subbands = subbandpv.get()
                 if len(subbands) > 0:
                     break
-                print 'Retry', pvname
+                print('Retry', pvname)
 
 
             # need to do this because the other bits arent part of the actual subband.
@@ -147,7 +147,7 @@ class FreqConfig(object):
             assert np.all(subbands >= 0), 'Invalid subbands: %s for %s' % (subbands, subbandpv)
             pvfreqs = []
             for sbid in subbands:
-                for f in xrange(8):
+                for f in range(8):
                     channo = sbid*8 + f
                     pvfreqs.append(pvchans[channo])
 

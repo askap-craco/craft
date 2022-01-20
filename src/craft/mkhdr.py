@@ -60,7 +60,7 @@ def _main():
     tsamp = float(int_time)/samp_rate
 
     bufmode_map = {16:0, 8:1, 4:2, 1:3}
-    assert values.buffer_mode in bufmode_map.keys(), 'Invalid buffer mode'
+    assert values.buffer_mode in list(bufmode_map.keys()), 'Invalid buffer mode'
     bufmode = bufmode_map[values.buffer_mode]
 
     if values.beam_number is None:
@@ -157,7 +157,7 @@ def _main():
 
 
     for (h, v, c) in hdr.cards:
-        print h, v
+        print(h, v)
 
 
 if __name__ == '__main__':

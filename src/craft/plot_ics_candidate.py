@@ -80,54 +80,54 @@ def make_vcraft_plots(sb,scan,cid,cid_vol,dm,beam_v,beam,ant,mjd,plot_time):
     # Here cid would be the capture id for the particular observation.
     # Here beam should be vcraft beam for the particular observation.
     
-    print "X polarisation is",beam_v[0]
-    print "Y polarisation is",beam_v[1]
-    print "Making plots using filterbank made from voltages"
-    print "Antenna to work on is",ant
-    print type(ant)
+    print("X polarisation is",beam_v[0])
+    print("Y polarisation is",beam_v[1])
+    print("Making plots using filterbank made from voltages")
+    print("Antenna to work on is",ant)
+    print(type(ant))
     original_sb = sb
     sb = fix_sb(sb)
     plot_dir = '/data/TETHYS_1/bha03n/test/auto_plots/'
     
     for i in range (len(beam_v)):
-        print "I is",i
+        print("I is",i)
         fil_path = ant +'/' + str(beam_v[i]) + '/beam.fil' 
         vcraft_path = ant+ '/'  + str(beam_v[i]) +'/'
         
         my_file = os.path.isfile(fil_path)
 
         if my_file:
-            print "file is present"
+            print("file is present")
         else:
-            print "Making a beam.fil"
+            print("Making a beam.fil")
             cmd = ' numactl --cpunodebind 0 /home/craftop/craftdev/python/vcraft2fil.py -i 4 ' + vcraft_path + '*.vcraft' + ' -o ' + vcraft_path+ 'beam.fil'
-            print cmd
+            print(cmd)
             os.popen(cmd)
          
          
         assert os.path.isfile(fil_path), 'Looks like vcraft2fil didnt work'
         
         cmd1 = 'dspsr -cepoch=start   -D ' + str(dm) + ' -c ' + str(plot_time) + '  -T ' + str(plot_time) + ' -k askap -N source -O '+ plot_dir +original_sb+'_'+scan+'_'+str(cid)+'_'+ant+'_'+str(beam_v[i]) + '_on'+' ' + fil_path
-        print cmd1
+        print(cmd1)
         os.popen(cmd1)
 
-    print "Adding both the polarisations"         
+    print("Adding both the polarisations")         
     cmd2 = 'psradd -o ' + plot_dir +original_sb+'_'+scan+'_'+str(cid)+'_'+ant+'_'+str(beam) + '_on_add.ar ' +  plot_dir +original_sb+'_'+scan+'_'+str(cid)+'_'+ant+'_beam*_on.ar'
-    print cmd2
+    print(cmd2)
     os.popen(cmd2)
     
-    print "Now plotting"
+    print("Now plotting")
     cmd3 = 'psrplot -p freq+ -c psd=0 -c x:unit=ms -jD -j "F 54"  -D ' + plot_dir + original_sb+'_'+scan+'_'+str(cid)+'_'+ant+'_'+str(beam) + '_on'+'.png/png ' + plot_dir + original_sb+'_'+scan+'_'+str(cid)+'_'+ant+'_'+str(beam) + '_on_add.ar'
-    print cmd3
+    print(cmd3)
     os.popen(cmd3)
-    print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
 def incoherent_sum(sb,scan,cid,beam,flag):
     
     plot_dir = '/data/TETHYS_1/bha03n/test/auto_plots/'
     if (flag==1):
     
-        print "Using filterbanks created from voltages" 
+        print("Using filterbanks created from voltages") 
         
 
         in_file_on = '{}_{}_{}_*{}_on_add.ar'.format(sb, scan, cid, beam)
@@ -138,14 +138,14 @@ def incoherent_sum(sb,scan,cid,beam,flag):
         outf_on = os.path.join(plot_dir,out_file_on)
         plot1f_on = os.path.join(plot_dir,plot1_on)
         cmd = 'psradd  -o ' + outf_on + ' ' + inf_on
-        print cmd
+        print(cmd)
         os.popen(cmd)
         cmd2 = 'pav -DFTp -N 3,3  ' + inf_on + ' ' + outf_on + ' -g ' + plot1f_on + '.png/PNG'
-        print cmd2
+        print(cmd2)
         os.popen(cmd2)
     else:
         
-        print " Using offline filterbanks"
+        print(" Using offline filterbanks")
         in_file_off = '{}_{}_{}_*{}_off.ar'.format(sb, scan, cid, beam)
         out_file_off = '{}_{}_{}_{}_off_ics.ar'.format(sb, scan, cid, beam)
         plot1_off = '{}_{}_{}_{}_off_ics.DFTp'.format(sb, scan, cid, beam)
@@ -154,24 +154,24 @@ def incoherent_sum(sb,scan,cid,beam,flag):
         outf_off = os.path.join(plot_dir,out_file_off)
         plot1f_off = os.path.join(plot_dir,plot1_off)
         cmd3 = 'psradd  -o ' + outf_off + ' ' + inf_off
-        print cmd3
+        print(cmd3)
         os.popen(cmd3)
         cmd4 = 'pav -DFTp -N 3,3  ' + inf_off + ' ' + outf_off + ' -g ' + plot1f_off + '.png/PNG'
-        print cmd4
+        print(cmd4)
         os.popen(cmd4)
     
 def make_plots(sb,scan,cid,dm,beam,ant,mjd,plot_time):
 	# Here CID should be the scan ID and beam should be the actual beam
 
-    print "Making plots using offline filterbank"
+    print("Making plots using offline filterbank")
     fil_path = '/data/TETHYS_1/craftop/data/'+ sb + '/' + scan + '/' + ant + '/' + str(cid) + '/*' + str(beam) + '.fil'
     
     plot_dir = '/data/TETHYS_1/bha03n/test/auto_plots/'
     start_pulse,nsamp,tsamp = find_start_time(sb,scan,cid,beam,mjd,ant)
-    print nsamp
-    print tsamp
+    print(nsamp)
+    print(tsamp)
     tsamp_s = tsamp*1e-6
-    print tsamp_s
+    print(tsamp_s)
     tobs = nsamp*tsamp_s
     t_left = tobs - start_pulse
     
@@ -188,9 +188,9 @@ def make_plots(sb,scan,cid,dm,beam,ant,mjd,plot_time):
     
     
     cmd1 = 'dspsr -cepoch=start -S ' + str(timeoff) + ' -D ' + str(dm) + ' -c ' + str(plot_time) + '  -T ' + str(plot_time) + ' -k askap -N source -O '+ plot_dir +sb+'_'+scan+'_'+str(cid)+'_'+ant+'_'+str(beam)+'_off' + ' ' + fil_path
-    print cmd1
+    print(cmd1)
     cmd2 = 'psrplot -p freq+ -c psd=0 -c x:unit=ms -jD   -D ' + plot_dir + sb+'_'+scan+'_'+str(cid)+'_'+ant+'_'+str(beam)+'_off' + '.png/png ' + plot_dir + sb+'_'+scan+'_'+str(cid)+'_'+ant+'_'+str(beam) + '_off.ar'
-    print cmd2
+    print(cmd2)
     os.popen(cmd1)
     os.popen(cmd2)
 
@@ -206,23 +206,23 @@ def check_realcand_ics(args):
     # I should be inside /data/TETHYS_1/craftop/data/testing/voltages/SB1783/20180605075255/ICS/C0
     ant = []
     beam_v = []
-    print "Snoopy real-time candidate"
+    print("Snoopy real-time candidate")
     cmd = 'pwd | sed  "s/\// /g" | awk "{print $10}"'
     capture = os.popen(cmd).read()
     capture_id = capture[-3:]
-    print "CID is", cid
+    print("CID is", cid)
     
     beam_path = 'co*/beam*'
-    print beam_path
+    print(beam_path)
     for b in glob.glob(beam_path):
-        print "File is",b
+        print("File is",b)
         ant.append(b.split('/')[0])
         beam_v.append(b.split('/')[1])
         
     ant = np.unique(ant)
     beam_v = np.unique(beam_v)
-    print "Antennas are",ant
-    print "The two polarisation beams are",beam_v
+    print("Antennas are",ant)
+    print("The two polarisation beams are",beam_v)
     snop = np.loadtxt("snoopy.log")
     snr = snop[0]
     fredsnop_mjd = snop[7]
@@ -234,14 +234,14 @@ def check_realcand_ics(args):
 
     if (fmode=='on'):
         for i in range(len(ant)):
-            print "Making plots using online filterbanks now for ",ant[i]
+            print("Making plots using online filterbanks now for ",ant[i])
             flag = 1
             make_vcraft_plots(sb,scan,cid,capture_id,dm,beam_v,beam,str(ant[i]),fredsnop_mjd, plot_time)
         incoherent_sum(sb,scan,cid,beam,flag)
 
     else:
         for i in range(len(ant)):
-            print "Making plots using offline filterbanks now for ",ant[i]
+            print("Making plots using offline filterbanks now for ",ant[i])
             flag = 0
             make_plots(sb,scan,cid,dm,beam,str(ant[i]),fredsnop_mjd, plot_time)
         incoherent_sum(sb,scan,cid,beam,flag)
@@ -249,11 +249,11 @@ def check_realcand_ics(args):
 def find_start_time(sb,scan,cid,beam,mjd,ant):
     # Get the MJDs from the filterbank files.
     fil_path = '/data/TETHYS_1/craftop/data/'+ sb + '/' + scan + '/' + ant + '/' + cid + '/*' + str(beam) + '.fil'  
-    print "filtebank file is",fil_path
+    print("filtebank file is",fil_path)
     header_path = '/home/sha355/bin/header'
     cmd1 = header_path + ' ' + fil_path + ' -tstart'
     fil_mjd = os.popen(cmd1).read()
-    print "Fil MJD is",fil_mjd
+    print("Fil MJD is",fil_mjd)
     fil_mjd = float(fil_mjd)
     cmd2 = header_path + ' ' + fil_path + ' -nsamples'
     nsamp = os.popen(cmd2).read()
@@ -264,7 +264,7 @@ def find_start_time(sb,scan,cid,beam,mjd,ant):
     tsamp = float(tsamp)
 
     start_time = (mjd-fil_mjd)*86400.
-    print "Start time of the pulse is",start_time
+    print("Start time of the pulse is",start_time)
     return start_time,nsamp,tsamp
 
 def slack(args):
@@ -288,7 +288,7 @@ def slack(args):
     latency_ms = snop[8]
     
     beam = fix_beam(beam)
-    print "Fmode is",fmode
+    print("Fmode is",fmode)
     if (fmode == 'on'):
         image = '{}_{}_{}_{}_on_ics.DFTp.png'.format(sb, scan, cid, beam)
     else:
@@ -309,7 +309,7 @@ def slack(args):
     client = boto3.client('s3',aws_access_key_id=ACCESS_KEY,aws_secret_access_key=SECRET_KEY)
     
     image_key = plot_dir + "/" + image
-    print image_key
+    print(image_key)
     
     client.upload_file(image_key, BUCKET, image_key,ExtraArgs={'ContentType': "image/png", 'ACL': "public-read",'Expires': expires})
     url = client.generate_presigned_url(ClientMethod='get_object',Params={'Bucket':BUCKET,'Key':image_key})

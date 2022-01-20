@@ -30,9 +30,9 @@ def _main():
     h = pyfits.open(values.files[0])
 
     uvdata = h[0].data
-    print h.info()
+    print(h.info())
     info = []
-    for irow in xrange(len(uvdata)):
+    for irow in range(len(uvdata)):
         row = uvdata[irow]
         u,v,w,jd,jdfrac,baseline,inttim,freqsel,source,datareal = row
         u,v,w = np.array([u,v,w,])*1e9

@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
-from crafthdr import DadaHeader
+from .crafthdr import DadaHeader
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -46,7 +46,7 @@ def _main():
     hdrs = [DadaHeader.fromfile(f) for f in hfiles]
         
     antennalist = sorted(set([f['ANT'][0].lower() for f in hdrs]))
-    print 'Antennalist: ', antennalist
+    print('Antennalist: ', antennalist)
 
     # determine the available cards from the header files
     cardsallhfiles = []
@@ -55,7 +55,7 @@ def _main():
     	card = int(hdr.get_value('CARD_NO'))
 	cardsallhfiles.append(card)
     cardnumbers = np.unique(cardsallhfiles)
-    print 'Cardnumbers: ', cardnumbers
+    print('Cardnumbers: ', cardnumbers)
 
     ncards = len(cardnumbers)
 
@@ -76,7 +76,7 @@ def _main():
 	mode = int(hdr.get_value('MODE'))
 	downlbeam = int(hdr.get_value('BEAM'))
     	if downlbeam != beamno:
-    	    print 'Beam in header file {} ({}) does not match beam argument {}'.format(f, downlbeam, beamno)
+    	    print('Beam in header file {} ({}) does not match beam argument {}'.format(f, downlbeam, beamno))
 
 
     # check that each card-fpga combination handles the same frequencies on each antenna
@@ -87,7 +87,7 @@ def _main():
                     #print 'freqs for C{} F{} in antennas {} and {} are the same'.format(c, f, a-1, a)
                     pass
                 else:
-                    print '!!! freqs for C{} F{} in antennas {} and {} are NOT the same'.format(c, f, a-1, a)
+                    print('!!! freqs for C{} F{} in antennas {} and {} are NOT the same'.format(c, f, a-1, a))
 
     # make a mapping for frequency - card/fpga combination;
     # sorted from low freq to high freq
@@ -109,7 +109,7 @@ def _main():
 
     dfiles = values.files
     if not dfiles:
-    	print 'No data files in {} for beam{}'.format(values.files, beamno)
+    	print('No data files in {} for beam{}'.format(values.files, beamno))
 	sys.exit()
 
     cf_sorted_spec = np.zeros((nant, len(dfiles), ncards * nfpgas * nfpgachans, nchan), dtype=np.complex64)
@@ -125,7 +125,7 @@ def _main():
         assert rdata.shape == idata.shape
         xaxis_all = rdata[:, 0]
         xaxis_all.shape = (nant, -1) # should be the same for all antennas
-        for a in xrange(nant):
+        for a in range(nant):
             xaxis = xaxis_all[a, :]
             assert np.all(xaxis == xaxis_all[0, :])
 
@@ -181,7 +181,7 @@ def _main():
 		    if snoffset > SN_THRESHOLD:
 		    	offset = cf_sorted_av.shape[3]/2 - ioffsetmax
 
-                print 'DELAYS', delays.shape
+                print('DELAYS', delays.shape)
 		delays[antenna+1, scan, fpga] = offset
 		#print '{} c{} f{} {}'.format(antennalist[antenna+1], fpga/nfpgas + 1, fpga%nfpgas, offset)
 
@@ -189,10 +189,10 @@ def _main():
     for antenna in range(delays.shape[0]):
     	for scan in range(1, delays.shape[1]):
 	    if not np.array_equal(delays[antenna, 0, :], delays[antenna, scan, :]):
-	    	print 'ANTENNA {}: delays for scan {} differ with respect to first scan {}'.format(antennalist[antenna], timestamps[scan], timestamps[0])
+	    	print('ANTENNA {}: delays for scan {} differ with respect to first scan {}'.format(antennalist[antenna], timestamps[scan], timestamps[0]))
 
     if scanid > len(timestamps) - 1:
-    	print 'WARNING: Invalid scanid {}, there are only {} scans, using first scan.'.format(scanid, len(timestamps))
+    	print('WARNING: Invalid scanid {}, there are only {} scans, using first scan.'.format(scanid, len(timestamps)))
     	scanid = 0
 
     # write the delays from the first scan to file

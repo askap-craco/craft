@@ -258,7 +258,7 @@ def time_blocks(vis, nt):
                 t = 0
 
 
-        if blid not in d.keys():
+        if blid not in list(d.keys()):
             d[blid] = np.zeros((nchan, nt), dtype=np.complex64)
 
         d[blid][:, t].real = row.data[...,0].reshape(nchan)

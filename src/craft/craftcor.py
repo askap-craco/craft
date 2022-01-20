@@ -11,9 +11,9 @@ import numpy as np
 import os
 import sys
 import logging
-import vcraft
-from calc11 import ResultsFile
-from corruvfits import CorrUvFitsFile
+from . import vcraft
+from .calc11 import ResultsFile
+from .corruvfits import CorrUvFitsFile
 from astropy.coordinates import SkyCoord
 import multiprocessing
 import signal
@@ -38,8 +38,8 @@ def print_delay(xx):
     '''
     delay = gradient/2./np.pi*len(punwrap)
     delayns = delay*27./32.*1e3*(54./len(punwrap))
-    print 'Unwrapped phase = {} rad = {} deg, gradient={} rad per channel, delay={}samples ={} ns nsamp={}' \
-        .format(phase, np.degrees(phase), gradient, delay, delay*27./32.*1e3, len(punwrap))
+    print('Unwrapped phase = {} rad = {} deg, gradient={} rad per channel, delay={}samples ={} ns nsamp={}' \
+        .format(phase, np.degrees(phase), gradient, delay, delay*27./32.*1e3, len(punwrap)))
 
     return (delay, np.degrees(phase))
 
@@ -74,10 +74,10 @@ class PlotOut(object):
         ax1.plot(abs(xx))
         ax2.plot(np.degrees(xxang), 'o')
         nf = self.corr.nfine_out_per_coarse
-        for i in xrange(self.corr.ncoarse_chan):
+        for i in range(self.corr.ncoarse_chan):
             ax2.axvline(nf*i, c='r')
             ax1.axvline(nf*i, c='r')
-            print 'PLOTSTUFF', nf, i, nf*i, nf*(i+1), self.corr.ncoarse_chan, xx.shape
+            print('PLOTSTUFF', nf, i, nf*i, nf*(i+1), self.corr.ncoarse_chan, xx.shape)
             print_delay(xx[nf*i:nf*(i+1)])
 
         lag = np.fft.fftshift(abs(np.fft.fft(xx)))
@@ -97,7 +97,7 @@ class PlotOut(object):
         fit_std = (np.polyval((rate, offset), t) - phase_vt).std()
         ax5.plot(phase_vt)
         ax6.imshow(abs(np.array(self.stuff)), aspect='auto')
-        print 'Phase rate={} offset={} std={} deg lagoff={}samples = {}ns lag S/N={}'.format(rate, offset, fit_std, lagoff, lagns, lagsn)
+        print('Phase rate={} offset={} std={} deg lagoff={}samples = {}ns lag S/N={}'.format(rate, offset, fit_std, lagoff, lagns, lagsn))
         fig.suptitle('a1 {} a2 {}'.format(a1.antname, a2.antname))
         curr_delay = self.corr.get_fixed_delay_usec(a2.antno)*1e3
         if a1 != a2:
@@ -125,7 +125,7 @@ class AntennaSource(object):
         self.all_geom_delays = []
         self.all_mjds = []
         self.pol = self.vfile.pol.lower()
-        print 'antenna {} {}'.format(self.antname, self.vfile.freqconfig)
+        print('antenna {} {}'.format(self.antname, self.vfile.freqconfig))
 
     def do_f(self, corr):
         self.frparams = FringeRotParams(corr, self)
@@ -170,7 +170,7 @@ class AntennaSource(object):
         d1 = self.data
         nfine = corr.nfft - 2*corr.nguard_chan
 
-        for c in xrange(corr.ncoarse_chan):
+        for c in range(corr.ncoarse_chan):
             cfreq = corr.freqs[c]
             freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw
             if corr.sideband == -1:
@@ -240,9 +240,9 @@ class AntennaSource(object):
                       360.*frac_delay_us*corr.f0, geom_delay_rate_us)
 
         sampoff = whole_delay + corr.abs_delay
-        print("antenna #: ",iant, self.antname)
+        print(("antenna #: ",iant, self.antname))
         frameid = self.vfile.start_frameid+sampoff
-        print('FRAMEID: '+str(frameid)+', remainder from 32: '+str(frameid % 32))
+        print(('FRAMEID: '+str(frameid)+', remainder from 32: '+str(frameid % 32)))
         # To avoid iPFB fractional delay, set FRAMEID such that the remainder is 0
         #print(sampoff, nsamp)
         rawd = self.vfile.read(sampoff, nsamp)
@@ -253,7 +253,7 @@ class AntennaSource(object):
         d1 = data_out
         nfine = corr.nfft - 2*corr.nguard_chan
 
-        for c in xrange(corr.ncoarse_chan):
+        for c in range(corr.ncoarse_chan):
             cfreq = corr.freqs[c]
             freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw
             if corr.sideband == -1:
@@ -305,7 +305,7 @@ class FringeRotParams(object):
 
     def __init__(self, corr, ant):
         mid_data = corr.frdata_mid[ant.antname]
-        self.u,self.v,self.w,self.delay = map(float, [mid_data[c] for c in FringeRotParams.cols])
+        self.u,self.v,self.w,self.delay = list(map(float, [mid_data[c] for c in FringeRotParams.cols]))
         self.delay_start = float(corr.frdata_start[ant.antname]['DELAY (us)'])
         self.delay_end = float(corr.frdata_end[ant.antname]['DELAY (us)'])
         self.delay_rate = (self.delay_end - self.delay_start)/float(corr.nint)
@@ -405,7 +405,7 @@ class Correlator(object):
     def get_ant_location(self, antno):
         key = 'common.antenna.ant{}.location.itrf'.format(antno)
         value = self.parset[key]
-        location = map(float, value.replace('[','').replace(']','').split(','))
+        location = list(map(float, value.replace('[','').replace(']','').split(',')))
         return location
 
     def get_fixed_delay_usec(self, antno):
@@ -468,8 +468,8 @@ class Correlator(object):
 
     def do_x(self):
         nant = len(self.ants)
-        for ia1 in xrange(nant):
-            for ia2 in xrange(ia1, nant):
+        for ia1 in range(nant):
+            for ia2 in range(ia1, nant):
                 if not self.running:
                     raise KeyboardInterrupt()
                     
@@ -482,8 +482,8 @@ class Correlator(object):
         xx = np.empty([self.nfine_chan, npolout], dtype=np.complex64)
         #np.seterr(all='raise')
         rfidelay = self.values.rfidelay
-        for p1 in xrange(self.npol_in):
-            for p2 in xrange(self.npol_in):
+        for p1 in range(self.npol_in):
+            for p2 in range(self.npol_in):
                 d1 = a1.data[:, :, p1]
                 d2 = a2.data[:, :, p2]
                 pout = p2 + p1*self.npol_in
@@ -491,7 +491,7 @@ class Correlator(object):
                 ntimes = float(ntimesi)
 
                 try:
-                    for c in xrange(self.nfine_chan):
+                    for c in range(self.nfine_chan):
                         #xx[:,pout] = (d1 * np.conj(d2)).mean(axis=0)
                         # vdot conjugates the first argument
                         # this is equivalent to (d1 * conj(d2)).mean(axis=0)
@@ -500,8 +500,8 @@ class Correlator(object):
                         else:# take complex conjugate if inverted
                             xx[c, pout] = np.vdot(d1[:ntimesi, c], d2[rfidelay:, c])/ntimes
                             
-                except Exception, e:
-                    print 'Error', e
+                except Exception as e:
+                    print('Error', e)
                     import ipdb
                     ipdb.set_trace()
 
@@ -524,7 +524,7 @@ class Correlator(object):
         sum_aligned = np.zeros((nsamp, nchan, self.npol_in), dtype=np.complex64)
         
         if an == None: # add all antennas
-            print('## Summing up all '+str(len(self.ants))+' antennas')
+            print(('## Summing up all '+str(len(self.ants))+' antennas'))
             for iant, ant in enumerate(self.ants):
                 if not self.running:
                     raise KeyboardInterrupt()
@@ -535,7 +535,7 @@ class Correlator(object):
 
             return sum_aligned
         else:
-            print('## Operate on only antenna #: '+str(an))
+            print(('## Operate on only antenna #: '+str(an)))
             ant = self.ants[an]
             iant = an
             temp = ant.do_f_tab(self,iant)
@@ -595,7 +595,7 @@ def parse_gpplt(fin):
             # if empty, it's a continuation of previous antennas
             sz = 14
             xfield = line[0:sz].strip()
-            bits = map(float, line[sz:].split())
+            bits = list(map(float, line[sz:].split()))
             if xfield == '':
                 curr_values.extend(bits)
             else:
@@ -662,15 +662,15 @@ class MiriadGainSolutions(object):
             self.bp_real = bp_real
             bp_imag *= -1  # complex conjugate of bandpass
             self.bp_imag = bp_imag
-            self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant], fill_value=(self.bp_real[0,iant], self.bp_real[-1,iant]), bounds_error=False) for iant in xrange(nant)]
-            self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant], fill_value=(self.bp_imag[0,iant], self.bp_imag[-1,iant]), bounds_error=False) for iant in xrange(nant)]
+            self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant], fill_value=(self.bp_real[0,iant], self.bp_real[-1,iant]), bounds_error=False) for iant in range(nant)]
+            self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant], fill_value=(self.bp_imag[0,iant], self.bp_imag[-1,iant]), bounds_error=False) for iant in range(nant)]
             self.bp_coeff = None
         else:
             print('Using AIPS bandpass solutions')
             if "polyfit_coeff" in bp_c_root: # AIPS polyfit coefficient
                 self.bp_coeff = np.load(bp_c_root)
             else:
-                from parse_aips import aipscor
+                from .parse_aips import aipscor
                 nant = None
                 nfreq = None
                 with open(bp_c_root,'r') as fl:
@@ -718,15 +718,15 @@ class MiriadGainSolutions(object):
                     try:
                         g = aips_cor.get_phase_fring(iant,pol)*aips_cor.get_phase_selfcal(iant,pol)
                         g = 1/g # inverse of gain
-                    except Exception, e:
+                    except Exception as e:
                         g = 0
                     bp = np.conj(bp) # complex conjugate of bandpass
                     self.bp_real[:,iant] = np.real(bp)
                     self.bp_imag[:,iant] = np.imag(bp)
                     g_real[0,iant] = np.real(g)
                     g_imag[0,iant] = np.imag(g)
-                self.bp_real_interp = [interp1d(self.freqs, self.bp_real[:, iant], fill_value=(self.bp_real[0,iant], self.bp_real[-1,iant]), bounds_error=False) for iant in xrange(nant)]
-                self.bp_imag_interp = [interp1d(self.freqs, self.bp_imag[:, iant], fill_value=(self.bp_imag[0,iant], self.bp_imag[-1,iant]), bounds_error=False) for iant in xrange(nant)]
+                self.bp_real_interp = [interp1d(self.freqs, self.bp_real[:, iant], fill_value=(self.bp_real[0,iant], self.bp_real[-1,iant]), bounds_error=False) for iant in range(nant)]
+                self.bp_imag_interp = [interp1d(self.freqs, self.bp_imag[:, iant], fill_value=(self.bp_imag[0,iant], self.bp_imag[-1,iant]), bounds_error=False) for iant in range(nant)]
                 self.bp_coeff = None
 
         self.g_real = g_real
@@ -759,7 +759,7 @@ class MiriadGainSolutions(object):
     def plot(self):
         fig, ax = pylab.subplots(3,3)
         ax = ax.flatten()
-        for i in xrange(min(9, self.nant)):
+        for i in range(min(9, self.nant)):
             freq_ghz = self.freqs
             sol = self.get_solution(i, 0, freq_ghz)
             ax[i].plot(freq_ghz, abs(sol))
@@ -846,7 +846,7 @@ def _main():
             print('PERFORMING TIED-ARRAY BEAMFORMING')
             temp = corr.do_tab(values.an)
             fn = values.outfile
-            print('saving output to '+fn)
+            print(('saving output to '+fn))
             np.save(fn,temp)
         else:
             print('PERFORMING CORRELATION')
@@ -859,7 +859,7 @@ def _main():
                 corr.next_integration()
     finally:
         if values.tab:
-            print('craftcor.py running time: '+str(time.time()-t0))
+            print(('craftcor.py running time: '+str(time.time()-t0)))
             print('done')
         else:
             corr.fileout.close()

@@ -15,7 +15,7 @@ import sys
 import logging
 import datetime
 import dateutil
-import sigproc
+from . import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -34,7 +34,7 @@ def blockup(filename):
                     tstamp = None
                 
             elif len(bits) == 2:
-                x, y = map(float, bits)
+                x, y = list(map(float, bits))
                 d.append((x, y))
             else:
                 assert False, 'Unepxected bits'

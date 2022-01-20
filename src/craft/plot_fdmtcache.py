@@ -11,14 +11,14 @@ import numpy as np
 import os
 import sys
 import logging
-import fdmt as fdmt_class
+from . import fdmt as fdmt_class
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
                 
 
 def plot_cache(fdmt):
-    print(fdmt.hist_state_shape)
+    print((fdmt.hist_state_shape))
 
     pylab.plot(fdmt.hist_delta_t)
     pylab.xlabel('Iteration')
@@ -31,7 +31,7 @@ def plot_cache(fdmt):
     n_mem_hits = np.zeros(niter)
 
     for iiter, nf_data in enumerate(fdmt.hist_nf_data):
-        print 'IITER', iiter
+        print('IITER', iiter)
         fig, axes = pylab.subplots(2,2)
         axes = axes.flatten()
         
@@ -67,7 +67,7 @@ def plot_cache(fdmt):
     pylab.plot(n_cache_hits/n_mem_hits)
     pylab.xlabel('Iteration')
     pylab.ylabel('Cache hit ratio')
-    print 'Fraction of cache hits', n_cache_hits.sum()/n_mem_hits.sum(), 'Nhits', n_cache_hits.sum(), 'Nmem', n_mem_hits.sum()
+    print('Fraction of cache hits', n_cache_hits.sum()/n_mem_hits.sum(), 'Nhits', n_cache_hits.sum(), 'Nmem', n_mem_hits.sum())
     pylab.show()
 
     

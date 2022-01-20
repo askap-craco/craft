@@ -29,19 +29,19 @@ class RyanMultinestImage(object):
         with open(f, 'rU') as fin:
             for iline, line in enumerate(fin):
                 if iline == 0:
-                    self.nl, self.nm = map(int, np.array(line.split())[[2,4]])
+                    self.nl, self.nm = list(map(int, np.array(line.split())[[2,4]]))
                 elif iline == 1:
-                    self.lmin, self.dl, self.mmin, self.dm = map(float, np.array(line.split())[[2,4,6,8]])
+                    self.lmin, self.dl, self.mmin, self.dm = list(map(float, np.array(line.split())[[2,4,6,8]]))
 
         img = np.zeros((self.nm, self.nl))
-        for idx in xrange(d.shape[0]):
-            l, m = map(int, d[idx, 0:2])
+        for idx in range(d.shape[0]):
+            l, m = list(map(int, d[idx, 0:2]))
             img[m, l] = d[idx, 4]
 
         self.img = img
         lvec = np.arange(self.lmin, self.lmin + self.dl*self.nl, self.dl)
         mvec = np.arange(self.mmin, self.mmin + self.dm*self.nm, self.dm)
-        print lvec.min(), lvec.max(), mvec.min(), mvec.max()
+        print(lvec.min(), lvec.max(), mvec.min(), mvec.max())
         self.gx, self.gy = np.meshgrid(lvec, mvec)
 
 
@@ -84,7 +84,7 @@ def _main():
 
     pylab.imshow(v, aspect='auto', origin='bottom', extent=(rf.gx.min(), rf.gx.max(), rf.gy.min(), rf.gy.max()))
     ax = pylab.gca()
-    print lms.shape
+    print(lms.shape)
     pylab.scatter(lms[:, 0], lms[:, 1])
     for ibeam, lm in enumerate(lms):
         pylab.text(lm[0], lm[1], '%d'%ibeam)
@@ -103,7 +103,7 @@ def _main():
         values.file = 'test'
 
     fout = values.file + '.fits'
-    print 'WRiting', fout
+    print('WRiting', fout)
     hdr = hdu.header
     hdr['infile'] = values.file
     hdr['object'] = 'FRB170107'
@@ -127,10 +127,10 @@ def _main():
     hdr['CROTA1'] = values.pa
     hdr['CROTA2'] = values.pa
 
-    print dir(hdr)
+    print(dir(hdr))
 
-    for h in hdr.items():
-        print h
+    for h in list(hdr.items()):
+        print(h)
 
     hdulist.writeto(fout, overwrite=True)
 

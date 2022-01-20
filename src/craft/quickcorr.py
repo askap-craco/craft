@@ -11,8 +11,8 @@ import numpy as np
 import os
 import sys
 import logging
-import vcraft
-from cmdline import strrange
+from . import vcraft
+from .cmdline import strrange
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -56,7 +56,7 @@ def _main():
 
             d1t = func(f1.hdr[h][0])
             d2t = func(f2.hdr[h][0])
-            print h, 'd1=',d1t, 'd2=',d2t, 'diff=',d2t - d1t,mul*(d2t-d1t)
+            print(h, 'd1=',d1t, 'd2=',d2t, 'diff=',d2t - d1t,mul*(d2t-d1t))
 
     fig, axes = pylab.subplots(5,1)
     fig.suptitle(' '.join(values.files[0:2]))
@@ -70,23 +70,23 @@ def _main():
     else:
         offset = values.offset
 
-    print 'OFFSET IS', offset
+    print('OFFSET IS', offset)
     d1 = f1.read(offset)
     d2 = f2.read(0)
     nsamp, nchan = d1.shape
     # truncate to identical nsamp
     nsamp = min(d1.shape[0], d2.shape[0])
-    print 'SHAPE BEFORE', d1.shape, d2.shape, nsamp
+    print('SHAPE BEFORE', d1.shape, d2.shape, nsamp)
 
     d1 = d1[:nsamp, :]
     d2 = d2[:nsamp, :]
-    print 'SHAPE AFTER', d1.shape, d2.shape
+    print('SHAPE AFTER', d1.shape, d2.shape)
 
     assert d1.shape == d2.shape
 
-    print 'Data shape', d1.shape, 'freqs', f1.freqs
-    print 'D1 channel0', d1[0:100, 0]
-    print 'D2 channel0', d2[0:100, 0]
+    print('Data shape', d1.shape, 'freqs', f1.freqs)
+    print('D1 channel0', d1[0:100, 0])
+    print('D2 channel0', d2[0:100, 0])
 
 
     if offset >= d1.shape[0] or offset >= d2.shape[0]:
@@ -115,7 +115,7 @@ def _main():
     xx11 = xf1 * np.conj(xf1)
     xx22 = xf2 * np.conj(xf2)
 
-    print 'PRODUCT SIZE', xx12.shape, xx12.shape[0]*Nf, nsamp, 'shortsamp', shortsamp, 'offset', offset
+    print('PRODUCT SIZE', xx12.shape, xx12.shape[0]*Nf, nsamp, 'shortsamp', shortsamp, 'offset', offset)
     xx12m = xx12.mean(axis=0)
     punwrap = np.unwrap(np.angle(xx12m))
     xx = np.arange(len(punwrap))
@@ -147,7 +147,7 @@ def _main():
     xx12a = xx12.mean(axis=1)
 
 
-    print 'Lagmax {}samples. Unwrapped phase = {} deg, delay={} us = {:0.2f}samples cross amplitude={}'.format(lag_offset, np.degrees(phase), delayus, delaysamp, corramp)
+    print('Lagmax {}samples. Unwrapped phase = {} deg, delay={} us = {:0.2f}samples cross amplitude={}'.format(lag_offset, np.degrees(phase), delayus, delaysamp, corramp))
 
 
     pylab.figure()

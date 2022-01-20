@@ -25,7 +25,7 @@ class FileOperations:
         self.file2 = open('fifi.log', 'w')
         self.file2.write(self.candtxt[0])
     def outputfof(self,param):
-        print(self.candheader[param])
+        print((self.candheader[param]))
         return self.cand[param]
     def collect_multibeam(self):
         if len(self.candtxt)>2:
@@ -38,10 +38,10 @@ class FileOperations:
                     dmcheck=np.diff(self.cand[5][idx])
                     if np.max(dmcheck) > 5:
                         continue
-                print(self.cand.T[idx])
+                print((self.cand.T[idx]))
                 primarybeam=np.argmax(self.cand[0][idx])
                 print(primarybeam)
-                print(self.cand.T[idx][primarybeam])
+                print((self.cand.T[idx][primarybeam]))
                 self.newcandtxt.append(self.candtxt[idx[primarybeam]+1])
                 bgcand=np.append(bgcand,self.cand.T[idx][primarybeam])
             self.reducedcand=bgcand.reshape(-1,len(self.candheader))
@@ -51,7 +51,7 @@ class FileOperations:
             self.reducedcand=self.cand
 
     def getparams(self,param):
-        print(self.candheader[param])
+        print((self.candheader[param]))
         return self.reducedcand.T[param]
     def write_psr(self,line,psrname,prnt=False):
         self.file1.write(psrname+"\t"+self.newcandtxt[line])
@@ -104,36 +104,36 @@ class PsrPnt:
         #print(self.cat_name[mask],self.cat_dm[mask],self.psrcat[mask])
         return mask
     def full_crossmatch(self,ra,dec,dm,dmerr=1,beamradius=1.5):
-        print(dm,ra,dec)
+        print((dm,ra,dec))
         coordmask=self.coordmatch(ra,dec,beamradius)
         dmmask=self.dmmatch(dm,dmerr)
         mask=coordmask*dmmask
         location=SkyCoord(ra=ra*self.coord_units, dec=dec*self.coord_units)
         sep=location.separation(self.psrcat[mask])
         print("PSRCAT results as follows:")
-        print(self.cat_name[mask],self.cat_dm[mask],self.psrcat[mask])
+        print((self.cat_name[mask],self.cat_dm[mask],self.psrcat[mask]))
         return mask,sep
     def match_all(self,dmerr=5,beamradius=1.5):
         k=0
         printids=[]
         if isinstance(self.dm,np.float64):
-            print ("Candidate "+str(k))
+            print(("Candidate "+str(k)))
             i=self.coords
             j=self.dm
             pmask,psep=self.full_crossmatch(i[0],i[1],j,dmerr,beamradius)
             if len(psep)>0:
                 print("preview pulsar")
-                print(self.cat_name[pmask][np.argmin(psep)])
+                print((self.cat_name[pmask][np.argmin(psep)]))
                 printids.append([k,self.cat_name[pmask][np.argmin(psep)]])
             else:
                 printids.append([k,'None'])
         else:
             for i,j in zip(self.coords,self.dm):
-                print ("Candidate "+str(k))
+                print(("Candidate "+str(k)))
                 pmask,psep=self.full_crossmatch(i[0],i[1],j,dmerr,beamradius)
                 if len(psep)>0:
                     print("preview pulsar")
-                    print(pmask[np.argmin(psep)])
+                    print((pmask[np.argmin(psep)]))
                     printids.append([k,self.cat_name[pmask][np.argmin(psep)]])
                 else:
                     printids.append([k,'None'])
@@ -143,7 +143,7 @@ class PsrPnt:
 
 
     def readmask(self,mask):
-        print(self.cat_name[mask],self.cat_dm[mask],self.psrcat[mask])
+        print((self.cat_name[mask],self.cat_dm[mask],self.psrcat[mask]))
 
 
 
@@ -181,7 +181,7 @@ class hdrfiles():
 ##dmerr,beamradius,beam=10,5,1
 def freddachecker(hdrf,freddafof,dmerr=10,beamradius=5,beam=1):
     candidates=FileOperations(freddafof)
-    print(freddafof,hdrf)
+    print((freddafof,hdrf))
     candidates.collect_multibeam()
     cand_beams=candidates.getparams(6).astype(np.int)
     cand_dms=candidates.getparams(5)
