@@ -9,7 +9,7 @@ import logging
 import sys
 import numpy as np
 import pylab
-import cPickle as pickle
+import pickle as pickle
 
 
 def _main():
@@ -34,7 +34,7 @@ def plot(fin_name, values):
     fin = open(fin_name, 'rb')
     hdr = pickle.load(fin)
     for k in sorted(hdr.keys()):
-        print k, hdr[k]
+        print(k, hdr[k])
 
     ints = []
     xs= []
@@ -50,10 +50,10 @@ def plot(fin_name, values):
         try:
             (i, x, y, fA, fB, bA, bB) = pickle.load(fin)
             fA = np.array(fA)
-            print x.shape
+            print(x.shape)
 
             if np.all(fA==0):
-                print 'Zero packet i', i
+                print('Zero packet i', i)
                 continue
 
             if nignore > 0:
@@ -68,17 +68,17 @@ def plot(fin_name, values):
             fBs.append(fB)
             bAs.append(bA)
             bBs.append(bB)
-        except EOFError, UnpicklingError:
+        except EOFError as UnpicklingError:
             break
 
 
-    ints, xs, ys, fAs, fBs, bAs, bBs = map(np.array, (ints, xs, ys, fAs, fBs, bAs, bBs))
+    ints, xs, ys, fAs, fBs, bAs, bBs = list(map(np.array, (ints, xs, ys, fAs, fBs, bAs, bBs)))
 
-    print 'All ints', set(ints.flatten())
+    print('All ints', set(ints.flatten()))
 
     #Arrays are in time, beam, freq order
 
-    print xs.shape, ys.shape, ints.flatten().shape
+    print(xs.shape, ys.shape, ints.flatten().shape)
 #    fig, (beamax, intax) =  pylab.subplots(2,1)
 #    beamax.plot(beams)
 #    beamax.set_ylabel('Beam')
@@ -117,19 +117,19 @@ def dump_str(fin_name, values):
     fin = open(fin_name, 'rb')
     hdr = pickle.load(fin)
     for k in sorted(hdr.keys()):
-        print k, hdr[k]
+        print(k, hdr[k])
 
         
     while True:
         try:
             (beam, i, x, y, fA, fB, bA, bB) = pickle.load(fin)
-            print 'b',beam, 'i',i, 'len',len(x)
-            print 'x', x
-            print 'fA', fA
-            print 'fB', fB
-            print 'bA', bA
-            print 'bB', bB
-        except EOFError, UnpicklingError:
+            print('b',beam, 'i',i, 'len',len(x))
+            print('x', x)
+            print('fA', fA)
+            print('fB', fB)
+            print('bA', bA)
+            print('bB', bB)
+        except EOFError as UnpicklingError:
             break
 
     

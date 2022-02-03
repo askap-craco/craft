@@ -223,7 +223,7 @@ def mkfrb2(f1, foff, nchans, tsamp, dm, amp=1, toffset=0, noiserms=0, ntimes=409
     d = np.random.randn(np.prod(shape))*noiserms + dclevel
     d.shape = shape
 
-    for t in xrange(ntimes):
+    for t in range(ntimes):
         tstart_ms = t*tsamp # Beginnignof this integration
         tend_ms = (t+1)*tsamp # end of this integration
         for ic, f in enumerate(freqs):
@@ -275,7 +275,7 @@ def mkfrb_fdmt(f1, foff, nchans, tsamp, dm, amp=1, toffset=0, noiserms=0, ntimes
     shape = (ntimes, nchans)
     d = np.random.randn(np.prod(shape))*noiserms + dclevel
     d.shape = shape
-    import fdmt
+    from . import fdmt
     thefdmt = fdmt.Fdmt(f1, foff, nchans, max_dt=idm+1, n_t=ntimes)
     toffset_samp = int(np.round(float(toffset)/float(tsamp)))
     d = thefdmt.add_frb_track(idm, d.T, amp, toffset_samp)

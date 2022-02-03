@@ -11,9 +11,9 @@ import numpy as np
 import os
 import sys
 import logging
-from crafthdr import DadaHeader
-from sigproc import SigprocFile
-import vcraft
+from .crafthdr import DadaHeader
+from .sigproc import SigprocFile
+from . import vcraft
 
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -57,7 +57,7 @@ def detect(files, values):
         else:
             raise NotimplementedError("Only XX+YY currently implemented")
     else:
-        assert 'Unexpected number of input polarisations {}'.format(all_muxes.keys())
+        assert 'Unexpected number of input polarisations {}'.format(list(all_muxes.keys()))
 
     pols = sorted(all_muxes.keys())
     # pick random pol to get metadata - todo - check all muxes the same.
@@ -135,7 +135,7 @@ def detect(files, values):
     din = np.empty((npolin, sample_block, nchan), dtype=np.complex64)
     dout = np.empty((npolout, nchan_file), dtype=np.float32) # XXX
     # reshape to integral number of integrations
-    for s in xrange(nsampout):
+    for s in range(nsampout):
         sampno = s*sample_block + toff_insamps
         logging.debug('block %i/%i, sampno: %i', s, nsampout,sampno)
         for ipol, pol in enumerate(pols):
@@ -145,7 +145,7 @@ def detect(files, values):
         # dout = np.empty((npolout, nchan_file), dtype=np.float32) #XXX
             
 
-        for c in xrange(nchan):
+        for c in range(nchan):
             if values.nchan == 0:
                 # We don't have to perform fft
                 #for ipol in xrange(npolout):
@@ -175,20 +175,20 @@ def detect(files, values):
                 #dabs = dabs[::-1] # invert spectra
                 #dabs= dabs.astype(np.float32) # convert to float32
                 #dout[0, :] = dabs
-                for thechan in xrange(dfft.shape[2]):
+                for thechan in range(dfft.shape[2]):
                     p = dfft[0, :, thechan]
                     dout[0, c*nchanout+thechan] = np.vdot(p,p).real
 
 
             elif npolin == 2:
                 if values.npolout == 1:
-                    for thechan in xrange(dfft.shape[2]):
+                    for thechan in range(dfft.shape[2]):
                         p1 = dfft[0, :, thechan]
                         p2 = dfft[1, :, thechan]
                         dout[0, c*nchanout+thechan] = np.vdot(p1,p1).real + np.vdot(p2,p2).real
 
                 elif values.npolout == 2: 
-                    for chanout in xrange(nchanout):
+                    for chanout in range(nchanout):
                         p1 = dfft[0, chanout, :]
                         p2 = dfft[1, chanout, :]
                         cross = np.vdot(p2, p1)
@@ -217,9 +217,9 @@ def detect(files, values):
         pylab.legend()
         bmax = 2**(nbits/2 - 1) # Factor of 2 for real+imag and -1 for full width
         bins = np.arange(-bmax-0.5, bmax+0.5, 1)
-        print 'NBITS', nbits, 'bmax', bmax
+        print('NBITS', nbits, 'bmax', bmax)
         fig, axes = plt.subplots(1,2, sharex=True, sharey=True)
-        for chan in xrange(nchan):
+        for chan in range(nchan):
             axes[0].hist(np.real(df[:, chan]), label='chan %d' % chan, bins=bins, histtype='step')
             axes[1].hist(np.imag(df[:, chan]), label='chan %d' % chan, bins=bins, histtype='step')
         axes[0].legend(frameon=False)
@@ -230,7 +230,7 @@ def detect(files, values):
         fig, ax = pylab.subplots(3,3, sharex=True)
         int_times = np.arange(dfil.shape[0])*tsamp
         ax = ax.flatten()
-        for f in xrange(nchan):
+        for f in range(nchan):
             ax[f].plot(int_times*1e3, dfil[:, f])
             ax[f].set_xlabel('Time (ms)')
             ax[f].set_ylabel('Power')

@@ -11,7 +11,7 @@ try:
 except ImportError:
     from mock import Mock, MagicMock
 
-import boxcar
+from . import boxcar
 import numpy as np
 from pylab import *
 
@@ -36,16 +36,16 @@ class TestBoxcar(TestCase):
         self.assertEqual(fout.shape, (self.nd, self.nt, self.nbox))
 
         # For the first block, it'll be the sum over zeros.
-        for t in xrange(nbox):
-            for b in xrange(nbox):
+        for t in range(nbox):
+            for b in range(nbox):
                 if b < t:
                     expect = b + 1
                 else:
                     expect = t + 1
                 self.assertTrue(np.all(fout[:, t, b] == expect))
 
-        for t in xrange(nbox, nt):
-            for b in xrange(nbox):
+        for t in range(nbox, nt):
+            for b in range(nbox):
                 self.assertTrue(np.all(fout[:, t, b] == (b+1)))
 
         # Run another block through  - this tiem the whole thing should be right
@@ -53,8 +53,8 @@ class TestBoxcar(TestCase):
         fout = self.boxcar(din)
 
         # the next block should include the history, so it should be all b+1
-        for t in xrange(nt):
-            for b in xrange(nbox):
+        for t in range(nt):
+            for b in range(nbox):
                 self.assertTrue(np.all(fout[:, t, b] == (b+1)))
 
     def test_boxcar_rand(self):
@@ -65,8 +65,8 @@ class TestBoxcar(TestCase):
 
 
 
-        for t in xrange(nbox, nt):
-            for b in xrange(nbox):
+        for t in range(nbox, nt):
+            for b in range(nbox):
                 myd = din[:, t-b:t+1]
                 mysum = myd.sum(axis=1)
                 diff = fout[:, t, b] - mysum
@@ -96,10 +96,10 @@ class TestBoxcarImage(TestCase):
         self.nt = self.nbox + 5
 
     def check_box(self, ib, indata, func):
-        for d in xrange(self.nd):
-            for t in xrange(self.nt):
+        for d in range(self.nd):
+            for t in range(self.nt):
                 dout = ib(d, indata[t, :, :]*d)
-                for b in xrange(self.nbox):
+                for b in range(self.nbox):
                     start = 0 if t < b else t - b
                     expected = func(indata[start:t+1:,:]*d, b)
                     self.assertTrue(np.allclose(dout[:,:,b], expected))

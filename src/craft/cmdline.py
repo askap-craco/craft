@@ -38,8 +38,8 @@ def strrange(rangestr):
         if len(cbits) == 1:
             fullrange.append(int(cbits[0]))
         elif len(cbits) == 2:
-            start, end = map(int, cbits)
-            fullrange.extend(range(start, end+1))
+            start, end = list(map(int, cbits))
+            fullrange.extend(list(range(start, end+1)))
         else:
             raise argparse.ArgumentTypeErrror("Invalid range string %s" % (rangestr))
     

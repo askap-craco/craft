@@ -12,7 +12,7 @@ import askap.time
 import numpy as np
 import time
 import pylab
-import cPickle as pickle
+import pickle as pickle
 import datetime
 import askap.craft.pktdump as pktdump
 from askap.craft.sigproc import SigprocFile
@@ -48,7 +48,7 @@ def _main():
     fin = values.file
     f = pktdump.pktopen(fin)
     main_hdr = f.hdr
-    print main_hdr
+    print(main_hdr)
     intcount = main_hdr['CRAFT_INT_CYCLES']
     intime = main_hdr['CRAFT_INT_TIME']
     batint = intime*27./30.
@@ -65,9 +65,9 @@ def _main():
     print_times = False
     last_times = {}
 
-    print 'CARDS', main_hdr['CARDS']
+    print('CARDS', main_hdr['CARDS'])
 
-    cards = map(int, main_hdr['CARDS'].split(','))
+    cards = list(map(int, main_hdr['CARDS'].split(',')))
     ncards = len(cards)
     nchans_per_fpga = 1 # change to 8 when we  get non-truncated  packets - CRAFT-6
     nfpgas_per_card = 6
@@ -82,7 +82,7 @@ def _main():
     
     for hdr, address, rawdata, pktdate in f:
         if address[0] in ignore_cards:
-            print 'Skipping bad card ' + address[0]
+            print('Skipping bad card ' + address[0])
             continue
 
         if hdr['packetType'] != 129:
@@ -106,13 +106,13 @@ def _main():
         dev = hdr['srcDevice']
         seqno = hdr['packetSequence']
         if print_times:
-            print 'times', times
-            print 'start bats', start_bats
-            print 'stop bat', stop_bats
-            print 'bat diffs', stop_bats - start_bats
-            print 'start frames', start_frames
-            print 'stop frames', stop_frames
-            print 'frame diffs', stop_frames - start_frames
+            print('times', times)
+            print('start bats', start_bats)
+            print('stop bat', stop_bats)
+            print('bat diffs', stop_bats - start_bats)
+            print('start frames', start_frames)
+            print('stop frames', stop_frames)
+            print('frame diffs', stop_frames - start_frames)
 
         chan = get_channel(hdr, address)
         #print start_frames - stop_frames, type(start_frames), start_frames.dtype, start_frames, (start_frames - stop_frames), (start_frames + stop_frames), start_frames[0] + stop_frames[0]
@@ -121,7 +121,7 @@ def _main():
         bdiff = stop_bats - start_bats 
 
         if pktbat < first_bat:
-            print 'Skipping', first_bat, pktbat, first_bat - pktbat, hdr, len(rawdata), d
+            print('Skipping', first_bat, pktbat, first_bat - pktbat, hdr, len(rawdata), d)
             continue
 
         if frame1 is None:
@@ -157,14 +157,14 @@ def _main():
         
         if values.verbose:
         
-            print '\t'.join(map(str, ('%s/%s' % (address[0], hdr['srcDevice']),
+            print('\t'.join(map(str, ('%s/%s' % (address[0], hdr['srcDevice']),
                                   pktdatestr, pktdiff,
                                   seqno, seqno-last_seqno,
                                   hdrbat, hdrbat - hbat1, hdrbat - last_hdrbat,
                                   pktbat, pktbat-bat1,  pktbat-last_pktbat, '%0.3f' % intno_bat,
                                   pktframe, pktframe - frame1,pktframe - last_pktframe, '%0.3f' % intno, start_frames[1:] - start_frames[0],
                                   'fdiff', fdiff, bdiff, chan, '%d%s' % (len(rawdata), datazero_str)
-                                  )))
+                                  ))))
 
         last_times[(address, dev)] = (pktbat, pktframe, hdrbat, seqno, pktdate)
 

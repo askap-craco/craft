@@ -6,8 +6,8 @@ Copyright (C) CSIRO 2016
 """
 __author__ = 'Keith Bannister <keith.bannister@csiro.au>'
 import logging
-import sigproc
-from plot_dada import Formatter
+from . import sigproc
+from .plot_dada import Formatter
 import numpy as np
 import pylab
 import sys
@@ -48,7 +48,7 @@ def _main():
         dtype = np.dtype(values.dtype)
 
     if values.times:
-        bits = map(int, values.times.split(','))
+        bits = list(map(int, values.times.split(',')))
         if len(bits) == 1:
             tstart = bits[0]
             ntimes = 128*8
@@ -74,7 +74,7 @@ def plot_time_series(f, tstart, ntimes, dtype, values):
     nelements = ntimes*f.nifs*f.nchans
 
     f.seek_data(f.bytes_per_element*tstart)
-    print nelements, ntimes, f.nchans, f.nifs, dtype
+    print(nelements, ntimes, f.nchans, f.nifs, dtype)
     v = np.fromfile(f.fin, dtype=dtype, count=nelements )
     t = np.arange(len(v))*f.tsamp
     pylab.plot(t, v)
@@ -83,11 +83,11 @@ def plot_time_series(f, tstart, ntimes, dtype, values):
 
 def fold(data, tsamp, period):
     nbins = int(period/tsamp)
-    print 'Folding with tsamp {} period {} nbins {} data.shape {}'.format(tsamp, period, nbins, data.shape)
+    print('Folding with tsamp {} period {} nbins {} data.shape {}'.format(tsamp, period, nbins, data.shape))
     ntimes, nchans = data.shape
     folded = np.zeros((nbins, nchans), dtype=np.float32)
     
-    for i in xrange(ntimes):
+    for i in range(ntimes):
         t = i*tsamp;
         phase = t/period
         thebin = i % nbins
@@ -110,7 +110,7 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
     f.seek_data(f.bytes_per_element*tstart)
     v = np.fromfile(f.fin, dtype=dtype, count=nelements )
     v = v.astype(np.float)
-    print 'Nelements', nelements, 'Ntimes', ntimes, 'nchans', f.nchans, 'nifs', f.nifs, dtype, 'Actual length', len(v)
+    print('Nelements', nelements, 'Ntimes', ntimes, 'nchans', f.nchans, 'nifs', f.nifs, dtype, 'Actual length', len(v))
     
     v.shape = (ntimes, f.nifs, f.nchans)
 #    v.shape = (ntimes, f.nchans, f.nifs)
@@ -118,7 +118,7 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
     v = np.ma.masked_array(v, mask=np.isnan(v))
     #nrows = f.nifs/6
 
-    nrows, ncols = map(int, values.nxy.split(','))
+    nrows, ncols = list(map(int, values.nxy.split(',')))
 
     #plot_cov(v[:, :, 150:151], f)
     
@@ -146,7 +146,7 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
 
     beam_mean = v.mean(axis=1)
 
-    for ifn in xrange(nrows*ncols):
+    for ifn in range(nrows*ncols):
         ax = axes.flat[ifn]
         hax = hist_axes.flat[ifn]
         bpax = bandpass_axes.flat[ifn]
@@ -166,7 +166,7 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
             dmean = data.mean(axis=0)
             dstd = data.std(axis=0)
 
-            print 'data', data.shape, dmean.shape, dstd.shape
+            print('data', data.shape, dmean.shape, dstd.shape)
             data = (data - dmean + 100)/dstd
             #vmin = data.min()
             #vmax = data.max()
@@ -180,7 +180,7 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
             vmax = vmid+2*vstd
             vmin = vmid-2*vstd
 
-        print 'VMIN', vmin, 'VMAX', vmax, data.shape
+        print('VMIN', vmin, 'VMAX', vmax, data.shape)
         if values.plot_image:
             im = ax.imshow(data.T, aspect='auto', vmin=vmin, vmax=vmax, interpolation='none', origin='lower')
             ax.text(0, 0, 'ifn %d' % ifn, va='top', ha='left') 
@@ -204,7 +204,7 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
 
         if values.period > 0:
             vfolded = fold(data, f.tsamp, values.period)
-            print 'Plotting folded data'
+            print('Plotting folded data')
             fax.imshow(vfolded.T, label='IF %s'%ifn, aspect='auto')
             
 
@@ -216,7 +216,7 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
         pltharmonics = np.arange(2, 30)*f.tsamp*1e3
 
         if values.plot_fft:
-            for chan in xrange(0, nchans,16):
+            for chan in range(0, nchans,16):
                 afixed = (data[:, chan])
                 af = abs(np.fft.rfft(afixed))
                 if np.any(af[1:] > 0):
@@ -290,11 +290,11 @@ def plot_cov(v, f, save_all=False):
 
     ntimes, nbeams, nchans = v.shape
 
-    for c in xrange(nchans):
+    for c in range(nchans):
         R = np.cov(v[:, :, c].T)
         lam, evec = np.linalg.eig(R)
         evec = np.matrix(evec)
-        for t in xrange(v.shape[0]):
+        for t in range(v.shape[0]):
             vf[t, :, c] -= np.dot(v[t, :, c], evec)*lam
 
         pylab.clf()
@@ -318,7 +318,7 @@ def plot_beam_cov(v, f):
     v = v[:, 0:nbeams, 32:nchans+32]
     #v = np.swapaxes(v, 1, 2)
     vr = v.reshape(v.shape[0], v.shape[1]*v.shape[2])
-    print vr.shape
+    print(vr.shape)
     vrr = np.cov(vr.T)
     pylab.imshow(np.log10(vrr/np.diag(vrr)), vmax=0, vmin=-2, aspect='auto', origin='upper', interpolation='none')
     c = pylab.colorbar()

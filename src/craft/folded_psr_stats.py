@@ -133,10 +133,10 @@ def get_timing_stats(filename_p, name, verbose):
             return -1.0, -1.0, ""
     pat_out_lines = pat_out.split('\n')
     if len(pat_out_lines) > 3:
-        print "Error, expected 3 lines from pat, got {}: {}".format(
-                len(pat_out_lines), pat_out)
+        print("Error, expected 3 lines from pat, got {}: {}".format(
+                len(pat_out_lines), pat_out))
     if "FORMAT" not in pat_out_lines[0]:
-        print "Problem with pat output:", pat_out
+        print("Problem with pat output:", pat_out)
         return -1.0, -1.0, ""
     # This should:
     # file freq SAT unc tel fe_flag fe be_flag be f_flag f bw_flag bw
@@ -160,7 +160,7 @@ def get_psr_flux(filename_p, freq, name, verbose):
     (psrflux_out, psrflux_err) = psrflux_proc.communicate()
     if psrflux_err:
         if "unloading" not in psrflux_err:
-            print "Problem with psrflux:", psrflux_err
+            print("Problem with psrflux:", psrflux_err)
             return -1.0, -1.0, -1.0
         psrflux_out_fn = filename_p + ".ds"
     with open(psrflux_out_fn) as fh:
@@ -202,7 +202,7 @@ def extract_snrs_from_archive(archive_fn, verbose):
                                stderr=sb.PIPE)
     (psrstat_out, psrstat_err) = psrstat_process.communicate()
     if psrstat_err:
-        print "Error while running psrstat:", psrstat_err
+        print("Error while running psrstat:", psrstat_err)
         return -1
     else:
         out = psrstat_out.split()
@@ -241,9 +241,9 @@ def extract_snrs_from_archive(archive_fn, verbose):
             snr_pdmp = -1
             tint = -1
             off_avg = -1
-            print "Error interpreting psrstat output:"
-            print psrstat_out
-            print len(out)
+            print("Error interpreting psrstat output:")
+            print(psrstat_out)
+            print(len(out))
 
     weff_tmp = weff_turns.replace('.', '', 1).replace('e', '', 1).replace('-', '', 1)
     if not weff_tmp.isdigit():

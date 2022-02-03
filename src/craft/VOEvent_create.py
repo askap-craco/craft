@@ -104,12 +104,12 @@ def NewVOEvent(dm, dm_err, width, snr, fluence, ra, dec,  ne2001, name, importan
             #xmlstr = minidom.parseString(voxml).toprettyxml(indent="   ")
             #f.write(xmlstr)
             vp.dump(v, f)
-            print(vp.prettystr(v.Who))
-            print(vp.prettystr(v.What))
-            print(vp.prettystr(v.WhereWhen))
-            print(vp.prettystr(v.Why))
+            print((vp.prettystr(v.Who)))
+            print((vp.prettystr(v.What)))
+            print((vp.prettystr(v.WhereWhen)))
+            print((vp.prettystr(v.Why)))
     else:
-        print ("Unable to write file %s.xml" % name)
+        print(("Unable to write file %s.xml" % name))
 
 
 if __name__ == "__main__":
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     imp = args.importance
     utc = args.utc
 
-    print (dm, dm_err, width, fluence, ra, dec, ne2001, name, imp, utc)
+    print((dm, dm_err, width, fluence, ra, dec, ne2001, name, imp, utc))
 
     # Parse coordinates
     c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame='icrs')
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     gl = g.l.deg
     gb = g.b.deg
    
-    print (c, g, gl, gb)
+    print((c, g, gl, gb))
     #print utc, utc_YY, utc_MM, utc_DD, utc_hh, utc_mm, utc_ss, mjd
 
 

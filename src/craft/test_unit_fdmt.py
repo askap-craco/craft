@@ -11,12 +11,12 @@ try:
 except ImportError:
     from mock import Mock, MagicMock
 
-import fdmt
-import sample_fdmt
-from unit_fdmt import *
+from . import fdmt
+from . import sample_fdmt
+from .unit_fdmt import *
 import numpy as np
 from pylab import *
-from craco import printstats
+from .craco import printstats
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -69,8 +69,8 @@ class TestUnitFdmt(TestCase):
         iout = 2
         inconfig = IterConfig(self.unitfdmt, iterno)
         outconfig = IterConfig(self.unitfdmt, iterno+1)
-        print inconfig
-        print outconfig
+        print(inconfig)
+        print(outconfig)
         
         read_dm, toffset = inconfig.state2conf(d, iterno, input_channel, unitidx, iout)
         cdex, ciiter, ciunit, ciout = inconfig.conf2state(read_dm, input_channel, toffset)

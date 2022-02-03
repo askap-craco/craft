@@ -19,10 +19,10 @@ from numba import jit
 def do_prepare_numba(input_data, calibration_data, sky_model, output_data, block_average):
     # make output data using numpy broadcasting rules - cheating slightly, but you get the idea
     nbl, nchan, npol, nt = input_data.shape
-    for ibl in xrange(nbl):
-        for ichan in xrange(nchan):
-            for ipol in xrange(npol):
-                for it in xrange(nt):
+    for ibl in range(nbl):
+        for ichan in range(nchan):
+            for ipol in range(npol):
+                for it in range(nt):
                     d = input_data[ibl, ichan, ipol, it] # read input sample
                     
                     # Output is the sum over polarisations after applying the calibration and subtracting the sky model

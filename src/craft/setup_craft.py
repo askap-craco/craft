@@ -20,11 +20,11 @@ MAX_BF_FPGA_BW = MAX_BF_CARD_BW/6        #@brief Processed BW of each beamformer
 def getCraftSubbands(bf):
     #m_craftSubbands[i] = (m_bullant->getFPGASubbandID(fpgaAddress[i]) & 0x7f) * MAX_BF_FPGA_BW;
     subbands = []
-    for i in xrange(6):
+    for i in range(6):
         b = bf.getBullantCard().getFPGASubbandID(fpgaAddress[i] & 0x7f) * MAX_BF_FPGA_BW
         subbands.append(b)
 
-    print 'Got subbands', subbands
+    print('Got subbands', subbands)
 
     return subbands
         
@@ -44,8 +44,8 @@ def getCraftSkyFrequencies2(bf):
     subbands = getCraftSubbands(bf)
     skyfreqs = []
 
-    for _id in xrange(6):
-        for _freq in xrange(8):
+    for _id in range(6):
+        for _freq in range(8):
             skyfreq = allfreqs[subbands[_id] + _freq]
             skyfreqs.append(skyfreq)
 
@@ -95,7 +95,7 @@ def setup_craft_ant(antv):
     assert int_cycles >=1 and int_cycles <= 7, 'Invalid int cycles {}'.format(int_cycles)
 
     bufmode_map = {16:0, 8:1, 4:2, 1:3}
-    assert values.buffer_mode in bufmode_map.keys(), 'Invalid buffer mode'
+    assert values.buffer_mode in list(bufmode_map.keys()), 'Invalid buffer mode'
     bufmode = bufmode_map[values.buffer_mode]
 
     if values.beam_number is None:
@@ -113,7 +113,7 @@ def setup_craft_ant(antv):
 
     bfs = []
     pushDownloadDelay = values.push_delay
-    print 'Looking at cards', values.cards
+    print('Looking at cards', values.cards)
 
     foutname  = 'ak{}_{}'.format(ant, values.freqfile)
     logging.info('Writing file %s', foutname)
@@ -150,7 +150,7 @@ def setup_craft_ant(antv):
         delay_sec = packet_interval_sec*float(total_card_no)
         delay_samps = int(np.ceil(delay_sec/8e-9))
 
-        print 'DELAYS', ant, iant, card, icard, packet_interval_sec, delay_sec, delay_samps
+        print('DELAYS', ant, iant, card, icard, packet_interval_sec, delay_sec, delay_samps)
 
         if values.push_delay == -1:
             bf.getBullantCard().setDownloadDelay(delay_samps)

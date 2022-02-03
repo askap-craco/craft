@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-import plotutil
+from . import plotutil
 import fnmatch
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"

@@ -5,14 +5,14 @@ Created on Jan 4, 2012
 
 @author: ban115
 '''
-from __future__ import with_statement
+
 import socket
 import types
 import threading
 import datetime
 from time import mktime
 
-type_to_monica_map = {types.IntType:'int'}
+type_to_monica_map = {int:'int'}
 
 def type_to_monica(value):
     montype = type_to_monica_map.get(type(value))
@@ -58,8 +58,8 @@ You could hardcode this value or get the current value from MoniCA by looking at
         
     dutc = get_dutc(dutc)
     
-    time_mills = int(mktime(dt.timetuple()))*1000L
-    return (time_mills * 1000L) + dutc*1000000L + 3506716800000000L
+    time_mills = int(mktime(dt.timetuple()))*1000
+    return (time_mills * 1000) + dutc*1000000 + 3506716800000000
     
 
 
@@ -134,7 +134,7 @@ class MonicaValues(dict):
         dict.__init__(self, *args, **kwargs)
         
     def __str__(self):
-        return format_values(self.values())
+        return format_values(list(self.values()))
         
 class MonicaDetails(object):
     def __init__(self, ctrlpoint, samplerate, unit, description):
@@ -198,7 +198,7 @@ class MonicaClient(object):
         """Generic method for getting stuff"""
         self.connect()
         
-        if type(ctrlpoints) == types.StringType:
+        if type(ctrlpoints) == bytes:
             points = (ctrlpoints,)
         else:
             points = ctrlpoints 
@@ -229,7 +229,7 @@ class MonicaClient(object):
                 except:
                     raise ValueError("Could not parse result for point: %s. Line='%s'" % (point, line))
             
-        if type(ctrlpoints) == types.StringType:
+        if type(ctrlpoints) == bytes:
             return values[rpoint]
         else:
             return values
@@ -254,7 +254,7 @@ class MonicaClient(object):
             if isinstance(values, MonicaValue): # it's a one fff:
                 values.details = details
             else: # its returned multpile thngs
-                for k,d in details.iteritems():
+                for k,d in details.items():
                     values[k].set_details(d)
         
         return values
@@ -270,7 +270,7 @@ class MonicaClient(object):
 
             times = []
             data = []
-            for i in xrange(ndata):
+            for i in range(ndata):
                 line = self.fsock.readline()
                 bits = line.split('\t')
                 times.append(int(bits[0], 16))
@@ -300,7 +300,7 @@ class MonicaClient(object):
         details = self._send_cmd('details', lambda bits: MonicaDetails(*bits), ctrlpoints)
         
         if self.details_cache is not None:
-            for k,v in details.iteritems():
+            for k,v in details.items():
                 self.details_cache[k] = v
                 
         return details
@@ -312,7 +312,7 @@ class MonicaClient(object):
         """
         # returns something that looks ike:
         #site.environment.weather.Temperature 10.0 "C" "Temperature"
-        if isinstance(ctrlpoints, types.StringType):
+        if isinstance(ctrlpoints, bytes):
             ctrlpoints = (ctrlpoints,)
             
         ctrlset = set(ctrlpoints)

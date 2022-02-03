@@ -42,21 +42,21 @@ def _main():
     fconfig = FreqConfig.load_from_dada_header(h, cards)
     nbf, nchans = fconfig.freqs.shape
 
-    print fconfig
+    print(fconfig)
 
-    print 'NUM_BEAMFORMERS {}'.format(nbf)
+    print('NUM_BEAMFORMERS {}'.format(nbf))
 
     assert cards is None or nbf == len(cards)
 
-    print 'FREQ {}'.format(fconfig.freq)
-    print 'BW {}'.format(fconfig.bw)
-    print 'NCHAN {}'.format(fconfig.nchan)
+    print('FREQ {}'.format(fconfig.freq))
+    print('BW {}'.format(fconfig.bw))
+    print('NCHAN {}'.format(fconfig.nchan))
 
     fig, axes = pylab.subplots(2,1)
     ax1, ax2 = axes.flatten()
 
 
-    for i in xrange(nbf):
+    for i in range(nbf):
         freqs = fconfig.freqs[i, :]
         chanmap = fconfig.chanmaps[i, :]
         freqmap = fconfig.freqmaps[i, :]
@@ -66,10 +66,10 @@ def _main():
         else:
             cardno = cards[i]
 
-        print 'BEAMFORMER{}_CARDNO {}'.format(i, cardno)
-        print 'BEAMFORMER{}_CHANMAP {}'.format(i,  ','.join(map(str, chanmap)))
-        print 'BEAMFORMER{}_FREQMAP {}'.format(i,  ','.join(map(str, freqmap)))
-        print 'BEAMFORMER{}_FREQS {}'.format(i,  ','.join(map(str, freqs)))
+        print('BEAMFORMER{}_CARDNO {}'.format(i, cardno))
+        print('BEAMFORMER{}_CHANMAP {}'.format(i,  ','.join(map(str, chanmap))))
+        print('BEAMFORMER{}_FREQMAP {}'.format(i,  ','.join(map(str, freqmap))))
+        print('BEAMFORMER{}_FREQS {}'.format(i,  ','.join(map(str, freqs))))
 
         if values.show:
             ax1.plot(freqs, 'o', label='ibf {}'.format(i))

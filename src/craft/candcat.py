@@ -28,14 +28,14 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     nfiles = len(values.files)
-    offsets = map(int, values.offset.split(','))
+    offsets = list(map(int, values.offset.split(',')))
     assert nfiles == len(offsets)
     for fin_name, boff in zip(values.files, offsets):
         fin = open(fin_name, 'rU')
-        print '# new file %s beam offset %d' % (fin_name, boff)
+        print('# new file %s beam offset %d' % (fin_name, boff))
         for line in fin:
             if line.strip().startswith('#'):
-                print line
+                print(line)
             else:
                 bits = line.strip().split()
                 if len(bits) == 0:
@@ -43,7 +43,7 @@ def _main():
                 else:
                     new_beamno = int(bits[-1]) + boff
                     bits[-1] = str(new_beamno)
-                    print ' '.join(bits)
+                    print(' '.join(bits))
 
         fin.close()
 

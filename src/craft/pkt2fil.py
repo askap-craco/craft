@@ -12,7 +12,7 @@ import askap.time
 import numpy as np
 import time
 import pylab
-import cPickle as pickle
+import pickle as pickle
 import datetime
 import pytz
 import warnings
@@ -25,7 +25,7 @@ import askap.craft.pktdump as pktdump
 def bat2mjd(bat):
     utcdt = askap.time.bat2utcDt(int(bat))
     mjd = askap.time.utcDt2mjd(utcdt)
-    print 'BAT conversion', bat, utcdt, mjd
+    print('BAT conversion', bat, utcdt, mjd)
     return mjd
 
 def get_channel(hdr, address):
@@ -88,7 +88,7 @@ class OutputReorderBuffer(object):
             numnew = intno - currint
             if numnew > self._nslots:
                 raise ValueError('Probably invalid intno >> nslots: intno=%s nslots=%s numnew=%s' % (intno, self._nslots, numnew))
-            for i in xrange(numnew):
+            for i in range(numnew):
                 self.new_slot(currint + i + 1)
 
         # Get currint again, as allocating slots will change currint
@@ -117,7 +117,7 @@ class OutputReorderBuffer(object):
 
     def flush(self):
         currint = self.get_currint()
-        for i in xrange(self._nslots):
+        for i in range(self._nslots):
             newint = currint + 1
             self.new_slot(newint)
 
@@ -130,7 +130,7 @@ class DataWriter(object):
         else:
             source_name = values.source_name
 
-        for i in xrange(values.nfiles):
+        for i in range(values.nfiles):
             sigproc_hdr = {}
             sigproc_hdr['tstart'] = float(main_hdr['TSTART'])
             sigproc_hdr['tsamp'] = float(main_hdr['TSAMP'])
@@ -201,13 +201,13 @@ class InputDefragmenter(object):
         
         if len(fragments) == self._nfrag:
             buf = ''
-            for i in xrange(self._nfrag):
+            for i in range(self._nfrag):
                 d = fragments[i][2]
                 buf += d
 
             new_seqno = (seqno + 1) % 256
 
-            logging.debug('Got all fragments for key %s. They were: %s. New seqno %s', key, fragments.keys(), new_seqno)
+            logging.debug('Got all fragments for key %s. They were: %s. New seqno %s', key, list(fragments.keys()), new_seqno)
 
             self._frags[key] = {}
             self._seqnos[key] = new_seqno
@@ -215,7 +215,7 @@ class InputDefragmenter(object):
             return buf
         else:
             self._frags[key] = fragments
-            logging.debug('Saved fragment for key %s. Now have %s fragments: %s', key, len(fragments), fragments.keys())
+            logging.debug('Saved fragment for key %s. Now have %s fragments: %s', key, len(fragments), list(fragments.keys()))
 
             return None
 
@@ -242,7 +242,7 @@ def _main():
     f = pktdump.pktopen(fin)
     main_hdr = f.hdr
 
-    print main_hdr
+    print(main_hdr)
     intcount = int(main_hdr['INT_CYCLES'])
     intime = float(main_hdr['INT_TIME'])
     
@@ -260,7 +260,7 @@ def _main():
     ignore_cards = []
     last_times = {}
 
-    cards = map(int, main_hdr['CARDS'].split(','))
+    cards = list(map(int, main_hdr['CARDS'].split(',')))
     ncards = len(cards)
     nchans_per_fpga = 8 
     nfpgas_per_card = 6
@@ -278,14 +278,14 @@ def _main():
     MAX_INTCOUNT = 7
     MAX_PKT_NBYTES = 8188
     
-    for ic in xrange(1, MAX_INTCOUNT+1):
+    for ic in range(1, MAX_INTCOUNT+1):
         # nbytes = 72 beams * 8 channels * 4 bytes/point + header(4 timestamps * 8 bytes)
         nbytes = (72*8*4 + 4*8) * ic
         npkts = nbytes/MAX_PKT_NBYTES
         fraglen = [MAX_PKT_NBYTES]*npkts + [nbytes % MAX_PKT_NBYTES]
         assert sum(fraglen) == nbytes
         fraglengths[ic] = fraglen
-        print 'Fragments for intcount', ic, fraglen
+        print('Fragments for intcount', ic, fraglen)
 
     defrag = InputDefragmenter(fraglengths[intcount])
 
@@ -342,13 +342,13 @@ def _main():
         ibf = cards.index(bf_no)
 
         if values.print_times:
-            print 'times', times
-            print 'start bats', start_bats
-            print 'stop bat', stop_bats
-            print 'bat diffs', stop_bats - start_bats
-            print 'start frames', start_frames
-            print 'stop frames', stop_frames
-            print 'frame diffs', stop_frames - start_frames
+            print('times', times)
+            print('start bats', start_bats)
+            print('stop bat', stop_bats)
+            print('bat diffs', stop_bats - start_bats)
+            print('start frames', start_frames)
+            print('stop frames', stop_frames)
+            print('frame diffs', stop_frames - start_frames)
 
         chan = get_channel(hdr, address)
         #print start_frames - stop_frames, type(start_frames), start_frames.dtype, start_frames, (start_frames - stop_frames), (start_frames + stop_frames), start_frames[0] + stop_frames[0]
@@ -361,11 +361,11 @@ def _main():
             first_bat = pktbat + 5e4
             currbat = first_bat
             # This BAT doesn't seem to convert nicely to an mjd.
-            print 'Scheduled for first_bat', first_bat, pktbat
+            print('Scheduled for first_bat', first_bat, pktbat)
             continue
 
         if pktbat < first_bat:
-            print 'Before first bat. Skipping ', first_bat, pktbat, first_bat - pktbat, hdr, len(data), d
+            print('Before first bat. Skipping ', first_bat, pktbat, first_bat - pktbat, hdr, len(data), d)
             continue
 
         if frame1 is None:
@@ -375,7 +375,7 @@ def _main():
             currint = None
             timezone = pytz.timezone('Australia/Perth')
             pktdate_awst = pktdate.replace(tzinfo=timezone)
-            print 'date', pktdate, pktdate_awst
+            print('date', pktdate, pktdate_awst)
             #BAD IDEA! Isn't synced with data, and is for the wrong packet! But anway.
             # TODO: uess BAT as its missingthe top 8 (or is it 16???) bits
             main_hdr['TSTART'] = str(askap.time.utcDt2mjd(pktdate_awst)) 
@@ -397,7 +397,7 @@ def _main():
         intno = intno1
 
         if intno % 1000 == 0:
-            print 'INTNO', intno, pktframe, frame1, intime, pktframe-frame1, type(pktframe), type(frame1)
+            print('INTNO', intno, pktframe, frame1, intime, pktframe-frame1, type(pktframe), type(frame1))
 
         intno_bat = (pktbat - bat1) / batint
 
@@ -412,14 +412,14 @@ def _main():
             pktdatestr = ''
 
         if values.verbose:
-            print '\t'.join(map(str, (address[0], hdr['srcDevice'],
+            print('\t'.join(map(str, (address[0], hdr['srcDevice'],
 #                                  pktdatestr, pktdiff,
                                   seqno, seqno-last_seqno, hdr['fragmentID'],
                                   hdrbat, hdrbat - hbat1, hdrbat - last_hdrbat,
                                   pktbat, pktbat-bat1,  pktbat-last_pktbat, '%0.3f' % intno_bat,
                                   pktframe, pktframe - frame1,pktframe - last_pktframe, '%0.3f' % intno,
                                   'fdiff', fdiff, bdiff, chan, datazero, len(data)
-                                  )))
+                                  ))))
 
         last_times[(address, dev)] = (pktbat, pktframe, hdrbat, seqno, pktdate)
 
@@ -432,9 +432,9 @@ def _main():
         else:
             fidxs = freq_config.chanmaps[ibf, fpga*nchans_per_fpga:(fpga+1)*nchans_per_fpga]
 
-        for i in xrange(intcount):
+        for i in range(intcount):
             # only writes 1 IF
-            for b in xrange(nbeampols):
+            for b in range(nbeampols):
                 d = data[:, i, b]
                 idxs = fidxs + b*nchan
                 outbuf.put(intno + i, idxs, d)

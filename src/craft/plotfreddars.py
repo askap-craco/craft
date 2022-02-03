@@ -11,8 +11,8 @@ import numpy as np
 import os
 import sys
 import logging
-from cmdline import strrange
-from rtdata import FreddaRescaleData
+from .cmdline import strrange
+from .rtdata import FreddaRescaleData
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -50,7 +50,7 @@ def showplot(ax, x, d, values, name, label=None, **kwargs):
         # need to plot one at a time fo rlabelling. Grrr.
         r = []
         lbl = None
-        for n in xrange(ncol):
+        for n in range(ncol):
             if label is not None:
                 lbl = label[n]
                 
@@ -70,7 +70,7 @@ class RescalePlot(object):
         self.values = values
         self.figs = []
         self.axs = []
-        for i in xrange(5):
+        for i in range(5):
             fig, ax = pylab.subplots(3,3)
             self.figs.append(fig)
             self.axs.append(ax.flatten())
@@ -82,18 +82,18 @@ class RescalePlot(object):
         line = event.artist
         xdata, ydata = line.get_data()
         for ind in event.ind:
-            print('Data x[{}]={} y[{}]={} label={}'.format(ind, xdata[ind], ind, ydata[ind], line.get_label()))
+            print(('Data x[{}]={} y[{}]={} label={}'.format(ind, xdata[ind], ind, ydata[ind], line.get_label())))
 
 
     def plot(self):
         values = self.values
         d = self.d
-        print d.hdr
-        print d.dada_files
-        print d.dada_files[0].nblocks
-        print d.nblocks
-        print d.antennas
-        print d.nbeams
+        print(d.hdr)
+        print(d.dada_files)
+        print(d.dada_files[0].nblocks)
+        print(d.nblocks)
+        print(d.antennas)
+        print(d.nbeams)
         fig, fig2, fig3,fig4,fig5 = self.figs
         ax, ax2, ax3,ax4,ax5 = self.axs
 
@@ -119,7 +119,7 @@ class RescalePlot(object):
 
         ant_beam_labels = []
         ant_labels = d.antennas
-        antnumbers = map(int, [a[2:] for a in d.antennas])
+        antnumbers = list(map(int, [a[2:] for a in d.antennas]))
         if values.ant is None:
             iant = 0
         else:
@@ -130,10 +130,10 @@ class RescalePlot(object):
             beam_labels = []
             iant = 0
             for a in d.antennas:
-                beam_labels.extend(['{} b{}'.format(a, b) for b in xrange(nbeams)])
+                beam_labels.extend(['{} b{}'.format(a, b) for b in range(nbeams)])
             ant_labels = beam_labels
         else:
-            beam_labels = ['beam={}'.format(b) for b in xrange(nbeams)]
+            beam_labels = ['beam={}'.format(b) for b in range(nbeams)]
                 
 
         xbeams = np.arange(nbeams)
@@ -170,7 +170,7 @@ class RescalePlot(object):
             if values.antmerge:
                 bdn.shape = (1, nant*nbeam, -1)
 
-            print name, bdn.shape # shape is (ant, beam, chan)
+            print(name, bdn.shape) # shape is (ant, beam, chan)
 
             lines1 = showplot(ax[iax],d.freqs, bdn[iant, :, :].T, values, name, beam_labels)
             lines2 = showplot(ax2[iax], xbeams, bdn[:,:,ichan].T, values, name, ant_labels)

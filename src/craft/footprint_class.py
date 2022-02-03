@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
 from math import pi,sqrt
-import skypos as s
+from . import skypos as s
 # DMcC: Ammended 2015-03-11 to provide the PA correction required to maintain the PA in offset beam operations.
 # See note in fottprint.py
 # DMcC: Ammended 2015-05-05 to add stdPitch function
@@ -41,7 +41,7 @@ class Footprint(object):
             a = np.array([b0.DPA(s.skypos(p[0],p[1])) for p in offsets])
             b = np.array([b0.DPA(s.skypos(p[0],p[1])) for p in interOffs])
 
-        print "interOffs ",b
+        print("interOffs ",b)
         if len(b)==0:
             b = np.array([[0.0,0.0]])
         self.offsetsPolar   = np.array([a.T[0],a.T[1]+angle]).T
@@ -117,7 +117,7 @@ class Footprint(object):
 
     def save(self,outfile):
         f = open(outfile,'w')
-        for b,j in zip(self.offsetsPolar,range(self.nBeams)):
+        for b,j in zip(self.offsetsPolar,list(range(self.nBeams))):
             outline = "beam.%d.polar = (%f,%f)"%(j,b[0],b[1])
             f.write(outline+'\n')
         f.close()
@@ -135,7 +135,7 @@ class Footprint(object):
         """
         f = open(name,'rU')
         lines = f.readlines()
-        print "restore(%s)"%name
+        print("restore(%s)"%name)
         ib = 0
         pairs = []
         pos = None
@@ -143,17 +143,17 @@ class Footprint(object):
         unitFac = 1.0
         first = True
         for li in lines:
-             print 'xx li = %s'%li
+             print('xx li = %s'%li)
              if "offsets.units" in li:
                   if 'deg' in li:
                        unitFac = pi/180.0
 
              if "src%d.field"%(ib+1) in li:
-                print 'li = %s'%li
+                print('li = %s'%li)
                 #tmp = li.strip().split("= ")[-1].strip('()').split(',')
                 svals = [a for a in re.split('[ =()\[\],\'\"]',li.strip()) if len(a) > 0]
                 if first:
-                    print 'first'
+                    print('first')
                     if "field_direction" in li:
                         otype = "abs"
                     elif "pol" in li:
@@ -167,7 +167,7 @@ class Footprint(object):
                     #print svals[-3],svals[-2]
                     pairs.append([s.ras_rad(svals[-3]),s.decs_rad(svals[-2])])
                 else:
-                    a,b = map(float,svals[-2:])
+                    a,b = list(map(float,svals[-2:]))
                     pairs.append((a,b))
                 ib += 1
         offsets = np.array(pairs)*unitFac
@@ -183,7 +183,7 @@ class Footprint(object):
         interOffs = ()
         if name == "diamond":
             outer = root3
-            pas = list((np.array([0.0]+range(0,360,60)+[90,270]))*pi/180.0)
+            pas = list((np.array([0.0]+list(range(0,360,60))+[90,270]))*pi/180.0)
             dis = list(np.array([0.0]+6*[1.0]+[outer,outer])*pitch)
             offsets = [(a,b) for a,b in zip(dis,pas)]
             otype = 'polar'
@@ -191,21 +191,21 @@ class Footprint(object):
 
         if name == "rhombus":
             outer = root3
-            pas = list((np.array([0.0]+range(30,360,60)+[120,300]))*pi/180.0)
+            pas = list((np.array([0.0]+list(range(30,360,60))+[120,300]))*pi/180.0)
             dis = list(np.array([0.0]+6*[1.0]+[outer,outer])*pitch)
             offsets = [(a,b) for a,b in zip(dis,pas)]
             otype = 'polar'
             interOffs = np.zeros(np.array(offsets).shape)
 
         if name == "octagon":
-            pas = list((np.array([0.0]+range(0,360,45)))*pi/180.0)
+            pas = list((np.array([0.0]+list(range(0,360,45))))*pi/180.0)
             dis = list(np.array([0.0]+8*[1.0])*pitch)
             offsets = [(a,b) for a,b in zip(dis,pas)]
             otype = 'polar'
             interOffs = np.zeros(np.array(offsets).shape)
 
         if name == "trapezoid3":
-            pas = list((np.array([0.0]+range(30,360,60) + [120.0,240.0]))*pi/180.0)
+            pas = list((np.array([0.0]+list(range(30,360,60)) + [120.0,240.0]))*pi/180.0)
             dis = list(np.array([0.0]+6*[1.0]+2*[root3])*pitch)
             offsets = [(a,b) for a,b in zip(dis,pas)]
             otype = 'polar'
@@ -220,7 +220,7 @@ class Footprint(object):
 
         if name == "3x3":
             outer = root3
-            pas = list((np.array([0.0]+range(30,360,60)+[60,120]))*pi/180.0)
+            pas = list((np.array([0.0]+list(range(30,360,60))+[60,120]))*pi/180.0)
             dis = list(np.array([0.0]+6*[1.0]+[outer,outer])*pitch)
             offsets = [(a,b) for a,b in zip(dis,pas)]
             io_dis = np.array([1.,1.])*pitch/root3

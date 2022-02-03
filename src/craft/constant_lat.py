@@ -65,7 +65,7 @@ def _main():
     #pset.write('common.target.src%d.footprint.name=square_6x6\n')
     #pset.write('common.target.src%d.footprint.pitch=0.9\n')
     #pset.write('common.target.src%d.footprint.pa=45\n')
-    targnames = ['src{}'.format(i+1) for i in xrange(len(fields))]
+    targnames = ['src{}'.format(i+1) for i in range(len(fields))]
     pset.write('common.targets = [[{}]]\n'.format(','.join(targnames)))
     pset.write('standard.repeat = 999\n')
     
@@ -93,9 +93,9 @@ def _main():
     frame = AltAz(obstime=times, location=mro)
     for field, cgal in fields:
         altaz = field.transform_to(frame)
-        print altaz.alt.degree
+        print(altaz.alt.degree)
         #pylab.plot(times.plot_date, altaz.alt.degree)
-        print field, altaz
+        print(field, altaz)
         nup[altaz.alt.degree > 15.0] += 1
 
 

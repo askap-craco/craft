@@ -59,7 +59,7 @@ class CalcFile(object):
 
     def writeto(self, foutname):
         with open(foutname, 'w') as fout:
-            for k,v in self.cards.iteritems():
+            for k,v in self.cards.items():
                 kcol = k +':'
                 fout.write('{:<20}{}\n'.format(kcol,v))
 
@@ -85,10 +85,10 @@ class Poly(object):
             polyname = ' '.join(namebits[4:])
             antpolys = self.source0antpolys.get(antid, {})
             self.source0antpolys[antid] = antpolys
-            antpolys[polyname] = map(float, value.split())
+            antpolys[polyname] = list(map(float, value.split()))
 
     def __str__(self):
-        return 'POLY ID={} mjd={} sec={} ants={}'.format(self.polyid, self.mjd, self.sec, str(self.source0antpolys.keys()))
+        return 'POLY ID={} mjd={} sec={} ants={}'.format(self.polyid, self.mjd, self.sec, str(list(self.source0antpolys.keys())))
 
     __repr__ = __str__
 
@@ -134,7 +134,7 @@ class Scan(object):
 
     def get_poly(self, mjd):
         #the_poly = min(self.polys, key=lambda p: abs(mjd - p.mjdfull))
-        after_polys = filter(lambda p: p.mjdfull <= mjd, self.polys)
+        after_polys = [p for p in self.polys if p.mjdfull <= mjd]
         if len(after_polys) == 0:
             the_poly = max(self.polys, key=lambda p:p.mjdfull)
             warnings.warn('Past last polynomial. mjd={} last mjd={}'.format(mjd, the_poly.mjdfull))
@@ -156,10 +156,10 @@ class Scan(object):
         assert secs >= 0
             
         ant_results = {}
-        for ant, polys in poly.source0antpolys.iteritems():
+        for ant, polys in poly.source0antpolys.items():
             antname = self.resfile.telnames[ant]
             ant_results[antname] = {}
-            for polyname, pcoeff in polys.iteritems():
+            for polyname, pcoeff in polys.items():
                 ant_results[antname][polyname] = np.polyval(pcoeff[::-1], secs)
 
             elevation = ant_results[antname]['EL GEOM']
@@ -175,9 +175,9 @@ class Scan(object):
         res = self.eval_src0_poly(mjd)
         ref_results = res[refant]
         resdelta = {}
-        for ant, polydata in res.iteritems():
+        for ant, polydata in res.items():
             resdelta[ant] = {}
-            for polyname, value in polydata.iteritems():
+            for polyname, value in polydata.items():
                 resdelta[ant][polyname] = value - ref_results[polyname]
 
         return resdelta
@@ -208,7 +208,7 @@ class ResultsFile(OrderedDict):
 
         self.num_telsecopes = int(self['NUM TELESCOPES'])
         self.telnames = []
-        for itel in xrange(self.num_telsecopes):
+        for itel in range(self.num_telsecopes):
             self.telnames.append(self['TELESCOPE {} NAME'.format(itel)])
 
         self.num_scans = int(self['NUM SCANS'])
@@ -217,7 +217,7 @@ class ResultsFile(OrderedDict):
         polynames = ('DELAY (us)','U (m)', 'V (m)', 'W (m)')
         polyid = 0
         for polyname in polynames:
-            r.scans[0].polys[0].source0antpolys.iteritems()
+            iter(r.scans[0].polys[0].source0antpolys.items())
 
 
 def plot_polys(rfile, tmax):
@@ -226,8 +226,8 @@ def plot_polys(rfile, tmax):
     for polyname in polynames:
         pylab.figure()
         p0 = None
-        print  r.scans[0].polys[0]
-        for ant, polys in rfile.scans[0].polys[0].source0antpolys.iteritems():
+        print(r.scans[0].polys[0])
+        for ant, polys in rfile.scans[0].polys[0].source0antpolys.items():
             pcoeff = polys[polyname]
             t = np.arange(tmax)
             pvalue = np.polyval(pcoeff[::-1], t)
@@ -251,14 +251,14 @@ def plot_polys_range(rfile, mjdstart, tmax):
         p = rfile.scans[0].eval_src0_poly(mjd) 
         values.append(p)
         if imjd == 563 or imjd == 560:
-            print 'MJD set', mjd
+            print('MJD set', mjd)
 
         
     polynames = ('DELAY (us)','U (m)', 'V (m)', 'W (m)')
     fig, (ax1, ax2, ax3, ax4, ax5, ax6) = pylab.subplots(6,1, sharex=True)
     lines = []
     labels = []
-    print 'At MJD', mjdstart
+    print('At MJD', mjdstart)
     
     for ia1, a1 in enumerate(rfile.telnames):
         for ia2, a2 in enumerate(rfile.telnames[ia1:]):
@@ -270,12 +270,12 @@ def plot_polys_range(rfile, mjdstart, tmax):
             el = [val[a1]['EL GEOM'] for val in values]
             secoffs = [val['secoff'] for val in values]
             delays = [val[a1]['DELAY (us)'] - val[a2]['DELAY (us)']for val in values]
-            u,v,w,secoffs, delays = map(np.array, (u,v,w, secoffs, delays))
-            print '{} u={} v={} w={} el={} secoff={} delay={:0.9f}us'.format(lbl, u[0], v[0], w[0], el[0], secoffs[0], float(delays[0]))
+            u,v,w,secoffs, delays = list(map(np.array, (u,v,w, secoffs, delays)))
+            print('{} u={} v={} w={} el={} secoff={} delay={:0.9f}us'.format(lbl, u[0], v[0], w[0], el[0], secoffs[0], float(delays[0])))
             if np.any(abs(u) > 1e5):
                 bad_times = np.where(abs(u) > 1e5)[0]
-                print 'BAD TIMES',bad_times, mjds[bad_times]
-                print values[bad_times[0]]['poly']
+                print('BAD TIMES',bad_times, mjds[bad_times])
+                print(values[bad_times[0]]['poly'])
                 
             pylab.figure(2)
             line, = pylab.plot(u,v)
@@ -330,7 +330,7 @@ def _main():
     #plot_polys(f,10)
     mjdstart = f.scans[0].first_mjd
     mjdend = f.scans[0].last_mjd
-    print 'File {} starts at mjd {} and ends at {}'.format(values.files[0], mjdstart, mjdend)
+    print('File {} starts at mjd {} and ends at {}'.format(values.files[0], mjdstart, mjdend))
     if values.mjdstart is None:
         mjd = mjdstart
     else:
@@ -341,7 +341,7 @@ def _main():
     else:
         nhrs = values.nhrs
 
-    print 'PLotting mjds starting from', mjd
+    print('PLotting mjds starting from', mjd)
     plot_polys_range(f, mjd, 3600*values.nhrs)
     
 

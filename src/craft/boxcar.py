@@ -42,7 +42,7 @@ class Boxcar(object):
         # boxcar 0 == the input
         dout[:, :, 0] = dincat[:, nbox:nt+nbox]
 
-        for b in xrange(1, nbox):
+        for b in range(1, nbox):
             dout[:, :, b] = dincat[:, nbox-b:nt+nbox-b] + dout[:, :, b-1]
 
         self.history[:,:] = din[:, nt-nbox:nt].copy()
@@ -100,7 +100,7 @@ class ImageBoxcar(object):
         dout[:,:, 0] = img
 
         # Compute boxcar
-        for b in xrange(1, nbox):
+        for b in range(1, nbox):
             dout[:,:,b] = (dout[:,:,b-1] + self.history[d, :,:,b-1])
 
         # Multiply by boxcar weights
@@ -140,7 +140,7 @@ def _main():
     indata[0, :, :] = 1
 
     outd = []
-    for t in xrange(nt):
+    for t in range(nt):
         outd.append(ib(0, indata[t,:,:]))
 
     outd = np.array(outd)

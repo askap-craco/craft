@@ -13,10 +13,10 @@ import numpy as np
 import os
 import sys
 import logging
-import sigproc
+from . import sigproc
 import scipy.stats
 import warnings
-import dada
+from . import dada
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -88,7 +88,7 @@ def eigenflag(d, values):
     vic = np.empty((nchan, nbeam))
     uic = np.empty((nchan, nbeam, nbeam))
     k = values.nsub
-    for ic in xrange(nchan):
+    for ic in range(nchan):
         r = d[:, :, ic]
         thecov = np.cov(r)
         #dcovar[ic, :, :] = thecov
@@ -96,7 +96,7 @@ def eigenflag(d, values):
             u, v, vh = np.linalg.svd(thecov)
             vic[ic, :] = v
             uic[ic, :, :] = u
-            for t in xrange(nint):
+            for t in range(nint):
                 rfi = np.dot(u.T, r[:, t])
                 #rfiout[:, t, ic] = rfi[:]
                 rfi[:k] = 0
@@ -139,7 +139,7 @@ def eigenflag_dm0(d, values):
     k = values.nsub
     opt_dm0 = np.empty((nbeam, nint))
 
-    for t in xrange(nint):
+    for t in range(nint):
         r = dm0[:, t]
         rfi = np.dot(u.T, r)
         rfi[k:] = 0
@@ -163,7 +163,7 @@ def eigenflag_dm0(d, values):
 
         newdm0 = dout.mean(axis=2)
         ax[0,1].plot(newdm0.T[:, maxbeams])
-        print 'Have I subtracted everything', dm0.T[:, maxbeams].max(), newdm0.T[:, maxbeams].max()
+        print('Have I subtracted everything', dm0.T[:, maxbeams].max(), newdm0.T[:, maxbeams].max())
         ax[0,1].set_title('DM0 after cleaning')
 
         ax[0,2].plot(v)
@@ -231,8 +231,8 @@ class DadaReader(object):
         ''' Returns a dictionary suitable for use as filterbank header'''
         h = self.infile.hdr
         hdr = {}
-        bra = map(float, h.get_value('BEAM_RA').split(','))[beamid]
-        bdec = map(float, h.get_value('BEAM_DEC').split(','))[beamid]
+        bra = list(map(float, h.get_value('BEAM_RA').split(',')))[beamid]
+        bdec = list(map(float, h.get_value('BEAM_DEC').split(',')))[beamid]
         hdr['foff'] = float(h.get_value('BW'))
         hdr['fch1'] = float(h.get_value('FREQ'))
         hdr['tstart'] = float(h.get_value('MJD_START'))
@@ -261,7 +261,7 @@ class DadaReader(object):
         
 def open_files(values):
     r = None
-    if len(values.files) > 1 and all(map(lambda s:s.endswith('.fil'), values.files)):
+    if len(values.files) > 1 and all([s.endswith('.fil') for s in values.files]):
         r = SigprocReader(values.files, values)
     elif len(values.files) == 1 and values.files[0].endswith('.dada'):
         r = DadaReader(values.files[0], values)
@@ -304,7 +304,7 @@ def _main():
 
     reader = open_files(values)
     nbeams = reader.nbeams
-    outfile_names = [os.path.join(values.outdir, reader.outfile(b)) for b  in xrange(nbeams)]
+    outfile_names = [os.path.join(values.outdir, reader.outfile(b)) for b  in range(nbeams)]
     for f in outfile_names:
         d = os.path.dirname(f)
         if not os.path.isdir(d):
@@ -322,9 +322,9 @@ def _main():
     
     k = values.nsub
 
-    print startblock, endblock
+    print(startblock, endblock)
 
-    for b in xrange(startblock, endblock):
+    for b in range(startblock, endblock):
         d = reader.read(b)
         dtype = d.dtype
 

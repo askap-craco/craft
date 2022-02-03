@@ -8,7 +8,7 @@ import numpy as np
 import os
 import sys
 import logging
-from crafthdr import DadaHeader
+from .crafthdr import DadaHeader
 import datetime
 import glob
 import re
@@ -62,11 +62,11 @@ class TargetParset(dict):
         p = None
 
         targ_str = 'common.target.{}.{}'.format(src, param)
-        if targ_str in self.keys():
+        if targ_str in list(self.keys()):
             p = self[targ_str]
         else:
             srcid = int(src[3:])
-            for k, v in self.iteritems():
+            for k, v in self.items():
                 if '%d' not in k:
                     continue
 
@@ -81,7 +81,7 @@ class TargetParset(dict):
         return p
 
     def _add_field_directions(self):
-        for src, data in self.sources.iteritems():
+        for src, data in self.sources.items():
             if 'field_direction' not in data:
                 continue
 
@@ -102,7 +102,7 @@ class TargetParset(dict):
             #data['footprint'] = fp
 
     def get_nearest_source(self, pos, tol_deg=0.1):
-        sources = [s for s in self.sources.values() if 'skycoord' in s]
+        sources = [s for s in list(self.sources.values()) if 'skycoord' in s]
         nearest = min(sources, key=lambda p: mysep2(p['skycoord'], pos))
         sepdeg  = np.degrees(mysep2(nearest['skycoord'], pos) )
         if sepdeg > tol_deg:
@@ -181,7 +181,7 @@ def fix_header(hdr_file, sbdata, pset, values):
     else:
         sbinfo = None # if there's no sbdata at all, then don't complain
     
-    if 'FIXED_VERSION' in hdr.keys():
+    if 'FIXED_VERSION' in list(hdr.keys()):
         last_version = int(hdr.get_value('FIXED_VERSION'))
         new_version = last_version+1
         hdr.set_value('FIXED_VERSION', new_version)
@@ -201,7 +201,7 @@ def fix_header(hdr_file, sbdata, pset, values):
         hdr += ('SB_OWNER', sbinfo[5], 'SB owner')
 
     if sbtemplate.lower() != 'beamform':
-        ra, dec = map(float, (hdr['RA'][0], hdr['DEC'][0]))
+        ra, dec = list(map(float, (hdr['RA'][0], hdr['DEC'][0])))
         ant_pos = SkyCoord(ra, dec, unit='deg')
         src = pset.get_nearest_source(ant_pos, values.tolerance)
         field_direction = src['field_direction']
@@ -220,7 +220,7 @@ def fix_header(hdr_file, sbdata, pset, values):
         field_name = src['field_name']
 
         # sometimes names were incorrect in headers. Fix using the name map
-        for oldname, newname in name_map.iteritems():
+        for oldname, newname in name_map.items():
             if oldname in field_name:
                 field_name = field_name.replace(oldname, newname)
                 break
@@ -241,9 +241,9 @@ def fix_header(hdr_file, sbdata, pset, values):
         logging.debug('FOOTPRINT %s %s %s %s %s %s %s %s', fp_shape, fp_pitch, fp_pa, 'ant pa', ant_pa, 'refpos', ra, dec)
         fp_ras = np.degrees([p.ra for p in fp.positions])
         fp_decs = np.degrees([p.dec for p in fp.positions])
-        ra_strings = map(str, fp_ras)
+        ra_strings = list(map(str, fp_ras))
         ra_strings += ra_strings
-        dec_strings = map(str, fp_decs)
+        dec_strings = list(map(str, fp_decs))
         dec_strings += dec_strings
         hdr.set_value('BEAM_RA',','.join(ra_strings))
         hdr.set_value('BEAM_DEC',','.join(dec_strings))

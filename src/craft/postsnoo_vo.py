@@ -6,7 +6,7 @@ Based on CREATE_VOevent by Shivani Bhandari
 
 Copyright (C) CSIRO 2018
 """
-from crafthdr import DadaHeader
+from .crafthdr import DadaHeader
 import os
 import sys
 import logging
@@ -65,8 +65,8 @@ def obsparms(hdr, beamno):
     ant_pos = vp.Position2D(ra=ra, dec=dec, units='deg', system=vp.definitions.sky_coord_system.utc_fk5_geo)
     p += ant_pos
 
-    beam_ra_all = map(float, hdr.get_value('BEAM_RA').split(','))
-    beam_dec_all = map(float, hdr.get_value('BEAM_DEC').split(','))
+    beam_ra_all = list(map(float, hdr.get_value('BEAM_RA').split(',')))
+    beam_dec_all = list(map(float, hdr.get_value('BEAM_DEC').split(',')))
     beam_ra = beam_ra_all[beamno]
     beam_dec = beam_dec_all[beamno]
 
@@ -169,12 +169,12 @@ def NewVOEvent(dm, dm_err, width, snr, fluence, ra, dec,  ne2001, name, importan
             #xmlstr = minidom.parseString(voxml).toprettyxml(indent="   ")
             #f.write(xmlstr)
             vp.dump(v, f)
-            print(vp.prettystr(v.Who))
-            print(vp.prettystr(v.What))
-            print(vp.prettystr(v.WhereWhen))
-            print(vp.prettystr(v.Why))
+            print((vp.prettystr(v.Who)))
+            print((vp.prettystr(v.What)))
+            print((vp.prettystr(v.WhereWhen)))
+            print((vp.prettystr(v.Why)))
     else:
-        print ("Unable to write file %s.xml" % name)
+        print(("Unable to write file %s.xml" % name))
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -203,8 +203,8 @@ def _main():
     # Move all these caluculations into the NewVoEvent function
     dm_err = 0
     width = boxcar+1
-    beam_ras = map(float, hdr.get_value('BEAM_RA').split(','))
-    beam_decs = map(float, hdr.get_value('BEAM_DEC').split(','))
+    beam_ras = list(map(float, hdr.get_value('BEAM_RA').split(',')))
+    beam_decs = list(map(float, hdr.get_value('BEAM_DEC').split(',')))
     beamno = int(beamno) 
     ra = beam_ras[beamno] # degres
     dec = beam_decs[beamno] # degrees
@@ -233,7 +233,7 @@ def _main():
     #imp = args.importance
     #utc = args.utc
 
-    print (dm, dm_err, width, fluence, ra, dec, ne2001, name, imp, utc)
+    print((dm, dm_err, width, fluence, ra, dec, ne2001, name, imp, utc))
 
     # Parse coordinates
     c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame='icrs')
@@ -241,7 +241,7 @@ def _main():
     gl = g.l.deg
     gb = g.b.deg
    
-    print (c, g, gl, gb)
+    print((c, g, gl, gb))
     #print utc, utc_YY, utc_MM, utc_DD, utc_hh, utc_mm, utc_ss, mjd
     # TODO: put the entire cand information in from teh snoopy log.
     

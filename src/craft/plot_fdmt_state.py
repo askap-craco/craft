@@ -49,7 +49,7 @@ def load4d(fname, dtype=np.float32):
     d = np.fromfile(fin, dtype=dtype, count=theshape.prod())
     d.shape = theshape
     fin.close()
-    print 'load4d', fname, d.shape
+    print('load4d', fname, d.shape)
     return d
 
 def file_series(prefix, start=0):
@@ -67,7 +67,7 @@ def show_series(prefix, theslice):
         ostate = load4d(fname)
         pylab.figure()
         v = ostate[theslice]
-        print fname, ostate.shape, 'zeros?', np.all(ostate == 0), 'max', v.max(), np.unravel_index(v.argmax(), v.shape)
+        print(fname, ostate.shape, 'zeros?', np.all(ostate == 0), 'max', v.max(), np.unravel_index(v.argmax(), v.shape))
         myimshow(pylab.gca(), v, aspect='auto', origin='lower')
         pylab.title(fname)
 
@@ -76,7 +76,7 @@ def plot_series(prefix, theslice):
         ostate = load4d(fname)
         pylab.figure()
         v = ostate[theslice]
-        print fname, ostate.shape, 'zeros?', np.all(ostate == 0), 'max', v.max(), np.unravel_index(v.argmax(), v.shape)
+        print(fname, ostate.shape, 'zeros?', np.all(ostate == 0), 'max', v.max(), np.unravel_index(v.argmax(), v.shape))
         pylab.plot(v.T)
         pylab.title(fname)
 
@@ -100,7 +100,7 @@ def plot_stats():
         ax[3].plot(bdm0)
         ax[3].set_ylabel('Dm0')
         fig.text(0.5, 0.98, fname.replace('mean_','').replace('.dat',''), ha='center', va='top')
-        print fname
+        print(fname)
 
 
 def _main():
@@ -159,7 +159,7 @@ def _main():
 
         dtstart = max(dt - values.ndm/2, 0)
         dtend = min(dt + values.ndm/2, ndt-1)
-        print 'dtrange', dtstart, dtend
+        print('dtrange', dtstart, dtend)
         ax[2].plot(d[beam, chan, dtstart:dtend, :].T)
         ax[2].set_xlabel('t')
         ax[2].set_ylabel('Amplitude')
@@ -170,7 +170,7 @@ def _main():
         ax[3].set_ylabel('Amplitude')
         ax[3].set_title(fname + ' chan={} t={}'.format(chan, values.time))
 
-        print fname, d.shape, np.prod(d.shape)
+        print(fname, d.shape, np.prod(d.shape))
 
     pylab.show()
     

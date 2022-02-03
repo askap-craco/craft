@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-import vcraft
+from . import vcraft
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -35,10 +35,10 @@ def _main():
     for mux, ax in zip(muxes, allax):
         samps = mux.read(0, values.nsamp)
         ax.set_title(mux.ant)
-        print samps.shape
+        print(samps.shape)
         m = samps.real.mean(axis=0)
         s = samps.real.std(axis=0)
-        print m.shape, s.shape, mux.freqs.shape
+        print(m.shape, s.shape, mux.freqs.shape)
         ax.plot(mux.freqs, m, 'o')
         ax2 = ax.twinx()
         ax.plot(mux.freqs, s, 'x')

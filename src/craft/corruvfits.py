@@ -127,10 +127,10 @@ class CorrUvFitsFile(object):
             Col('NOSTA','1J', array=np.arange(1,nant+1, dtype=np.int32)),
             Col('MNTSTA','1J', array=np.ones(nant, dtype=np.int32)),
             Col('STAXOF','1E','METERS', array=np.zeros(nant)),
-            Col('POLTYA','1A', array=['X' for i in xrange(nant)]),
+            Col('POLTYA','1A', array=['X' for i in range(nant)]),
             Col('POLAA','1E','DEGREES', array=np.zeros(nant)),
             Col('POLCALA','1E', array=np.zeros(nant)),
-            Col('POLTYB','1A', array=['Y' for i in xrange(nant)]),
+            Col('POLTYB','1A', array=['Y' for i in range(nant)]),
             Col('POLAB','1E','DEGREES', array=np.zeros(nant)),
             Col('POLCALB','1E', array=np.zeros(nant)),
             Col('DIAMETER','1E', array=np.ones(nant)*12.)
@@ -222,7 +222,7 @@ class CorrUvFitsFile(object):
 
     def add_type(self, typeno, comment=None, **args):
         hdr = self.hdr
-        for k,v, in args.iteritems():
+        for k,v, in args.items():
             hdr['{}{}'.format(k,typeno).upper()] = (v, comment)
 
     def put_data(self, uvw, mjd, ia1, ia2, inttim, data, weights=None):
@@ -280,7 +280,7 @@ def _main():
     f.close()
     fin = pyfits.open(fname)
     fin.info()
-    print fin[0].data[0].data.shape
+    print(fin[0].data[0].data.shape)
 
 
 if __name__ == '__main__':

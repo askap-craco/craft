@@ -22,13 +22,13 @@ def dispersed_voltage(f_min, f_max, n_pulse, n_samps, D=5, PulseSig = 0.4, Pulse
     Produces a dispersed voltage time zeries
     Modified from FDMT.py
     '''
-    print locals()
+    print(locals())
     N_total = n_samps
     PulseLength = n_pulse
     practicalD = DispersionConstant * D
     I = np.random.normal(0,1,N_total)
     I[PulsePosition:PulsePosition+PulseLength] += np.random.normal(0,PulseSig,PulseLength)
-    print "MAX Thoretical SNR:", np.sum(np.abs(I[PulsePosition:PulsePosition+PulseLength])**2 - np.mean(abs(I)**2)) / (np.sqrt(PulseLength*np.var(abs(I)**2)))
+    print("MAX Thoretical SNR:", np.sum(np.abs(I[PulsePosition:PulsePosition+PulseLength])**2 - np.mean(abs(I)**2)) / (np.sqrt(PulseLength*np.var(abs(I)**2))))
     
     X = CoherentDedispersion(I, -D, f_min,f_max,False)    
 

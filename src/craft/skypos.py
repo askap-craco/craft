@@ -118,8 +118,8 @@ class skypos:
         try:
             D = pi*0.5-asin(z)
         except:
-            print 'z = ',z
-            print 'asin(z) = ',asin(z)
+            print('z = ',z)
+            print('asin(z) = ',asin(z))
         PA = atan2(y,-x)
         return (D,PA)
 
@@ -203,14 +203,14 @@ def lm_to_dp(lm):
 
 def ras_rad(ras):
      (a,b,c) = re.findall('[0-9\.]+',ras)
-     hh,mm = map(int,[a,b])
+     hh,mm = list(map(int,[a,b]))
      ss = float(c)
      return (ss + 60.0*(mm+60.0*hh))*2.0*pi/86400.0
 
 
 def decs_rad(decs):
      a,b,c = re.findall('[0-9\.]+',decs)
-     dd,mm = map(int,[a,b])
+     dd,mm = list(map(int,[a,b]))
      ss = float(c)
      r = (ss + 60.0*(mm+60.0*dd))*2.0*pi/1296000.0
      if decs[0] == '-':

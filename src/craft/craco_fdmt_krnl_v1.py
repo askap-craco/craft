@@ -14,11 +14,11 @@ import sys
 import logging
 from astropy.io import fits
 from scipy import constants
-import fdmt
+from . import fdmt
 import warnings
-from craco import *
-import craco
-import uvfits
+from .craco import *
+from . import craco
+from . import uvfits
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -34,7 +34,7 @@ def fdmt_baselines(hdul, baselines, uvcells, values):
     for blkt, d in enumerate(time_blocks(vis, values.nt)):
         dblk = np.zeros((nuv, values.ndm, values.nt), dtype=np.complex64)
         alld = []
-        for k, v in d.iteritems():
+        for k, v in d.items():
             alld.append(v)
         alld = np.array(alld)
         logging.info('UV data output shape is %s nbl=%s blkt=%s d.shape=%s real/imag mean: %f/%f std: %f/%f',
@@ -125,7 +125,7 @@ def _main():
     assert ch1 == 1.0, 'Unexpected initial frequency'
     nchan = vis[0].data.shape[-3]
     freqs = np.arange(nchan)*foff + fch1 # Hz
-    lcell, mcell = map(arcsec2rad, values.cell.split(','))
+    lcell, mcell = list(map(arcsec2rad, values.cell.split(',')))
     Npix = values.npix
     lfov = lcell*Npix
     mfov = mcell*Npix
@@ -133,7 +133,7 @@ def _main():
     logging.info('Fch1=%f foff=%f uvcell=%s', fch1, foff, (ucell, vcell))
     uvcells = []
 
-    for blid, bldata in baselines.iteritems():
+    for blid, bldata in baselines.items():
         #UU, VV WW are in seconds
         ulam = bldata['UU'] * freqs
         vlam = bldata['VV'] * freqs

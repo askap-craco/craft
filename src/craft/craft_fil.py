@@ -16,7 +16,7 @@ from askap.adbe import Beamformer, adbe_msg_str, FilterTypes, ZoomModes, AdbeSta
 
 from askap.craft.sigproc import SigprocFile
 import askap.time
-import cPickle as pickle
+import pickle as pickle
 import atexit
 import numpy as np
 import time
@@ -137,10 +137,10 @@ class CraftBeamformer(Beamformer):
 
     def check_craft_enabled(self):
         all_enabled = True
-        for fpga in xrange(6):
+        for fpga in range(6):
             bits = self.get_capability_register(fpga+1)
             craft_enable = (bits & 0x10) == 0x10
-            print 'FPGA %d capabilities 0x%x CRAFT enabled? %s' % (fpga, bits, craft_enable)
+            print('FPGA %d capabilities 0x%x CRAFT enabled? %s' % (fpga, bits, craft_enable))
             all_enabled &= craft_enable
 
         assert all_enabled, 'CRAFT not enabled on this beamformer'
@@ -163,7 +163,7 @@ class CraftConsole(object):
         pass
 
     def input(self, msg):
-        return raw_input(msg)
+        return input(msg)
 
     def output(self, msg):
         sys.stdout.write(msg)
@@ -245,7 +245,7 @@ class Plots(object):
 
     def update(self, data):
         nint = data.shape[2]
-        for i in xrange(min(len(self.axes), nint)):
+        for i in range(min(len(self.axes), nint)):
             self.axes[i].imshow(data[i, :,:].T, aspect='auto')
 
         pylab.draw()
@@ -282,7 +282,7 @@ def _main():
     tsamp = float(int_time)/samp_rate
 
     bufmode_map = {16:0, 8:1, 4:2, 1:3}
-    assert values.buffer_mode in bufmode_map.keys(), 'Invalid buffer mode'
+    assert values.buffer_mode in list(bufmode_map.keys()), 'Invalid buffer mode'
     bufmode = bufmode_map[values.buffer_mode]
 
     if values.beam_number is None:
@@ -352,13 +352,13 @@ def _main():
 
     hostport = (hostport[0], int(hostport[1]))
     assert len(hostport) == 2
-    print 'Using push address', hostport
+    print('Using push address', hostport)
     push_rx = CraftPushReceiver(hostport)
-    print 'Doing my own reset'
+    print('Doing my own reset')
     push_rx.send_reset()
 
-    print 'And the result was'
-    print push_rx.recv()
+    print('And the result was')
+    print(push_rx.recv())
 
     if values.do_setup:
 
@@ -371,7 +371,7 @@ def _main():
 
     time.sleep(1)
 
-    print 'Recording...'
+    print('Recording...')
 
     pkl_file = open(values.output, 'w')
     pickle.dump(hdr, pkl_file)
@@ -385,14 +385,14 @@ def _main():
             if hdr.packetType != 129:
                 continue
 
-            print hdr, address, len(data)#, binascii.hexlify(data)
+            print(hdr, address, len(data))#, binascii.hexlify(data)
             nint = int_cycles # get configured value, don't assume the packet size is right
             hdrsize = nint*4*8
             expected_size = hdrsize + 4*NBEAMS*NCHANS*nint
             actual_size = len(data)
             num_padbytes = expected_size - actual_size
             if expected_size != actual_size:
-                print 'Expected size', expected_size, 'actual size', actual_size
+                print('Expected size', expected_size, 'actual size', actual_size)
             assert num_padbytes >= 0
             if num_padbytes > 0:
                 data += '\x00'*num_padbytes
@@ -408,13 +408,13 @@ def _main():
             stopBats = bats[1::2]
 
 
-            print hdr, 'BAT=', hex(hdr.bat), len(data), binascii.hexlify(data)
-            print '\t startBATs', ' '.join(map(hex, startBats))
-            print '\t stopBATs', ' '.join(map(hex, stopBats))
-            print '\t diffs', (stopBats - startBats)
-            print '\t startFrames', startFrames
-            print '\t stopFrames', stopFrames
-            print '\t diffs', (stopFrames - startFrames)
+            print(hdr, 'BAT=', hex(hdr.bat), len(data), binascii.hexlify(data))
+            print('\t startBATs', ' '.join(map(hex, startBats)))
+            print('\t stopBATs', ' '.join(map(hex, stopBats)))
+            print('\t diffs', (stopBats - startBats))
+            print('\t startFrames', startFrames)
+            print('\t stopFrames', stopFrames)
+            print('\t diffs', (stopFrames - startFrames))
 
             spectra = np.fromstring(data[hdrsize:], dtype=np.float32)
             # According to beamformer.cc the it's in FTB ordering, with
@@ -452,8 +452,8 @@ def write_result_pkl(pkl_file, results):
     bAs = np.empty_like(fAs)
     bBs = np.empty_like(fAs)
     
-    for i in xrange(nints):
-        for beam in xrange(72):
+    for i in range(nints):
+        for beam in range(72):
             r = results[beam].point[i]
             data[beam,:] = [p.data for p in r]
             freqs[beam,:] = [p.freq for p in r]

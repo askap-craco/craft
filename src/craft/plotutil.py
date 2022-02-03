@@ -31,7 +31,7 @@ def onpick(event):
     xdata, ydata = thisline.get_data()
     ind = event.ind
 
-    print thisline.get_label(), xdata[ind], ydata[ind]
+    print(thisline.get_label(), xdata[ind], ydata[ind])
 
 def addpick(fig=None):
     if fig is None:

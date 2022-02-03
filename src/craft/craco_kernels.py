@@ -105,8 +105,8 @@ class Gridder(Kernel):
         plan = self.plan.uv_plan
         nuv = len(plan)
         assert data1.shape[0] == nuv, 'UVPlan and grid data have different NUV'
-        for iuv in xrange(nuv):
-            upix, vpix = map(int, plan[iuv, 2:4])
+        for iuv in range(nuv):
+            upix, vpix = list(map(int, plan[iuv, 2:4]))
             v1 = data1[iuv]
             if data2 is not None:
                 v2 = data2[iuv]*1j
@@ -341,8 +341,8 @@ class ImagePipeline(Kernel):
         else:
             dall = None
         
-        for idm in xrange(nd):
-            for t in xrange(nt/2):
+        for idm in range(nd):
+            for t in range(nt/2):
                 #g = gridder(d[idm, 2*t, :], d[idm, 2*t+1, :])
                 g = gridder(idm, t, blk)
                 #g.tofile(gout)

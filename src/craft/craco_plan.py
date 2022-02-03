@@ -44,7 +44,7 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=False):
 
     # Updated for python 3
     #for blid, bldata in baselines.iteritems():
-    for blid, bldata in baselines.items():
+    for blid, bldata in list(baselines.items()):
         #UU, VV WW are in seconds
         ulam = bldata['UU'] * freqs
         vlam = bldata['VV'] * freqs
@@ -209,7 +209,7 @@ class FdmtPlan(object):
         while len(uvcells_remaining) > 0:
             logging.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
             minchan = min(uvcells_remaining, key=lambda uv:(uv.chan_start, uv.blid)).chan_start
-            possible_cells = filter(lambda uv:calc_overlap(uv, minchan, ncin) > 0, uvcells_remaining)
+            possible_cells = [uv for uv in uvcells_remaining if calc_overlap(uv, minchan, ncin) > 0]
 
             # Do not know how to get a length of iterator in python3, comment it out here
             #logging.debug('Got %d possible cells', len(possible_cells))
@@ -453,7 +453,7 @@ def calc_grid_luts(plan, upper=True):
     if upper:
         assert len(remaining_fdmt_cells) == 0
 
-    num_shifts =  sum(map(lambda inst:inst.shift == True, all_instructions))
+    num_shifts =  sum([inst.shift == True for inst in all_instructions])
 
     unique_uvidxs = set([inst.uvidx for inst in all_instructions])
     #assert len(unique_uvidxs) == len(uvcells), 'Got {} unique UV indexces != len(uvcels) = {}'.format(len(unique_uvidxs), len(uvcells))
@@ -608,10 +608,10 @@ class PipelinePlan(object):
         Npix = self.values.npix
 
         if self.values.cell is not None:
-            lcell, mcell = map(craco.arcsec2rad, self.values.cell.split(','))
+            lcell, mcell = list(map(craco.arcsec2rad, self.values.cell.split(',')))
             los, mos = lres/lcell, mres/mcell
         else:
-            los, mos = map(float, self.values.os.split(','))
+            los, mos = list(map(float, self.values.os.split(',')))
             lcell = lres/los
             mcell = mres/mos
             
@@ -828,7 +828,7 @@ def _main():
         pylab.show()
 
     dump_plan(plan, values.pickle_fname)
-    print(load_plan(values.pickle_fname))
+    print((load_plan(values.pickle_fname)))
     
 if __name__ == '__main__':
     _main()

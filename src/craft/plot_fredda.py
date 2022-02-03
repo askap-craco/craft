@@ -49,10 +49,10 @@ def load4d(fname, dtype=np.float32):
     v = np.fromfile(fin, dtype=dtype, count=theshape.prod())
     v.shape = theshape
     fin.close()
-    print fname, v.shape, len(v), 'Nzeros=', np.sum(v == 0), \
+    print(fname, v.shape, len(v), 'Nzeros=', np.sum(v == 0), \
             'max/min/mean/sum {}/{}/{}/{}'.format(v.max(), v.min(), v.mean(), v.sum()), \
             'max at', \
-            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v)), 'Ninfs?=', np.sum(np.isinf(v))
+            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v)), 'Ninfs?=', np.sum(np.isinf(v)))
 
     return v
 
@@ -91,7 +91,7 @@ def show_inbuf_series(prefix, theslice, start=0, maxn=10):
 
 
         if maxn is not None and ifname >= maxn:
-            print 'Quitting as maxn exceeded'
+            print('Quitting as maxn exceeded')
             break
 
 def statplot(ax, fname, name):
@@ -102,7 +102,7 @@ def statplot(ax, fname, name):
         ax.plot(d[sl].T)
         ax.set_ylabel(name)
     except IOError:
-        print 'No data for ', fname, name
+        print('No data for ', fname, name)
     return d
 
 def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
@@ -117,7 +117,7 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         rawname = fname.replace('fdmt','inbuf')
         rawdat = load4d(rawname)
         rawd = rawdat[ibeam, :, 0, :]
-        print 'Raw inbuf', rawdat.shape
+        print('Raw inbuf', rawdat.shape)
         nchans, ntimes = rawd.shape
         rawd = np.ma.masked_equal(rawd, 0.0)
         myimshow(rawax, rawd, aspect='auto', origin='lower')
@@ -128,10 +128,10 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
         nfreq, ntime = v.shape
 
         maxpos = np.unravel_index(v.argmax(), v.shape)
-        print fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), \
+        print(fname, ostate.shape, len(v), 'zeros?', np.all(ostate == 0), \
             'max/min/mean/sum {}/{}/{}/{}'.format(v.max(), v.min(), v.mean(), v.sum()), \
             'max at', \
-            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v))
+            np.unravel_index(v.argmax(), v.shape), 'NaNs?', np.sum(np.isnan(v)))
 
         vmid = np.ma.median(v)
         voff = np.std((v - vmid))
@@ -187,16 +187,16 @@ def show_fdmt_series(prefix, theslice, values, start=0, maxn=10, ibeam=0):
             dm0countax.plot(dm0count[0,0,ibeam,:])
             dm0countax.set_ylim(0, None)
         except:
-            print 'COunlt plot count'
+            print('COunlt plot count')
 
         pylab.show()
 
         if maxn is not None and ifname >= maxn - 1:
-            print 'Quitting as maxn exceeded'
+            print('Quitting as maxn exceeded')
             break
 
 def comma_list(s):
-    return map(int, s.split(','))
+    return list(map(int, s.split(',')))
 
 
 def _main():

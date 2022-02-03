@@ -11,10 +11,10 @@ import numpy as np
 import os
 import sys
 import logging
-import craco
-from craco import image_fft, printstats
-from craco_kernels import Imager
-from boxcar import ImageBoxcar
+from . import craco
+from .craco import image_fft, printstats
+from .craco_kernels import Imager
+from .boxcar import ImageBoxcar
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -49,8 +49,8 @@ class Gridder(object):
         g = np.zeros((npix, npix), dtype=self.dtype)
         nuv = len(self.config)
         assert data1.shape[0] == nuv, 'UVConfig and grid data have different NUV'
-        for iuv in xrange(nuv):
-            upix, vpix = map(int, self.config[iuv, 2:4])
+        for iuv in range(nuv):
+            upix, vpix = list(map(int, self.config[iuv, 2:4]))
             v1 = data1[iuv]
             if data2 is not None:
                 v2 = data2[iuv]*1j
@@ -147,8 +147,8 @@ def image_pipeline(fname, values):
 
     assert nt % 2 == 0, 'Nt must be divisible by 2 as were doing complex-to-real gridding'
 
-    for idm in xrange(nd):
-        for t in xrange(nt/2):
+    for idm in range(nd):
+        for t in range(nt/2):
             g = gridder(d[idm, 2*t, :], d[idm, 2*t+1, :])
             g.tofile(gout)
             img = imager(g).astype(np.complex64)

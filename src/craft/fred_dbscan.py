@@ -16,7 +16,7 @@ mjd = 7     # Modified Julian Date
 
 def _main():
 	if len(sys.argv) < 4:
-		print "USAGE: ./run_DBSCAN.py <.cand file> <eps> <nmin>"
+		print("USAGE: ./run_DBSCAN.py <.cand file> <eps> <nmin>")
 	else:
 		fname = sys.argv[1]
 		cands = open_file(fname)
@@ -47,7 +47,7 @@ def open_file(fname, sort_idx=sn, ret_nparr=True):
 		for i, line in enumerate(f):
 			if line[0] != '#' and len(line) > 5:
 				# In case the file has more columns than we need, trim the extras off the end
-				new_cand = map(float, line.split()[0:mjd+1])
+				new_cand = list(map(float, line.split()[0:mjd+1]))
 				cands.append(new_cand)
 				
 				# Sometimes there's no mjd field by default, so we need to add it

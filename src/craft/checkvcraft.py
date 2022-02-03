@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-import vcraft
+from . import vcraft
 import scipy.signal
 
 
@@ -58,7 +58,7 @@ def _main():
 
             d1t = func(f1.hdr[h][0])
             d2t = func(f2.hdr[h][0])
-            print h, 'd1=',d1t, 'd2=',d2t, 'diff=',d2t - d1t,mul*(d2t-d1t)
+            print(h, 'd1=',d1t, 'd2=',d2t, 'diff=',d2t - d1t,mul*(d2t-d1t))
 
     fig, axes = pylab.subplots(5,1)
     d1ax, d2ax,lagax,pax,lax = axes.flatten()
@@ -71,23 +71,23 @@ def _main():
         offset = values.offset
 
 
-    print 'OFFSET IS', offset
+    print('OFFSET IS', offset)
     d1 = f1.read(offset)
     d2 = f2.read(0)
     nsamp, nchan = d1.shape
     # truncate to identical nsamp
     nsamp = min(d1.shape[0], d2.shape[0])
-    print 'SHAPE BEFORE', d1.shape, d2.shape, nsamp
+    print('SHAPE BEFORE', d1.shape, d2.shape, nsamp)
 
     d1 = d1[:nsamp, :]
     d2 = d2[:nsamp, :]
-    print 'SHAPE AFTER', d1.shape, d2.shape
+    print('SHAPE AFTER', d1.shape, d2.shape)
 
     assert d1.shape == d2.shape
 
-    print 'Data shape', d1.shape, 'freqs', f1.freqs
-    print 'D1 channel0', d1[0:100, 0]
-    print 'D2 channel0', d2[0:100, 0]
+    print('Data shape', d1.shape, 'freqs', f1.freqs)
+    print('D1 channel0', d1[0:100, 0])
+    print('D2 channel0', d2[0:100, 0])
 
 
     if offset >= d1.shape[0] or offset >= d2.shape[0]:
@@ -117,11 +117,11 @@ def _main():
         d = f.read(foff, N)
         is_equal = np.all(d[:, :] == d0[:, :])
 
-        print '{} TRIGGER_FRAMEID={} FRAME_OFF={} equal ? {}'.format(f.fname, f.trigger_frameid, foff, is_equal)
+        print('{} TRIGGER_FRAMEID={} FRAME_OFF={} equal ? {}'.format(f.fname, f.trigger_frameid, foff, is_equal))
         if not is_equal and values.show:
             wrap_frameid = int(f.hdr['START_WRITE_FRAMEID'][0])
             ngood = 96
-            print 'WRAP FRAME', wrap_frameid, fstart, f.trigger_frameid, f.trigger_frameid - wrap_frameid, d0.shape, 'ngood', ngood
+            print('WRAP FRAME', wrap_frameid, fstart, f.trigger_frameid, f.trigger_frameid - wrap_frameid, d0.shape, 'ngood', ngood)
             d0c = d0[:, chan]
             dc = d[:, chan]
 
@@ -160,14 +160,14 @@ def _main():
     xx11 = xf1 * np.conj(xf1)
     xx22 = xf2 * np.conj(xf2)
 
-    print 'PRODUCT SIZE', xx12.shape, xx12.shape[0]*Nf, nsamp, 'shortsamp', shortsamp, 'offset', offset
+    print('PRODUCT SIZE', xx12.shape, xx12.shape[0]*Nf, nsamp, 'shortsamp', shortsamp, 'offset', offset)
     xx12m = xx12.mean(axis=0)
     punwrap = np.unwrap(np.angle(xx12m))
     xx = np.arange(len(punwrap))
     gradient, phase = np.polyfit(xx, punwrap, 1)
     delay = 32./27.*gradient/2./np.pi*len(punwrap)
     corramp =  abs(xx12m[5:-5]).mean()
-    print 'Unwrapped phase = {} deg, delay={} us cross amplitude={}'.format(np.degrees(phase), delay, corramp)
+    print('Unwrapped phase = {} deg, delay={} us cross amplitude={}'.format(np.degrees(phase), delay, corramp))
 
     lagax.plot(abs(xx11.mean(axis=0)), label='auto0')
     lagax.plot(abs(xx22.mean(axis=0)), label='auto1')

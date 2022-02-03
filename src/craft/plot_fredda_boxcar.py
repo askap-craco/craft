@@ -13,7 +13,7 @@ import sys
 import logging
 import subprocess
 import matplotlib.gridspec as gridspec
-from plot_fredda import load4d, file_series, comma_list, Formatter
+from .plot_fredda import load4d, file_series, comma_list, Formatter
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -55,7 +55,7 @@ def _main():
         ax2.set_ylabel('mean')
         ax2.set_xlabel('Boxcar')
 
-        print 'S/N per beam idm=%d t=%d bc=%d: %s' % (values.dm, values.time, values.boxcar, alld[:, values.dm, values.time, values.boxcar])
+        print('S/N per beam idm=%d t=%d bc=%d: %s' % (values.dm, values.time, values.boxcar, alld[:, values.dm, values.time, values.boxcar]))
 
         ax3 = ax[3]
         ax3.imshow(alld[values.beam, :, :, values.boxcar], aspect='auto', origin='lower')

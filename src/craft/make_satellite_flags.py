@@ -14,9 +14,9 @@ import logging
 import glob
 import ephem
 import aces.mro as mro
-import sigproc
-import craftobs
-from crafthdr import DadaHeader
+from . import sigproc
+from . import craftobs
+from .crafthdr import DadaHeader
 import datetime
 
 def opentle(f):
@@ -63,7 +63,7 @@ class Trajectory(object):
 
 def get_trajectories(satellites, times, beam_bodies, septhresh_deg=None):
     trajectories = {}
-    for satname, satlines in satellites.iteritems():
+    for satname, satlines in satellites.items():
         traj = Trajectory(satname, satlines, len(times), len(beam_bodies))
         sat = ephem.readtle(*satlines)
 
@@ -120,7 +120,7 @@ def plot(times, beam_bodies, trajectories):
     times_mins = (times - min(times))*24.*60.
 
 
-    for satname, (const, traj) in trajectories.iteritems():
+    for satname, (const, traj) in trajectories.items():
         ra = np.degrees(traj.ra)
         dec = np.degrees(traj.dec)
         bsepmin = np.degrees(traj.bsepmin)
@@ -140,7 +140,7 @@ def plot(times, beam_bodies, trajectories):
 
     fig, axes = pylab.subplots(1, 2)
     #fig.set_size_inches([12,4])
-    for satname, (const, traj) in trajectories.iteritems():
+    for satname, (const, traj) in trajectories.items():
         bsepmin = np.degrees(traj.bsepmin)
         bsepbeam = traj.bsepbeam
         axes[0].plot(times_mins, bsepmin, label=satname)
@@ -184,12 +184,12 @@ def _main():
         logging.basicConfig(level=logging.INFO)
 
     hdrfile = values.hdrfile[0]
-    print 'Loading header', hdrfile
+    print('Loading header', hdrfile)
     hdr = DadaHeader.fromfile(hdrfile)
     beamdir = os.path.dirname(os.path.abspath(hdrfile))
 
 
-    print 'Loading beam dir', beamdir
+    print('Loading beam dir', beamdir)
     beams, filfiles = craftobs.load_beams(beamdir, 128,128, return_files=True)
 
     if 'TSTART' in hdr:
@@ -204,8 +204,8 @@ def _main():
         duration = values.duration/3600./24.
 
 
-    ras = map(float, hdr['BEAM_RA'][0].split(','))[0:36]
-    decs = map(float, hdr['BEAM_DEC'][0].split(','))[0:36]
+    ras = list(map(float, hdr['BEAM_RA'][0].split(',')))[0:36]
+    decs = list(map(float, hdr['BEAM_DEC'][0].split(',')))[0:36]
     if values.rotate_beams != 0:
         logging.info('Rotating beams by %f', values.rotate_beams)
         ra0 = float(hdr['RA'][0])
@@ -221,7 +221,7 @@ def _main():
     tdelt = values.tdelta/3600./24.
     mjd0 = 15021.5 - 2.0
     start_time = ephem.Date(mjdstart - mjd0)
-    print 'start time', start_time, float(start_time)
+    print('start time', start_time, float(start_time))
     times = np.arange(float(start_time), float(start_time)+ duration, tdelt)
     times_mjd = times + mjd0
 
@@ -260,7 +260,7 @@ def _main():
     for const in constellations:
         const.load_tle(values.tle_dir)
         trajectories = const.calc_trajectories(times, beam_bodies)
-        for satname, traj in trajectories.iteritems():
+        for satname, traj in trajectories.items():
             all_traj[satname] = (const, traj)
 
     if values.show:
@@ -280,7 +280,7 @@ def _main():
                     format(const.tlename, len(const.tle), datetime.datetime.fromtimestamp(const.get_tle_mtime()).isoformat()))
 
     flout.write('# {} trajectories are within the threshold\n'.format(len(all_traj)))
-    for satname, (const, traj) in all_traj.iteritems():
+    for satname, (const, traj) in all_traj.items():
         bsepmin = np.degrees(traj.bsepmin)
         bsepbeam = traj.bsepbeam
         minidx = bsepmin.argmin()
@@ -291,7 +291,7 @@ def _main():
         flout.write('# flags\n')
         flout.write('# mjdstart, mjdend, freq_mhz_start, freq_mhz_end, beam_start, beam_end\n')
         
-        for ibeam in xrange(nbeams):
+        for ibeam in range(nbeams):
             for fcent, fwidth, bandname in const.freqs:
                 beam_seps = traj.bsep[:, ibeam]
                 # find start and end time when it's too close

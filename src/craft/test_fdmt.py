@@ -11,7 +11,7 @@ try:
 except ImportError:
     from mock import Mock, MagicMock
 
-import fdmt
+from . import fdmt
 import numpy as np
 from pylab import *
 
@@ -53,7 +53,7 @@ class TestFdmtLookupTableGeneration(TestCase):
                 id1_cff = self.thefdmt.calc_id1_cff(iterno, c)
                 off_cff = self.thefdmt.calc_offset_cff(iterno, c)
                 chanconfig = self.thefdmt.hist_nf_data[iterno][c][-1]
-                print('Iterno', iterno, 'c', c, 'id1_cff', id1_cff, 'offset_cff', off_cff, int(np.round(id1_cff*(1<<16))), int(np.round(off_cff*(1<<16))))
+                print(('Iterno', iterno, 'c', c, 'id1_cff', id1_cff, 'offset_cff', off_cff, int(np.round(id1_cff*(1<<16))), int(np.round(off_cff*(1<<16)))))
                 for idm in range(len(chanconfig)):
                     _, id1, offset, id2, _, _, _ = chanconfig[idm]
                     self.assertEqual(id1, int(np.round(idm*id1_cff)))
@@ -325,7 +325,7 @@ class TestFdmtHighDm(TestCase):
     def test_init_ones_at_t0(self):
         ones = np.ones((self.nf, self.nt))
         onei = self.thefdmt.initialise(ones)
-        print(onei.shape)
+        print((onei.shape))
         (nf, nd, nt) = onei.shape
         self.assertEqual(nf, self.nf)
         t0 = onei[:, :, 0]
@@ -335,7 +335,7 @@ class TestFdmtHighDm(TestCase):
     def test_init_ones_at_t1(self):
         ones = np.ones((self.nf, self.nt))
         onei = self.thefdmt.initialise(ones)
-        print(onei.shape)
+        print((onei.shape))
         (nf, nd, nt) = onei.shape
         self.assertEqual(nf, self.nf)
         t1 = onei[:, :, 1]
@@ -347,7 +347,7 @@ class TestFdmtHighDm(TestCase):
     def test_ones_at_t0(self):
         ones = np.ones((self.nf, self.nt))
         oneout = self.thefdmt(ones)
-        print(oneout.shape)
+        print((oneout.shape))
 
         # Look at the very first time sample
         t0 = oneout[:, 0]
@@ -375,7 +375,7 @@ class TestFdmtHighDm(TestCase):
         '''
         ones = np.ones((self.nf, self.nt))
         oneout = self.thefdmt(ones)
-        print(oneout.shape)
+        print((oneout.shape))
         
         # Look at the very first time sample
         t1 = oneout[:, 1]

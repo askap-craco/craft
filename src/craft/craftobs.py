@@ -8,9 +8,9 @@ import numpy as np
 import os
 import sys
 import logging
-import sigproc
+from . import sigproc
 import glob
-import heimdall
+from . import heimdall
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 

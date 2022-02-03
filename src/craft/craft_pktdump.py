@@ -13,7 +13,7 @@ from askap.craft.cmdline import strrange
 from askap.craft.sigproc import SigprocFile
 from askap.craft.beamformer import CraftBeamformer, TxHeader, buffer_to_header
 import askap.time
-import cPickle as pickle
+import pickle as pickle
 import atexit
 import numpy as np
 import time
@@ -56,7 +56,7 @@ class Plots(object):
 
     def update(self, data):
         nint = data.shape[2]
-        for i in xrange(min(len(self.axes), nint)):
+        for i in range(min(len(self.axes), nint)):
             self.axes[i].imshow(data[i, :,:].T, aspect='auto')
 
         pylab.draw()
@@ -97,7 +97,7 @@ def _main():
     tsamp = float(int_time)/samp_rate
 
     bufmode_map = {16:0, 8:1, 4:2, 1:3}
-    assert values.buffer_mode in bufmode_map.keys(), 'Invalid buffer mode'
+    assert values.buffer_mode in list(bufmode_map.keys()), 'Invalid buffer mode'
     bufmode = bufmode_map[values.buffer_mode]
 
     if values.beam_number is None:
@@ -109,7 +109,7 @@ def _main():
     
     ants = values.antennas
     cards = values.cards
-    print 'Cards', values.cards, cards
+    print('Cards', values.cards, cards)
 
     mjdnow = 55000.
     programFPGA = 0  # please dont' program FPGA - just be nice
@@ -192,15 +192,15 @@ def _main():
         sockets.extend(socks) 
     
     for push_rx in push_receivers:
-        print 'Doing my own reset'
+        print('Doing my own reset')
         push_rx.send_reset()
         
-        print 'And the result was'
-        print push_rx.recv()
+        print('And the result was')
+        print(push_rx.recv())
 
     #time.sleep(1)
 
-    print 'Recording...'
+    print('Recording...')
 
     pkl_file = open(values.output, 'w')
     pickle.dump(hdr, pkl_file)

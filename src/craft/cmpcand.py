@@ -16,7 +16,7 @@ import pandas as pd
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 def loadcand(fin):
-    print 'Loading', fin
+    print('Loading', fin)
     icscand = np.loadtxt(fin, usecols=(0,1,2,3,4,5,6,7))
     icsmask = (icscand[:,0] >= 7) & (65 < icscand[:,5]) & (icscand[:, 5] < 70) 
     icscand = icscand[icsmask, :]
@@ -41,7 +41,7 @@ def _main():
     mjd0 = None
     for f in values.files:
         d = loadcand(f)
-        print d.shape
+        print(d.shape)
         sn = d[:, 0]
         sampno = d[:, 1]
         secs = d[:, 2]

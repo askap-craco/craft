@@ -12,10 +12,10 @@ import os
 import sys
 import logging
 from scipy import constants
-from cmdline import strrange
+from .cmdline import strrange
 from astropy.coordinates import SkyCoord
-import fdmt
-import simfrb
+from . import fdmt
+from . import simfrb
 import subprocess
 import shutil
 import time
@@ -25,7 +25,7 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 def runmir(task, **kwargs):
     cmd = [str(task)]
-    argarr = [str(k)+'='+str(v) for k,v, in kwargs.iteritems()]
+    argarr = [str(k)+'='+str(v) for k,v, in kwargs.items()]
     cmd.extend(argarr)
     logging.info('Running command: %s', ' '.join(cmd))
     subprocess.check_call(cmd, shell=False)
@@ -34,7 +34,7 @@ def uvgen(values):
     sourcefile = values.outfile+'.frbpos'
     with open(sourcefile, 'w+') as fout:
         # Assumign FRB relpos in 2 numbers offset in arcsec
-        dra, ddec = map(float, values.frb_relpos.split(','))
+        dra, ddec = list(map(float, values.frb_relpos.split(',')))
         fout.write('{} {} {}\n'.format(values.frb_amp, dra, ddec))
         
     # make source file
@@ -159,7 +159,7 @@ def modify_data(amps, h0, nant, values):
         noiseamp = values.frb_amp/values.frb_sn/np.sqrt(Nchan*nbl*Npol)
 
     firstbl = h0.data[0]['BASELINE']
-    for irow in xrange(nrows):
+    for irow in range(nrows):
         row = h0.data[irow]
         blid = row['BASELINE']
         if row['DATE'] != currdate or (blid == firstbl and irow != 0):

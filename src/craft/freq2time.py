@@ -113,9 +113,9 @@ def _main():
         t_series = reconstruct(values.fn, values.fftlength, values.DM, f0=values.f0, quiet=values.q)
     
     if values.outfile is not None:
-        print('output saved to: '+values.outfile)
+        print(('output saved to: '+values.outfile))
         np.save(values.outfile,t_series)
-    print('freq2time.py running time: '+str(time.time()-t0))
+    print(('freq2time.py running time: '+str(time.time()-t0)))
         
 if __name__ == '__main__':
     _main()

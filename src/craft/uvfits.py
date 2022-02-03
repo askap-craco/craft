@@ -63,15 +63,15 @@ class UvFits(object):
         '''
         fmax = self.channel_frequencies.max()
         baselines = self.baselines
-        ulam_max = max([abs(bldata['UU'])*fmax for bldata in baselines.values()])
-        vlam_max = max([abs(bldata['VV'])*fmax for bldata in baselines.values()])
+        ulam_max = max([abs(bldata['UU'])*fmax for bldata in list(baselines.values())])
+        vlam_max = max([abs(bldata['VV'])*fmax for bldata in list(baselines.values())])
         return (ulam_max, vlam_max)
 
     
     def plot_baselines(self):
         baselines = self.baselines
         freqs = self.channel_frequencies
-        for blid, bldata in baselines.iteritems():
+        for blid, bldata in baselines.items():
             ulam = bldata['UU'] * freqs
             vlam = bldata['VV'] * freqs
             

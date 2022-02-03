@@ -11,8 +11,8 @@ import numpy as np
 import os
 import sys
 import logging
-from plot_fredda_cand import  find_files
-from crafthdr import DadaHeader
+from .plot_fredda_cand import  find_files
+from .crafthdr import DadaHeader
 import glob
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -51,16 +51,16 @@ def _main():
             try:
                 ncand, npass = count_ncand(f, values)
 
-                print d, f, source, ncand, npass
+                print(d, f, source, ncand, npass)
                 if 'PSR' not in source:
                     npass_d += npass
                     npass_all += npass
             except:
                 logging.exception('Could not count ncand %s', f)
             
-        print d, npass_d
+        print(d, npass_d)
 
-    print 'TOTAL', npass_all
+    print('TOTAL', npass_all)
 
 def count_ncand(f, values):
     vin = np.loadtxt(f)

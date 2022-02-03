@@ -8,11 +8,11 @@ import numpy as np
 import os
 import sys
 import logging
-import crafthdr
+from . import crafthdr
 import re
 import glob
-import sigproc
-import dada
+from . import sigproc
+from . import dada
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -69,7 +69,7 @@ class FreddaRescaleData(object):
         self.tsamp = float(self.hdr.get_value('TSAMP')) # tsamp fo rrescaling different from source tsamp
         self.antennas = self.hdr.get_value('SOURCE_ANTENNA_NAME','')
         if self.antennas.strip() == '':
-            antennas = ['ia{:02d}'.format(ia) for ia in xrange(nant)]
+            antennas = ['ia{:02d}'.format(ia) for ia in range(nant)]
         else:
             antennas = self.antennas.split(',')
 
@@ -87,7 +87,7 @@ class FreddaRescaleData(object):
                 
     @property
     def nblocks(self):
-        return min(map(len, self.dada_files))
+        return min(list(map(len, self.dada_files)))
 
     def get_block(self, blkid):
         return FreddaRescaleBlock(self, blkid)
@@ -116,7 +116,7 @@ class DataDir(object):
     def _pathglob(self, pattern, isdir=False):
         lst = glob.glob(self._pathjoin(pattern))
         if isdir:
-            lst = filter(os.path.isdir, lst)
+            lst = list(filter(os.path.isdir, lst))
 
         return lst
 
@@ -268,7 +268,7 @@ class ScanDir(DataDir):
         ''' 
         Returns all the antennas with the given start
         '''
-        ants = filter(lambda d: start_name in d.start_names, self.antenna_dirs)
+        ants = [d for d in self.antenna_dirs if start_name in d.start_names]
         return ants
                 
 
@@ -298,7 +298,7 @@ class AntennaDir(DataDir):
 
     @property
     def start_names(self):
-        return map(os.path.basename, self.start_paths)
+        return list(map(os.path.basename, self.start_paths))
 
     def get_start(self, start_name):
         return StartDir(self, self._pathjoin(start_name))
@@ -346,7 +346,7 @@ class SchedblockDir(DataDir):
         Retuns a list of scan names as strings. Only the scan npart of the name, not the other bits
         e.g. ['201901020304050607')
         '''
-        scannames = map(os.path.basename, self.scan_paths)
+        scannames = list(map(os.path.basename, self.scan_paths))
         return scannames
                     
 
@@ -363,7 +363,7 @@ class SearchDir(DataDir):
 
     @property
     def sbnames(self):
-        return map(os.path.basename, self.sbpaths)
+        return list(map(os.path.basename, self.sbpaths))
 
     @property
     def sbdirs(self):
@@ -419,27 +419,27 @@ def _main():
         sb = d.searchdata.get_schedblock(values.commands[1])
         print(sb)
         for scan in sb.scan_dirs:
-            print(' '*1+ str(scan))
+            print((' '*1+ str(scan)))
             for ant in scan.antenna_dirs:
-                print(' '*2 + str(ant))
+                print((' '*2 + str(ant)))
                 for start in ant.start_dirs:
-                    print(' '*3 + str(start))
+                    print((' '*3 + str(start)))
                     for fil in start.filterbanks:
-                        print(' '*4 + str(fil))
+                        print((' '*4 + str(fil)))
             for start in scan.start_names:
-                print start
+                print(start)
                 ants = scan.get_antennas_with_start(start)
                 antstarts = [a.get_start(start) for a in ants]
                 for antstart in antstarts:
-                    print antstart.start_fullname
-                    print antstart.header
-                    print antstart.fredda_candfile_name
+                    print(antstart.start_fullname)
+                    print(antstart.header)
+                    print(antstart.fredda_candfile_name)
                     for fredepoch in antstart.list_fredda_epochs:
-                        print ' '*5, str(fredepoch)
+                        print(' '*5, str(fredepoch))
                     
 
                     for f in antstart.filterbank_paths:
-                        print ' '*5, str(f)
+                        print(' '*5, str(f))
 
 
                         

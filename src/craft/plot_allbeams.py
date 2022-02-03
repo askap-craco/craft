@@ -12,8 +12,8 @@ import os
 import sys
 import logging
 import itertools
-from craftobs import load_beams
-from plotutil import subplots
+from .craftobs import load_beams
+from .plotutil import subplots
 import matplotlib.gridspec as gridspec
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -23,7 +23,7 @@ def onpick(event):
     xdata, ydata = thisline.get_data()
     ind = event.ind
 
-    print thisline.get_label(), xdata[ind], ydata[ind]
+    print(thisline.get_label(), xdata[ind], ydata[ind])
 
 def annotate(fig, title, xlabel, ylabel):
     fig.text( 0.5, 0.98,title, ha='center', va='top')
@@ -31,18 +31,18 @@ def annotate(fig, title, xlabel, ylabel):
     fig.text(0.02, 0.5, ylabel, rotation=90, ha='center', va='top')
 
 def commasep(s):
-    return map(int, s.split(','))
+    return list(map(int, s.split(',')))
 
 def floatcommasep(s):
-    return map(float, s.split(','))
+    return list(map(float, s.split(',')))
 
 def next_divisor(x, n):
-    for t in xrange(x, n/2):
+    for t in range(x, n/2):
         if n % t == 0:
             return t
 
 def divisors(n):
-    d = [t for t in xrange(1, n/2 + 1) if n % t == 0]
+    d = [t for t in range(1, n/2 + 1) if n % t == 0]
     return d
 
 def _main():
@@ -87,7 +87,7 @@ def _main():
 def tscrunch(beams, factor):
     ntimes, nbeams, nfreq = beams.shape
     newbeams = np.zeros((ntimes/factor, nbeams, nfreq))
-    for t in xrange(newbeams.shape[0]):
+    for t in range(newbeams.shape[0]):
         tstart = t*factor
         tend = (t+1)*factor
         newbeams[t, :, :] = beams[tstart:tend, :, :].sum(axis=0)/np.sqrt(factor)
@@ -98,7 +98,7 @@ def tscrunch(beams, factor):
 def fscrunch(beams, factor):
     ntimes, nbeams, nfreq = beams.shape
     newbeams = np.zeros((ntimes, nbeams, nfreq/factor))
-    for f in xrange(newbeams.shape[2]):
+    for f in range(newbeams.shape[2]):
         fstart = f*factor
         fend = (f+1)*factor
         newbeams[:, :, f] = beams[:, :, fstart:fend].sum(axis=2)/np.sqrt(factor)
@@ -110,7 +110,7 @@ def dmroll(beams, dm, fch1, foff, tint):
     newbeams = np.empty_like(beams)
     ntimes, nbeams, nfreq = newbeams.shape
     reffreq = min(fch1, fch1 + nfreq*foff)
-    for f in xrange(nfreq):
+    for f in range(nfreq):
         freq = fch1 + f*foff
         tdelay = 4.15*dm*(reffreq**-2 - freq**-2)
         shift = int(np.round(tdelay/tint))
@@ -142,7 +142,7 @@ class Plotter(object):
         self.fig_labels = {}
         # Sniff data
         self.files = filenames
-        print self.files[0]
+        print(self.files[0])
         beams, files = load_beams(filenames, tstart, ntimes=1, return_files=True)
         self.total_samples = min([f.nsamples for f in files])
         ntimes, self.nbeams, self.nfreq = beams.shape
@@ -200,7 +200,7 @@ class Plotter(object):
     def set_position_mjd(self, mjdstart, ntimes):
         self.ntimes = int(ntimes)
         self.tstart = int(((mjdstart - self.mjdstart)*86400)/self.tsamp) - self.ntimes # Is my tstart really what I think it is?
-        print 'MJD', mjdstart, ntimes, self.tstart
+        print('MJD', mjdstart, ntimes, self.tstart)
 
     def mk_single_fig(self, name, title, xlab, ylab):
         p = plt.subplot
@@ -235,31 +235,31 @@ class Plotter(object):
         fig, axes = self.figs[name]
         
         ax = axes[i]
-        print i, len(axes), len(self.bnames), self.bnames
+        print(i, len(axes), len(self.bnames), self.bnames)
         ax.text(0.98, 0.98, 'B{}'.format(self.bnames[i]), va='top', ha='right', transform=ax.transAxes)
         return fig, ax
 
     def clearfigs(self):
-        for name, (fig, axes) in self.figs.iteritems():
+        for name, (fig, axes) in self.figs.items():
             for ax in axes:
-                print 'clearing', fig, ax
+                print('clearing', fig, ax)
                 ax.cla()
                 
 
     def saveall(self, prefix):
-        for name, (fig, axes) in self.figs.iteritems():
+        for name, (fig, axes) in self.figs.items():
             fout='{}_{}.png'.format(prefix, name)
-            print 'Saving', fout
+            print('Saving', fout)
             fig.savefig(fout)
 
     def closeall(self):
-        for name, (fig, axes) in self.figs.iteritems():
+        for name, (fig, axes) in self.figs.items():
             plt.close(fig)
 
         self.figs = {}
         
     def drawall(self):
-        for name, (fig, axes) in self.figs.iteritems():
+        for name, (fig, axes) in self.figs.items():
             fig.draw()
 
     def __del__(self):
@@ -287,7 +287,7 @@ class Plotter(object):
             f1idx, f2idx = (f2idx, f1idx)
 
         assert f1idx < f2idx
-        print 'Toggling frequencies', f1, f2, f1idx, f2idx
+        print('Toggling frequencies', f1, f2, f1idx, f2idx)
         self.freq_flags[f1idx:f2idx] = ~ self.freq_flags[f1idx:f2idx]
     
     def reset_flagged_frequencies(self):
@@ -296,16 +296,16 @@ class Plotter(object):
 
     def flag_frequencies(self):
         try:
-            l = raw_input('f1 f2 (with space):')
-            f1, f2 = map(float, l.split())
+            l = input('f1 f2 (with space):')
+            f1, f2 = list(map(float, l.split()))
             self.toggle_freq_flags(f1, f2)
-        except Exception, e:
-            print 'Couldnt parse flags', l, e
+        except Exception as e:
+            print('Couldnt parse flags', l, e)
 
 
     
     def press(self, event):
-        print 'press', event.key
+        print('press', event.key)
         draw = True
         if event.key == 'right' or event.key == 'n':
             self.tstart += self.ntimes/2
@@ -328,7 +328,7 @@ class Plotter(object):
             fdiv = divisors(self.nfreq)
             self.fscrunch_factor = fdiv[fdiv.index(self.fscrunch_factor) -1]
         elif event.key == 'd':
-            self.dm = float(raw_input('Input DM(pc/cm3)'))
+            self.dm = float(input('Input DM(pc/cm3)'))
         elif event.key == 'c':
             self.squeeze_zrange(2.)
         elif event.key == 'C':
@@ -406,7 +406,7 @@ class Plotter(object):
         k - Show histogram'
         h or ? - Print this help
         Ctrl-C - quit'''
-        print s
+        print(s)
 
         return s
 
@@ -419,8 +419,8 @@ class Plotter(object):
             
         f0 = files[0]
         self.beams = beams
-        print 'Loaded beams', beams.shape
-        print 'scrunching t=', self.tscrunch_factor, 'f=', self.fscrunch_factor, 'dm', self.dm
+        print('Loaded beams', beams.shape)
+        print('scrunching t=', self.tscrunch_factor, 'f=', self.fscrunch_factor, 'dm', self.dm)
 
         orig_ntimes, orig_nbeams, orig_nfreq = beams.shape
         
@@ -434,7 +434,7 @@ class Plotter(object):
             beams = fscrunch(beams, self.fscrunch_factor)
             
         if self.rescale:
-            print  'Doing rescale'
+            print('Doing rescale')
             beams -= beams.mean(axis=0)
             beams /= beams.std(axis=0) 
 
@@ -487,7 +487,7 @@ class Plotter(object):
             self.imzrange = (bi.min(), bi.max())
 
         imzmin, imzmax = self.imzrange
-        print 'BISHAPE', bi.shape, 'ZRAGE', imzmin, imzmax
+        print('BISHAPE', bi.shape, 'ZRAGE', imzmin, imzmax)
         
         rawax.imshow(bi, aspect='auto', origin=origin, vmin=imzmin, vmax=imzmax, extent=im_extent, interpolation='none', picker=3)
         #if imzmin is None and imzmax is None:
@@ -541,7 +541,7 @@ class Plotter(object):
             ax[0].set_ylabel('Beam number')
             
         nplots = min(self.nrows*self.ncols, nbeams)
-        for i in xrange(nplots):
+        for i in range(nplots):
 
             fig1, ax1 = self.getfig('dynspec', i)
             fig2, ax2 = self.getfig('mean', i)
@@ -557,9 +557,9 @@ class Plotter(object):
             bmm = np.tile(beam_mean, (ntimes, 1))
             bsm = np.tile(beam_std, (ntimes, 1))
             bi_znorm = (bi - bmm)/bsm
-            print 'Znorm', bi_znorm.shape
+            print('Znorm', bi_znorm.shape)
             beam_kurtosis = np.mean((bi_znorm)**4, axis=0)/np.mean((bi_znorm)**2, axis=0)**2
-            print 'kurt shape', beam_kurtosis.shape
+            print('kurt shape', beam_kurtosis.shape)
 
             ax2.plot(freqs, beam_mean)
             ax3.plot(freqs, beam_std)
@@ -578,7 +578,7 @@ class Plotter(object):
                 fftfreqs  = np.arange(len(dm0f))/float(ntimes)/self.tsamp
                 fft_ext = (fftfreqs.min(), fftfreqs.max(), 0, nchans)
                 ax4.imshow(np.log10(bf)[:, 1:], aspect='auto', extent=fft_ext, origin='lower')
-                print 'fft', dm0f.shape
+                print('fft', dm0f.shape)
                 ax5.loglog(fftfreqs[1:], (dm0f[1:]))
                 fig6, ax6 = self.getfig('dm0plt', i)
                 ax6.plot(dm0)

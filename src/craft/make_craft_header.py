@@ -44,14 +44,14 @@ def _main():
     ants = values.antennas
     num_beamformers = len(cards)*len(ants)
 
-    print 'NUM_BEAMFORMERS {}'.format(num_beamformers)
+    print('NUM_BEAMFORMERS {}'.format(num_beamformers))
     for iant, ant in enumerate(ants):
         for icard, c in enumerate(cards):
             bfno = icard + iant*len(cards)
-            print 'BEAMFORMER{}_ADDR 10.2.{}.{}'.format(bfno, ant, c)
+            print('BEAMFORMER{}_ADDR 10.2.{}.{}'.format(bfno, ant, c))
             chanmap = ','.join(map(str, np.arange(48)))
-            print 'BEAMFORMER{}_CHANMAP {}'.format(bfno, chanmap)
-            print 'BEAMFORMER{}_FREQMAP {}'.format(bfno, chanmap)
+            print('BEAMFORMER{}_CHANMAP {}'.format(bfno, chanmap))
+            print('BEAMFORMER{}_FREQMAP {}'.format(bfno, chanmap))
             
 
             

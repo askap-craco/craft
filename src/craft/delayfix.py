@@ -38,9 +38,9 @@ def _main():
 
     f1 = loadfile(values.files[0])
     f2 = loadfile(values.files[1])
-    allkeys = f1.keys() + f2.keys()
+    allkeys = list(f1.keys()) + list(f2.keys())
     for k in sorted(allkeys):
-        print k, f1.get(k, 0) + f2.get(k,0)
+        print(k, f1.get(k, 0) + f2.get(k,0))
         
         
     

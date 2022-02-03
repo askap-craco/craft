@@ -16,7 +16,7 @@ import numba
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 def unpack_mode2(dwords, d):
-    for samp in xrange(4):
+    for samp in range(4):
         # convert from 4-bit two's complement to int8
         d[samp::4, :, 0] = (dwords & 0xf) - (dwords & 0x8)*2 # real
         dwords >>= 4
@@ -28,7 +28,7 @@ def unpack_mode2(dwords, d):
     
 @numba.jit(nopython=True)
 def unpack_mode2_jit(dwords, d):
-    for samp in xrange(4):
+    for samp in range(4):
         # convert from 4-bit two's complement to int8
         d[samp::4, :, 0] = (dwords & 0xf) - (dwords & 0x8)*2 # real
         dwords >>= 4 # numba doesn't support this - so it fails.
@@ -40,10 +40,10 @@ def unpack_mode2_jit(dwords, d):
 @numba.jit(nopython=True)
 def unpack_mode2_jit_v2(dwords, d):
     (nsampwords, nchan) = dwords.shape
-    for s in xrange(nsampwords):
-        for c in xrange(nchan):
+    for s in range(nsampwords):
+        for c in range(nchan):
             word = dwords[s, c]
-            for samp in xrange(4):
+            for samp in range(4):
                 d[4*s + samp, c, 0] = (word & 0xf) - (word & 0x8)*2 # real
                 word >>= 4
                 d[4*s + samp, c, 1] = (word & 0xf) - (word & 0x8)*2 # imag

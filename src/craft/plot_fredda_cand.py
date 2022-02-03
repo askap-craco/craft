@@ -11,9 +11,9 @@ import numpy as np
 import os
 import sys
 import logging
-import plotutil
+from . import plotutil
 import fnmatch
-import plot_allbeams
+from . import plot_allbeams
 import glob
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -68,7 +68,7 @@ def _main():
             pylab.show()
 
         if values.outfile:
-            print('Saving to  {}'.format(values.outfile))
+            print(('Saving to  {}'.format(values.outfile)))
             pylab.savefig(values.outfile)
 
             
@@ -78,7 +78,7 @@ def old_code(self):
     if consol:
         candlist = find_files_filelist(values.files)
         
-    for key, c in candlist.iteritems():
+    for key, c in candlist.items():
 
         pylab.close()
         '''
@@ -115,10 +115,10 @@ def old_code(self):
             fout = values.outfile
 
         if ncand > 0:
-            print 'Saving', fout
+            print('Saving', fout)
             fig.savefig(fout, dpi=200)
         else:
-            print 'Not saving ', fout, 'is empty'
+            print('Not saving ', fout, 'is empty')
         
         if values.show:
             pylab.show()
@@ -130,7 +130,7 @@ def plot_dir(din, values, scmap=None):
 
 def plot_scans(candfiles, values, scmap=None):
 
-    print 'len candfiles', len(candfiles)
+    print('len candfiles', len(candfiles))
     
     if len(candfiles) == 0:
         fig = pylab.figure()
@@ -143,7 +143,7 @@ def plot_scans(candfiles, values, scmap=None):
         nrows += 1
 
     assert nrows * ncols >= len(candfiles)
-    print 'nxy', nrows, ncols
+    print('nxy', nrows, ncols)
     fig, axes = plotutil.subplots(nrows, ncols)
     fig.set_size_inches([8,6])
     axes = axes.flatten()
@@ -173,7 +173,7 @@ def find_files_filelist(files):
         run = bits[3]
         rest = bits[4]
         key = (sb, scan)
-        if key not in scans.keys():
+        if key not in list(scans.keys()):
             scans[key] = []
 
         data = (fname, sb, scan, ant, run, rest, )
@@ -186,7 +186,7 @@ def find_files_filelist(files):
 def onpick(event):
     thisline = event.artist
     cand = candidate_map[thisline.get_label()][event.ind,:][0, :]
-    print 'S/N={:0.1f} sampno={:0.0f} secoff={:0.2f} bc={:0.0f} idx={:0.0f} dm={:0.2f} beamno={:0.0f} mjd={:0.10f} lbl={label}'.format(*(cand[0:8]), label=thisline.get_label())
+    print('S/N={:0.1f} sampno={:0.0f} secoff={:0.2f} bc={:0.0f} idx={:0.0f} dm={:0.2f} beamno={:0.0f} mjd={:0.10f} lbl={label}'.format(*(cand[0:8]), label=thisline.get_label()))
     
 
 def loadfile(fin):
@@ -195,9 +195,9 @@ def loadfile(fin):
     for line in f:
         if line.startswith('#') or line.strip() == '':
             continue
-        bits = map(float, line.split())
+        bits = list(map(float, line.split()))
         nbits = len(bits)
-        bits.extend([0 for i in xrange(12-nbits)])
+        bits.extend([0 for i in range(12-nbits)])
         a.append(bits)
 
     return np.array(a)
@@ -216,7 +216,7 @@ def plot_file(fin, values, ax=None, title=None, labels=True, subtitle=None, scma
         ax.text(0.05, 0.95, subtitle, ha='left', va='top', transform=ax.transAxes)
 
     if len(vin) == 0:
-        print fin, 'is empty'
+        print(fin, 'is empty')
         if subtitle:
             s = 'Empty'
         else:
@@ -228,7 +228,7 @@ def plot_file(fin, values, ax=None, title=None, labels=True, subtitle=None, scma
         vin.shape = (1, len(vin))
 
     vin[:, 5] = abs(vin[:, 5]) # handle negative DMs
-    print fin, vin.shape
+    print(fin, vin.shape)
     boxcar = vin[:, 3]
     dm = vin[:, 5]
     sn = vin[:, 0]
@@ -247,7 +247,7 @@ def plot_file(fin, values, ax=None, title=None, labels=True, subtitle=None, scma
     ubeams = set(beamno)
     
     ax.scatter(badvin[:, 2], 1+badvin[:, 5], marker='.', alpha=0.4, edgecolors='face', c='0.5')
-    print 'MASK has ', sum(mask), 'valid candidates', ax
+    print('MASK has ', sum(mask), 'valid candidates', ax)
 
     for ib, b in enumerate(sorted(ubeams)):
         bmask = beamno == b
@@ -290,7 +290,7 @@ def plot_details(fin, vin, values, ax, title, labels, subtitle):
 
     ncand = vin.shape[0]
     ncols = vin.shape[1]
-    for c in xrange(ncand):
+    for c in range(ncand):
         cand = vin[c, :]
         plot_single_beam(fin, values, cand)
         plot_all_beams(fin, values, cand)
@@ -305,7 +305,7 @@ def plot_beams(fin, values, cand, pattern, nxy, postfix):
     tstart = max(0, tstart)
     nsamps = int(2*idm)
     assert len(beamfile) > 0, 'Couldnt find beamfiles in path {}'.format(bpath)
-    print 'got ', len(beamfile), 'beams in path', bpath, 'tstart', tstart, 'nsamps', nsamps
+    print('got ', len(beamfile), 'beams in path', bpath, 'tstart', tstart, 'nsamps', nsamps)
     p = plot_allbeams.Plotter(beamfile, nxy, tstart, nsamps)
     prefix = os.path.join(fdir, 's{:d}_b{:d}_idm{:d}_{}'.format(int(sampno), int(beamno), int(idm), postfix))
     p.draw()

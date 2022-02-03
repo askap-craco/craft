@@ -8,8 +8,8 @@ import numpy as np
 import os
 import sys
 import logging
-from cmdline import strrange
-from craftcor import CLIGHT
+from .cmdline import strrange
+from .craftcor import CLIGHT
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -38,7 +38,7 @@ def _main():
 
     blin = open(values.blfile, 'rU').read()
     blidx = blin.find('Miriad baseline convention')
-    print '# blfix.py args', ' '.join(sys.argv)
+    print('# blfix.py args', ' '.join(sys.argv))
     
     for line in blin[blidx:].split('\n'):
         if 'Miriad' in line or 'Ant' in line or '----' in line:
@@ -50,16 +50,16 @@ def _main():
 
         iant = int(line[0]) # miriad 1-index antenna number
         restline = line[1:]        # Fortran fixed widths aren't big enough
-        dxyz = np.array(map(float, restline.split()))
+        dxyz = np.array(list(map(float, restline.split())))
         dxyz_meters = dxyz*CLIGHT/1e9
         antno = values.antennas[iant-1]
         s = 'common.antenna.ant{:d}.location.itrf'.format(antno)
         oldxyz = pset[s]
-        oldxyz = np.array(map(float, oldxyz[1:-1].split(',')))
+        oldxyz = np.array(list(map(float, oldxyz[1:-1].split(','))))
         newxyz = oldxyz + dxyz_meters
         sout = '{} = [{:0.4f}, {:0.4f}, {:0.4f}]'.format(s, newxyz[0],newxyz[1],newxyz[2])
-        print '# iant={} antno={} dXYZ={} m oldxyz={} m'.format(iant, antno, dxyz_meters, oldxyz)
-        print sout
+        print('# iant={} antno={} dXYZ={} m oldxyz={} m'.format(iant, antno, dxyz_meters, oldxyz))
+        print(sout)
         
         
         

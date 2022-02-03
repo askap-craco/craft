@@ -12,9 +12,9 @@ import os
 import sys
 import logging
 import itertools
-from craftobs import load_beams
-from plotutil import subplots, addpick
-import sigproc
+from .craftobs import load_beams
+from .plotutil import subplots, addpick
+from . import sigproc
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -23,15 +23,15 @@ def annotate(fig, title, xlabel, ylabel):
     fig.text(0.5, 0.02, xlabel, ha='center', va='bottom')
     fig.text(0.02, 0.5, ylabel, rotation=90, ha='center', va='top')
     fout='{}.png'.format(title.replace(' ', ''))
-    print 'Saving', fout
+    print('Saving', fout)
     fig.savefig(fout)
     
 
 def commasep(s):
-    return map(int, s.split(','))
+    return list(map(int, s.split(',')))
 
 def floatcommasep(s):
-    return map(float, s.split(','))
+    return list(map(float, s.split(',')))
 
 
 def _main():
@@ -83,10 +83,10 @@ def _main():
     std_data = np.zeros((nbeams, len(values.channels), nsamps/ntimes))
     files = [sigproc.SigprocFile(fname) for fname in values.files]
     
-    print 'Memory', all_data.shape, mean_data.shape
+    print('Memory', all_data.shape, mean_data.shape)
 
     for ifname, f in enumerate(files):
-        print 'Loading file', f.filename
+        print('Loading file', f.filename)
         nelements = ntimes*f.nifs*f.nchans
         f.seek_data(f.bytes_per_element*tstart)
         t = 0
@@ -97,7 +97,7 @@ def _main():
 
         tsum = 0
         while t < nsamps:
-            print f.filename, 'reading', nelements
+            print(f.filename, 'reading', nelements)
             v = np.fromfile(f.fin, dtype=dtype, count=nelements )
             if len(v) != nelements:
                 break
@@ -106,14 +106,14 @@ def _main():
             assert f.nifs == 1
             d = v[:, 0, values.channels].T
             all_data[ifname, :, t:t+ntimes] = d
-            print d.shape, d.mean().shape, d.mean()
+            print(d.shape, d.mean().shape, d.mean())
             mean_data[ifname, :, tsum] = d.mean(axis=1)
             std_data[ifname, :, tsum] = d.std(axis=1)
             t += ntimes
             tsum += 1
 
 
-    print 'Loaded', all_data.shape, mean_data.shape
+    print('Loaded', all_data.shape, mean_data.shape)
     
     f0 = files[0]
     mjdstart = f0.tstart
@@ -123,9 +123,9 @@ def _main():
     src_raj = f0.src_raj
     src_dej = f0.src_dej
 
-    for c in xrange(len(values.channels)):
+    for c in range(len(values.channels)):
         fig = pylab.figure()
-        for b in xrange(nbeams):
+        for b in range(nbeams):
             pylab.plot(mean_data[b, c, :].T, label=files[b].filename, picker=3)
             pylab.xlabel('Sample')
             pylab.ylabel('Amplitude')
@@ -134,7 +134,7 @@ def _main():
 
     fig, axes = pylab.subplots(*values.nxy, sharex=True, sharey=True)
     axes = axes.flatten()
-    for b in xrange(len(axes)):
+    for b in range(len(axes)):
         ax = axes[b]
         ax.plot(mean_data[b, :, :].T)
         ax.set_title(files[b].filename[-6:-4])

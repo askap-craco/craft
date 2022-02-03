@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 import logging
-from rtdata import FreddaRescaleData
+from .rtdata import FreddaRescaleData
 from astropy.time import Time
 from influxdb import InfluxDBClient
 
@@ -37,10 +37,10 @@ class Stats(object):
 
     def to_influx(self):
         s = ''
-        statnames = self.data.keys()
+        statnames = list(self.data.keys())
         body = []
         for ia, a in enumerate(self.antennas):
-            for b in xrange(self.nbeams):
+            for b in range(self.nbeams):
                 fields = {statname:self.data[statname][ia, b] for statname in statnames
                           if isok(self.data[statname][ia, b])}
                 tags = {'antenna':a, 'beam':b}
@@ -76,12 +76,12 @@ def plot(f, values):
         return
     
     client = InfluxDBClient(database='craft', host='akingest01', username='craftwriter', password='craft')
-    print 'ANT', d.antennas
-    print 'NBEAM', d.nbeams
+    print('ANT', d.antennas)
+    print('NBEAM', d.nbeams)
     
     for block in d.blocks(step=values.step):
         t = Time(block.mjd, format='mjd')
-        print 'TIME', t.isot, block.mjd, block.rsdata.tstart, block.rsdata.tsamp
+        print('TIME', t.isot, block.mjd, block.rsdata.tstart, block.rsdata.tsamp)
         stat = Stats(d.antennas, d.nbeams_per_antenna, t.isot, values)
         names = ['mean','std','kurt','scale','offset', 'decay_offset', 'nsamps', 'dm0']
         names = ['mean', 'std','kurt', 'scale', 'offset']

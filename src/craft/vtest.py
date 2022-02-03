@@ -11,15 +11,15 @@ import numpy as np
 import os
 import sys
 import logging
-import dada
-from crafthdr import DadaHeader
+from . import dada
+from .crafthdr import DadaHeader
 import datetime
 import astropy
 from astropy.time import Time
-import aktime
+from . import aktime
 import pytz
-import filterbank
-import craftsim
+from . import filterbank
+from . import craftsim
 import FDMT
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
@@ -70,7 +70,7 @@ def _main():
     assert xf.shape == (values.nsamps, NCHANS), 'Unexpected shape. xfshape={} expected {}'.format(xf.shape, (values.nsamps, NCHANS))
 
     if values.plot:
-        print 'xf shape', xf.shape, 'xshape', x.shape
+        print('xf shape', xf.shape, 'xshape', x.shape)
         ex = (0, xf.shape[0], freqs[0], freqs[-1])
         pylab.imshow(abs(xf**2).T, aspect='auto', interpolation='nearest', origin='lower', extent=ex)
         pylab.xlabel('Sample')
@@ -79,7 +79,7 @@ def _main():
 
 
     hdr = make_header(values, freqs)
-    print hdr
+    print(hdr)
     d = xf*32 # scale to better look like 16 bit numbers. TODO: find a approprite scaling factor
     
     # INJECT SIGNALS HERE ON A PER CHANNEL BASIS
