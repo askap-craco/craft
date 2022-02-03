@@ -581,8 +581,18 @@ def calc_pad_lut(plan, ssr=16):
 
 
 class PipelinePlan(object):
-    def __init__(self, f, values):
-        self.values = values
+    def __init__(self, f, values=None):
+        if values is None:
+            print('Creating default values')
+            self.values = get_parser().parse_args()
+        elif isinstance(values, str):
+            print(f'parsing values {values}')
+            self.values = get_parser().parse_args(values.split())
+        else:
+            self.values = values
+
+        values = self.values
+        
         logging.info('making Plan values=%s', self.values)
 
         umax, vmax = f.get_max_uv()
@@ -762,7 +772,7 @@ def add_arguments(parser):
     '''
     Add planning arguments
     '''
-    parser.add_argument('--uv', help='Load antenna UVW coordinates from this UV file')
+    parser.add_argument('--uv', help='Load antenna UVW coordinates from this UV file', default='uv_data')
     parser.add_argument('--pickle_fname', default='pipeline.pickle', help='File to dump and load pickle file')
     parser.add_argument('--npix', help='Number of pixels in image', type=int, default=256)
     parser.add_argument('--os', help='Number of pixels per beam', default='2.1,2.1')
@@ -783,6 +793,14 @@ def add_arguments(parser):
     parser.add_argument('--save', action='store_true',  help='Save data as .npy for input, FDMT and image pipeline')
     parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s', '--show', action='store_true', help='Show plots')
+
+def get_parser():
+    from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+    parser = ArgumentParser(description='Plans a CRACO scan', formatter_class=ArgumentDefaultsHelpFormatter)
+    add_arguments(parser)
+    parser.set_defaults(verbose=False)
+    return parser
+               
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
