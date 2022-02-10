@@ -40,3 +40,13 @@ source venv/bin/activate
 # directory and you don't have to re-instally it to see those changes.
 pip install -e . 
 ```
+
+# For notebooks
+
+You probably want to install jupyter
+
+```
+pip install jupyter
+cd notebooks
+jupyter notebook
+```
