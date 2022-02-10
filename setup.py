@@ -1,5 +1,6 @@
 import os
 import re
+import glob
 
 from setuptools import find_packages, setup
 
@@ -54,6 +55,7 @@ if __name__ == '__main__':
         keywords=['craft'],
         package_dir={'': 'src'},
         packages=find_packages('src'),
+        scripts=glob.glob('scripts/*'),
         zip_safe=False,
         classifiers=['Development Status :: 3 - Alpha',
                      'Intended Audience :: Developers',
