@@ -24,7 +24,16 @@ In the end I followed these instructions to get LLVM11 installed on my Ubuntu 18
 LLVM_CONFIG=llvm-config-11 pip install numba
 ```
 
+LAPACK etc
+######
+```
+sudo apt install libblas3 liblapack3 liblapack-dev libblas-dev gfortran libatlas-base-dev python-numpy python-scipy
 
+```
+
+To run the pipeline
+###################
+Creating test data currently requires ATNF Mirid. Install it and make sure it's in your path. See https://www.atnf.csiro.au/computing/software/miriad/INSTALL.html
 
 
 For Development
@@ -32,7 +41,8 @@ For Development
 ```
 git clone ...
 cd craft
-python3.8 -v venv venv
+# pick up system scipy otherwise it takes ages to install
+python3.8 -v venv venv  --system-site-packages
 source venv/bin/activate
 
 # the following pip installs all teh required dependencies and installs

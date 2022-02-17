@@ -198,7 +198,7 @@ class FdmtGridder(Kernel):
             blkdm = int(np.round(idm*idm_cff(fch1, plan)))
             toff = int(np.round(idm*offset_cff(fch1, plan)))
             blkt = 2*t - toff
-            logging.debug('Gridder idm=%s t=%s irun=%s  minchan=%s blkdm=%s toff=%s blkt=%s fch1=%s idm_cff=%s off_cff', idm, t, irun, minchan, blkdm, toff,  blkt, fch1, idm*idm_cff(fch1, plan), idm*offset_cff(fch1, plan))
+            logging.debug('Gridder idm=%s t=%s irun=%s  minchan=%s blkdm=%s toff=%s blkt=%s fch1=%s idm_cff=%s off_cff=%s', idm, t, irun, minchan, blkdm, toff,  blkt, fch1, idm*idm_cff(fch1, plan), idm*offset_cff(fch1, plan))
 
             for iuv, uvcell in enumerate(fdmtrun):
                 upix, vpix = uvcell.uvpix
@@ -328,7 +328,8 @@ class ImagePipeline(Kernel):
         npix = self.plan.npix
         nd = self.plan.nd
         nt = self.plan.nt
-        outshape = (nd, nt/2, npix, npix)
+        assert nt % 2 == 0
+        outshape = (nd, nt//2, npix, npix)
         logging.info("Input shape is %s. Writing output data to %s shape is (nd,nt/2,npix,npix)=%s", blk.shape, outfname, outshape)
         fout = open(outfname, 'w')
         gout = open(outgridname, 'w')
@@ -337,21 +338,25 @@ class ImagePipeline(Kernel):
 
         dosave = self.plan.values.save
         if dosave:
-            dall = np.zeros(outshape, dtype=np.complex64)
+            img_all = np.zeros(outshape, dtype=np.complex64)
+            grid_all = np.zeros(outshape, dtype=np.complex64)
         else:
-            dall = None
+            img_all = None
+            grid_all = None
         
         for idm in range(nd):
-            for t in range(nt/2):
+            for t in range(nt//2):
                 #g = gridder(d[idm, 2*t, :], d[idm, 2*t+1, :])
                 g = gridder(idm, t, blk)
                 #g.tofile(gout)
                 img = imager(g).astype(np.complex64)
-                if dall is not None:
-                    dall[idm, t, :, :] = img
+                if img_all is not None:
+                    img_all[idm, t, :, :] = img
+                    grid_all[idm, t, :, :] = g
                 #img.tofile(fout)
+                # send real part in to the boxcar & grouping
                 c1 = grouper(idm, 2*t, boxcar(idm, img.real))
-                c2 = grouper(idm, 2*t + 1, boxcar(idm, img.imag))
+                c2 = grouper(idm, 2*t + 1, boxcar(idm, img.imag)) # send imaginary part into p
                 rlabel = 'real idm={} t={}'.format(idm, t)
                 ilabel = 'imag idm={} t={}'.format(idm, t)
                 logging.debug('img.real idm=%d t=%d %s', idm, t, craco.printstats(img.real, rlabel))
@@ -370,7 +375,7 @@ class ImagePipeline(Kernel):
         grouper.to_file(candname)
         fout.close()
         gout.close()
-        return dall
+        return img_all, grid_all
         
 
 def savefile(fname, arr):
@@ -401,9 +406,10 @@ class CracoPipeline(Kernel):
             if self.plan.values.save:
                 savefile('blk_{}_fdmt.npy'.format(blkt), blk)
 
-            dout = self.image(blk)
+            img, grid = self.image(blk)
             if self.plan.values.save:
-                savefile('blk_{}_img.npy'.format(blkt), dout)
+                savefile('blk_{}_img.npy'.format(blkt), img)
+                savefile('blk_{}_grid.npy'.format(blkt), grid)
 
         logging.info('Pipeline finished')
 

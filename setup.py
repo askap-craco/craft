@@ -55,7 +55,23 @@ if __name__ == '__main__':
         keywords=['craft'],
         package_dir={'': 'src'},
         packages=find_packages('src'),
+        package_data={'craft':['data/antenna_locations/*']},
         scripts=glob.glob('scripts/*'),
+        entry_points = {
+            'console_scripts':['uvfrbsim=craft.uvfrbsim:_main',
+                               'craco_pipeline=craft.craco_pipeline:_main',
+                               'craco_plan=craft.craco_plan:_main',
+                               'craco_img_krnl=craft.craco_img_krnl:_main',
+                               'craftcor=craft.craftcor:_main',
+                               'fredfof_ics=craft.fredfof_ics:_main',
+                               'fredfof=craft.fredfof:_main',
+                               'plot_allbeams=craft.plot_allbeams:_main',
+                               'quickcorr=craft.quickcorr:_main',
+                               'vcraft2fil=craft.vcraft2fil:_main',
+                               'uvfits2fil=craft.uvfits2fil:_main',
+                               'antenna_locations=craft.antenna_locations:_main'
+            ]
+            },
         zip_safe=False,
         classifiers=['Development Status :: 3 - Alpha',
                      'Intended Audience :: Developers',

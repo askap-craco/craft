@@ -9,6 +9,12 @@ function param {
 
 if [[ $# != 5 ]] ; then
     echo "Need 5 arguments"
+    echo "Usage: $0 DM T0 AMP SN RELPOS"
+    echo "  DM - DM in PC/CM3"
+    echo "  T0 - startign time in samples"
+    echo "  AMP - Amplitude of output FRB"
+    echo "  SN - Desired Signal to noise"
+    echo "  RELPOS - comma separated ra_arcsec,dec_arcsec"
     exit 1
 fi
 
@@ -27,13 +33,15 @@ nd=8
 nchan=256 # number of channels
 tint=1.728
 desired_amp=500 # desired amplitude a the output of the FFT
-threshold=12
+threshold=10
 ncin=32
 ndout=8
 #antfile=`dirname $0`/askap-ak1-ak30.ant
-antfile=`dirname $0`/askap-ak1-ak3.ant
+#antfile=`dirname $0`/askap-ak1-ak3.ant
+antfile="askap-ak1-ak24.ant"
+antfile=$(antenna_locations $antfile)
 echo Antfile is $antfile
-wc -l $antfile
+
 
 # Calculated parameters
 frb_relpos_frbname=$( echo "$frb_relpos" | sed s/,//)
@@ -89,7 +97,7 @@ param scale $scale
 param ncin $ncin
 param sim_method $sim_method
 
-cmd="uvfrbsim.py --fch1 $fch1 --nchan $nchan --antfile $antfile2 --tint $tint --duration $nt --frb_idm $frb_dm --frb_amp $frb_amp --frb_sn $frb_sn --frb_relpos $frb_relpos --frb_tstart $frb_tstart -o $fits --sim-method $sim_method"
+cmd="uvfrbsim --fch1 $fch1 --nchan $nchan --antfile $antfile2 --tint $tint --duration $nt --frb_idm $frb_dm --frb_amp $frb_amp --frb_sn $frb_sn --frb_relpos $frb_relpos --frb_tstart $frb_tstart -o $fits --sim-method $sim_method"
 echo "Running $cmd"
 #$cmd --show
 $cmd
@@ -97,7 +105,10 @@ $cmd
 #craco_fdmt_krnl.py --nt $nt --ndm $nd --format raw --nfftcu $ncu --output-scale $scale $fits
 #craco_img_krnl.py --ndm $nd --uvgrid $fits.uvgrid.txt --nfftcu $ncu --nt $nt  $fits.ndm${nd}_nt${nt}.b0.uvdata.raw --threshold $threshold
 
-craco_pipeline.py --nt $nt --ndm $nd --ncin $ncin --ndout $ndout --uv $fits --boxcar-weight sqrt --threshold $threshold --save
+cmd="craco_pipeline --nt $nt --ndm $nd --ncin $ncin --ndout $ndout --uv $fits --boxcar-weight sqrt --threshold $threshold --save"
+
+echo "Running $cmd"
+$cmd
 
 popd
 

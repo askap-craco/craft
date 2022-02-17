@@ -1,8 +1,13 @@
 wheel # needed by numpy?
 cython # needed by numpy?
+numpy # numba needs 1.21 - 
+#numba
 matplotlib
-numpy
+cython
+pybind11 # needed for scipy? (WHY?)
+pythran
+scipy
 astropy
 IPython
 dill
-numba
+

@@ -21,7 +21,6 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='Be verbose')
     craco_plan.add_arguments(parser)
     parser.set_defaults(verbose=False)
     values = parser.parse_args()

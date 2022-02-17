@@ -12,7 +12,17 @@ import os
 import sys
 import logging
 import warnings
-from numba import njit, prange
+try:
+    from numba import njit, prange
+except:
+    print('Couldnt import numba. Bahh humbug')
+    # define pass-through decorators
+    def njit(f):
+        return f
+
+    def prange(x):
+        return range(x)
+          
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
