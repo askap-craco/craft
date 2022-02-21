@@ -22,6 +22,14 @@ In the end I followed these instructions to get LLVM11 installed on my Ubuntu 18
 
 ```
 LLVM_CONFIG=llvm-config-11 pip install numba
+
+```
+
+On python3.6 this worked for me
+###############################
+```
+sudo apt install llvm-10
+LLVM_CONFIG=llvm-config-10 pip install numba
 ```
 
 LAPACK etc
