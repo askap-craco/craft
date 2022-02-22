@@ -784,7 +784,7 @@ def add_arguments(parser):
     parser.add_argument('--nuvwide', help='Number of UV processed in parallel', type=int, default=8)
     parser.add_argument('--nuvmax', help='Maximum number of UV allowed.', type=int, default=8192)
     parser.add_argument('--ncin', help='Numer of channels for sub fdmt', type=int, default=32)
-    parser.add_argument('--ndout', help='Number of DM for sub fdmt', type=int, default=32)
+    parser.add_argument('--ndout', help='Number of DM for sub fdmt', type=int, default=186)
     parser.add_argument('--threshold', type=float, help='Threshold for candidate grouper', default=3)
     parser.add_argument('--fdmt_scale', type=float, help='Scale FDMT output by this amount', default=1.0)
     parser.add_argument('--fft_scale', type=float, help='Scale FFT output by this amount. If both scales are 1, the output equals the value of frb_amp for crauvfrbsim.py', default=10.0)
