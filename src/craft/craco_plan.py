@@ -33,6 +33,19 @@ def load_plan(pickle_fname):
     
     return plan
 
+def make_ddreader_configs(plan):
+    '''
+    Make the ddgrid reader config
+    See maek_sample_configs in ddgrid_catchtest.cpp
+    '''
+
+    configs = np.zeros((plan.nuvrest_max, 2), dtype=np.uint16)
+    for irun, run in enumerate(plan.fdmt_plan.runs):
+        # now convert to integers
+        configs[irun, 0] = fdmt.cff_to_word(run.idm_cff)
+        configs[irun, 1] = fdmt.cff_to_word(run.offset_cff)
+
+    return configs
 
 def get_uvcells(baselines, uvcell, freqs, Npix, plot=False):
     uvcells = []
@@ -657,6 +670,19 @@ class PipelinePlan(object):
         self.fft_ssr = 16 # number of FFT pixels per clock - "super sample rate"
         self.ngridreg = 16 # number of grid registers to do
         assert self.threshold >= 0, 'Invalid threshold'
+
+        # calculate DMs and DD grid reader LUT
+        # DMS is in units of samples
+        # you could load from a file or a more difficult specification from the CMDLINE
+        # For now we just do every DM up to nd
+        assert self.nd <= self.values.max_ndm, 'Requested ND is > larger than MAX_NDM'
+        self.dms = np.arange(self.values.max_ndm, dtype=np.uint32)
+        # zero off final DMS
+        self.dms[self.nd:] = 0
+
+        assert len(self.dms) == self.values.max_ndm, 'Lookup able must have MAX_NDM entries'
+
+        
         self.fdmt_plan = FdmtPlan(uvcells, self)
         self.save_fdmt_plan_lut()
         
@@ -678,6 +704,14 @@ class PipelinePlan(object):
         self.upper_idxs, self.upper_shifts, self.lower_idxs, self.lower_shifts = calc_pad_lut(self, self.fft_ssr)
         self.save_pad_lut(self.upper_idxs, self.upper_shifts, 'upper')
         self.save_pad_lut(self.lower_idxs, self.lower_shifts, 'lower')
+
+        # calculate DD grid id1 and offset values, there
+        self.ddreader_config = make_ddreader_configs(self)
+
+        # concatenate bytes of DMS and ddreader config
+        self.ddreader_lut = np.frombuffer(self.dms.tobytes() + self.ddreader_config.tobytes(), dtype=np.uint32)
+        self.save_lut(self.ddreader_lut, 'ddreader', 'value')
+        
         
     def save_lut(self, data, lutname, header, fmt='%d'):
         filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
@@ -763,7 +797,7 @@ class PipelinePlan(object):
         '''
         Returns maximum DM - placeholder for when we do DM gaps
         '''
-        return self.nd
+        return max(self.dms)
             
             
         
@@ -779,6 +813,7 @@ def add_arguments(parser):
     parser.add_argument('--cell', help='Image cell size (arcsec). Overrides --os')
     parser.add_argument('--nt', help='Number of times per block', type=int, default=256)
     parser.add_argument('--ndm', help='Number of DM trials', type=int, default=2)
+    parser.add_argument('--max-ndm', help='Maximum number of DM trials. MUST AGREE WITH FIRMWARE', type=int, default=1024)
     parser.add_argument('--nbox', help='Number of boxcar trials', type=int, default=8)
     parser.add_argument('--boxcar-weight', help='Boxcar weighting type', choices=('sum','avg','sqrt'), default='sum')
     parser.add_argument('--nuvwide', help='Number of UV processed in parallel', type=int, default=8)

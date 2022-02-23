@@ -153,23 +153,6 @@ def offset_cff(fch1, plan):
     assert ocff >= 0
     return ocff
 
-'''
-                    if t == 1 and idm==2:
-                        thisblk = blk[irun, :,:, iuv]
-                        pylab.imshow(thisblk.real, aspect='auto', origin='lower', interpolation='nearest')
-                        pylab.plot(blkdm,blkt, 'x')
-                        maxt,maxdm = np.unravel_index(np.argmax(thisblk.real), thisblk.shape)
-                        pylab.plot(maxdm, maxt, '+')
-                        sum_max += thisblk.real[maxt, maxdm]
-                        sum_predict += thisblk.real[blkt, blkdm]
-                        diff = thisblk.real[blkt, blkdm] - thisblk.real[maxt, maxdm]
-                        msg = 'EQUAL' if (maxt == blkt and maxdm == blkdm) else 'WRONG'
-                        logging.debug('iuv=%s predicted=%s at %s,%s max=%s at %s,%s diff=%s %s', iuv, thisblk.real[blkt, blkdm], blkt, blkdm, thisblk.real[maxt, maxdm], maxt, maxdm, diff, msg)
-                        pylab.xlabel('IDM')
-                        pylab.ylabel('T')
-                        pylab.show()
-'''
-
 class FdmtGridder(Kernel):
     '''
     Grids the data assuming the FDMT has only done some of the dedispersion

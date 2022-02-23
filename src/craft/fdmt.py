@@ -29,6 +29,7 @@ def cff(f1_start, f1_end, f2_start, f2_end):
     ratio = num / den
     return ratio
 
+
 #@jit(nopython=True)
 def calc_delta_t(f_min, f_max, f_start, f_end, max_dt):
     rf = cff(f_start, f_end, f_min, f_max)
@@ -36,6 +37,14 @@ def calc_delta_t(f_min, f_max, f_start, f_end, max_dt):
     delta_t = int(math.ceil(delta_tf)) + 1
     
     return delta_t
+
+def cff_to_word(v):
+    '''
+    Convert a CFF value (either offset_cff or id_cfff) to the word value used in the hardware
+    Assumes theword value is a 16 bit unsigned int
+    '''
+    word = int(np.round(v*(1<<16)))
+    return word
 
 def calc_var(smearing, width):
     '''
@@ -725,8 +734,9 @@ class Fdmt(object):
             for c in range(self.nchan_out_for_iter(iterno)):
                 id1_cff = self.calc_id1_cff(iterno, cout)
                 off_cff = self.calc_offset_cff(iterno, cout)
-                lut[cout, 0] = int(np.round(id1_cff*(1<<16)))
-                lut[cout, 1] = int(np.round(off_cff*(1<<16)))
+                
+                lut[cout, 0] = cff_to_word(id1_cff) 
+                lut[cout, 1] = cff_to_word(off_cff)
                 cout += 1
 
         assert cout == self.n_f - 1, 'Didnt finish lookup table correctly'
