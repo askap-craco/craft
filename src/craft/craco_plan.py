@@ -55,8 +55,6 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=False):
     if plot:
         grid = np.zeros((Npix, Npix))
 
-    # Updated for python 3
-    #for blid, bldata in baselines.iteritems():
     for blid, bldata in list(baselines.items()):
         #UU, VV WW are in seconds
         ulam = bldata['UU'] * freqs
@@ -404,13 +402,14 @@ def calc_grid_luts(plan, upper=True):
     logging.info('Got %d unique UV coords. Upper=%s', ncoord, upper)
 
     # check
-    check = False
+    check = True
     if check:
         grid = np.zeros((plan.npix, plan.npix))
         for i, (u, v) in enumerate(unique_uvcoords):
             grid[v,u] = i+1
 
-        pylab.imshow(np.ma.masked_equal(grid, 0), interpolation='none')
+        pylab.imshow(np.ma.masked_equal(grid, 0), interpolation='none', origin='lower')
+        pylab.title(f'Checking calc_grid_luts upper={upper}')
         pylab.show()
     
     fplan = plan.fdmt_plan
@@ -426,7 +425,6 @@ def calc_grid_luts(plan, upper=True):
     assert nwrites <= 4096*2, 'Not enough clocks to write data in! nwrites={}'.format(nwrites)
     logging.info('Need to write %d groups of %d register to pad function', nwrites, ngridreg)
 
-    #for iwrite in xrange(nwrites):
     for iwrite in range(nwrites):
         # Add available cells
         n = min(ngridreg, ncoord - iwrite*ngridreg)
@@ -437,7 +435,7 @@ def calc_grid_luts(plan, upper=True):
         for islot, slot_uv_coord in enumerate(slot_uv_coords):
             logging.debug('Considering islot=%d slot=%s', islot, slot_uv_coord)
             # The FDMT has all its data in the upper hermetian - so we always use upper hermetian coordinates
-            upper_slot_uv_coord = craco.make_upper(slot_uv_coord)
+            upper_slot_uv_coord = craco.make_upper(slot_uv_coord, plan.npix)
              # Find irun and icell 
             for cell_coord in fplan.find_uv(upper_slot_uv_coord):
                 # cell_coord is the location in the FDMT output buffer
@@ -500,6 +498,13 @@ def get_pad_input_registers(instr, ssr=16):
             curr = [None for i in range(ssr)]
 
 def calc_pad_lut(plan, ssr=16):
+    '''
+    Calculates the padding lookup table
+
+    @param plan PipelinePlan
+    @param ssr super-sample rate for FFT. I.e. how many pixels per clock we need to produce after padding
+    @returns (upper_idxs, upper_shifts, lower_idxs, lower_shifts) tuple
+    '''
     upper_inst = plan.upper_instructions
     lower_inst  = plan.lower_instructions
     upper_inputs = get_pad_input_registers(upper_inst)
@@ -510,18 +515,16 @@ def calc_pad_lut(plan, ssr=16):
     upper_registers = []
     lower_registers = []
 
-    # Update for python 3
-    #upper_registers.extend(upper_inputs.next())
-    #upper_registers.extend(upper_inputs.next())
-    #
-    #lower_registers.extend(lower_inputs.next())
-    #lower_registers.extend(lower_inputs.next())
+    # add 2 sets of inputs to upper and lower registers
 
     upper_registers.extend(next(upper_inputs))
     upper_registers.extend(next(upper_inputs))
                                             
     lower_registers.extend(next(lower_inputs))
     lower_registers.extend(next(lower_inputs))
+
+    print('Upper registers', upper_registers)
+    print('Lower registers', lower_registers)
     
     upper_shifts = []
     lower_shifts = []
@@ -529,14 +532,13 @@ def calc_pad_lut(plan, ssr=16):
     lower_idxs = []
 
     npix = plan.npix
-    
-    #for v in xrange(npix):
+
+    # raster scan in u direction fastest, then v
+    # top left pixel is 0,0
     for v in range(npix):
-        #for ublk in xrange(npix/ssr):
         for ublk in range(npix//ssr):
             lower_shift = False
             upper_shift = False
-            #for iu in xrange(ssr):
             for iu in range(ssr):
                 u = iu + ublk*ssr
                 uv = (u,v)
@@ -548,11 +550,11 @@ def calc_pad_lut(plan, ssr=16):
                         upper_registers[i] = 'USED'
                         upper_shift |= i >= ssr - 1
                     else:
-                        i = -1 # which means 0
+                        i = -1 # which means pad with 0
 
                     upper_idxs.append((u,v,i))
                 else: # lower hermeitan
-                    if (v,u) in uvpix_set:
+                    if craco.make_upper(uv, npix) in uvpix_set:
                         i = lower_registers.index(uv)
                         lower_shift |= i >= ssr - 1
                     else:
@@ -564,8 +566,6 @@ def calc_pad_lut(plan, ssr=16):
             if upper_shift:
                 upper_registers[:ssr] = upper_registers[ssr:]
                 try:
-                    # update for python 3
-                    #upper_registers[ssr:] = upper_inputs.next()
                     upper_registers[ssr:] = next(upper_inputs)
                 except StopIteration:
                     upper_finished = True
@@ -574,8 +574,6 @@ def calc_pad_lut(plan, ssr=16):
             if lower_shift:
                 lower_registers[:ssr] = lower_registers[ssr:]
                 try:
-                    # Update for python 3
-                    #lower_registers[ssr:] = lower_inputs.next()
                     lower_registers[ssr:] = next(lower_inputs)
                 except StopIteration:
                     lower_finished = True
@@ -586,7 +584,6 @@ def calc_pad_lut(plan, ssr=16):
 
     assert upper_finished, 'Upper inputs not empty'
     assert lower_finished, 'Lower inputs not empty'
-
 
     assert len(upper_shifts) == npix*npix/ssr
 
@@ -814,6 +811,7 @@ def add_arguments(parser):
     parser.add_argument('--nt', help='Number of times per block', type=int, default=256)
     parser.add_argument('--ndm', help='Number of DM trials', type=int, default=2)
     parser.add_argument('--max-ndm', help='Maximum number of DM trials. MUST AGREE WITH FIRMWARE', type=int, default=1024)
+    parser.add_argument('--max-nbl', help='Maximum number of baselines - cuts number of baselines to this value', type=int, default=36*35/2)
     parser.add_argument('--nbox', help='Number of boxcar trials', type=int, default=8)
     parser.add_argument('--boxcar-weight', help='Boxcar weighting type', choices=('sum','avg','sqrt'), default='sum')
     parser.add_argument('--nuvwide', help='Number of UV processed in parallel', type=int, default=8)

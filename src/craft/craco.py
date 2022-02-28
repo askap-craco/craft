@@ -95,7 +95,7 @@ def triangular_index(x, y, n, raster='xy'):
 
 
     '''
-    assert raster in ('xy','yx'), 'Invalid raster value:{}'.foramt(raster)
+    assert raster in ('xy','yx'), f'Invalid raster value:{raster}'
 
     assert 0 <= x < n, 'Invalid values 0<= x(%d) < n(%d)'%(x, n)
     assert 0 <= y < n , 'Invalid values 0<= y(%d) < n(%d)'%(y, n)
@@ -109,18 +109,21 @@ def triangular_index(x, y, n, raster='xy'):
     
     return i
 
-def make_upper(uvpix):
+def make_upper(uvpix, npix):
     '''
     Make the given uvpix tuple upper hermetian.
     i.e. always returns a tuple with u >= v
+    assumes (0,0) pixel is top left and raster order is rows then columns
+
+    TODO: FIX TESTS - as they're rubbish!
     
-    >>> make_upper((2,1))
+    >>> make_upper((2,1), 256)
     (2, 1)
     
-    >>> make_upper((1,1))
+    >>> make_upper((1,1), 256)
     (1, 1)
 
-    >>> make_upper((1,3))
+    >>> make_upper(256-3, 256-1), 256)
     (3, 1)
     '''
     
@@ -128,7 +131,7 @@ def make_upper(uvpix):
     if u >= v:
         return (u, v)
     else:
-        return (v, u)
+        return (npix-u, npix-v)
 
 
 def bl2ant(bl):
@@ -396,7 +399,7 @@ class BaselineCell(object):
     :uvpix: (2 tuple) of (u, v) integer pixels
     :chan_start, chan_end: First and last channels inclusive
     :freqs: array of frequencies
-    :npix: Number of pixles (probably superfluous)
+    :npix: Number of pixels
     '''
     def __init__(self, blid, uvpix, chan_start, chan_end, freqs, npix):
         self.blid = blid
@@ -432,9 +435,7 @@ class BaselineCell(object):
         if self.is_upper:
             retuv = (u, v)
         else:
-            retuv = (v, u)
-
-        assert retuv[0] >= retuv[1], 'Invalid upper UV coordinates'
+            retuv = (self.npix - u, self.npix - v)
 
         return retuv
 
@@ -444,7 +445,7 @@ class BaselineCell(object):
         Returns uV pixel coordinates tuple guaranteed to be in the lower half plane
         '''
         u,v = self.uvpix_upper
-        return (v,u)
+        return (self.npix - u, self.npix - v)
     
 
     @property
@@ -473,8 +474,7 @@ class BaselineCell(object):
         Returns True if the uvpix coordinates supplied in the constructor
         where in the lower half plane. I.e. if u < v
         '''
-        u, v = self.uvpix
-        return u < v
+        return not self.is_upper
 
     @property
     def is_upper(self):

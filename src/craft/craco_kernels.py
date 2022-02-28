@@ -167,7 +167,8 @@ class FdmtGridder(Kernel):
         assert 2*t+1 < self.plan.nt
         plan = self.plan
         #g = gridder(d[idm, 2*t, :], d[idm, 2*t+1, :])
-        assert blk.shape == (plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide)
+        expectshape = (plan.nuvrest, plan.nt, plan.ndout, plan.nuvwide)
+        assert blk.shape == expectshape, f'Invalid input blk shape. Was {blk.shape} expected {expectshape}'
         npix = self.plan.npix
         g = np.zeros((npix, npix), dtype=self.plan.dtype)
         fdmt_band = plan.ncin*plan.foff # Bandwidth of FDMT

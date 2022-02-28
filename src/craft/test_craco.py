@@ -11,15 +11,27 @@ try:
 except ImportError:
     from mock import Mock, MagicMock
 
-from . import craco
-from . import craco_plan
+from craft import craco
+from craft import craco_plan
 import numpy as np
-from . import uvfits
+from craft import uvfits
 from pylab import *
 
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
-    
+
+class TestCracoBaselineCell(TestCase):
+    def test_uvcell(self):
+        uvpix = (6, 12)
+        npix = 256
+        c = craco.BaselineCell(float(1+256*2), uvpix, 10, 19, np.arange(10.0), npix)
+        #__init__(self, blid, uvpix, chan_start, chan_end, freqs, npix):
+        self.assertTrue(c.is_lower)
+        self.assertFalse(c.is_upper)
+        self.assertEquals(c.uvpix == uvpix)
+        self.assertEquals(c.lower_uvpix == uvpix)
+        self.assertEquals(c.upper_uvpix == (npix - 6, npix - 12))
+
 
 class TestCracoFdmtTranspose(TestCase):
 

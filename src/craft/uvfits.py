@@ -19,8 +19,13 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 class UvFits(object):
 
-    def __init__(self, hdulist):
+    def __init__(self, hdulist, max_nbl=None):
+        '''
+        @param hdulist FITS HDLISt typically got from pyfits.open
+        @param max_nbl - if not none, only return this many baselines
+        '''
         self.hdulist = hdulist
+        self.max_nbl = max_nbl
 
     @property
     def vis(self):
@@ -52,7 +57,7 @@ class UvFits(object):
         for i in range(self.vis.size):
             row = vis[i]
             baselines[row['BASELINE']] = row
-            if row['DATE'] != d0:
+            if row['DATE'] != d0 or (self.max_nbl is not None and i > self.max_nbl):
                 break
 
         return baselines
@@ -85,6 +90,8 @@ class UvFits(object):
         '''
         Returns a sequence of baseline data in blocks of nt
         '''
+        # WARNING TODO: ONLY RETURN BASELINES THAT HAVE BEEN RETURNED in .baselines
+        # IF max_nbl has been set
         return craco.time_blocks(self.vis, nt)
 
     def close(self):
