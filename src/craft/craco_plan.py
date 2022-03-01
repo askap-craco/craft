@@ -402,7 +402,7 @@ def calc_grid_luts(plan, upper=True):
     logging.info('Got %d unique UV coords. Upper=%s', ncoord, upper)
 
     # check
-    check = True
+    check = False
     if check:
         grid = np.zeros((plan.npix, plan.npix))
         for i, (u, v) in enumerate(unique_uvcoords):
@@ -436,7 +436,7 @@ def calc_grid_luts(plan, upper=True):
             logging.debug('Considering islot=%d slot=%s', islot, slot_uv_coord)
             # The FDMT has all its data in the upper hermetian - so we always use upper hermetian coordinates
             upper_slot_uv_coord = craco.make_upper(slot_uv_coord, plan.npix)
-             # Find irun and icell 
+            # Find irun and icell 
             for cell_coord in fplan.find_uv(upper_slot_uv_coord):
                 # cell_coord is the location in the FDMT output buffer
                 cell = fplan.get_cell(cell_coord) # this is the actual baseline cell. Don't use it other than to remove it form our check buffer
@@ -795,9 +795,15 @@ class PipelinePlan(object):
         Returns maximum DM - placeholder for when we do DM gaps
         '''
         return max(self.dms)
-            
-            
-        
+
+    @property
+    def tsamp_s(self):
+        '''
+        Returns sample time in seconds
+        '''
+
+        # Hard coed for now - need to tie to the sample rate
+        return 1.7e-3
 
 def add_arguments(parser):
     '''
