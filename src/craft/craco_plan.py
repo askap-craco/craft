@@ -19,6 +19,8 @@ from . import craco_kernels
 from . import craco
 from . import fdmt
 
+log = logging.getLogger(__name__)
+
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 def dump_plan(plan, pickle_fname):
@@ -156,7 +158,7 @@ def split_cells(cells, minchan, ncin):
         else:
             # split the cell in two parts
             npix = c.npix
-            logging.debug('c %d-%d freq=%f-%f endchan=%d', c.chan_start, c.chan_end, c.freqs[0], c.freqs[-1], endchan)
+            log.debug('c %d-%d freq=%f-%f endchan=%d', c.chan_start, c.chan_end, c.freqs[0], c.freqs[-1], endchan)
             endidx = endchan - c.chan_start
             assert 0 <= endidx < ncin
             c1 = craco.BaselineCell(c.blid, c.uvpix, c.chan_start, endchan, c.freqs[:endidx+1], npix)
@@ -176,7 +178,7 @@ class FdmtRun(object):
         self.total_overlap = 0
         for uv in cells:
             overlap = calc_overlap(uv, self.chan_start, plan.pipeline_plan.ncin)
-            logging.debug('Cell chan_start %s %s %s-%s overlap=%d', self.chan_start, uv, uv.chan_start, uv.chan_end, overlap)
+            log.debug('Cell chan_start %s %s %s-%s overlap=%d', self.chan_start, uv, uv.chan_start, uv.chan_end, overlap)
             assert overlap > 0
             self.total_overlap += overlap
 
@@ -218,16 +220,16 @@ class FdmtPlan(object):
         run_fch1 = []
         runs = []
         while len(uvcells_remaining) > 0:
-            logging.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
+            log.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
             minchan = min(uvcells_remaining, key=lambda uv:(uv.chan_start, uv.blid)).chan_start
             possible_cells = [uv for uv in uvcells_remaining if calc_overlap(uv, minchan, ncin) > 0]
 
             # Do not know how to get a length of iterator in python3, comment it out here
-            #logging.debug('Got %d possible cells', len(possible_cells))
+            #log.debug('Got %d possible cells', len(possible_cells))
 
             # sort as best we can so that it's stable - I.e. we get hte same answer every time
             best_cells = sorted(possible_cells, key=lambda uv:(calc_overlap(uv, minchan, ncin), uv.blid, uv.upper_idx), reverse=True)
-            logging.debug('Got %d best cells. Best=%s overlap=%s', len(best_cells), best_cells[0], calc_overlap(best_cells[0], minchan, ncin))
+            log.debug('Got %d best cells. Best=%s overlap=%s', len(best_cells), best_cells[0], calc_overlap(best_cells[0], minchan, ncin))
             used_cells = best_cells[0:min(nuvwide, len(best_cells))]
             full_cells, leftover_cells = split_cells(used_cells, minchan, ncin)
             run = FdmtRun(full_cells, self)
@@ -239,7 +241,7 @@ class FdmtPlan(object):
             
             total_overlap = run.total_overlap
             # Do not know how to get a length of iterator in python3, comment it out here
-            #logging.debug('minchan=%d npossible=%d used=%d full=%d leftover=%d total_overlap=%d', minchan, len(possible_cells), len(used_cells), len(full_cells), len(leftover_cells), total_overlap)
+            #log.debug('minchan=%d npossible=%d used=%d full=%d leftover=%d total_overlap=%d', minchan, len(possible_cells), len(used_cells), len(full_cells), len(leftover_cells), total_overlap)
             
             # Remove used cells
             uvcells_remaining = [cell for cell in uvcells_remaining if cell not in used_cells]
@@ -259,7 +261,7 @@ class FdmtPlan(object):
         efficiency = float(len(uvcells))/float(nuvtotal)
         required_efficiency = float(nuvtotal)/8192.0
         
-        logging.info('FDMT plan has ntotal=%d of %d runs with packing efficiency %f. Grid read requires efficiency of > %f of NUV=8192. History size square=%d minimal=%d =%d 256MB HBM banks', nuvtotal, nruns, efficiency, required_efficiency, square_history_size, minimal_history_size, minimal_history_size*4/256/1024/1024)
+        log.info('FDMT plan has ntotal=%d of %d runs with packing efficiency %f. Grid read requires efficiency of > %f of NUV=8192. History size square=%d minimal=%d =%d 256MB HBM banks', nuvtotal, nruns, efficiency, required_efficiency, square_history_size, minimal_history_size, minimal_history_size*4/256/1024/1024)
         self.fdmt_runs = fdmt_runs
         self.run_chan_starts = run_chan_starts
         self.run_fch1 = run_fch1
@@ -299,7 +301,7 @@ class FdmtPlan(object):
         assert self.zero_cell[1] < ncin
         #assert self.get_cell(self.zero_cell) != None
 
-        logging.info("FDMT zero cell is %s=%s", self.zero_cell, self.zero_cell[0]*nuvwide+self.zero_cell[1])
+        log.info("FDMT zero cell is %s=%s", self.zero_cell, self.zero_cell[0]*nuvwide+self.zero_cell[1])
 
         uvmap = {}
         for irun, run in enumerate(self.runs):
@@ -399,7 +401,7 @@ def calc_grid_luts(plan, upper=True):
 
     unique_uvcoords = sorted(unique_uvcoords, key=sorter)
     ncoord = len(unique_uvcoords)
-    logging.info('Got %d unique UV coords. Upper=%s', ncoord, upper)
+    log.info('Got %d unique UV coords. Upper=%s', ncoord, upper)
 
     # check
     check = False
@@ -423,7 +425,7 @@ def calc_grid_luts(plan, upper=True):
 
     nwrites = (ncoord + ngridreg - 1) // ngridreg # number of writes
     assert nwrites <= 4096*2, 'Not enough clocks to write data in! nwrites={}'.format(nwrites)
-    logging.info('Need to write %d groups of %d register to pad function', nwrites, ngridreg)
+    log.info('Need to write %d groups of %d register to pad function', nwrites, ngridreg)
 
     for iwrite in range(nwrites):
         # Add available cells
@@ -433,14 +435,14 @@ def calc_grid_luts(plan, upper=True):
         instructions = []
 
         for islot, slot_uv_coord in enumerate(slot_uv_coords):
-            logging.debug('Considering islot=%d slot=%s', islot, slot_uv_coord)
+            log.debug('Considering islot=%d slot=%s', islot, slot_uv_coord)
             # The FDMT has all its data in the upper hermetian - so we always use upper hermetian coordinates
             upper_slot_uv_coord = craco.make_upper(slot_uv_coord, plan.npix)
             # Find irun and icell 
             for cell_coord in fplan.find_uv(upper_slot_uv_coord):
                 # cell_coord is the location in the FDMT output buffer
                 cell = fplan.get_cell(cell_coord) # this is the actual baseline cell. Don't use it other than to remove it form our check buffer
-                logging.debug('removing cell %s %s', cell, cell_coord)
+                log.debug('removing cell %s %s', cell, cell_coord)
                 remaining_fdmt_cells.remove(cell)
 
                 inst = AddInstruction(plan, islot, cell_coord, slot_uv_coord)
@@ -455,7 +457,7 @@ def calc_grid_luts(plan, upper=True):
         instructions[-1].shift = True
 
         all_instructions.extend(instructions)
-        logging.debug('Added %d instructions with %d available', len(instructions), len(remaining_fdmt_cells))
+        log.debug('Added %d instructions with %d available', len(instructions), len(remaining_fdmt_cells))
 
     # Check instructions
 
@@ -603,7 +605,7 @@ class PipelinePlan(object):
 
         values = self.values
         
-        logging.info('making Plan values=%s', self.values)
+        log.info('making Plan values=%s', self.values)
 
         umax, vmax = f.get_max_uv()
         lres, mres = 1./umax, 1./vmax
@@ -634,11 +636,11 @@ class PipelinePlan(object):
         umax_km = umax*lambdamin/1e3
         vmax_km = vmax*lambdamin/1e3
         
-        logging.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s',
+        log.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s',
                  nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos))
         
         uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix, values.show)
-        logging.info('Got Ncells=%d uvcells', len(uvcells))
+        log.info('Got Ncells=%d uvcells', len(uvcells))
         d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.int32)
         np.savetxt(self.values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
 
@@ -712,7 +714,7 @@ class PipelinePlan(object):
         
     def save_lut(self, data, lutname, header, fmt='%d'):
         filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
-        logging.info('Saving {lutname} shape={d.shape} type={d.dtype} to {filename} header={header}'.format(lutname=lutname, d=data, filename=filename, header=header))
+        log.info('Saving {lutname} shape={d.shape} type={d.dtype} to {filename} header={header}'.format(lutname=lutname, d=data, filename=filename, header=header))
         np.savetxt(filename, data, fmt=fmt, header=header)
 
     def save_fdmt_plan_lut(self):
@@ -744,7 +746,7 @@ class PipelinePlan(object):
 
         
     def save_grid_instructions(self, instructions, name):
-        logging.info('Got %d %s grid instructions', len(instructions), name)
+        log.info('Got %d %s grid instructions', len(instructions), name)
         d = np.array([[i.target_slot, i.uvidx, i.shift_flag, i.uvpix[0], i.uvpix[1]] for i in instructions], dtype=np.int32)
         header ='target_slot, uvidx, shift_flag, upix, vpix'
         self.save_lut(d, 'gridlut.'+name, header)
@@ -852,7 +854,7 @@ def _main():
     else:
         logging.basicConfig(level=logging.INFO)
 
-    logging.info('Loading UV coordinates from file %s ', values.uv)
+    log.info('Loading UV coordinates from file %s ', values.uv)
     f = uvfits.open(values.uv)
     plan = PipelinePlan(f, values)
 
