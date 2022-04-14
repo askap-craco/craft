@@ -74,10 +74,9 @@ class FitsTableWriter:
             dout = data.copy().byteswap()
         else:
             dout = data
-        
+
         self.fout.write(dout.tobytes())
         self.ngroups += len(data)
-        print(f'Write {len(data)} {self.ngroups}')
 
     def close(self):
         '''
@@ -95,7 +94,7 @@ class FitsTableWriter:
         fout.write(bytes(n_extra_bytes))
         assert fout.tell() % 2880 == 0
         file_size = fout.tell()
-        assert file_size == os.path.getsize(self.fname)
+        #assert file_size == os.path.getsize(self.fname)
 
         # update extension header
         hdr = self.tabhdr
@@ -103,14 +102,11 @@ class FitsTableWriter:
 
         # seek to the start of the table extension header
         start = len(self.prihdr.tostring())
-        print(f'Goign to {start} from {fout.tell()}')
-        print(f'new header to {start} is {hdr.tostring()}')
-
         fout.seek(start,0)
-        assert fout.tell() == start
+#        assert fout.tell() == start
         fout.write(hdr.tostring().encode('utf-8'))
         fout.close()
-        assert file_size == os.path.getsize(self.fname)
+#        assert file_size == os.path.getsize(self.fname)
 
 
     def __enter__(self):

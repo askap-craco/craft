@@ -27,6 +27,11 @@ class UvFits(object):
         self.hdulist = hdulist
         self.max_nbl = max_nbl
 
+
+    @property
+    def header(self):
+        return self.hdulist[0].header
+
     @property
     def vis(self):
         '''Returns visbility table

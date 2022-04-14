@@ -13,6 +13,10 @@ import sys
 import logging
 import pickle 
 import warnings
+from astropy.wcs import WCS
+from astropy import units as u
+from astropy.time import Time
+from astropy.coordinates import SkyCoord
 
 from . import uvfits
 from . import craco_kernels
@@ -635,9 +639,25 @@ class PipelinePlan(object):
         lambdamin = 3e8/fmax
         umax_km = umax*lambdamin/1e3
         vmax_km = vmax*lambdamin/1e3
+
+        # Could get RA/DeC from fits table, or header. Header is easier, but maybe less correct
+        ra = f.header['OBSRA'] * u.degree
+        dec = f.header['OBSDEC'] * u.degree
+        wcs = WCS(naxis=2)
+        wcs.wcs.crpix = [Npix/2 + 1,Npix/2 + 1] # honestly, I dont' understand if we need to +1 or not
+        wcs.wcs.crval = [ra.value, dec.value]
+        wcs.wcs.ctype = ['RA---SIN','DEC--SIN']
+        wcs.wcs.cdelt = np.degrees([-lcell, mcell])
+        self.wcs = wcs
+        self.ra = ra
+        self.dec = dec
+        self.phase_center = SkyCoord(ra=ra, dec=dec, frame='icrs')
+
+        # could get TSTART from tabel or header. Header is easier.
+        self.tstart = Time(f.header['DATE-OBS'], format='isot', scale='utc')
         
-        log.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s',
-                 nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos))
+        log.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s wcs=%s',
+                 nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos), self.wcs)
         
         uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix, values.show)
         log.info('Got Ncells=%d uvcells', len(uvcells))
@@ -805,7 +825,7 @@ class PipelinePlan(object):
         '''
 
         # Hard coed for now - need to tie to the sample rate
-        return 1.7e-3
+        return 1.7e-3*u.second
 
 def add_arguments(parser):
     '''
