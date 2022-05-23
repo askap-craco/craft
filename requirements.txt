@@ -6,7 +6,7 @@ matplotlib
 cython
 pybind11 # needed for scipy? (WHY?)
 pythran
-scipy
+#scipy
 astropy
 IPython
 dill

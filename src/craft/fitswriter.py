@@ -31,7 +31,7 @@ class FitsTableWriter:
 
     @see corruvfits
     '''
-    def __init__(self, fname, dtype, byteswap=True):
+    def __init__(self, fname, dtype, byteswap=True, header={}):
         self.fname = fname
         self.dtype = dtype
         self.byteswap = byteswap
@@ -42,6 +42,10 @@ class FitsTableWriter:
         single_element = np.ones(1, dtype=dtype)
         hdu = fits.BinTableHDU(data=single_element)
         hdu.header['BYTESWAP'] = 'TRUE' if byteswap  else 'FALSE'
+
+        for k,v in header.items():
+            hdu.header[k] = v
+        
         for c in hdu.columns:
             c.bzero = 0 # astropy.io.fits is ***ING* insane and sets bzero to some insane value because it's insane. That's INSANE
             #pass
