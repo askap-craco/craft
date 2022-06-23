@@ -38,7 +38,7 @@ ncin=32
 ndout=8
 #antfile=`dirname $0`/askap-ak1-ak30.ant
 #antfile=`dirname $0`/askap-ak1-ak3.ant
-antfile="askap-ak1-ak24.ant"
+antfile="askap.ant"
 antfile=$(antenna_locations $antfile)
 echo Antfile is $antfile
 

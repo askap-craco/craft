@@ -65,7 +65,7 @@ def uvgen(values):
             return
         
     args = {'source':sourcefile,
-            'ant': antenna_locations.get_antenna_file(values.antfile),
+            'ant': values.antfile,
             'telescop':'askap',
             'baseunit':'3.33564',
             'corr':'{nchan},1,0,{width_mhz}'.format(**locals()),
@@ -216,7 +216,7 @@ def _main():
     parser.add_argument('--nchan', type=int, help='Number of channels', default=256)
 #    parser.add_argument('-f', '--calcfile', required=True, help='Calc11 im file for UV coordinates and stuff')
     parser.add_argument('-o','--outfile', help='Output data file', default='frb')
-    parser.add_argument('--antfile', help='Antenna file', default='askap-ak1-ak30.ant', type=antenna_locations.get_antenna_file)
+    parser.add_argument('--antfile', help='Antenna file', default='askap-ak1-ak30.ant')#), type=antenna_locations.get_antenna_file)
     parser.add_argument('--clobber', action='store_true', help='Clobber output files')
     #parser.add_argument('--ignore-ant', help='Antennas numbers to ignore', default='31-36', type=strrange)
     #parser.add_argument('--include-ant', help='Antenna numbers to include (overrides --ignore-ant)', type=strrange)
