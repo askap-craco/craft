@@ -7,8 +7,8 @@ Copyright (C) CSIRO 2017
 import numpy as np
 import logging
 import os
-import pyfits
-from pyfits import Column as Col
+import astropy.io.fits as pyfits
+from astropy.io.fits import Column as Col
 from astropy.time import Time
 import warnings
 import sys
@@ -19,7 +19,7 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 parnames = ('UU','VV','WW','DATE','BASELINE','FREQSEL','SOURCE','INTTIM','DATA')
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT'):
+    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT'):
         '''
         Make a correlator UV fits file
         :fname: file name
@@ -85,7 +85,7 @@ class CorrUvFitsFile(object):
         #self.first_time.format = 'fits'
         hdr['OBJECT'] = 'MULTI'
         #hdr['DATE_OBS'] = self.first_time.value Miriad gets confused by this 
-        hdr['TELESCOP'] = telesop
+        hdr['TELESCOP'] = telescop
         hdr['INSTRUME'] = instrume
         hdr['ORIGIN'] = origin
         hdr['OBSERVER'] = ''
@@ -95,8 +95,8 @@ class CorrUvFitsFile(object):
         histstr = 'Created on {} by {}'.format(datetime.datetime.now().isoformat(), ' '.join(sys.argv))
         hdr['HISTORY'] = histstr
 
-        self.fout = open(fname, 'w+')
-        self.fout.write(hdr.tostring())
+        self.fout = open(fname, 'w+b')
+        self.fout.write(bytes(hdr.tostring(), 'utf-8'))
         self.ngroups = 0
         self.dtype = [('UU', '>f4'), ('VV', '>f4'), ('WW', '>f4'), \
             ('DATE', '>f4'), ('BASELINE', '>f4'), \
@@ -165,7 +165,7 @@ class CorrUvFitsFile(object):
         zeros = np.zeros(ns)
         cols = [
             Col('ID. NO.', '1J', array=np.arange(1,ns+1, dtype=np.int32)),
-            Col('SOURCE','20A','METERS', array=[s['name'] for s in sources]),
+            Col('SOURCE','50A','METERS', array=[s['name'] for s in sources]),
             Col('QUAL','1J', array=zeros),
             Col('CALCODE','4A', array=None),
             Col('IFLUX','1E','JY', array=zeros),
@@ -199,12 +199,12 @@ class CorrUvFitsFile(object):
         if n_extra_bytes == 2880:
             n_extra_bytes = 0
 
-        fout.write('\x00'*n_extra_bytes)
+        fout.write(bytes(n_extra_bytes))
 
         # update headdr
         fout.seek(0, 0)
         hdr['GCOUNT'] = self.ngroups
-        fout.write(hdr.tostring())
+        fout.write(bytes(hdr.tostring(), 'utf-8'))
         assert fout.tell() % 2880 == 0
         fout.flush()
         fout.close()
@@ -225,7 +225,7 @@ class CorrUvFitsFile(object):
         for k,v, in args.items():
             hdr['{}{}'.format(k,typeno).upper()] = (v, comment)
 
-    def put_data(self, uvw, mjd, ia1, ia2, inttim, data, weights=None):
+    def put_data(self, uvw, mjd, ia1, ia2, inttim, data, weights=None, source=1):
         assert ia1 >= 0
         assert ia2 >= 0
         visdata_all = np.recarray(1, dtype=self.dtype)
@@ -238,17 +238,23 @@ class CorrUvFitsFile(object):
         dayfrac = jd - day
 
         visdata['UU'], visdata['VV'], visdata['WW'] = uvw
-        visdata['DATE'] = jd - self.jd0
+        #visdata['DATE'] = jd - self.jd0
+        visdata['DATE'] = mjd - self.mjd0
         #visdata['_DATE'] = dayfrac
         visdata['BASELINE'] = (ia1 + 1)*256 + ia2 + 1
         visdata['INTTIM'] = inttim
         visdata['FREQSEL'] = 1
-        visdata['SOURCE'] = 1
+        visdata['SOURCE'] = source
 
         d = visdata['DATA']
         npol = data.shape[1]
-        d[0,0,0,:,:,0] = data.real
-        d[0,0,0,:,:,1] = data.imag
+        if np.iscomplexobj(data):
+            d[0,0,0,:,:,0] = data.real
+            d[0,0,0,:,:,1] = data.imag
+        else:
+            d[0,0,0,:,:,0] = data[...,0]
+            d[0,0,0,:,:,1] = data[...,1]
+            
         d[0,0,0,:,:,2] = weights
         self.fout.write(visdata_all.tobytes())
         self.ngroups += 1
