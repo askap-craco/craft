@@ -597,7 +597,7 @@ def calc_pad_lut(plan, ssr=16):
 
 
 class PipelinePlan(object):
-    def __init__(self, f, values=None):
+    def __init__(self, f, values=None, dms=None):
         if values is None:
             print('Creating default values')
             self.values = get_parser().parse_args()
@@ -665,7 +665,6 @@ class PipelinePlan(object):
         np.savetxt(self.values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
 
         self.uvcells = uvcells
-        self.nd = self.values.ndm
         self.nt = self.values.nt
         self.ncu = 4 # hard coded
         self.nchunk_time = self.values.nt // (2*self.ncu)
@@ -694,14 +693,12 @@ class PipelinePlan(object):
         # DMS is in units of samples
         # you could load from a file or a more difficult specification from the CMDLINE
         # For now we just do every DM up to nd
-        assert self.nd <= self.values.max_ndm, 'Requested ND is > larger than MAX_NDM'
-        self.dms = np.arange(self.values.max_ndm, dtype=np.uint32)
-        # zero off final DMS
-        self.dms[self.nd:] = 0
+        assert self.values.ndm <= self.values.max_ndm, 'Requested ND is > larger than MAX_NDM'
+        if dms is None:
+            dms = np.arange(self.values.ndm, dtype=np.uint32)
 
-        assert len(self.dms) == self.values.max_ndm, 'Lookup able must have MAX_NDM entries'
+        self.__set_dms(dms)
 
-        
         self.fdmt_plan = FdmtPlan(uvcells, self)
         self.save_fdmt_plan_lut()
         
@@ -730,7 +727,7 @@ class PipelinePlan(object):
         # concatenate bytes of DMS and ddreader config
         self.ddreader_lut = np.frombuffer(self.dms.tobytes() + self.ddreader_config.tobytes(), dtype=np.uint32)
         self.save_lut(self.ddreader_lut, 'ddreader', 'value')
-        
+
         
     def save_lut(self, data, lutname, header, fmt='%d'):
         filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
@@ -816,8 +813,28 @@ class PipelinePlan(object):
         '''
         Returns maximum DM - placeholder for when we do DM gaps
         '''
-        return max(self.dms)
+        return max(self._dms)
 
+    @property
+    def nd(self):
+        '''
+        Returns numebr of dms
+        '''
+        return self._ndm
+
+    @property
+    def dms(self):
+        return self._dms
+
+    def __set_dms(self, in_dms):
+        # TOOD: Check every DM is less than the maximum DM
+        assert len(in_dms) <= self.values.max_ndm, f'Cant have more than {self.values.max_ndm} dms'
+        self._ndm = len(in_dms)
+        
+        self._dms = np.zeros(self.values.max_ndm, dtype=np.uint32)
+        self._dms[:len(in_dms)] = in_dms
+        
+        
     @property
     def tsamp_s(self):
         '''
@@ -843,7 +860,7 @@ def add_arguments(parser):
     parser.add_argument('--nbox', help='Number of boxcar trials', type=int, default=8)
     parser.add_argument('--boxcar-weight', help='Boxcar weighting type', choices=('sum','avg','sqrt'), default='sum')
     parser.add_argument('--nuvwide', help='Number of UV processed in parallel', type=int, default=8)
-    parser.add_argument('--nuvmax', help='Maximum number of UV allowed.', type=int, default=8192)
+    parser.add_argument('--nuvmax', help='Maximum number of UV allowed.', type=int, default=8192-8) # For some reason NUREST is 1023 in craco_pybind11
     parser.add_argument('--ncin', help='Numer of channels for sub fdmt', type=int, default=32)
     parser.add_argument('--ndout', help='Number of DM for sub fdmt', type=int, default=186)
     parser.add_argument('--threshold', type=float, help='Threshold for candidate grouper', default=3)

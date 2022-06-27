@@ -149,7 +149,7 @@ def offset_cff(fch1, plan):
     f1 = fch1
     fmin = plan.fmin
     fmax = plan.fmax
-    ocff = fdmt.cff(f1, fmin, fmax, fmin) + 0.5/float(plan.nd) # Need to add a bit extra. not sure why.
+    ocff = fdmt.cff(f1, fmin, fmax, fmin) + 0.5/float(plan.dmax) # Need to add a bit extra. not sure why.
     assert ocff >= 0
     return ocff
 
