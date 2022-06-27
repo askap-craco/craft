@@ -860,7 +860,7 @@ def add_arguments(parser):
     parser.add_argument('--nbox', help='Number of boxcar trials', type=int, default=8)
     parser.add_argument('--boxcar-weight', help='Boxcar weighting type', choices=('sum','avg','sqrt'), default='sum')
     parser.add_argument('--nuvwide', help='Number of UV processed in parallel', type=int, default=8)
-    parser.add_argument('--nuvmax', help='Maximum number of UV allowed.', type=int, default=8192-8) # For some reason NUREST is 1023 in craco_pybind11
+    parser.add_argument('--nuvmax', help='Maximum number of UV allowed.', type=int, default=8192-8+8) # For some reason NUREST is 1023 in craco_pybind11 but setting this to 8192 - 8 makes it hang - so put it back for now and be very very bloody careful.
     parser.add_argument('--ncin', help='Numer of channels for sub fdmt', type=int, default=32)
     parser.add_argument('--ndout', help='Number of DM for sub fdmt', type=int, default=186)
     parser.add_argument('--threshold', type=float, help='Threshold for candidate grouper', default=3)
