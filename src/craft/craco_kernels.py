@@ -131,9 +131,9 @@ def idm_cff(fch1, plan):
     fdmt_band = plan.ncin*plan.foff # Bandwidth of FDMT
     f1 = fch1
     f2 = f1 + fdmt_band
-    fmin = plan.fmin
-    fmax = plan.fmax
-    dmcff = fdmt.cff(f2, f1, fmax, fmin)
+    fmin = plan.fmin # center freq of bottom channel
+    fmax = plan.fmax # center freq of top channel
+    dmcff = fdmt.cff(f2, f1, fmax, fmin) # the cff
     assert dmcff >= 0
     return dmcff
 

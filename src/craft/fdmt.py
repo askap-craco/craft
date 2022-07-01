@@ -153,7 +153,7 @@ def add_offset_kernel2(v1, v2, vout, toff):
     return vout
 
 class Fdmt(object):
-    def __init__(self, f_min, f_off, n_f, max_dt, n_t, history_dtype=None):
+    def __init__(self, f_min, f_off, n_f, max_dt, n_t, history_dtype=None, do_correction=True):
         '''
         Make an object that does the FDMT.
         This contsructor makes the FDMT plan which can then be called with .execute() or just __call__
@@ -170,6 +170,7 @@ class Fdmt(object):
         self.f_min = float(f_min)
         self.d_f = f_off
         self.n_f = int(n_f)
+        self.do_correction = do_correction
         assert n_f > 0
         self.bw = self.n_f * f_off
         self.f_max = self.f_min + (self.n_f - 1)*self.d_f
@@ -246,7 +247,7 @@ class Fdmt(object):
         state_shape = np.array([nf, delta_t, n_t + ndt])
         
         correction = 0.0
-        if intnum > 0: # this is always invoked - it's a leftover from Barak's code
+        if intnum > 0 and self.do_correction: # this is always invoked - it's a leftover from Barak's code
             correction = self.d_f/2.0
 
         # shift input and shift output are never used - they're leftovers from barak's code
@@ -665,8 +666,7 @@ class Fdmt(object):
         :c: Channel numberp
         '''
         fres = self.fres_for_iter(iterno+1)
-        correction = self.d_f*0.5
-        nc = self.nchan_in_for_iter(iterno)
+        correction = self.d_f*0.5 if self.do_correction else 0.0
         f_start = self.freq_of_chan(iterno+1, c)
         f_end = self.freq_of_chan(iterno+1, c+1)
         f_middle = f_start + fres*0.5 - correction
@@ -683,8 +683,7 @@ class Fdmt(object):
         :c: Channel number
         '''
         fres = self.fres_for_iter(iterno+1)
-        correction = self.d_f*0.5
-        nc = self.nchan_in_for_iter(iterno)
+        correction = self.d_f*0.5 if self.do_correction else 0.0
         f_start = self.freq_of_chan(iterno+1, c)
         f_end = self.freq_of_chan(iterno+1, c+1)
         f_middle = f_start + fres*0.5 - correction

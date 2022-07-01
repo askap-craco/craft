@@ -188,6 +188,7 @@ class FdmtRun(object):
 
         assert self.max_idm <= plan.pipeline_plan.ndout, 'NDOUT is too small - needs to be at least %s' % self.max_idm
 
+
     @property
     def offset_cff(self):
         return craco_kernels.offset_cff(self.fch1, self.plan.pipeline_plan)
@@ -209,7 +210,8 @@ class FdmtRun(object):
     def __str__(self):
         ncells = len(self.cells)
         return 'ncells={ncells} fch1={self.fch1} chan_start={self.chan_start} total_overlap={self.total_overlap}'.format(self=self, ncells=ncells)
-        
+
+    __repr__ = __str__
 
 
 
@@ -274,7 +276,7 @@ class FdmtPlan(object):
         # create an FDMT object for each run so  we can use it to calculate the lookup tbales
         #     def __init__(self, f_min, f_off, n_f, max_dt, n_t, history_dtype=None):
 
-        fdmts = [fdmt.Fdmt(fch1, self.pipeline_plan.foff, ncin, ndout, 1) for fch1 in self.run_fch1]
+        fdmts = [fdmt.Fdmt(fch1-self.pipeline_plan.foff/2.0, self.pipeline_plan.foff, ncin, ndout, 1, do_correction=False) for fch1 in self.run_fch1]
         fdmt_luts = np.array([thefdmt.calc_lookup_table() for thefdmt in fdmts])
         niter = int(np.log2(ncin))
         # final LUTs we need to copy teh same LUT for every NUVWIDE
