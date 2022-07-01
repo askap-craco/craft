@@ -1149,6 +1149,8 @@ int fdmt_execute_iterations(fdmt_t* fdmt)
 	fdmt->t_iterations.stop();
 	//cout << "FDMT Iterations only took " << t << endl;
 	fdmt->curr_state_idx = s; // Tell people where to find the current state
+
+        return 0;
 }
 
 int fdmt_execute(fdmt_t* fdmt, fdmt_dtype* indata, fdmt_dtype* outdata)
@@ -1278,6 +1280,7 @@ int fdmt_calculate_weights(fdmt_t* fdmt)
 	// clear ostate
 	array4d_zero(&fdmt->ostate);
 	gpuErrchk(cudaDeviceSynchronize());
+        return 0;
 
 }
 
