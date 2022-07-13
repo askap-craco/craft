@@ -10,16 +10,24 @@ import os
 import astropy.io.fits as pyfits
 from astropy.io.fits import Column as Col
 from astropy.time import Time
+from astropy import units as u
 import warnings
 import sys
 import datetime
+import scipy
+
+log = logging.getLogger(__name__)
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 parnames = ('UU','VV','WW','DATE','BASELINE','FREQSEL','SOURCE','INTTIM','DATA')
+dtype_to_bitpix = {np.dtype('int16'):16,
+                   np.dtype('int32'):32,
+                   np.dtype('float32'):-32,
+                   np.dtype('float64'):-64}
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT'):
+    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT', output_dtype=np.float32, bmax=None, time_scale=1.0*u.day):
         '''
         Make a correlator UV fits file
         :fname: file name
@@ -30,8 +38,32 @@ class CorrUvFitsFile(object):
         :mjd0: MJD of first sample
         :sources: List of osurces (format?)
         :antenas: List of antenas
-        :sideband: 
+        :sideband: (Not sure)
+        :telescop: Put into header
+        :instrume: put into header
+        :origin: put into header
+        :output_dtype: Dtype of output. According to fits standard: https://archive.stsci.edu/fits/fits_standard/node39.html - valid values are (np.int16, np.int32, np.float32, np.float64)
+        :bmax: Astropy unit of distance that is the longest baseline in teh array. If set, UVW values are scale for dtype=int16 and dtype=int32 to get decent dynamic range
+        :time_scale: Set to an astropy unit that converts to days, it will be used to specify the scale in FITS headers for the DATE and INTTIM columns. Can be used so the version on disk is in units of "integrations". THis might not be very sensible. If you set this to the integration time, you can use put_data(..t=integration_number) and get sensile output
         '''
+
+        self.bmax = bmax  # maximum baseline 
+
+        if bmax is None:
+            uvw_scale = 1.0
+        else:
+            tmax = bmax.to(u.meter).value/scipy.constants.c # maximum baseline - seconds
+            print('tmax', tmax, 'bmax', bmax, 'bmax to meter', bmax.to(u.meter))
+            if output_dtype == np.dtype('int16'):
+                vmax = 1<<15 # largerst value of a 16 bit signed number, if that's what we want to use for uvw
+                uvw_scale = vmax/tmax
+            elif output_dtype == np.dtype('int32'):
+                vmax = 1<<31
+                uvw_scale = vmax/tmax
+            else:
+                uvw_scale = 1.0
+            
+        self.uvw_scale = uvw_scale
         
         self.dshape = [1,1,1,nchan, npol, 3]
         hdr = pyfits.Header()
@@ -48,10 +80,17 @@ class CorrUvFitsFile(object):
         self.fname = fname
         self.no_if = 1
         self.sideband = sideband
-        #self.first_time = Time(firstmjd, format='mjd')
+
+        bitpix = dtype_to_bitpix.get(output_dtype, None)
+        if bitpix is None:
+            raise ValueError(f'Invalid output_dtype={output_dtype}. Must be one of {dtype_to_bitpix.keys()}')
+
+        print(f'Bitpix {bitpix}')
+        self.output_dtype = output_dtype
+        self.bitpix = bitpix
 
         hdr['SIMPLE'] = True
-        hdr['BITPIX'] = -32
+        hdr['BITPIX'] = bitpix
         self.set_axes()
         hdr['EXTEND'] = (True, 'Tables will follow')
         hdr['BLOCKED'] = (True, 'File may be blocked')
@@ -71,16 +110,24 @@ class CorrUvFitsFile(object):
         self.add_type(6, ctype='RA', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
         self.add_type(7, ctype='DEC', crval=1.0, cdelt=1.0, crpix=1.0, crota=0.0)
 
+        self.time_scale = time_scale
+        tscale = 1./time_scale.to(u.day).value
+        
+        uvwscale = (1/self.uvw_scale)
+        print(self.uvw_scale)
+        print("header scale", uvwscale)
+
+
         #ptypes
-        self.add_type(1, ptype='UU', pscal=1.0, pzero=0.0)
-        self.add_type(2, ptype='VV', pscal=1.0, pzero=0.0)
-        self.add_type(3, ptype='WW', pscal=1.0, pzero=0.0)
-        self.add_type(4, ptype='DATE', pscal=1.0, pzero=self.jd0, comment='Day number')
+        self.add_type(1, ptype='UU', pscal=uvwscale, pzero=0.0)
+        self.add_type(2, ptype='VV', pscal=uvwscale, pzero=0.0)
+        self.add_type(3, ptype='WW', pscal=uvwscale, pzero=0.0)
+        self.add_type(4, ptype='DATE', pscal=tscale, pzero=self.jd0, comment='Day number')
         #self.add_type(5, ptype='DATE', pscal=1.0, pzero=0.0, comment='Day fraction')
         self.add_type(5, ptype='BASELINE', pscal=1.0, pzero=0.0)
         self.add_type(6, ptype='FREQSEL', pscal=1.0, pzero=0.0)
         self.add_type(7, ptype='SOURCE', pscal=1.0, pzero=0.0)
-        self.add_type(8, ptype='INTTIM', pscal=1.0, pzero=0.0)
+        self.add_type(8, ptype='INTTIM', pscal=tscale, pzero=0.0)
 
         #self.first_time.format = 'fits'
         hdr['OBJECT'] = 'MULTI'
@@ -98,10 +145,17 @@ class CorrUvFitsFile(object):
         self.fout = open(fname, 'w+b')
         self.fout.write(bytes(hdr.tostring(), 'utf-8'))
         self.ngroups = 0
-        self.dtype = [('UU', '>f4'), ('VV', '>f4'), ('WW', '>f4'), \
-            ('DATE', '>f4'), ('BASELINE', '>f4'), \
-            ('FREQSEL', '>f4'), ('SOURCE', '>f4'), ('INTTIM', '>f4'), \
-            ('DATA', '>f4', (1, 1, 1, nchan, npol, 3))]
+        dt = self.output_dtype
+
+        # aaah, craparooney - dthe data type for the whole row has to be the same. This means you can't
+        # just have 165 bit data and 32 bit UVWs, which means it's rubbisharooney, unless I can
+        # be bothered ot do somethign with BZERO and BSCALE (Maybe?)
+        self.dtype = np.dtype([('UU', dt), ('VV', dt), ('WW', dt), \
+            ('DATE', dt), ('BASELINE', dt), \
+            ('FREQSEL', dt), ('SOURCE', dt), ('INTTIM', dt), \
+            ('DATA', dt, (1, 1, 1, nchan, npol, 3))])
+
+        log.debug('Dtype size is %s', self.dtype.itemsize)
 
     def fq_table(self):
         cols = [Col('FRQSEL','1J', array=[1]),
@@ -211,6 +265,7 @@ class CorrUvFitsFile(object):
 
         hdu = pyfits.open(self.fname, 'append')
         fq = self.fq_table()
+
         hdu.append(fq)
 
         an = self.an_table(self.antennas)
@@ -225,7 +280,12 @@ class CorrUvFitsFile(object):
         for k,v, in args.items():
             hdr['{}{}'.format(k,typeno).upper()] = (v, comment)
 
-    def put_data(self, uvw, mjd, ia1, ia2, inttim, data, weights=None, source=1):
+    def put_data(self, uvw, mjd ,ia1, ia2, inttim, data, weights=None, source=1, t=None):
+        '''
+        :uvw: UVW in meters
+        :mjd: MJD of integration - you must have time_scale=1.0day
+        :t: If Not none, this is put into the file raw for the date, instead of mjd0.
+        '''
         assert ia1 >= 0
         assert ia2 >= 0
         visdata_all = np.recarray(1, dtype=self.dtype)
@@ -237,9 +297,13 @@ class CorrUvFitsFile(object):
         day = np.floor(jd)
         dayfrac = jd - day
 
-        visdata['UU'], visdata['VV'], visdata['WW'] = uvw
+        visdata['UU'], visdata['VV'], visdata['WW'] = uvw*self.uvw_scale
         #visdata['DATE'] = jd - self.jd0
-        visdata['DATE'] = mjd - self.mjd0
+        if t is None:
+            assert self.time_scale == 1*u.day
+            visdata['DATE'] = mjd - self.mjd0
+        else:
+            visdata['DATE'] = t
         #visdata['_DATE'] = dayfrac
         visdata['BASELINE'] = (ia1 + 1)*256 + ia2 + 1
         visdata['INTTIM'] = inttim
