@@ -21,10 +21,10 @@ log = logging.getLogger(__name__)
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 parnames = ('UU','VV','WW','DATE','BASELINE','FREQSEL','SOURCE','INTTIM','DATA')
-dtype_to_bitpix = {np.dtype('int16'):16,
-                   np.dtype('int32'):32,
-                   np.dtype('float32'):-32,
-                   np.dtype('float64'):-64}
+dtype_to_bitpix = {np.dtype('>i2'):16,
+                   np.dtype('>i4'):32,
+                   np.dtype('>f4'):-32,
+                   np.dtype('>f8'):-64}
 
 class CorrUvFitsFile(object):
     def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT', output_dtype=np.float32, bmax=None, time_scale=1.0*u.day):
@@ -112,11 +112,9 @@ class CorrUvFitsFile(object):
 
         self.time_scale = time_scale
         tscale = 1./time_scale.to(u.day).value
-        
         uvwscale = (1/self.uvw_scale)
-        print(self.uvw_scale)
-        print("header scale", uvwscale)
-
+        log.info("UVW Scale: %s header scale %s", self.uvw_scale, uvwscale)
+        log.info("Time scale: %s header %s", self.time_scale, tscale)
 
         #ptypes
         self.add_type(1, ptype='UU', pscal=uvwscale, pzero=0.0)
@@ -146,7 +144,7 @@ class CorrUvFitsFile(object):
         self.fout.write(bytes(hdr.tostring(), 'utf-8'))
         self.ngroups = 0
         dt = self.output_dtype
-
+        assert dt.byteorder == '>', 'Byte order of FITS output ata type must be big endian'
         # aaah, craparooney - dthe data type for the whole row has to be the same. This means you can't
         # just have 165 bit data and 32 bit UVWs, which means it's rubbisharooney, unless I can
         # be bothered ot do somethign with BZERO and BSCALE (Maybe?)
