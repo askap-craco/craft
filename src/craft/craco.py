@@ -123,7 +123,7 @@ def make_upper(uvpix, npix):
     >>> make_upper((1,1), 256)
     (1, 1)
 
-    >>> make_upper(256-3, 256-1), 256)
+    >>> make_upper(255-3, 255-1), 256)
     (3, 1)
     '''
     
@@ -131,7 +131,7 @@ def make_upper(uvpix, npix):
     if u >= v:
         return (u, v)
     else:
-        return (npix-u, npix-v)
+        return (npix-u-1, npix-v-1)
 
 
 def bl2ant(bl):
@@ -435,7 +435,7 @@ class BaselineCell(object):
         if self.is_upper:
             retuv = (u, v)
         else:
-            retuv = (self.npix - u, self.npix - v)
+            retuv = (self.npix -1 - u, self.npix -1 - v)
 
         return retuv
 
@@ -445,7 +445,7 @@ class BaselineCell(object):
         Returns uV pixel coordinates tuple guaranteed to be in the lower half plane
         '''
         u,v = self.uvpix_upper
-        return (self.npix - u, self.npix - v)
+        return (self.npix -1 - u, self.npix -1 - v)
     
 
     @property

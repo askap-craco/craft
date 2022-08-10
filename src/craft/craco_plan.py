@@ -53,7 +53,38 @@ def make_ddreader_configs(plan):
 
     return configs
 
-def get_uvcells(baselines, uvcell, freqs, Npix, plot=False):
+
+def fftshift_coordinate(c, npix):
+    '''
+    Returns the FFT shifted version of the given coordinate with respect to an FFT that has size npix
+
+    >>> fftshift_coordinate(0, 256)
+    128
+    >>> fftshift_coordinate(128, 256)
+    0
+    >>> fftshift_coordinate(1, 256)
+    129
+    >>> fftshift_coordinate(129, 256)
+    1
+    '''
+    assert c >= 0
+    pivot = npix // 2
+    assert npix % 2 == 0
+    if c < pivot:
+        cout = c + pivot
+    else:
+        cout = c - pivot
+
+    assert 0 <= cout < npix
+    
+    return cout
+
+fftshift_coordinates = np.vectorize(fftshift_coordinate)
+
+def get_uvcells(baselines, uvcell, freqs, Npix, plot=False, fftshift=True, transpose=False):
+    '''
+    fftshift=True means apply similar transform to numpy fft shift so that the DC bin is the first elemetn
+    '''
     uvcells = []
 
     ucell, vcell = uvcell
@@ -71,6 +102,14 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=False):
         vpix = np.round(vlam/vcell + pix_offset).astype(int)
         if np.any((upix < 0) | (upix >= Npix) | (vpix < 0) | (vpix >= Npix)):
             warnings.warn('Pixel coordinates out of range')
+            raise ValueError('Pixel coordinates out of range')
+
+        if fftshift:
+            upix = fftshift_coordinates(upix, Npix)
+            vpix = fftshift_coordinates(vpix, Npix)
+
+        if transpose:
+            (vpix, upix) = (upix, vpix)
 
         if plot:
             #pylab.plot(ulam/1e3, vlam/1e3)
@@ -80,11 +119,12 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=False):
         for istart, iend in craco.runidxs(uvpos):
             uvpix = uvpos[istart]
             assert uvpos[istart] == uvpos[iend]
+            assert uvpix[0] < Npix
+            assert uvpix[1] < Npix
             b = craco.BaselineCell(blid, uvpix, istart, iend, freqs[istart:iend+1], Npix)
             uvcells.append(b)
             if plot:
                 grid[uvpix[1],uvpix[0]] += len(b.freqs)
-
 
     if plot:
         pylab.imshow(grid)
@@ -284,7 +324,6 @@ class FdmtPlan(object):
         self.fdmt_lut = np.repeat(fdmt_luts[:,:,np.newaxis, :], nuvwide, axis=2)
         expected_lut_shape = (nruns, ncin-1, nuvwide, 2)
         assert self.fdmt_lut.shape == expected_lut_shape, 'Incorrect shape for LUT=%s expected %s' % (self.fdmt_lut.shape, expected_lut_shape)
-        
 
         self.nruns = nruns
         self.nuvtotal = nuvtotal
@@ -345,7 +384,7 @@ class FdmtPlan(object):
 
         assert uvpix[0] >= uvpix[1], 'Uvpix must be upper hermetian'
         # speed optimisation
-        cell_coords2 = self.__uvmap.get(uvpix,[])
+        cell_coords2 = self.__uvmap.get(uvpix)
         
         #cell_coords = []
         #for irun, run in enumerate(self.runs):
@@ -422,7 +461,7 @@ def calc_grid_luts(plan, upper=True):
     
     fplan = plan.fdmt_plan
     fruns = fplan.runs
-    remaining_fdmt_cells = [] # this is ana rray we keep for self-testing to make sure we used everything
+    remaining_fdmt_cells = [] # this is an array we keep for self-testing to make sure we used everything
     for run in fruns:
         remaining_fdmt_cells.extend(run.cells)
 
@@ -436,14 +475,17 @@ def calc_grid_luts(plan, upper=True):
     for iwrite in range(nwrites):
         # Add available cells
         n = min(ngridreg, ncoord - iwrite*ngridreg)
+        
 
         slot_uv_coords = unique_uvcoords[iwrite*ngridreg:iwrite*ngridreg + n]
+        log.debug('n=%s ncoord=%s', n, len(slot_uv_coords))
         instructions = []
 
         for islot, slot_uv_coord in enumerate(slot_uv_coords):
-            log.debug('Considering islot=%d slot=%s', islot, slot_uv_coord)
             # The FDMT has all its data in the upper hermetian - so we always use upper hermetian coordinates
             upper_slot_uv_coord = craco.make_upper(slot_uv_coord, plan.npix)
+            log.debug('Considering islot=%d slot=%s upper=%s', islot, slot_uv_coord, upper_slot_uv_coord)
+
             # Find irun and icell 
             for cell_coord in fplan.find_uv(upper_slot_uv_coord):
                 # cell_coord is the location in the FDMT output buffer
@@ -460,6 +502,7 @@ def calc_grid_luts(plan, upper=True):
 
         # See shift marker for last 2 instruction, as we read 2UV/clk and I don't know which mattes
         #instructions[-2].shift = True
+        assert len(instructions) > 0
         instructions[-1].shift = True
 
         all_instructions.extend(instructions)

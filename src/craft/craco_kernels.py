@@ -114,7 +114,7 @@ class Gridder(Kernel):
                 v2 = 0
                 
             g[vpix, upix] += v1 + v2
-            g[npix-vpix, npix-upix] += np.conj(v1) - np.conj(v2)
+            g[npix-1-vpix, npix-1-upix] += np.conj(v1) - np.conj(v2)
 
         return g
 
@@ -200,7 +200,7 @@ class FdmtGridder(Kernel):
 
                 # This is summing because some UV Cells get split to do the FDMT and we need to recombine them
                 g[vpix, upix] += v1 + v2
-                g[npix-vpix, npix-upix] += np.conj(v1) - np.conj(v2)
+                g[npix-1-vpix, npix-1-upix] += np.conj(v1) - np.conj(v2)
 
         logging.debug('Gridding idm=%s t=%s sum_max=%s sum_predict=%s', idm, t, sum_max, sum_predict)
                 
