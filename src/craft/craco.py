@@ -109,6 +109,24 @@ def triangular_index(x, y, n, raster='xy'):
     
     return i
 
+def conjidx(i, npix):
+    '''
+    Returns conjugate index of i
+    i.e. if index is 0, returns 0, else returns npix-1
+    '''
+    cidx = 0 if i == 0 else npix - i
+    return cidx
+
+
+def conjuv(uv, npix):
+    '''
+    Returns conjugate uv pixel coordinate
+    '''
+    cuv = ((conjidx(uv[0], npix), conjidx(uv[1], npix)))
+    
+    return cuv
+    
+
 def make_upper(uvpix, npix):
     '''
     Make the given uvpix tuple upper hermetian.
@@ -131,7 +149,7 @@ def make_upper(uvpix, npix):
     if u >= v:
         return (u, v)
     else:
-        return (npix-u-1, npix-v-1)
+        return conjuv(uvpix, npix)
 
 
 def bl2ant(bl):
@@ -431,11 +449,11 @@ class BaselineCell(object):
         
         :returns: (u, v) where u >= v always.
         '''
-        u, v = self.uvpix
+            
         if self.is_upper:
-            retuv = (u, v)
+            retuv = self.uvpix
         else:
-            retuv = (self.npix -1 - u, self.npix -1 - v)
+            retuv = conjuv(self.uvpix, self.npix)
 
         return retuv
 
@@ -444,8 +462,7 @@ class BaselineCell(object):
         '''
         Returns uV pixel coordinates tuple guaranteed to be in the lower half plane
         '''
-        u,v = self.uvpix_upper
-        return (self.npix -1 - u, self.npix -1 - v)
+        return conjuv(self.uvpix_upper, self.npix)
     
 
     @property

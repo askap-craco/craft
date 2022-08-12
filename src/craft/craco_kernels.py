@@ -197,10 +197,12 @@ class FdmtGridder(Kernel):
                     v2 = complex(0,0)
 
 
-
                 # This is summing because some UV Cells get split to do the FDMT and we need to recombine them
                 g[vpix, upix] += v1 + v2
-                g[npix-1-vpix, npix-1-upix] += np.conj(v1) - np.conj(v2)
+
+                #g[npix-1-vpix, npix-1-upix] += np.conj(v1) - np.conj(v2)
+                # Assume we're gridding with DC bin at [0,0] rather than [npix/2, npix/2]
+                g[-vpix,-upix] += np.conj(v1) - np.conj(v2)
 
         logging.debug('Gridding idm=%s t=%s sum_max=%s sum_predict=%s', idm, t, sum_max, sum_predict)
                 

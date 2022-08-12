@@ -122,9 +122,17 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=False, fftshift=True, trans
             assert uvpix[0] < Npix
             assert uvpix[1] < Npix
             b = craco.BaselineCell(blid, uvpix, istart, iend, freqs[istart:iend+1], Npix)
-            uvcells.append(b)
+            if uvpix[0] == 0 or uvpix[1] == 0:
+                warnings.warn(f'Cannot grid things on U=0 or V=0 blid={blid} uvpix={uvpix}')
+            else:
+                uvcells.append(b)
+                print(b.uvpix_lower, b.uvpix_upper, ulam[0], vlam[0], ulam[0]/ucell, vlam[0]/vcell)#, ulam*freqs[0]/ucell, vlam*freqs[0]/vcell)
+                print(b)
+
+                
             if plot:
                 grid[uvpix[1],uvpix[0]] += len(b.freqs)
+
 
     if plot:
         pylab.imshow(grid)
