@@ -57,9 +57,9 @@ def sigproc_sex2deg(x):
     return dout
 
 def unpack(hdr, param, struct_format):
-    idx = hdr.find(param)
+    idx = hdr.find(param.encode('utf-8'))
     if idx < 0:
-        #warnings.warn('Could not find parameter {}'.format(param))
+        warnings.warn('Could not find parameter {}'.format(param))
         return None
 
     idx += len(param) # idx is thte start of the string
@@ -71,7 +71,7 @@ def unpack(hdr, param, struct_format):
     return value
 
 def unpack_str(hdr, param):
-    idx = hdr.find(param)
+    idx = hdr.find(param.encode('utf-8'))
     if idx < 0:
         #warnings.warn('Could not find parameter {}'.format(param))
         return None
@@ -99,7 +99,7 @@ def write(f, v, struct_format):
         raise 
 
 class SigprocFile(object):
-    def __init__(self, filename, mode='r', header=None):
+    def __init__(self, filename, mode='rb', header=None):
         self.filename = filename
         self.fin = open(self.filename, mode)
         if header is not None:
@@ -141,28 +141,27 @@ class SigprocFile(object):
         fin = self.fin
         fin.seek(0)
         hdr = fin.read(HEADER_LENGTH)
-        start_idx = hdr.find("HEADER_START")
-        end_idx = hdr.find("HEADER_END")
+        start_idx = hdr.find("HEADER_START".encode('utf-8'))
+        end_idx = hdr.find("HEADER_END".encode('utf-8'))
         hdr = hdr[start_idx:end_idx]
         self.data_start_idx = end_idx + len("HEADER_END")
         self.seek_data()
         header = {}
         self.header = header
         self.hdr = hdr
-        
                     
         for p in STRING_PARAMS:
             header[p] = unpack_str(hdr, p)
             
         for p in INT_PARAMS:
             header[p] = unpack(hdr, p, INT_FORMAT)
+            print(p, header[p])
             
         for p in DOUBLE_PARAMS:
             header[p] = unpack(hdr, p, DOUBLE_FORMAT)
 
         for k,v in self.header.items():
             setattr(self, k, v)
-            
 
         self.file_size_bytes = os.path.getsize(self.filename)
         self.header_size_bytes = self.data_start_idx
@@ -170,8 +169,8 @@ class SigprocFile(object):
         assert self.nifs > 0, 'Invalid nifs {}'.format(self.nifs)
         assert self.nchans > 0, 'Invalid nchans {}'.format(self.nchans)
         assert self.nbits > 0, 'Invalid nbits {}'.format(self.nbits)
-        self.bytes_per_element = self.nifs * self.nchans * self.nbits/8 
-        self.file_size_elements = self.data_size_bytes / self.bytes_per_element
+        self.bytes_per_element = self.nifs * self.nchans * self.nbits//8 
+        self.file_size_elements = self.data_size_bytes // self.bytes_per_element
         
         if self.nsamples is None:
             self.nsamples = self.file_size_elements
@@ -254,7 +253,7 @@ class SigprocFile(object):
         if num_samples < 0:
             raise ValueError("cant do negative number of samples")
         
-        byte_start = self.arr_index(time_start, chanindex, ifindex) * self.nbits / 8
+        byte_start = self.arr_index(time_start, chanindex, ifindex) * self.nbits // 8
         self.seek_data(byte_start)
         
         """ TODO: If nbits < 8 will need to read an extra byte here"""
