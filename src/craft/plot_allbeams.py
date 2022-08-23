@@ -86,7 +86,7 @@ def _main():
 
 def tscrunch(beams, factor):
     ntimes, nbeams, nfreq = beams.shape
-    newbeams = np.zeros((ntimes/factor, nbeams, nfreq))
+    newbeams = np.zeros((ntimes//factor, nbeams, nfreq))
     for t in range(newbeams.shape[0]):
         tstart = t*factor
         tend = (t+1)*factor
@@ -97,7 +97,7 @@ def tscrunch(beams, factor):
 
 def fscrunch(beams, factor):
     ntimes, nbeams, nfreq = beams.shape
-    newbeams = np.zeros((ntimes, nbeams, nfreq/factor))
+    newbeams = np.zeros((ntimes, nbeams, nfreq//factor))
     for f in range(newbeams.shape[2]):
         fstart = f*factor
         fend = (f+1)*factor
@@ -308,15 +308,15 @@ class Plotter(object):
         print('press', event.key)
         draw = True
         if event.key == 'right' or event.key == 'n':
-            self.tstart += self.ntimes/2
+            self.tstart += self.ntimes//2
         elif event.key == 'left' or event.key == 'p':
-            self.tstart -= self.ntimes/2
+            self.tstart -= self.ntimes//2
             self.tstart = max(self.tstart, 0)
         elif event.key == 'w':
             self.ntimes *= 2
         elif event.key == 'a':
             if self.ntimes > 2:
-                self.ntimes /= 2
+                self.ntimes //= 2
         elif event.key == 't':
             self.tscrunch_factor += 1
         elif event.key == 'T':

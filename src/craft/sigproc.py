@@ -179,11 +179,11 @@ class SigprocFile(object):
 
         
     def seek_data(self, offset_bytes=0):
-        self.fin.seek(self.data_start_idx + offset_bytes)
+        self.fin.seek(self.data_start_idx + int(offset_bytes))
 
     def seek_sample(self, sampnum):
         self.fin.seek(self.data_start_idx + sampnum*self.nifs*self.nchans*self.nbits/8)
-        
+
     def get_num_elements(self):
         nelements = self.nifs * self.nchans * self.nsamples
         return nelements
