@@ -89,7 +89,7 @@ def unpack_str(hdr, param):
 def write_str(f, s):
     n = struct.pack('i', len(s))
     f.write(n)
-    f.write(s)
+    f.write(s.encode('utf-8'))
 
 def write(f, v, struct_format):
     try:
