@@ -557,7 +557,7 @@ class Correlator(object):
 def parse_delays(values):
     delayfile = values.calcfile.replace('.im','.hwdelays')
     if os.path.exists(delayfile)==False:
-	delayfile = values.hwfile
+        delayfile = values.hwfile
 	#print(delayfile)
     delays = {}
     if delayfile is not None and os.path.exists(delayfile):
@@ -620,8 +620,8 @@ class MiriadGainSolutions(object):
         with the given options
 
         Limitations: Currently does no time interpolation - just uses first time
-        $file_root.gains.real - yaxis=real
-        $file_root.gains.imag - yaxis=imag
+        $file_root.gain.real - yaxis=real
+        $file_root.gain.imag - yaxis=imag
         $file_root.bandpass.real - options=bandpass, yaxis=real
         $file_root.bandpass.imag - options=bandpass, yaxis=imag
         
@@ -636,8 +636,8 @@ class MiriadGainSolutions(object):
             self.bp_real = None
         elif bp_c_root == None:
             print('Using MIRIAD bandpass solutions')
-            times1, g_real = parse_gpplt(file_root+'.gains.real')
-            times2, g_imag = parse_gpplt(file_root+'.gains.imag')
+            times1, g_real = parse_gpplt(file_root+'.gain.real')
+            times2, g_imag = parse_gpplt(file_root+'.gain.imag')
             if 1: # should take complex conjugate, and inverse of gain
                 g = g_real + 1j * g_imag
                 g = 1/np.conj(g)
