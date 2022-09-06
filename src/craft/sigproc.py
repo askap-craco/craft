@@ -186,7 +186,7 @@ class SigprocFile(object):
         self.fin.seek(self.data_start_idx + int(offset_bytes))
 
     def seek_sample(self, sampnum):
-        self.fin.seek(self.data_start_idx + sampnum*self.nifs*self.nchans*self.nbits/8)
+        self.fin.seek(self.data_start_idx + sampnum*self.nifs*self.nchans*self.nbits//8)
 
     def get_num_elements(self):
         nelements = self.nifs * self.nchans * self.nsamples
@@ -252,7 +252,7 @@ class SigprocFile(object):
             
         num_samples = (time_end - time_start)
         num_elements = num_samples*self.nchans
-        num_dtypes = num_elements / samps_per_element 
+        num_dtypes = num_elements // samps_per_element 
         
         if num_samples < 0:
             raise ValueError("cant do negative number of samples")
@@ -261,7 +261,7 @@ class SigprocFile(object):
         self.seek_data(byte_start)
         
         """ TODO: If nbits < 8 will need to read an extra byte here"""
-        num_bytes = num_samples * self.nbits / 8
+        num_bytes = num_samples * self.nbits // 8
 
         if num_bytes + self.data_start_idx > self.file_size_bytes:
             raise ValueError('Requested data off the end of the file. File size: %d. num_bytes: %d. data_start_idx: %d' % (self.file_size_bytes, num_bytes, self.data_start_idx))
@@ -274,9 +274,9 @@ class SigprocFile(object):
             print('samp', num_samples, 'nelem', num_elements, 'ndtypes', num_dtypes, len(data), len(data2))
 
             data2[0::4] = (data & 0b00000011)*2 - 3
-            data2[1::4] = (data & 0b00001100)/2 - 3
-            data2[2::4] = (data & 0b00110000)/4 - 3
-            data2[3::4] = (data & 0b11001100)/8 - 3
+            data2[1::4] = (data & 0b00001100)//2 - 3
+            data2[2::4] = (data & 0b00110000)//4 - 3
+            data2[3::4] = (data & 0b11001100)//8 - 3
 
             data = data2
             
