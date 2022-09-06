@@ -101,6 +101,10 @@ def write(f, v, struct_format):
 class SigprocFile(object):
     def __init__(self, filename, mode='rb', header=None):
         self.filename = filename
+        if not mode.endswith('b'):
+            mode += 'b'
+
+        assert mode == 'rb' or mode == 'wb', f'Invalid mode for sigproc file {filename} {mode}'
         self.fin = open(self.filename, mode)
         if header is not None:
             self._write_header(header)
