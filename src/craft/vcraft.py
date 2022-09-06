@@ -39,17 +39,17 @@ MODE_BEAMS = [72,72,72,72,2,2,2,2]
 MAX_SETS = 29172
 
 #  Number of sample vs mode
-SAMPS_MODE = [29172*32*nsamp_per_word*72/nbeams for (nsamp_per_word, nbeams) in zip(SAMPS_PER_WORD32, MODE_BEAMS)]
+SAMPS_MODE = [29172*32*nsamp_per_word*72//nbeams for (nsamp_per_word, nbeams) in zip(SAMPS_PER_WORD32, MODE_BEAMS)]
 
 def unpack_craft(fin, nsamp_per_word):
     dwords = np.fromfile(fin, dtype=np.uint32)
-    nwords = len(dwords)/nchan
+    nwords = len(dwords)//nchan
     nsamps = nwords*nsamp_per_word
     assert len(dwords) == nchan*nwords
     dwords.shape = (nwords, nchan)
 
     d = np.empty((nsamps, nchan, 2), dtype=np.int8)
-    bitshift = 32/nsamp_per_word
+    bitshift = 32//nsamp_per_word
     assert nsamp_per_word*bitshift == 32
 
     for samp in range(nsamp_per_word):
@@ -123,9 +123,9 @@ class VcraftFile(object):
         data_bytes = file_bytes - self.hdrsize
         nchan = len(self.freqs)
         smp_per_word = SAMPS_PER_WORD32[self.mode]
-        data_words = data_bytes/4
+        data_words = data_bytes//4
 
-        nsamp = data_words*smp_per_word/nchan
+        nsamp = data_words*smp_per_word//nchan
 
         return nsamp
 
@@ -216,17 +216,17 @@ class VcraftFile(object):
             # and reshape it to the orrect shape
             #d = d.reshape(nsamps, nchan, 2)
             
-            wordidx = startsamp / 2 # which 32 bit word the start sample is in
+            wordidx = startsamp // 2 # which 32 bit word the start sample is in
             sampoff = startsamp % 2 # how may samples into the first word the start sample is
-            nwordsamps = (nsamp + 1 + sampoff) / 2 # how many times we need to read (in words)
+            nwordsamps = (nsamp + 1 + sampoff) // 2 # how many times we need to read (in words)
             nwords = nwordsamps*nchan # total numberof words including channels
             seek_bytes = self.hdrsize + wordidx*nchan*4  # seek offset in bytes
             fin.seek(seek_bytes)
             #print 'MODE1', 'startsamp', startsamp, 'wordidx', wordidx, 'sampoff', sampoff, 'nwordsamps', nwordsamps, 'nwords', nwords, 'seek bytes', seek_bytes
             dwords = np.fromfile(fin, dtype='<u4', count=nwords)
 
-            # each word contains 4 8 bit numbers, (imag/real)*2
-            nwords = len(dwords)/nchan
+            # each word contains 4 8 bit numbers, (imag//real)*2
+            nwords = len(dwords)//nchan
             assert len(dwords) == nchan*nwords, 'Got {} dwords = nchan={} nwords={} expected={}'.format(len(dwords), nchan, nwords, nchan*nwords)
             dwords.shape = nwords, nchan
             nsamps = nwords*2
@@ -237,15 +237,15 @@ class VcraftFile(object):
 
         elif mode == 2: # 4b+4b
             
-            wordidx = startsamp / 4 # which 32 bit word the start sample is in
+            wordidx = startsamp // 4 # which 32 bit word the start sample is in
             sampoff = startsamp % 4 # how may samples into the first word the start sample is
-            nwordsamps = (nsamp + 3 + sampoff) / 4 # how many times we need to read (in words)
+            nwordsamps = (nsamp + 3 + sampoff) // 4 # how many times we need to read (in words)
             nwords = nwordsamps*nchan # total numberof words including channels
             seek_bytes = self.hdrsize + wordidx*nchan*4  # seek offset in bytes
             fin.seek(seek_bytes)
             dwords = np.fromfile(fin, dtype='<u4', count=nwords)
-            # each word contains 4 8 bit numbers, (imag/real)*2
-            nwords = len(dwords)/nchan
+            # each word contains 4 8 bit numbers, (imag//real)*2
+            nwords = len(dwords)//nchan
             nsamps = nwords*4
             assert len(dwords) == nchan*nwords
             dwords.shape = (nwords, nchan)
@@ -264,15 +264,15 @@ class VcraftFile(object):
             d = d[sampoff:sampoff+nsamp, :, :]
 
         elif mode == 3: # 1b+1b
-            # each 32 bit word contais 32 1 bit numbers (imag/real)*16 for the same channel
-            wordidx = startsamp / 16 # which 32 bit word the start sample is in
+            # each 32 bit word contais 32 1 bit numbers (imag//real)*16 for the same channel
+            wordidx = startsamp // 16 # which 32 bit word the start sample is in
             sampoff = startsamp % 16 # how may samples into the first word the start sample is
-            nwordsamps = (nsamp + 15 + sampoff) / 16 # how many times we need to read (in words)
+            nwordsamps = (nsamp + 15 + sampoff) // 16 # how many times we need to read (in words)
             nwords = nwordsamps*nchan # total numberof words including channels
             seek_bytes = self.hdrsize + wordidx*nchan*4  # seek offset in bytes
             fin.seek(seek_bytes)
             dwords = np.fromfile(fin, dtype='<u4', count=nwords)
-            #nwords = len(dwords)/nchan
+            #nwords = len(dwords)//nchan
             assert len(dwords) == nwords
             dwords.shape = (nwordsamps, nchan)
             nsamps = nsamp
