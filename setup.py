@@ -69,7 +69,8 @@ if __name__ == '__main__':
                                'quickcorr=craft.quickcorr:_main',
                                'vcraft2fil=craft.vcraft2fil:_main',
                                'uvfits2fil=craft.uvfits2fil:_main',
-                               'antenna_locations=craft.antenna_locations:_main'
+                               'antenna_locations=craft.antenna_locations:_main',
+                               'filadd=craft.filadd:_main'
             ]
             },
         zip_safe=False,
