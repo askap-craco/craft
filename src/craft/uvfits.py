@@ -13,6 +13,12 @@ import sys
 import logging
 from astropy.io import fits
 from . import craco
+from .craco import bl2ant
+from astropy import units as u
+from astropy.time import Time
+from astropy.coordinates import SkyCoord
+
+log = logging.getLogger(__name__)
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -26,7 +32,15 @@ class UvFits(object):
         '''
         self.hdulist = hdulist
         self.max_nbl = max_nbl
+        self.flagant = []
+        self.ignore_autos = True
 
+    def set_flagants(self, flagant):
+        '''
+        set list of 1-based antennas to flag
+        '''
+        self.flagant = flagant
+        return self
 
     @property
     def header(self):
@@ -40,7 +54,13 @@ class UvFits(object):
 
     @property
     def start_date(self):
-        d0 = self.vis[0]['DATE']
+        row = self.vis[0]
+        d0 = row['DATE']
+        try:
+            d0 += row['_DATE'] # FITS standard says add these two columns together
+        except KeyError:
+            pass
+
         return d0
 
     @property
@@ -51,6 +71,7 @@ class UvFits(object):
     def baselines(self):
         '''
         Returns all data from first integration
+        Doesn't include baselines containing flagant
         
         :returns: dictionary, keyed by baseline ID of all basesline data with a timestamp
         equal to the first timestamp in the file
@@ -61,7 +82,15 @@ class UvFits(object):
         vis = self.vis
         for i in range(self.vis.size):
             row = vis[i]
-            baselines[row['BASELINE']] = row
+            blid = row['BASELINE']
+            a1, a2 = bl2ant(blid)
+            if a1 in self.flagant or a2 in self.flagant:
+                continue
+
+            if self.ignore_autos and a1 == a2:
+                continue
+            
+            baselines[blid] = row
             if row['DATE'] != d0 or (self.max_nbl is not None and i > self.max_nbl):
                 break
 
@@ -97,7 +126,42 @@ class UvFits(object):
         '''
         # WARNING TODO: ONLY RETURN BASELINES THAT HAVE BEEN RETURNED in .baselines
         # IF max_nbl has been set
-        return craco.time_blocks(self.vis, nt)
+        return craco.time_blocks(self.vis, nt, self.flagant, self.ignore_autos)
+    
+    def get_tstart(self):
+        '''
+        return tstart as astropy Time from header otherwise first row of fits table
+        '''
+        f = self
+        if 'DATE-OBS' in f.header:
+            tstart = Time(f.header['DATE-OBS'], format='isot', scale='utc')
+        else:
+            jdfloat = f.start_date
+            tstart = Time(jdfloat, format='jd', scale='utc')
+        
+        return tstart
+        
+    def get_target_position(self, targidx=0):
+        '''
+        return (ra,dec) degrees from header if available, otherwise source table
+        '''
+        f = self
+        if 'OBSRA' in f.header:
+            ra = f.header['OBSRA'] * u.degree
+            dec = f.header['OBSDEC'] * u.degree
+            log.info('Got radec=(%s/%s) from OBSRA header', ra, dec)
+        else:
+            source_table = f.hdulist[3].data
+            assert len(source_table)==1, f'Dont yet support multiple source files: {len(source_table)}'
+            row = source_table[targidx]
+            src = row['SOURCE']
+            ra = row['RAEPO']*u.degree
+            dec = row['DECEPO']*u.degree
+            log.info('Got radec=(%s/%s) from source table for %s', ra, dec, src)
+
+        return (ra, dec)
+            
+
 
     def close(self):
         return self.hdulist.close()

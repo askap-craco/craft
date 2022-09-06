@@ -187,7 +187,8 @@ def bl2array(baselines):
     blids = sorted(baselines.keys())
     nbl = len(blids)
     tfshape = baselines[blids[0]].shape
-    fullshape = [nbl, tfshape[0], tfshape[1]] # TBC make more generic
+    fullshape = [nbl]
+    fullshape.extend(tfshape)
 
     d = np.zeros(fullshape, dtype=np.complex64)
     for idx, blid in enumerate(blids):
@@ -255,7 +256,7 @@ def printstats(d, prefix=''):
     return s
 
 
-def time_blocks(vis, nt):
+def time_blocks(vis, nt, flagant=[], flag_autos=True):
     '''
     Generator that returns nt time blocks of the given visiblity table
 
@@ -265,7 +266,9 @@ def time_blocks(vis, nt):
     '''
 
     nrows = vis.size
-    nchan = vis[0].data.shape[-3]
+    inshape = vis[0].data.shape
+    nchan = inshape[-3]
+    npol = inshape[-2]
     logging.info('returning blocks for nrows=%s rows nt=%s visshape=%s', nrows, nt, vis[0].data.shape)
     d = {}
     t = 0
@@ -275,6 +278,10 @@ def time_blocks(vis, nt):
     for irow in range(nrows):
         row = vis[irow]
         blid = row['BASELINE']
+        a1,a2 = bl2ant(blid)
+        if a1 in flagant or a2 in flagant or (flag_autos and a1 == a2):
+            continue
+        
         #logging.(irow, blid, bl2ant(blid), row['DATE'], d0, t)
         if row['DATE'] > d0 or (blid == first_blid and irow != 0): # integration finifhsed when we see first blid again. date doesnt have enough resolution
             t += 1
@@ -290,10 +297,10 @@ def time_blocks(vis, nt):
 
 
         if blid not in list(d.keys()):
-            d[blid] = np.zeros((nchan, nt), dtype=np.complex64)
+            d[blid] = np.zeros((nchan, npol, nt), dtype=np.complex64)
 
-        d[blid][:, t].real = row.data[...,0].reshape(nchan)
-        d[blid][:, t].imag = row.data[...,1].reshape(nchan)
+        d[blid][..., t].real = row.data[...,0]
+        d[blid][..., t].imag = row.data[...,1]
 
         
     if len(d) > 0:
@@ -401,11 +408,11 @@ def get_freqs(hdul):
     fch1 = hdr['CRVAL4']
     foff = hdr['CDELT4']
     ch1 = hdr['CRPIX4']
-    assert ch1 == 1.0, 'Unexpected initial frequency'
+    #assert ch1 == 1.0, f'Unexpected initial frequency: {ch1}'
     assert foff > 0, 'cant handle negative frequencies anywhere athe moment foff=%f' % foff
     vis = hdul[0].data
     nchan = vis[0].data.shape[-3]
-    freqs = np.arange(nchan)*foff + fch1 # Hz
+    freqs = (np.arange(nchan, dtype=np.float) - ch1)*foff + fch1 # Hz
 
     return freqs
 
@@ -629,7 +636,7 @@ class FastBaseline2Uv:
         '''
 
         assert uv_data.shape == self.plan.uv_shape, f'Invalid uv_data shape. Was {uv_data.shape} expected {self.uv_shape}'
-        assert baseline_data.shape == self.plan.baseline_shape, f'Invalid basline_data shape. Was {baseline_data.shape} expected {self.baseline_shape}'
+        assert baseline_data.shape == self.plan.baseline_shape, f'Invalid baseline_data shape. Was {baseline_data.shape} expected {self.plan.baseline_shape}'
 
         baseline2uv_numba(self.lut, baseline_data, uv_data)
 

@@ -22,11 +22,18 @@ from . import uvfits
 from . import craco_kernels
 from . import craco
 from . import fdmt
+from .cmdline import strrange
 
 log = logging.getLogger(__name__)
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+BMAX = 6e3; # max baseline meters
+FREQMAX = 1.8e9 # max frequency Hz
+C = 3e8 # m/s
+LAMMIN = C/FREQMAX # smallest wavelength
+UVMAX = BMAX/LAMMIN # largest UV point
+        
 def dump_plan(plan, pickle_fname):
     filehandler = open(pickle_fname, 'wb') 
     pickle.dump(plan, filehandler)
@@ -38,7 +45,7 @@ def load_plan(pickle_fname):
     filehandler.close()
     
     return plan
-
+            
 def make_ddreader_configs(plan):
     '''
     Make the ddgrid reader config
@@ -96,6 +103,11 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=False, fftshift=True, trans
         #UU, VV WW are in seconds
         ulam = bldata['UU'] * freqs
         vlam = bldata['VV'] * freqs
+        a1,a2 = craco.bl2ant(blid)
+
+        if np.any((np.abs(ulam) >= UVMAX) | (np.abs(vlam >=UVMAX))):
+            warnings.warn(f'Maximum UV is larger than ASKAP for {a1}-{a2}. UVMAX={UVMAX} ulam={ulam.max()} vlam={vlam.max()}')
+
         pix_offset = float(Npix)/2.0
         
         upix = np.round(ulam/ucell + pix_offset).astype(int)
@@ -123,11 +135,11 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=False, fftshift=True, trans
             assert uvpix[1] < Npix
             b = craco.BaselineCell(blid, uvpix, istart, iend, freqs[istart:iend+1], Npix)
             if uvpix[0] == 0 or uvpix[1] == 0:
-                warnings.warn(f'Cannot grid things on U=0 or V=0 blid={blid} uvpix={uvpix}')
+                warnings.warn(f'Cannot grid things on U=0 or V=0 blid={blid} {a1}-{a2} uvpix={uvpix}')
             else:
                 uvcells.append(b)
-                print(b.uvpix_lower, b.uvpix_upper, ulam[0], vlam[0], ulam[0]/ucell, vlam[0]/vcell)#, ulam*freqs[0]/ucell, vlam*freqs[0]/vcell)
-                print(b)
+                #print(b.uvpix_lower, b.uvpix_upper, ulam[0], vlam[0], ulam[0]/ucell, vlam[0]/vcell)#, ulam*freqs[0]/ucell, vlam*freqs[0]/vcell)
+                #print(b)
 
                 
             if plot:
@@ -661,6 +673,8 @@ class PipelinePlan(object):
             self.values = values
 
         values = self.values
+        if values.flag_ants:
+            f.set_flagants(values.flag_ants)
         
         log.info('making Plan values=%s', self.values)
 
@@ -694,8 +708,7 @@ class PipelinePlan(object):
         vmax_km = vmax*lambdamin/1e3
 
         # Could get RA/DeC from fits table, or header. Header is easier, but maybe less correct
-        ra = f.header['OBSRA'] * u.degree
-        dec = f.header['OBSDEC'] * u.degree
+        (ra, dec) = f.get_target_position()
         wcs = WCS(naxis=2)
         wcs.wcs.crpix = [Npix/2 + 1,Npix/2 + 1] # honestly, I dont' understand if we need to +1 or not
         wcs.wcs.crval = [ra.value, dec.value]
@@ -706,13 +719,15 @@ class PipelinePlan(object):
         self.dec = dec
         self.phase_center = SkyCoord(ra=ra, dec=dec, frame='icrs')
 
-        # could get TSTART from tabel or header. Header is easier.
-        self.tstart = Time(f.header['DATE-OBS'], format='isot', scale='utc')
+        self.tstart = f.get_tstart()
         
         log.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s wcs=%s',
                  nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos), self.wcs)
         
         uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix, values.show)
+        if umax > UVMAX or vmax > UVMAX:
+            raise ValueError('Maximum basline larger than ASKAP umax={umax} vmax={vmax} UVMAX={UVMAX}')
+                  
         log.info('Got Ncells=%d uvcells', len(uvcells))
         d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.int32)
         np.savetxt(self.values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
@@ -812,7 +827,6 @@ class PipelinePlan(object):
         header='ant1, ant2, u(pix), v(pix), chan1, chan2, irun, icell, total_overlap, max_idm, max_offset, offset_cff, idm_cff, fch1'
         fmt = '%d ' * 8 + ' %d '*3 + ' %f '*3
         self.save_lut(d, 'uvgrid.split', header, fmt=fmt)
-        
 
         
     def save_grid_instructions(self, instructions, name):
@@ -922,8 +936,11 @@ def add_arguments(parser):
     parser.add_argument('--show-image', action='store_true', help='Show image plots', default=False)
     parser.add_argument('--show-fdmt', action='store_true', help='Show FDMT plots', default=False)
     parser.add_argument('--save', action='store_true',  help='Save data as .npy for input, FDMT and image pipeline')
+    parser.add_argument('--flag-ants', type=strrange, help='Ignore these 1-based antenna number')
     parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s', '--show', action='store_true', help='Show plots')
+    parser.add_argument('--target-input-rms', type=float, default=512, help='Target input RMS')
+
 
 def get_parser():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
@@ -958,8 +975,8 @@ def _main():
 
         pylab.show()
 
-    dump_plan(plan, values.pickle_fname)
-    print((load_plan(values.pickle_fname)))
+    #dump_plan(plan, values.pickle_fname) # Large plans don't work - need to not serialise the bad bits
+    #print((load_plan(values.pickle_fname)))
     
 if __name__ == '__main__':
     _main()
