@@ -911,6 +911,23 @@ class PipelinePlan(object):
         # Hard coed for now - need to tie to the sample rate
         return 1.7e-3*u.second
 
+    @property
+    def nant(self):
+        '''
+        Returns number of antennas - basically from number of baselines and solving the quadratic equation
+        '''
+        na = int((1 + np.sqrt(1 + 8*self.nbl))/2)
+        return na
+
+    @property
+    def maxant(self):
+        '''
+        Returns the largest antenna ID (1 based) in the baselines
+        '''
+        mx = max([max(craco.bl2ant(blid)) for blid in self.baseline_order])
+        
+        return mx
+
 def add_arguments(parser):
     '''
     Add planning arguments
