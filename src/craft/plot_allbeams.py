@@ -42,7 +42,7 @@ def next_divisor(x, n):
             return t
 
 def divisors(n):
-    d = [t for t in range(1, n/2 + 1) if n % t == 0]
+    d = [t for t in range(1, n//2 + 1) if n % t == 0]
     return d
 
 def _main():
@@ -171,7 +171,7 @@ class Plotter(object):
         self.imzrange = None
         self.histfig = None
         if nbeams == 1:
-            self.mk_single_fig('dynspec', '', 'Time (%s) after %f' % (xunit, mjdstart), 'Frequency (%s)' % yunit)
+            self.mk_single_fig('dynspec', filenames[0], 'Time (%s) after %f' % (xunit, mjdstart), 'Frequency (%s)' % yunit)
         else:
             self.mkfig('mean', 'Mean bandpass', 'Frequency (%s)' % yunit,'Mean bandpass')
             self.mkfig('std', 'Bandpass stdDev', 'Frequency (%s)' % yunit ,'Bandpass StdDev')
@@ -214,6 +214,7 @@ class Plotter(object):
         #fig.canvas.mpl_connect('button_press_event', self.button_press)
         #fig.canvas.mpl_connect('button_release_event', self.button_release)
         #annotate(fig, title, xlab, ylab)
+        fig.suptitle(title)
         self.figs[name] = (fig, [rawax, tax, fax])
         self.fig_labels[name] = (title, xlab, ylab)
 
