@@ -25,7 +25,7 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 class UvFits(object):
 
-    def __init__(self, hdulist, max_nbl=None):
+    def __init__(self, hdulist, max_nbl=None, mask=True):
         '''
         @param hdulist FITS HDLISt typically got from pyfits.open
         @param max_nbl - if not none, only return this many baselines
@@ -34,6 +34,7 @@ class UvFits(object):
         self.max_nbl = max_nbl
         self.flagant = []
         self.ignore_autos = True
+        self.mask = mask
 
     def set_flagants(self, flagant):
         '''
@@ -126,7 +127,7 @@ class UvFits(object):
         '''
         # WARNING TODO: ONLY RETURN BASELINES THAT HAVE BEEN RETURNED in .baselines
         # IF max_nbl has been set
-        return craco.time_blocks(self.vis, nt, self.flagant, self.ignore_autos)
+        return craco.time_blocks(self.vis, nt, self.flagant, self.ignore_autos, mask=self.mask)
     
     def get_tstart(self):
         '''

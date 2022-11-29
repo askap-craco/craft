@@ -178,21 +178,43 @@ def bl2ant(bl):
 
     return (a1, a2)
 
+def ant2bl(ants):
+    '''
+    Convert antenna tuple into UV baseline index using UV fits convention
+    Antenna numbers start at 1.
+
+    :param: ants is tuple (a1, a2) where a1 and a2 are 1-based antenna numbers
+    :see: bl2ant
+
+    >>> ant2bl((7,12)) == 256*7 + 12
+    True
+    '''
+    a1, a2 = ant
+    assert a1 >= 1
+    assert a2 >= 1
+    ibl = a1*256 + a2
+    return ibl
+
 
 def bl2array(baselines):
     '''
     Converts baseline dictionary into an array sorted by baseline id
     :returns: np array of shape [nbl, nf, nt]
+    If input is a masked array, returns a masked array too
     '''
     blids = sorted(baselines.keys())
     nbl = len(blids)
-    tfshape = baselines[blids[0]].shape
+    indata = baselines[blids[0]]
+    tfshape = indata.shape
     fullshape = [nbl]
     fullshape.extend(tfshape)
 
     d = np.zeros(fullshape, dtype=np.complex64)
+
+    if np.ma.isMaskedArray(indata):
+        d = np.ma.masked_array(d, mask=np.zeros(fullshape, dtype=bool), fill_value=indata.fill_value)
+    
     for idx, blid in enumerate(blids):
-        
         d[idx, ...] = baselines[blid]
 
     return d
@@ -256,11 +278,14 @@ def printstats(d, prefix=''):
     return s
 
 
-def time_blocks(vis, nt, flagant=[], flag_autos=True):
+def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
     '''
     Generator that returns nt time blocks of the given visiblity table
 
-
+    :flagant: list of antenna numbers. If an antenna number is in this list, all baselines to this antenna 
+    are removed from the output
+    :flag_autos: If true, autos will be removed from the output
+    :mask: If true, returns np.masked_array with the masked values where the weights in the file were 0
     :returns: Directionary, keyed by baseline ID, value = np.array size (nchan, nt) dtype=complex64
     :see: bl2ant()
     '''
@@ -269,6 +294,8 @@ def time_blocks(vis, nt, flagant=[], flag_autos=True):
     inshape = vis[0].data.shape
     nchan = inshape[-3]
     npol = inshape[-2]
+
+    shape = (nchan, npol, nt)
     logging.info('returning blocks for nrows=%s rows nt=%s visshape=%s', nrows, nt, vis[0].data.shape)
     d = {}
     t = 0
@@ -297,16 +324,31 @@ def time_blocks(vis, nt, flagant=[], flag_autos=True):
 
 
         if blid not in list(d.keys()):
-            d[blid] = np.zeros((nchan, npol, nt), dtype=np.complex64)
+            dvalue = np.zeros(shape, dtype=np.complex64)
 
-        d[blid][..., t].real = row.data[...,0]
-        d[blid][..., t].imag = row.data[...,1]
+            if mask:
+                dvalue = np.ma.masked_array(dvalue, mask=np.zeros(shape, dtype=bool), copy=False, fill_value=0+0j)
+            
+            d[blid] = dvalue
 
+        db = d[blid]
+
+        if mask:
+            # mask values if input row weight is zero
+            db[..., t].data.real = row.data[...,0]
+            db[..., t].data.imag = row.data[...,1]
+            db[..., t].mask = row.data[...,2] == 0
+        else:
+            db[..., t].real = row.data[...,0]
+            db[..., t].imag = row.data[...,1]
         
     if len(d) > 0:
         if t < nt - 1:
             warnings.warn('Final integration only contained t={} of nt={} samples len(d)={} nrows={}'.format(t, nt, len(d), nrows))
-        yield d
+            # Returns without yielding - this is the end
+        else:
+            assert t == nt -1
+            yield d
 
 def grid(uvcells, Npix):
     '''

@@ -59,7 +59,7 @@ def sigproc_sex2deg(x):
 def unpack(hdr, param, struct_format):
     idx = hdr.find(param.encode('utf-8'))
     if idx < 0:
-        warnings.warn('Could not find parameter {}'.format(param))
+        #warnings.warn('Could not find parameter {}'.format(param))
         return None
 
     idx += len(param) # idx is thte start of the string
