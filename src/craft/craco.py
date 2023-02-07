@@ -189,7 +189,7 @@ def ant2bl(ants):
     >>> ant2bl((7,12)) == 256*7 + 12
     True
     '''
-    a1, a2 = ant
+    a1, a2 = ants
     assert a1 >= 1
     assert a2 >= 1
     ibl = a1*256 + a2
@@ -219,6 +219,14 @@ def bl2array(baselines):
 
     return d
 
+def get_bl_length(baselines, blid):
+    '''
+    Gets the baseline distance for a given baseline
+    :params: baselines (dict), blid (float)
+    :returns: Distance in seconds units (float)
+    '''
+    dist = np.sqrt(baselines[blid]['UU']**2 + baselines[blid]['VV']**2 + baselines[blid]['WW']**2)
+    return dist
 
 def runidxs(x):
     ''' 
