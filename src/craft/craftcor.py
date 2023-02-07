@@ -613,6 +613,55 @@ def parse_gpplt(fin):
 
     return np.array(x), v
 
+class GppltFile:
+    '''
+    Header looks like this:
+# Gain/Polarization listing for SB43128_run3_v2_beam00.uvfits.mir
+# Listing of the Real of the bandpass for X,Y
+# Number of antennas: 36
+# Freq(GHz)     X1        Y1        X2        Y2        X3        Y3
+#               X4        Y4        X5        Y5        X6        Y6
+#               X7        Y7        X8        Y8        X9        Y9
+#               X10       Y10       X11       Y11       X12       Y12
+#               X13       Y13       X14       Y14       X15       Y15
+#               X16       Y16       X17       Y17       X18       Y18
+#               X19       Y19       X20       Y20       X21       Y21
+#               X22       Y22       X23       Y23       X24       Y24
+#               X25       Y25       X26       Y26       X27       Y27
+#               X28       Y28       X29       Y29       X30       Y30
+#               X31       Y31       X32       Y32       X33       Y33
+#               X34       Y34       X35       Y35       X36       Y36
+'''
+    def __init__(self, fin):
+        '''
+        Parse header
+        We should know NPOL and NANT, and and be able to reshape the values accordingly
+        '''
+        
+        with open(fin, 'r') as f:
+            for iline, line in enumerate(f):
+                if line.startswith('# Gain/Polarization listing for'):
+                    self.sourcefile  = line.split()[-1] # file name
+                elif line.startswith('# Listing of the '):
+                    self.polarisations = line.split()[-1].split(',') # should be ['X','Y'] or ['I']
+                elif line.startswith('# Number of antennas:'):
+                    self.nant = int(line.split()[-1]) # integer
+                elif iline == 3:
+                    self.xlabel = line[:16].strip()
+
+        self.xvalues, self.values = parse_gpplt(fin)
+        self.values = self.values.reshape(-1, self.nant, self.npol)
+
+    @property
+    def npol(self):
+        return len(self.polarisations)
+
+
+def parse_gpplt2(fin):
+    infile = GppltFile(fin)
+    return (infile.xvalues, infile.values)
+
+
 class MiriadGainSolutions(object):
     def __init__(self, file_root, bp_c_root=None, pol=None, freqs=None):
         '''Loads gpplt exported bandpass and gain calibration solutions.
@@ -636,19 +685,20 @@ class MiriadGainSolutions(object):
             self.bp_real = None
         elif bp_c_root == None:
             print('Using MIRIAD bandpass solutions')
-            times1, g_real = parse_gpplt(file_root+'.gain.real')
-            times2, g_imag = parse_gpplt(file_root+'.gain.imag')
+            times1, g_real = parse_gpplt2(file_root+'.gain.real')
+            times2, g_imag = parse_gpplt2(file_root+'.gain.imag')
             if 1: # should take complex conjugate, and inverse of gain
                 g = g_real + 1j * g_imag
-                g = 1/np.conj(g)
+                m = g != 0
+                g[m] = 1/np.conj(g[m])
                 g_real = np.real(g)
                 g_imag = np.imag(g)
 
             assert all(times1 == times2), 'Times in gains real/imag dont match'
             assert g_real.shape == g_imag.shape, 'Unequal shapes of gain files'
 
-            freqs1, bp_real = parse_gpplt(file_root+'.bandpass.real')
-            freqs2, bp_imag = parse_gpplt(file_root+'.bandpass.imag')
+            freqs1, bp_real = parse_gpplt2(file_root+'.bandpass.real')
+            freqs2, bp_imag = parse_gpplt2(file_root+'.bandpass.imag')
             assert all(freqs1 == freqs2), 'Freqs in bandpass real/imag dont match'
 
             assert bp_real.shape == bp_imag.shape, 'Unequal shapes of bandpass files'
@@ -662,9 +712,12 @@ class MiriadGainSolutions(object):
             self.bp_real = bp_real
             bp_imag *= -1  # complex conjugate of bandpass
             self.bp_imag = bp_imag
-            self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant], fill_value=(self.bp_real[0,iant], self.bp_real[-1,iant]), bounds_error=False) for iant in range(nant)]
-            self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant], fill_value=(self.bp_imag[0,iant], self.bp_imag[-1,iant]), bounds_error=False) for iant in range(nant)]
-            self.bp_coeff = None
+
+            # this it too hard to do with I vs X,Y solutions, so I'm commenging it out fo rnow.
+            # If we really need it it can add it back in later.
+            #self.bp_real_interp = [interp1d(self.freqs, bp_real[:, iant], fill_value=(self.bp_real[0,iant], self.bp_real[-1,#iant]), bounds_error=False) for iant in range(nant)]
+            #self.bp_imag_interp = [interp1d(self.freqs, bp_imag[:, iant], fill_value=(self.bp_imag[0,iant], self.bp_imag[-1,iant]), bounds_error=False) for iant in range(nant)]
+            #self.bp_coeff = None
         else:
             print('Using AIPS bandpass solutions')
             if "polyfit_coeff" in bp_c_root: # AIPS polyfit coefficient

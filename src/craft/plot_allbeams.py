@@ -87,13 +87,13 @@ def _main():
 def tscrunch(beams, factor):
     ntimes, nbeams, nfreq = beams.shape
     newbeams = np.zeros((ntimes//factor, nbeams, nfreq))
+
     for t in range(newbeams.shape[0]):
         tstart = t*factor
         tend = (t+1)*factor
         newbeams[t, :, :] = beams[tstart:tend, :, :].sum(axis=0)/np.sqrt(factor)
 
     return newbeams
-
 
 def fscrunch(beams, factor):
     ntimes, nbeams, nfreq = beams.shape
@@ -148,12 +148,16 @@ class Plotter(object):
         ntimes, self.nbeams, self.nfreq = beams.shape
         self.freq_flags = np.ones(self.nfreq, dtype=np.bool)
         f0 = files[0]
-        self.freqs = np.linspace(f0.fch1, f0.fch1 + self.nfreq*f0.foff, self.nfreq, endpoint=True)
         self.bnames = [f.filename.split('.')[-2] for f in files]
         nbeams = len(self.files)
         mjdstart = files[0].tstart
         tsamp = files[0].tsamp
         self.raw_units = raw_units
+        if raw_units:
+            self.freqs = np.arange(self.nfreq)
+        else:
+            self.freqs = f0.fch1 + f0.foff*np.arange(self.nfreq)
+
         self.tscrunch_factor = tscrunch
         self.fscrunch_factor = fscrunch
         self.dm = 0.
@@ -243,7 +247,6 @@ class Plotter(object):
     def clearfigs(self):
         for name, (fig, axes) in self.figs.items():
             for ax in axes:
-                print('clearing', fig, ax)
                 ax.cla()
                 
 
@@ -287,8 +290,8 @@ class Plotter(object):
         if f1idx > f2idx:
             f1idx, f2idx = (f2idx, f1idx)
 
-        assert f1idx < f2idx
         print('Toggling frequencies', f1, f2, f1idx, f2idx)
+        assert f1idx < f2idx
         self.freq_flags[f1idx:f2idx] = ~ self.freq_flags[f1idx:f2idx]
     
     def reset_flagged_frequencies(self):
@@ -298,6 +301,7 @@ class Plotter(object):
     def flag_frequencies(self):
         try:
             l = input('f1 f2 (with space):')
+            print(f'Got input {l} {l.split()}')
             f1, f2 = list(map(float, l.split()))
             self.toggle_freq_flags(f1, f2)
         except Exception as e:
