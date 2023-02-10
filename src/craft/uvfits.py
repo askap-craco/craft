@@ -11,12 +11,14 @@ import numpy as np
 import os
 import sys
 import logging
+import warnings
 from astropy.io import fits
 from . import craco
 from .craco import bl2ant
 from astropy import units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
+
 
 log = logging.getLogger(__name__)
 
@@ -153,8 +155,13 @@ class UvFits(object):
             log.info('Got radec=(%s/%s) from OBSRA header', ra, dec)
         else:
             source_table = f.hdulist[3].data
-            assert len(source_table)==1, f'Dont yet support multiple source files: {len(source_table)}'
-            row = source_table[targidx]
+            first_datarow = next(iter(self.baselines.values()))
+            first_targetidx = int(first_datarow['SOURCE'])
+            row = source_table[first_targetidx-1] # FITS convention is 1 based
+
+            if len(source_table) > 1:
+                warnings.warn(f'Dont yet support multiple source files: {len(source_table)} - using source at {first_targetidx} which is {row}')
+                
             src = row['SOURCE']
             ra = row['RAEPO']*u.degree
             dec = row['DECEPO']*u.degree
