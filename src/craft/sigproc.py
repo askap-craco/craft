@@ -159,7 +159,6 @@ class SigprocFile(object):
             
         for p in INT_PARAMS:
             header[p] = unpack(hdr, p, INT_FORMAT)
-            print(p, header[p])
             
         for p in DOUBLE_PARAMS:
             header[p] = unpack(hdr, p, DOUBLE_FORMAT)
