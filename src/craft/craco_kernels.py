@@ -128,12 +128,14 @@ def idm_cff(fch1, plan):
     :fch1: Frequency of the bottom of the FDMT channels
     :plan: craco plan
     '''
-    fdmt_band = plan.ncin*plan.foff # Bandwidth of FDMT
-    f1 = fch1
-    f2 = f1 + fdmt_band
+    fdmt_band = plan.ncin*plan.foff # Bandwidth of sub-FDMT
     fmin = plan.fmin # center freq of bottom channel
     fmax = plan.fmax # center freq of top channel
-    dmcff = fdmt.cff(f2, f1, fmax, fmin) # the cff
+
+    f1 = fch1
+    f2 = f1 + fdmt_band
+    #assert f2 < plan.fmax, f'F2 is past fmax f2={f2} fmax={fmax}' # not sure this is ncessary
+    dmcff = fdmt.cff(f2, f1, fmax, fmin) 
     assert dmcff >= 0
     return dmcff
 

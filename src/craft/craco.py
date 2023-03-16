@@ -308,7 +308,7 @@ def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
     d = {}
     t = 0
     d0 = vis[0]['DATE']
-    first_blid = vis[0]['BASELINE']
+    first_blid = None
     #for irow in xrange(nrows):
     for irow in range(nrows):
         row = vis[irow]
@@ -316,13 +316,21 @@ def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
         a1,a2 = bl2ant(blid)
         if a1 in flagant or a2 in flagant or (flag_autos and a1 == a2):
             continue
+
+        if first_blid is None:
+            first_blid = vis[0]['BASELINE']
+            first_blid_again = False
+        else:
+            first_blid_again = blid == first_blid
+            
+        date_changed = row['DATE'] > d0
         
         #logging.(irow, blid, bl2ant(blid), row['DATE'], d0, t)
-        if row['DATE'] > d0 or (blid == first_blid and irow != 0): # integration finifhsed when we see first blid again. date doesnt have enough resolution
+        if first_blid_again or date_changed: # integration finifhsed when we see first blid again. date doesnt have enough resolution
             t += 1
             tdiff = row['DATE'] - d0
             d0 = row['DATE']
-            logging.debug('Time change or baseline change irow=%d, len(d)=%d t=%d d0=%s rowdate=%s tdiff=%0.2f millisec', irow, len(d), t, d0, row['DATE'], tdiff*86400*1e3)
+            logging.debug('Time change or baseline change irow=%d, len(d)=%d t=%d d0=%s rowdate=%s tdiff=%0.2f millisec. First bl again? %s date changed? %s', irow, len(d), t, d0, row['DATE'], tdiff*86400*1e3, first_blid_again, date_changed)
 
             if t == nt:
                 logging.debug('Returning block irow=%d, len(d)=%d t=%d d0=%s rowdate=%s tdiff=%0.2f millisec', irow, len(d), t, d0, row['DATE'], tdiff*86400*1e3)

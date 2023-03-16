@@ -71,7 +71,8 @@ if __name__ == '__main__':
                                'uvfits2fil=craft.uvfits2fil:_main',
                                'antenna_locations=craft.antenna_locations:_main',
                                'filadd=craft.filadd:_main',
-                               'sigprochdr=craft.sigproc:_main'
+                               'sigprochdr=craft.sigproc:_main',
+                               'pltuvfits=craft.uvfits:_main'
                                
             ]
             },

@@ -246,7 +246,7 @@ class FdmtRun(object):
             assert overlap > 0
             self.total_overlap += overlap
 
-        assert self.max_idm <= plan.pipeline_plan.ndout, 'NDOUT is too small - needs to be at least %s' % self.max_idm
+        assert self.max_idm <= plan.pipeline_plan.ndout, f'NDOUT ={plan.pipeline_plan.ndout} is too small - needs to be at least {self.max_idm} for fch1={self.fch1} fmin={plan.pipeline_plan.fmin} fmax={plan.pipeline_plan.fmax} dmax={self.plan.pipeline_plan.dmax}'
 
 
     @property
@@ -684,6 +684,7 @@ class PipelinePlan(object):
         self.baselines = baselines
         nbl = len(baselines)
         freqs = f.channel_frequencies
+        self.target_name = f.target_name
 
         # Cant handle inverted bands - this is assumed all over the code. It's boring
         assert freqs.min() == freqs[0]
@@ -709,17 +710,20 @@ class PipelinePlan(object):
 
         # Could get RA/DeC from fits table, or header. Header is easier, but maybe less correct
         (ra, dec) = f.get_target_position()
-        wcs = WCS(naxis=2)
-        wcs.wcs.crpix = [Npix/2 + 1,Npix/2 + 1] # honestly, I dont' understand if we need to +1 or not
-        wcs.wcs.crval = [ra.value, dec.value]
-        wcs.wcs.ctype = ['RA---SIN','DEC--SIN']
-        wcs.wcs.cdelt = np.degrees([-lcell, mcell])
-        self.wcs = wcs
         self.ra = ra
         self.dec = dec
+        self.tstart = f.get_tstart()
+        wcs = WCS(naxis=2)
+        wcs.wcs.crpix = [Npix/2 + 1,Npix/2 + 1] # honestly, I dont' understand if we need to +1 or not
+        wcs.wcs.crval = [ra.deg.value, dec.deg.value]
+        wcs.wcs.ctype = ['RA---SIN','DEC--SIN']
+        wcs.wcs.cunit = ['DEG','DEG']
+        wcs.wcs.cdelt = np.degrees([-lcell, mcell])
+
+        self.wcs = wcs
         self.phase_center = SkyCoord(ra=ra, dec=dec, frame='icrs')
 
-        self.tstart = f.get_tstart()
+
         
         log.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s wcs=%s',
                  nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos), self.wcs)
@@ -853,8 +857,7 @@ class PipelinePlan(object):
         '''
         bldata = self.baselines(blid)
         return (bldata['UU'], bldata['VV'])
-        
-        
+
     @property
     def nf(self):
         '''Returns number of frequency channels'''

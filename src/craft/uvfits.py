@@ -27,16 +27,33 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 class UvFits(object):
 
-    def __init__(self, hdulist, max_nbl=None, mask=True):
+    def __init__(self, hdulist, max_nbl=None, mask=True, skip_blocks=0):
         '''
         @param hdulist FITS HDLISt typically got from pyfits.open
         @param max_nbl - if not none, only return this many baselines
+        @param skip_blocks - number of time blocks to skip
         '''
         self.hdulist = hdulist
         self.max_nbl = max_nbl
         self.flagant = []
         self.ignore_autos = True
         self.mask = mask
+
+        # first we calculate the number of baselines in a block
+        assert skip_blocks >= 0, f'Invalid skip_blocks={skip_blocks}'
+        self.__nstart = 0
+        startbl = self.baselines
+        self.nbl = len(startbl)
+        # next we set the start block for the rest of time
+        self.__nstart = self.nbl*skip_blocks
+        self.skip_blocks = skip_blocks
+        nrows = len(self.hdulist[0].data)
+        log.debug('File contains %d baselines. Skipping %d blocks with nstart=%d', self.nbl, skip_blocks, self.__nstart)
+
+        if self.__nstart >= nrows:
+            raise ValueError(f'Requested skip {skip_blocks} larger than file. nrows={nrows} nbl={self.nbl} nstart={self.__nstart}')
+
+        
 
     def set_flagants(self, flagant):
         '''
@@ -51,12 +68,18 @@ class UvFits(object):
 
     @property
     def vis(self):
-        '''Returns visbility table
         '''
-        return self.hdulist[0].data
+        Returns visbility table
+        if skip_blocks is > in teh constructor, then that number of blocks will have been skipped and you won't see them
+
+        '''
+        return self.hdulist[0].data[self.__nstart:]
 
     @property
     def start_date(self):
+        '''
+        Returns MJD float of first (skipped) sample in the file
+        '''
         row = self.vis[0]
         d0 = row['DATE']
         try:
@@ -136,14 +159,30 @@ class UvFits(object):
         return tstart as astropy Time from header otherwise first row of fits table
         '''
         f = self
+        first_sample_date = Time(f.start_date, format='jd', scale='utc')
+
         if 'DATE-OBS' in f.header:
             tstart = Time(f.header['DATE-OBS'], format='isot', scale='utc')
+            assert self.skip_blocks == 0, f'This date will be be incorrect if skip_blocks={self.skip_blocks} is nonzero - header={tstart} but first integration is {first_sample_date}. This code needs ot be fixed if you neeed it'
         else:
-            jdfloat = f.start_date
-            tstart = Time(jdfloat, format='jd', scale='utc')
+            tstart = first_sample_date
         
         return tstart
+
+    @property
+    def source_table_entry(self):
+        f = self
+        source_table = f.hdulist[3].data
+        first_datarow = next(iter(self.baselines.values()))
+        first_targetidx = int(first_datarow['SOURCE'])
+        row = source_table[first_targetidx-1] # FITS convention is 1 based
         
+        if len(source_table) > 1:
+            warnings.warn(f'Dont yet support multiple source files: {len(source_table)} - using source at {first_targetidx} which is {row}')
+            
+        return row
+
+    
     def get_target_position(self, targidx=0):
         '''
         return (ra,dec) degrees from header if available, otherwise source table
@@ -154,34 +193,38 @@ class UvFits(object):
             dec = f.header['OBSDEC'] * u.degree
             log.info('Got radec=(%s/%s) from OBSRA header', ra, dec)
         else:
-            source_table = f.hdulist[3].data
-            first_datarow = next(iter(self.baselines.values()))
-            first_targetidx = int(first_datarow['SOURCE'])
-            row = source_table[first_targetidx-1] # FITS convention is 1 based
-
-            if len(source_table) > 1:
-                warnings.warn(f'Dont yet support multiple source files: {len(source_table)} - using source at {first_targetidx} which is {row}')
-                
+            row = self.source_table_entry
             src = row['SOURCE']
             ra = row['RAEPO']*u.degree
             dec = row['DECEPO']*u.degree
             log.info('Got radec=(%s/%s) from source table for %s', ra, dec, src)
 
         return (ra, dec)
-            
 
+    @property
+    def target_name(self, targidx=0):
+        f = self
+        if 'OBJECT' in f.header:
+            src =f.header['OBJECT']
+        else:
+            row = self.source_table_entry
+            src = row['SOURCE']
+            
+        return src
 
     def close(self):
         return self.hdulist.close()
 
 def open(*args, **kwargs):
     logging.info('Opening file %s', args[0])
-    return UvFits(fits.open(*args, **kwargs))
+    return UvFits(fits.open(*args, **kwargs), **kwargs)
 
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
+    parser.add_argument('--skip-blocks', type=int, default=0, help='Skip this many bllocks in teh UV file before usign it for UVWs and data')
+
     parser.add_argument(dest='files', nargs='+')
     parser.set_defaults(verbose=False)
     values = parser.parse_args()
@@ -189,6 +232,11 @@ def _main():
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
+
+    f = open(values.files[0], skip_blocks=values.skip_blocks)
+    f.plot_baselines()
+    pylab.show()
+    
     
 
 if __name__ == '__main__':
