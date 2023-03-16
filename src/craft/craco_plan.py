@@ -16,7 +16,9 @@ import warnings
 from astropy.wcs import WCS
 from astropy import units as u
 from astropy.time import Time
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, Angle
+
+from craft.craco_wcs import CracoWCS
 
 from . import uvfits
 from . import craco_kernels
@@ -690,6 +692,7 @@ class PipelinePlan(object):
         assert freqs.min() == freqs[0]
         assert freqs.max() == freqs[-1]
         Npix = self.values.npix
+        self.npix = Npix
 
         if self.values.cell is not None:
             lcell, mcell = list(map(craco.arcsec2rad, self.values.cell.split(',')))
@@ -698,10 +701,14 @@ class PipelinePlan(object):
             los, mos = list(map(float, self.values.os.split(',')))
             lcell = lres/los
             mcell = mres/mos
+
+        lmcell = Angle([lcell*u.rad, mcell*u.rad])
+        self.lmcell = lmcell
             
         lfov = lcell*Npix
         mfov = mcell*Npix
         ucell, vcell = 1./lfov, 1./mfov
+
         fmax = freqs.max()
         foff = freqs[1] - freqs[0]
         lambdamin = 3e8/fmax
@@ -709,22 +716,16 @@ class PipelinePlan(object):
         vmax_km = vmax*lambdamin/1e3
 
         # Could get RA/DeC from fits table, or header. Header is easier, but maybe less correct
-        (ra, dec) = f.get_target_position()
-        self.ra = ra
-        self.dec = dec
+
+        target_skycoord = f.get_target_skycoord()
+        self.phase_center = target_skycoord
+        self.ra = target_skycoord.ra
+        self.dec = target_skycoord.dec
         self.tstart = f.get_tstart()
-        wcs = WCS(naxis=2)
-        wcs.wcs.crpix = [Npix/2 + 1,Npix/2 + 1] # honestly, I dont' understand if we need to +1 or not
-        wcs.wcs.crval = [ra.deg.value, dec.deg.value]
-        wcs.wcs.ctype = ['RA---SIN','DEC--SIN']
-        wcs.wcs.cunit = ['DEG','DEG']
-        wcs.wcs.cdelt = np.degrees([-lcell, mcell])
+        craco_wcs = CracoWCS.from_plan(self)
+        self.craco_wcs = craco_wcs
+        self.wcs = craco_wcs.wcs2 # The 2D WCS for images
 
-        self.wcs = wcs
-        self.phase_center = SkyCoord(ra=ra, dec=dec, frame='icrs')
-
-
-        
         log.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s wcs=%s',
                  nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos), self.wcs)
         
@@ -741,7 +742,6 @@ class PipelinePlan(object):
         self.ncu = 4 # hard coded
         self.nchunk_time = self.values.nt // (2*self.ncu)
         self.freqs = freqs
-        self.npix = Npix
         self.nbox = self.values.nbox
         self.boxcar_weight = self.values.boxcar_weight
         self.nuvwide = self.values.nuvwide

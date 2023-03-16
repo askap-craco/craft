@@ -49,6 +49,12 @@ def calc_ab(H, delta, phi):
 class CracoWCS:
     def __init__(self, target: SkyCoord, time: Time, cellsize, npix:int, inttime, site: EarthLocation=None):
         '''
+
+        Has 2 useful attributes
+        wcs2 is the 2D WCS for an image centered on the given phase center, which includes the generalised SIN slant orthographic projection described in Ord et al. 2010
+
+        wcs3 is wcs2 but includes the time axis, which is set to start at the given time and increases by inttime every pixel. This is useful for encoding a movie of images
+        
         :param: target - SkyCoord look direction phase center
         :time: Time to set WCS to
         :cellsize: (lcell, mcell) cell size 2 tuple as astropy Angle
@@ -58,9 +64,12 @@ class CracoWCS:
         '''
         if site is None:
             site = EarthLocation.of_site('ASKAP')
+
+        time.location = site # needed to remove warning
         
         lst = time.sidereal_time('apparent', site.lon)
         altaz = target.transform_to(AltAz(obstime=time, location=site))
+        assert altaz.alt.deg > 12, f'target is below ASKAP horizon {altaz} {lst}'
         hour_angle = lst - target.ra
         a,b = calc_ab(hour_angle.rad, target.dec.rad, site.lat.rad)
 
@@ -78,65 +87,40 @@ class CracoWCS:
         lcell, mcell = cellsize
         assert lcell > 0, 'Invalid LCELL'
         assert mcell > 0, 'Invalid MCELL'
-        wcs = WCS(naxis=2)
-        wcs.wcs.crpix = [npix/2 + 1,npix/2 + 1] # honestly, I dont' understand if we need to +1 or not
-        wcs.wcs.crval = [target.ra.deg, target.dec.deg]
-        wcs.wcs.ctype = ['RA---SIN','DEC--SIN']
-        wcs.wcs.cunit = ['deg','deg']
-        wcs.wcs.cdelt = [-lcell.deg, mcell.deg]
+        wcs = WCS(naxis=3)
+        wcs.wcs.crpix = [npix/2 + 0.5,npix/2 + 0.5, 1] # honestly, I dont' understand if we need to +0.5 or not, or 1. 
+        wcs.wcs.crval = [target.ra.deg, target.dec.deg, 0]
+        wcs.wcs.ctype = ['RA---SIN','DEC--SIN', 'TAI']
+        wcs.wcs.cunit = ['deg','deg','s']
+        wcs.wcs.cdelt = [-lcell.deg,
+                         mcell.deg,
+                         inttime.to(u.second).value]
+        # From Ord 2010...
         # The SIN projection is extended with the use
         #of the PV2_1 and PV2_2 FITS keywords set to a and -b, re-spectively.
         wcs.wcs.set_pv(((2,1,a), (2,2,-b)))
         wcs.wcs.timesys='TAI'
-        wcs.wcs.trefpos = 'TOPOCENTER'
+        # wcs.wcs.trefpos = 'topocenter' astropy prints warning if we set trefpos anod don't set obsgeo - and I don't know how to do that. it's probably not too important
         wcs.wcs.timeunit = 's'
         mjdref = time.tai.mjd
         # mjdref integer and fractional part
         wcs.wcs.mjdref[:] = (int(mjdref), mjdref - int(mjdref))
 
-        self.wcs2 = wcs
+        # wcs3 is 3D wcs
+        self.wcs3 = wcs
 
-        # Astropy makes a mess if we use the WCS
-        # We can add keywords to the header though
-        w3hdr = wcs.to_header()
-        w3hdr['NAXIS'] = 3
-        w3hdr['CUNIT3'] = 's'
-        w3hdr['CRVAL3'] = 0
-        w3hdr['CRPIX3'] = 0
-        w3hdr['CDELT3'] = inttime.to(u.second).value
-        w3hdr['CTYPE3'] = 'TAI'
-        self.wcs3_hdr = w3hdr
-        
+        # drop time axis to make 2d wcs
+        self.wcs2 = wcs.dropaxis(2)
 
-        # Now we make a copy of the 2d WCS and add a TAI
-        # Dimension, just in case people want to use that.
-        w3 = WCS(naxis=3)
-        # Copy data from 2D WCS
-        w3.wcs.crpix[:2] = wcs.wcs.crpix
-        w3.wcs.crval[:2] = wcs.wcs.crval
-        w3.wcs.ctype = ['RA--SIN','DEC--SIN','UTC'] # string proxies don't like to be sliced. Grrr
-        w3.wcs.cunit = ['deg','deg','s']
-        w3.wcs.cdelt[:2] = wcs.wcs.cdelt
-        wcs.wcs.set_pv(((2,1,a), (2,2,-b)))
-        wcs.wcs.timesys='TAI'
-        wcs.wcs.trefpos = 'TOPOCENTER'
-        wcs.wcs.timeunit = 's'
-        mjdref = time.tai.mjd
-        # mjdref integer and fractional part
-        wcs.wcs.mjdref[:] = (int(mjdref), mjdref - int(mjdref))
 
-        # Add time axis
-        w3.wcs.crpix[2] = 0 # beginning of integration
-        w3.wcs.crval[2] = 0 # 0 w.r.t. MJDREF
-        w3.wcs.cdelt[2] = inttime.to(u.second).value # integration time
-        w3.wcs.set_pv(((2,1,a), (2,2,-b)))
-        w3.wcs.timesys='TAI'
-        w3.wcs.trefpos = 'TOPOCENTER'
-        w3.wcs.timeunit = 's'
-        # mjdref integer and fractional part
-        w3.wcs.mjdref[:] = (int(mjdref), mjdref - int(mjdref))
-
-        self.wcs3 = w3
+    
+    @staticmethod
+    def from_plan(plan):
+        return CracoWCS(plan.phase_center,
+                        plan.tstart,
+                        plan.lmcell,
+                        plan.npix,
+                        plan.tsamp_s)
 
        
 def _main():
