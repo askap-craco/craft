@@ -36,10 +36,10 @@ def sigproc_sex2deg(x):
     Computes a decimal number in degrees from a rediculous sigproc number in the form
     ddmmss.s
 
-    >>> print '%0.5f' % sigproc_sex2deg(123456.789)
-    12.58244
-    >>> print '%0.5f' % sigproc_sex2deg(-123456.789)
-    -12.58244
+    >>> '{:0.5f}'.format(sigproc_sex2deg(123456.789))
+    '12.58244'
+    >>> '{:0.5f}'.format(sigproc_sex2deg(-123456.789))
+    '-12.58244'
     >>> sigproc_sex2deg(0)
     0.0
     '''
@@ -56,6 +56,29 @@ def sigproc_sex2deg(x):
     
     return dout
 
+
+def sigproc_deg2sex(x):
+    '''
+    Converts degrees to rediculous sigproc number in the form
+    dd:mm:ss.s
+
+    >>> '{:0.3f}'.format(sigproc_deg2sex(188.7338458333333/15.0))
+    '123456.123'
+    >>> '{:0.4f}'.format(sigproc_deg2sex(-22.229355194444445))
+    '-221345.6787'
+    '''
+    sign = 1.0
+    if x < 0:
+        sign = -1
+        
+    x = abs(x)
+    dd = int(x)
+    mm = int((x-dd)*60)
+    ss = (x - dd - mm/60.0)*3600.
+    sexout = sign*(dd * 10000 + mm*100 + ss)
+    
+    return sexout
+        
 def unpack(hdr, param, struct_format):
     idx = hdr.find(param.encode('utf-8'))
     if idx < 0:
@@ -100,12 +123,21 @@ def write(f, v, struct_format):
 
 class SigprocFile(object):
     def __init__(self, filename, mode='rb', header=None):
+        '''
+        Header keys:
+        src_raj/src_dej  = weird sigproc headder
+        src_raj_deg/src_dej_deg = normal degrees
+        When writing, you probably want to specfiy the _deg versions, and they'll
+        be automagically convertedto the weird versin
+        '''
+
         self.filename = filename
         if not mode.endswith('b'):
             mode += 'b'
 
         assert mode == 'rb' or mode == 'wb', f'Invalid mode for sigproc file {filename} {mode}'
         self.fin = open(self.filename, mode)
+
         if header is not None:
             self._write_header(header)
             self.header = header
@@ -121,6 +153,10 @@ class SigprocFile(object):
     def _write_header(self, header):
         f = self.fin
         f.seek(0)
+        if 'src_raj_deg' in header.keys():
+            header['src_raj'] = sigproc_deg2sex(header['src_raj_deg']/15.0)
+            header['src_dej'] = sigproc_deg2sex(header['src_dej_deg'])
+            
         write_str(f, 'HEADER_START')
 
         for k, v in header.items():
@@ -139,7 +175,10 @@ class SigprocFile(object):
                 print('Cannot write header', k)
 
         write_str(f, 'HEADER_END')
+        f.flush()
         self.data_start_idx = f.tell()
+
+        
         
     def _read_header(self):
         fin = self.fin
