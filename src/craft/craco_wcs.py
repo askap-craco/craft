@@ -63,7 +63,15 @@ class CracoWCS:
         :site: if None defaults to EarthLocation.of_site('ASKAP') else the site
         '''
         if site is None:
-            site = EarthLocation.of_site('ASKAP')
+            try:
+                site = EarthLocation.of_site('ASKAP')
+            except:
+                # stupid old versions of stupid astropy don't stupid have askap
+                # stupid
+                site = EarthLocation.from_geocentric(-2556084.65961682,
+                                                     5097398.3818179,
+                                                     -2848424.06141933,
+                                                     u.meter)
 
         time.location = site # needed to remove warning
         
