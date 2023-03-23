@@ -201,6 +201,12 @@ class UvFits(object):
 
         return (ra, dec)
 
+    def get_target_skycoord(self):
+        (ra, dec) = self.get_target_position()
+        coord = SkyCoord(ra, dec, frame='icrs')
+        return coord
+        
+
     @property
     def target_name(self, targidx=0):
         f = self

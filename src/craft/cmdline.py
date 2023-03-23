@@ -31,7 +31,17 @@ def strrange(rangestr):
     >>> strrange('1-3,4,7,9-11')
     [1, 2, 3, 4, 7, 9, 10, 11]
 
+    >>> strrange('')
+    []
+
+    >>> strrange(None)
+    []
+
     '''
+
+    if rangestr == '' or rangestr is None:
+        return []
+    
     fullrange = []
     for c in rangestr.split(','):
         cbits = c.split('-')
