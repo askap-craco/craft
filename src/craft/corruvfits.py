@@ -27,7 +27,7 @@ dtype_to_bitpix = {np.dtype('>i2'):16,
                    np.dtype('>f8'):-64}
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT', output_dtype=np.float32, bmax=None, time_scale=1.0*u.day):
+    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT', output_dtype=np.dtype('>f4'), bmax=None, time_scale=1.0*u.day):
         '''
         Make a correlator UV fits file
         :fname: file name

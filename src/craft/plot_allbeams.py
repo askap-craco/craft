@@ -93,7 +93,8 @@ def tscrunch(beams, factor):
         tend = (t+1)*factor
         newbeams[t, :, :] = beams[tstart:tend, :, :].sum(axis=0)/np.sqrt(factor)
 
-    return newbeams
+    # inelegant - just mask where 0
+    return np.ma.masked_equal(newbeams, 0)
 
 def fscrunch(beams, factor):
     ntimes, nbeams, nfreq = beams.shape
@@ -103,7 +104,9 @@ def fscrunch(beams, factor):
         fend = (f+1)*factor
         newbeams[:, :, f] = beams[:, :, fstart:fend].sum(axis=2)/np.sqrt(factor)
 
-    return newbeams
+
+    
+    return np.ma.masked_equal(newbeams, 0)
 
 
 def dmroll(beams, dm, fch1, foff, tint):
@@ -428,6 +431,12 @@ class Plotter(object):
         print('scrunching t=', self.tscrunch_factor, 'f=', self.fscrunch_factor, 'dm', self.dm)
 
         orig_ntimes, orig_nbeams, orig_nfreq = beams.shape
+
+        if self.rescale:
+            print('Doing rescale')
+            beams -= beams.mean(axis=0)
+            beams /= beams.std(axis=0) 
+
         
         if self.dm != 0:
             beams = dmroll(beams, self.dm, f0.fch1/1e3, f0.foff/1e3, f0.tsamp*1e3)
@@ -438,11 +447,6 @@ class Plotter(object):
         if self.fscrunch_factor != 1:
             beams = fscrunch(beams, self.fscrunch_factor)
             
-        if self.rescale:
-            print('Doing rescale')
-            beams -= beams.mean(axis=0)
-            beams /= beams.std(axis=0) 
-
         ntimes, nbeams, nfreq = beams.shape
         mjdstart = f0.tstart
         
@@ -458,7 +462,7 @@ class Plotter(object):
         src_raj = f0.src_raj
         src_dej = f0.src_dej
         freqs = np.linspace(fch1, fch1 + nfreq*foff*self.fscrunch_factor, nfreq, endpoint=True)
-        times=  np.linspace(tstart*tsamp, (ntimes+tstart)*tsamp*self.tscrunch_factor, ntimes, endpoint=True)
+        times=  np.linspace(tstart*tsamp, (orig_ntimes+tstart)*tsamp, ntimes, endpoint=True)
 
         assert(len(freqs) ==nfreq)
         
