@@ -70,7 +70,8 @@ if __name__ == '__main__':
                                'vcraft2fil=craft.vcraft2fil:_main',
                                'uvfits2fil=craft.uvfits2fil:_main',
                                'antenna_locations=craft.antenna_locations:_main',
-                               'filadd=craft.filadd:_main'
+                               'filadd=craft.filadd:_main',
+                               'pltcalc11=craft.calc11:_main'
             ]
             },
         zip_safe=False,

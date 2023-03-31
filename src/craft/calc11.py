@@ -13,11 +13,83 @@ import sys
 import logging
 from collections import OrderedDict
 import warnings
+from astropy.utils import iers
+from astropy import units as u
+from astropy.time import Time
+from astropy.table import QTable
+from astropy.coordinates import SkyCoord
+import subprocess
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+def leapSecondsAt(t: Time):
+    '''
+    Returns the leap second value at a particular Astropy time
+    '''
+    dtaiutc = (t.tai.datetime - t.utc.datetime).seconds
+    return dtaiutc
+
+def getpoly(polyvals, ant,key):
+    return np.array([p[ant][key] for p in polyvals])
+
+def get_uvw(polyvals, ant):
+    u = getpoly(polyvals,ant,'U (m)')
+    v = getpoly(polyvals,ant,'V (m)')
+    w = getpoly(polyvals,ant,'W (m)')
+    return np.array([u,v,w])
+
+def get_ant_uvw(telnames, polyvals):
+    return np.array([get_uvw(polyvals, ant) for ant in telnames]).transpose(0,2,1)
+
+def uvw_ant_to_baselines(uvw):
+    nant = uvw.shape[0]
+    bl = []
+    for iant1 in range(nant):
+        for iant2 in range(iant1+1,nant):
+            bl.append(uvw[iant1,...] - uvw[iant2,...])
+    return np.array(bl)
+
 
 class CalcFile(object):
+    calc_template =  '''
+JOB ID:             374055
+JOB START TIME:     {start.utc.mjd}
+JOB STOP TIME:      {stop.utc.mjd}
+DUTY CYCLE:         1.000
+OBSCODE:            CRAFTFR
+DIFX VERSION:       trunk
+SUBJOB ID:          0
+SUBARRAY ID:        0
+VEX FILE:           /fred/oz002/adeller/askap/frb190608/0407/data/c1_f0/craftfrb.vex
+START MJD:          {start.utc.mjd}
+START YEAR:         {start.utc.datetime.year}
+START MONTH:        {start.utc.datetime.month}
+START DAY:          {start.utc.datetime.day}
+START HOUR:         {start.utc.datetime.hour}
+START MINUTE:       {start.utc.datetime.minute}
+START SECOND:       {start.utc.datetime.second}
+SPECTRAL AVG:       1
+TAPER FUNCTION:     UNIFORM
+NUM SOURCES:        1
+SOURCE 0 NAME:      {name}
+SOURCE 0 RA:        {skycoord.ra.rad}
+SOURCE 0 DEC:       {skycoord.dec.rad}
+SOURCE 0 CALCODE:    
+SOURCE 0 QUAL:      0
+NUM SCANS:          1
+SCAN 0 IDENTIFIER:  No0001
+SCAN 0 START (S):   0
+SCAN 0 DUR (S):     {duration}
+SCAN 0 OBS MODE NAME:askap
+SCAN 0 UVSHIFT INTERVAL (NS):2000000000
+SCAN 0 AC AVG INTERVAL (NS):2000000
+SCAN 0 POINTING SRC:0
+SCAN 0 NUM PHS CTRS:1
+SCAN 0 PHS CTR 0:   0
+NUM SPACECRAFT:     0
+IM FILENAME:        /fred/oz002/adeller/askap/frb190608/0407/data/c1_f0/craftfrb_374055.im
+FLAG FILENAME:      /fred/oz002/adeller/askap/frb190608/0407/data/c1_f0/craftfrb_374055.flag
+'''
     def __init__(self):
         self.cards = OrderedDict()
 
@@ -57,11 +129,103 @@ class CalcFile(object):
             self.addtel('Z (m)', 'location.itrf', 2)
             self.addtel('SHELF', default='NONE')
 
+    def add_eops(self, eoptab=None, toff=3):
+        '''
+        Add entries from the given EOP table to this CalcFile
+        if eoptab is None, it gets the astropy.ieors.earth_origientation_table()
+        and uses the START MJD from the table to populate the CalcFile
+        :eoptab: Table of EOP values -= we use 'MJX', 'PM_x', PM_y'
+        :toff: number of days either side of START_MJD to find entries for if eoptab is None
+        '''
+
+
+        neops = self.cards.get('NUM EOPS', 0)
+        assert neops == 0, f'CalcFile already has {neops} eops'
+        
+        if eoptab is None:
+            if 'START MJD' not in self.cards.keys():
+                raise ValueError('No START MJD in file. Cant add eops')
+                
+            start = Time(float(self.cards['START MJD']), scale='utc', format='mjd')
+            eoptab = iers.earth_orientation_table.get()
+            eoptab = eoptab[(start.mjd -toff < eoptab['MJD'].value) & (eoptab['MJD'].value < start.mjd+toff)]
+        
+        assert len(eoptab) > 0, 'Not enough EOP table entries'
+
+        self += ('NUM EOPS', int(len(eoptab)))
+        for irow, row in enumerate(eoptab):
+            mjd = Time(row['MJD'], scale='utc', format='mjd')
+            self += (f'EOP {irow} TIME (mjd)', str(int(mjd.value)))
+            self += (f'EOP {irow} TAI_UTC (sec)',str(leapSecondsAt(mjd)))
+            self += (f'EOP {irow} UT1_UTC (sec)', str(row['UT1_UTC'].to(u.second).value))
+            self += (f'EOP {irow} XPOLE (arcsec)', str(row['PM_x'].to(u.arcsecond).value))
+            self += (f'EOP {irow} YPOLE (arcsec)', str(row['PM_y'].to(u.arcsecond).value))
+
+        return self
+
+    def __str__(self):
+        s = ''
+        for k,v in self.cards.items():
+            kcol = k.strip() +':'
+            s += '{:<20}{}\n'.format(kcol,v) # DIFX looks at first 20 rows for keyword
+
+        return s
+        
+
     def writeto(self, foutname):
         with open(foutname, 'w') as fout:
-            for k,v in self.cards.items():
-                kcol = k +':'
-                fout.write('{:<20}{}\n'.format(kcol,v))
+            fout.write(str(self))
+
+    @staticmethod
+    def fromstring(s):
+        f = CalcFile()
+        for line in s.split('\n'):
+            bits = line.split(':')
+            if line.strip().startswith('#'):
+                continue
+            
+            if len(bits) == 2:
+                f += (bits[0].strip(), bits[1].strip())
+
+        return f
+
+    @staticmethod
+    def from_time_src(start:Time, stop:Time, skycoord:SkyCoord, name:str):
+        '''
+        Creates basic calcfile from the given start, stop and source coordinates
+        uses the built-in calc_template string, so it'll have some weird old stuff
+        but I'm too scard to work out what to remove.
+        
+        :start: Astropy start time
+        :stop: Astropy stop time
+        :name: source name
+        :skycoord: Astropy SkyCoord
+        '''
+        duration = (stop.datetime - start.datetime).seconds
+        s = CalcFile.calc_template.format(start=start, stop=stop, name=name, skycoord=skycoord, duration=duration)
+        return CalcFile.fromstring(s)
+
+
+def run_calc(calc_file:CalcFile, filename:str):
+    '''
+    Runs difxcalc on the given calcfile with the name supplied.
+    Returns a calc ResultsFile from the result
+    :calc_file: CalcFile with all the bits in it.
+    :filename: Name of the file to write the file to. must end in '.calc'
+    e.g. myscan.calc. difxcalc will write the results to a file with the same root and ending in .im
+    '''
+    assert filename.endswith('.calc'), f'Invalid calc file name {filename}'
+    outfile = filename.replace('.calc','.im')
+    try:
+        os.remove(outfile)
+    except FileNotFoundError:
+        pass
+
+    calc_file.writeto(filename)
+    subprocess.call(['difxcalc',filename])
+
+    return ResultsFile(outfile)
+
 
 class Poly(object):
     def __init__(self, polyid):
@@ -181,6 +345,39 @@ class Scan(object):
                 resdelta[ant][polyname] = value - ref_results[polyname]
 
         return resdelta
+
+    def eval_src0_poly_table(self, time:Time):
+        '''
+        Returns a numpy array of the values at the given astropy time
+        Instead of the rediculous dictionary version it returns an astropy QTable
+        Units should be correctly set
+        column names should have units stripped and be lower case
+        UTC of time is used as that's what used in calc11
+        
+        '''
+        polyvals = [self.eval_src0_poly(m) for m in time.utc.value]
+        telnames = self.resfile.telnames
+        p0 = polyvals[0]
+        v0 = list(p0.values())[0]
+        colnames = list(v0.keys())
+        d  = QTable()
+        d['antennas'] = telnames
+        for cname in colnames:
+            if cname.endswith('(us)'):
+                unit = u.microsecond
+            elif cname.endswith('(m)'):
+                unit = u.meter
+            elif cname == 'AZ' or cname == 'EL GEOM':
+                unit = u.degree
+            else:
+                raise ValueError(f'Unknown unit for field {cname}')
+        
+        
+            colname = cname.split(' ')[0].lower()
+            d[colname] = np.array([getpoly(polyvals, ant, cname) for ant in telnames])*unit
+
+        return d
+        
 
 class ResultsFile(OrderedDict):
     def __init__(self, fname):

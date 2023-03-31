@@ -52,7 +52,7 @@ def load_parset(fcmfile, prefix='common.antenna.ant'):
         if line.startswith(prefix):
             bits = key.split('.')
             antname = bits[2]
-            print(line, antname)
+            #print(line, antname)
             if len(antname) <= 3:
                 continue
 
