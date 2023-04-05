@@ -90,8 +90,13 @@ class UvFits(object):
         return d0
 
     @property
+    def tsamp(self):
+        return self.vis[0]['INTTIM']
+
+    @property
     def channel_frequencies(self):
         return craco.get_freqs(self.hdulist)
+
 
     @property
     def baselines(self):

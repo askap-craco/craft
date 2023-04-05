@@ -582,7 +582,7 @@ def parse_gpplt(fin):
     containing x values (dependant on the type of file)
     and values is a (len(x), Nant) numpy array
     '''
-    with open(fin, 'rU') as f:
+    with open(fin, 'rt') as f:
 
         all_values = [] 
         curr_values = []

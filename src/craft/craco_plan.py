@@ -679,7 +679,7 @@ class PipelinePlan(object):
             f.set_flagants(values.flag_ants)
         
         log.info('making Plan values=%s', self.values)
-
+        self.__tsamp = f.tsamp
         umax, vmax = f.get_max_uv()
         lres, mres = 1./umax, 1./vmax
         baselines = f.baselines
@@ -911,8 +911,7 @@ class PipelinePlan(object):
         Returns sample time in seconds
         '''
 
-        # Hard coed for now - need to tie to the sample rate
-        return 1.7e-3*u.second
+        return self.__tsamp*u.second
 
     @property
     def nant(self):

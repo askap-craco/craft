@@ -283,9 +283,12 @@ class CorrUvFitsFile(object):
         :uvw: UVW in meters
         :mjd: MJD of integration - you must have time_scale=1.0day
         :t: If Not none, this is put into the file raw for the date, instead of mjd0.
+        :source: 1-indexed source id
         '''
         assert ia1 >= 0
         assert ia2 >= 0
+        assert 1<= source <= len(self.sources), f'Invaoid source ID={source}. Source table has {len(self.sources)}'
+
         visdata_all = np.recarray(1, dtype=self.dtype)
         visdata = visdata_all[0]
         if weights is None:
