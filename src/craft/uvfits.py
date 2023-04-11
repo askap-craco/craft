@@ -91,7 +91,16 @@ class UvFits(object):
 
     @property
     def tsamp(self):
-        return self.vis[0]['INTTIM']
+        '''
+        Return sample time in seconds
+        '''
+        if 'INTTIME' in self.vis[0]:
+            ts = self.vis[0]['INTTIM']
+        else:
+            warnings.warn('Unknown int tiem in file. returning 1ms')
+            ts = 1e-3/3600/24
+
+        return ts
 
     @property
     def channel_frequencies(self):

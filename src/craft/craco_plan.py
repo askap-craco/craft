@@ -338,7 +338,11 @@ class FdmtPlan(object):
         # create an FDMT object for each run so  we can use it to calculate the lookup tbales
         #     def __init__(self, f_min, f_off, n_f, max_dt, n_t, history_dtype=None):
 
-        fdmts = [fdmt.Fdmt(fch1-self.pipeline_plan.foff/2.0, self.pipeline_plan.foff, ncin, ndout, 1, do_correction=False) for fch1 in self.run_fch1]
+        # do_correction = True makes the DM track pretty thign
+        # do_correction = False basically doubles the width which makes the whole thing very wide and noisey
+        # SEe "Testing image pipeline with impulses.ipynb.
+        do_correction = True
+        fdmts = [fdmt.Fdmt(fch1-self.pipeline_plan.foff/2.0, self.pipeline_plan.foff, ncin, ndout, 1, do_correction=do_correction) for fch1 in self.run_fch1]
         fdmt_luts = np.array([thefdmt.calc_lookup_table() for thefdmt in fdmts])
         niter = int(np.log2(ncin))
         # final LUTs we need to copy teh same LUT for every NUVWIDE
@@ -959,6 +963,8 @@ def add_arguments(parser):
     parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s', '--show', action='store_true', help='Show plots')
     parser.add_argument('--target-input-rms', type=float, default=512, help='Target input RMS')
+    parser.add_argument('--calibration', help='Calibration .bin file or root of Miriad files to apply calibration')
+
 
 
 def get_parser():
