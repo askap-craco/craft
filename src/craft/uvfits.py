@@ -94,11 +94,11 @@ class UvFits(object):
         '''
         Return sample time in seconds
         '''
-        if 'INTTIME' in self.vis[0]:
-            ts = self.vis[0]['INTTIM']
-        else:
-            warnings.warn('Unknown int tiem in file. returning 1ms')
-            ts = 1e-3/3600/24
+        try:
+            ts = self.vis[0]['INTTIM'] # seconds
+        except KeyError:
+            warnings.warn('Unknown int time in file. returning 1ms')
+            ts = 1e-3 # seconds
 
         return ts
 
