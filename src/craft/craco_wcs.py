@@ -96,7 +96,7 @@ class CracoWCS:
         assert lcell > 0, 'Invalid LCELL'
         assert mcell > 0, 'Invalid MCELL'
         wcs = WCS(naxis=3)
-        wcs.wcs.crpix = [npix/2 + 0.5,npix/2 + 0.5, 1] # honestly, I dont' understand if we need to +0.5 or not, or 1. 
+        wcs.wcs.crpix = [npix/2 + 1,npix/2 + 1, 1] # honestly, I dont' understand if we need to +0.5 or not, or 1. 
         wcs.wcs.crval = [target.ra.deg, target.dec.deg, 0]
         wcs.wcs.ctype = ['RA---SIN','DEC--SIN', 'TAI']
         wcs.wcs.cunit = ['deg','deg','s']
