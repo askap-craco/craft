@@ -470,7 +470,9 @@ def get_freqs(hdul):
     assert foff > 0, 'cant handle negative frequencies anywhere athe moment foff=%f' % foff
     vis = hdul[0].data
     nchan = vis[0].data.shape[-3]
-    freqs = (np.arange(nchan, dtype=np.float) - ch1)*foff + fch1 # Hz
+
+    # Need to add 1 due to stupid FITS convention. Grr.
+    freqs = (np.arange(nchan, dtype=np.float) - ch1 + 1)*foff + fch1 # Hz
 
     return freqs
 

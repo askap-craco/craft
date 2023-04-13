@@ -95,10 +95,10 @@ class UvFits(object):
         Return sample time in seconds
         '''
         try:
-            ts = self.vis[0]['INTTIM'] # seconds
+            ts = self.vis[0]['INTTIM']*u.second # seconds
         except KeyError:
             warnings.warn('Unknown int time in file. returning 1ms')
-            ts = 1e-3 # seconds
+            ts = 1e-3*u.second # seconds
 
         return ts
 

@@ -712,6 +712,7 @@ class PipelinePlan(object):
         lfov = lcell*Npix
         mfov = mcell*Npix
         ucell, vcell = 1./lfov, 1./mfov
+        self.uvcell = (ucell, vcell)
 
         fmax = freqs.max()
         foff = freqs[1] - freqs[0]
@@ -915,7 +916,7 @@ class PipelinePlan(object):
         Returns sample time in seconds
         '''
 
-        return self.__tsamp*u.second
+        return self.__tsamp
 
     @property
     def nant(self):
