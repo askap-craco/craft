@@ -42,7 +42,9 @@ def calc_ab(H, delta, phi):
     Z = arccos(cos_Z)
     
     a = tan(Z) * sin(chi) # Equation 4
-    b = -tan(Z) * cos(chi) # Equation 5
+
+    # Steve's equation 5
+    b = tan(Z) * cos(chi) # Equation 5
 
     return (a, b)
 
