@@ -43,7 +43,9 @@ def calc_ab(H, delta, phi):
     
     a = tan(Z) * sin(chi) # Equation 4
 
-    # Steve's equation 5
+    # Steve's equation 5 has a minus sign in front of tan(Z)
+    # I found I needed to remove it because otherwise my UVWs didn't fall on teh correct plane
+    # see CRACO-115 for details.
     b = tan(Z) * cos(chi) # Equation 5
 
     return (a, b)
