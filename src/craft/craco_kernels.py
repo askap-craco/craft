@@ -92,31 +92,107 @@ class Gridder(Kernel):
     Does Gridding of UV data into a complex grid
     '''
     
-    def __call__(self, data1, data2=None):
+    def __call__(self, block):
         '''
-        Grids the data
+        Performs complex to complex gridding of the visibility data
         
-        :data1: NUV visibilities
-        :data2: If not None, NUV visibilities and the gridder does complex to real gridding,
-        so that after FFT you get data1 in the real part and data2 in the imaginary part.
+        Params
+        ------
+        block: np.ndarray or numpy.ma.core.MaskedArray or dict
+                Block containing [nbl, nf, nt] complex visibility data (if array)
+                Dict containing [nf, nt] complex visibility data for nbl baselines (if dict)
         '''
+        if type(block) not in [np.ndarray, np.ma.core.MaskedArray, dict]:
+            raise Exception(f"I expected a np.ndarray/masked_array/dict, but got {type(block)}")
+        
+        if type(block) == dict:
+            expected_nbl = self.plan.nbl
+            assert len(block) == expected_nbl, "Vis dict did not have expected no. of baselines"
+            blids = list(block.keys())
+            data0 = block[blids[0]]
+            assert data0.ndim == 2, f"Expected a 2-D array for each baseline, got-{data0.ndim}"
+            assert data0.shape[0] == self.plan.nf
+            nt = data0.shape[-1]
+
+        else:
+            assert block.ndim == 3, "block needs to have [nbl, nf, nt] shape"
+            assert block.shape[:2] == (self.plan.nbl, self.plan.nf)
+            nt = block.shape[-1]
+
         npix = self.plan.npix
-        g = np.zeros((npix, npix), dtype=self.plan.dtype)
-        plan = self.plan.uv_plan
-        nuv = len(plan)
-        assert data1.shape[0] == nuv, 'UVPlan and grid data have different NUV'
+        assert nt >= 2, "Block needs to have atleast 2 time samples to perform CPLX to CPLX gridding"
+        assert nt%2 == 0, "Block needs to have even number of samples"
+        g = np.zeros((npix, npix, nt//2), dtype=self.plan.dtype)
+        nuv = len(self.plan.uvcells)
+
         for iuv in range(nuv):
-            upix, vpix = list(map(int, plan[iuv, 2:4]))
-            v1 = data1[iuv]
-            if data2 is not None:
-                v2 = data2[iuv]*1j
+            cell = self.plan.uvcells[iuv]
+            upix, vpix = cell.uvpix
+
+            if type(block) == dict:
+                v1 = block[cell.blid][cell.chan_slice, ::2].sum(axis=0)
+                v2 = block[cell.blid][cell.chan_slice, 1::2].sum(axis=0) * 1j
             else:
-                v2 = 0
+                bl_idx = np.where(self.plan.baseline_order == cell.blid)[0][0]
+                v1 = block[bl_idx, cell.chan_slice, ::2].sum(axis=0)
+                v2 = block[bl_idx, cell.chan_slice, 1::2].sum(axis=0) * 1j
                 
-            g[vpix, upix] += v1 + v2
-            g[npix-1-vpix, npix-1-upix] += np.conj(v1) - np.conj(v2)
+            g[vpix, upix, :] += v1 + v2
+            g[-vpix, -upix, :] += np.conj(v1) - np.conj(v2)
 
         return g
+    
+    def complx_to_real_gridder(self, block):
+        '''
+        Performs complex to real gridding of the visibility data
+        
+        Params
+        ------
+        block: np.ndarray or numpy.ma.core.MaskedArray or dict
+                Block containing [nbl, nf, nt] complex visibility data (if array)
+                Dict containing [nf, nt] complex visibility data for nbl baselines (if dict)
+        '''
+        if type(block) not in [np.ndarray, np.ma.core.MaskedArray, dict]:
+            raise Exception(f"I expected a np.ndarray/masked_array/dict, but got {type(block)}")
+        
+        if type(block) == dict:
+            expected_nbl = self.plan.nbl
+            assert len(block) == expected_nbl, "Vis dict did not have expected no. of baselines"
+            blids = list(block.keys())
+            data0 = block[blids[0]]
+            assert data0.ndim == 2, f"Expected a 2-D array for each baseline, got-{data0.ndim}"
+            assert data0.shape[0] == self.plan.nf
+            nt = data0.shape[-1]
+
+        else:
+            assert block.ndim == 3, "block needs to have [nbl, nf, nt] shape"
+            assert block.shape[:2] == (self.plan.nbl, self.plan.nf)
+            nt = block.shape[-1]
+
+        npix = self.plan.npix
+        assert nt >= 2, "Block needs to have atleast 2 time samples to perform CPLX to CPLX gridding"
+        assert nt%2 == 0, "Block needs to have even number of samples"
+        g = np.zeros((npix, npix, nt), dtype=self.plan.dtype)
+        nuv = len(self.plan.uvcells)
+
+        for iuv in range(nuv):
+            cell = self.plan.uvcells[iuv]
+            upix, vpix = cell.uvpix
+
+            if type(block) == dict:
+                v1 = block[cell.blid][cell.chan_slice,:].sum(axis=0)
+                v2 = 0
+            else:
+                bl_idx = np.where(self.plan.baseline_order == cell.blid)[0][0]
+                v1 = block[bl_idx, cell.chan_slice, :].sum(axis=0)
+                v2 = 0
+                
+            g[vpix, upix, :] += v1 + v2
+            g[-vpix, -upix, :] += np.conj(v1) - np.conj(v2)
+
+        return g
+    
+    
 
 def idm_cff(fch1, plan):
     '''
