@@ -935,6 +935,28 @@ class PipelinePlan(object):
         
         return mx
 
+
+    def pointsource(self, coord, amp=1, noiseamp=0):
+        '''
+        Returns points source visibilities at given astropy skycoord
+        :coord: Coordinate of point source
+        :amp: amplitude
+        :noiseamp: noise amplitude
+        '''
+        #psi = Angle('0.6d') # offset degrees - RA direction
+        #theta = Angle('0.7d') # offset degrees - dec direction
+        #expected_dec = plan.phase_center.dec + theta # not sure why I need a negative here
+        # RA needs to be decremented by source cos dec
+        #expected_ra = np.degrees(plan.phase_center.ra.rad - psi.rad/np.cos(expected_dec.rad))
+        #expected_pos = SkyCoord(expected_ra, expected_dec, unit='deg')
+
+        psi_rad= -coord.ra.rad*np.cos(coord.dec.rad) + plan.phase_center.rad
+        
+        lm = np.sin([psi.rad, theta.rad])
+
+        ps = craco.pointsource(amp, lm, self.freqs, self.baseline_order, self.baselines, noiseamp)
+        return ps
+        
 def add_arguments(parser):
     '''
     Add planning arguments

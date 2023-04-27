@@ -42,7 +42,11 @@ def calc_ab(H, delta, phi):
     Z = arccos(cos_Z)
     
     a = tan(Z) * sin(chi) # Equation 4
-    b = -tan(Z) * cos(chi) # Equation 5
+
+    # Steve's equation 5 has a minus sign in front of tan(Z)
+    # I found I needed to remove it because otherwise my UVWs didn't fall on teh correct plane
+    # see CRACO-115 for details.
+    b = tan(Z) * cos(chi) # Equation 5
 
     return (a, b)
 
@@ -96,7 +100,7 @@ class CracoWCS:
         assert lcell > 0, 'Invalid LCELL'
         assert mcell > 0, 'Invalid MCELL'
         wcs = WCS(naxis=3)
-        wcs.wcs.crpix = [npix/2 + 0.5,npix/2 + 0.5, 1] # honestly, I dont' understand if we need to +0.5 or not, or 1. 
+        wcs.wcs.crpix = [npix/2 + 1,npix/2 + 1, 1] # honestly, I dont' understand if we need to +0.5 or not, or 1. 
         wcs.wcs.crval = [target.ra.deg, target.dec.deg, 0]
         wcs.wcs.ctype = ['RA---SIN','DEC--SIN', 'TAI']
         wcs.wcs.cunit = ['deg','deg','s']

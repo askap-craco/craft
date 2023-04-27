@@ -16,9 +16,26 @@ from craft import craco_plan
 import numpy as np
 from craft import uvfits
 from pylab import *
+from astropy.coordinates import SkyCoord, Angle
 
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
+
+
+class TestCoordTransformations(TestCase):
+    def test_psitheta_to_coord(self):
+        psi = Angle('0.6d') # offset degrees - RA direction
+        theta = Angle('0.7d') # offset degrees - dec direction
+        phase_center = SkyCoord('19h21m11s +63d12m10s')
+        coord = craco.psitheta2coord((psi,theta), phase_center)
+        print(coord.to_string('hmsdms'), phase_center.to_string('hmsdms'))
+
+        lm = craco.coord2lm(coord, phase_center)
+        expected_lm = np.sin([psi.rad, theta.rad])
+        print(lm, expected_lm)
+        self.assertAlmostEqual(lm[0], expected_lm[0])
+        self.assertAlmostEqual(lm[1], expected_lm[1])
+        
 
 class TestCracoBaselineCell(TestCase):
     def test_uvcell(self):
