@@ -12,6 +12,7 @@ import os
 import sys
 import logging
 import warnings
+from astropy.coordinates import SkyCoord, Angle
 try:
     from numba import njit, prange
 except:
@@ -284,6 +285,71 @@ def printstats(d, prefix=''):
     s = '{prefix} max/min/mean/rms/sum/S/N = {dmax:.2e}/{dmin:0.2e}/{dmean:0.2e}/{dstd:0.2e}/{dsum:0.2e}/{sn:0.1f} peak at {maxpos}'.format(**locals())
     #print s
     return s
+
+def coord2lm(coord:SkyCoord, phase_center:SkyCoord):
+    '''
+    Convert given skyCoord to LM suitable for pointsource()
+    :returns: lenght 2 numpy array of direction cosines (l,m)
+    '''
+    theta = coord.dec.rad - phase_center.dec.rad
+    psi = np.cos(coord.dec.rad)*(phase_center.ra.rad - coord.ra.rad)
+    lm = np.sin([psi, theta])
+    return lm
+
+def psitheta2coord(psitheta, phase_center:SkyCoord):
+    '''
+    Compute coordinate of source given offsets in psi/theta and a phase center as SkyCoord
+    '''
+    psi,theta = psitheta
+    expected_dec = phase_center.dec + theta 
+
+    # RA needs to be decremented by source cos dec
+    expected_ra = np.degrees(phase_center.ra.rad - psi.rad/np.cos(expected_dec.rad))
+    expected_pos = SkyCoord(expected_ra, expected_dec, unit='deg')
+    return expected_pos
+
+def pointsource(amp, lm, freqs, baseline_order, baselines, noiseamp=0):
+    '''
+    Returns simulted visibilities for a point source with given amplitude at given value of lm =(l, m) in radians
+    offset from the phase center
+        
+    :amp: amplitude
+    :lm: tuple of l,m as direction cosines i.e. l=sin(psi), m=sin(theta)
+    :freqs: list of frequencies (Hz)
+    :baseline_order: array of NBL of desired order of baselinse
+    :baselines: dictionary keyed by blid containign UVWs
+    :noiseamp: add nois with tgiven ampliutude
+    :returns: np.array of complex dtype with shape (nbl, nchan)
+    '''
+    nbl = len(baselines)
+    nf = len(freqs)
+    assert np.all(freqs > 500e6), 'Invalid frequencies'
+    
+    l, m = lm
+    dout = np.empty((nbl, nf), dtype=np.complex64)
+    for ibl, blid in enumerate(baseline_order):       
+        # baselines in seconds
+        uvw_sec = np.array(baselines[blid][:3])
+        
+        # convert UVW coordinates to wavelegths
+        u = uvw_sec[0]*freqs
+        v = uvw_sec[1]*freqs
+        w = uvw_sec[2]*freqs
+
+        # TMS equation 3.7 - don't include 1/sqrt(1 - l*l - m*m) denomiator term for point sources#
+        # TMS has a minus sign
+        # Andre Offringa's simulator has a plus sign
+        # go figure?
+        # Without the minus sign also matches miriad
+        vis = amp*np.exp(2j*np.pi*(u*l + v*m + w*(np.sqrt(1.0 - l*l - m*m) - 1.0)))
+        if noiseamp > 0:
+            vishape = vis.shape
+            noise = noiseamp*(np.random.randn(*vishape) + 1j*np.random.randn(*vishape))
+            vis += noise
+
+        dout[ibl, :] = vis
+
+    return dout
 
 
 def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
