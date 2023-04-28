@@ -352,7 +352,7 @@ def pointsource(amp, lm, freqs, baseline_order, baselines, noiseamp=0):
     return dout
 
 
-def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
+def time_blocks_with_uvws(vis, nt, flagant=[], flag_autos=True, mask=False, fetch_uvws = True):
     '''
     Generator that returns nt time blocks of the given visiblity table
 
@@ -360,7 +360,9 @@ def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
     are removed from the output
     :flag_autos: If true, autos will be removed from the output
     :mask: If true, returns np.masked_array with the masked values where the weights in the file were 0
-    :returns: Directionary, keyed by baseline ID, value = np.array size (nchan, nt) dtype=complex64
+    :fetch_uvws: If True, extracts the UVWs for each time bin and returns them as a dict. If False, returns an empty dict
+    :returns: Tuple of 1)Dictionary- keyed by baseline ID, value = np.array size (nchan, nt) dtype=complex64,
+                       2)Dictionary - keyed by baseline ID, value = np.array size (3, nt), dtype=float64 (empty if fetch_uvws is False)
     :see: bl2ant()
     '''
 
@@ -370,8 +372,10 @@ def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
     npol = inshape[-2]
 
     shape = (nchan, npol, nt)
+    uvw_shape = (3, nt)
     logging.info('returning blocks for nrows=%s rows nt=%s visshape=%s', nrows, nt, vis[0].data.shape)
     d = {}
+    uvws = {}
     t = 0
     d0 = vis[0]['DATE']
     first_blid = None
@@ -379,6 +383,7 @@ def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
     for irow in range(nrows):
         row = vis[irow]
         blid = row['BASELINE']
+
         a1,a2 = bl2ant(blid)
         if a1 in flagant or a2 in flagant or (flag_autos and a1 == a2):
             continue
@@ -400,13 +405,17 @@ def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
 
             if t == nt:
                 logging.debug('Returning block irow=%d, len(d)=%d t=%d d0=%s rowdate=%s tdiff=%0.2f millisec', irow, len(d), t, d0, row['DATE'], tdiff*86400*1e3)
-                yield d
+                yield d, uvws
                 d = {}
+                uvws = {}
                 t = 0
 
 
         if blid not in list(d.keys()):
             dvalue = np.zeros(shape, dtype=np.complex64)
+            if fetch_uvws:
+                uvw_value = np.zeros(uvw_shape, dtype=np.float64)
+                uvws[blid] = uvw_value
 
             if mask:
                 dvalue = np.ma.masked_array(dvalue, mask=np.zeros(shape, dtype=bool), copy=False, fill_value=0+0j)
@@ -423,6 +432,9 @@ def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
         else:
             db[..., t].real = row.data[...,0]
             db[..., t].imag = row.data[...,1]
+
+        if fetch_uvws:
+            uvws[blid][..., t] = row['UU'], row['VV'], row['WW']
         
     if len(d) > 0:
         if t < nt - 1:
@@ -430,7 +442,12 @@ def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
             # Returns without yielding - this is the end
         else:
             assert t == nt -1
-            yield d
+            yield d, uvws
+
+def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
+    d_uvw = time_blocks_with_uvws(vis, nt, flagant, flag_autos, mask, fetch_uvws = False)
+    for d in d_uvw:
+        yield d[0]
 
 def grid(uvcells, Npix):
     '''
