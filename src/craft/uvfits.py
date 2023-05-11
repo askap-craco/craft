@@ -158,6 +158,14 @@ class UvFits(object):
         pylab.ylabel('V (klambda)')
         #pylab.show()
 
+    def time_blocks_with_uvws(self, nt):
+        '''
+        Returns a sequence of baseline data in blocks of nt
+        '''
+        # WARNING TODO: ONLY RETURN BASELINES THAT HAVE BEEN RETURNED in .baselines
+        # IF max_nbl has been set
+        return craco.time_blocks_with_uvws(self.vis, nt, self.flagant, self.ignore_autos, mask=self.mask, fetch_uvws = True)
+    
     def time_blocks(self, nt):
         '''
         Returns a sequence of baseline data in blocks of nt
