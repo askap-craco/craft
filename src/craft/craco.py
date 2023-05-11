@@ -246,6 +246,16 @@ def runidxs(x):
 def arcsec2rad(strarcsec):
     return np.radians(float(strarcsec)/3600.)
 
+def get_max_uv(baselines, fmax):
+    '''
+    Get maximum values of u,v in lambda
+    '''
+    ulam_max = max([abs(bldata['UU'])*fmax for bldata in list(baselines.values())])
+    vlam_max = max([abs(bldata['VV'])*fmax for bldata in list(baselines.values())])
+    
+    return (ulam_max, vlam_max)
+
+
 def image_fft(g, scale='none'):
     '''
     Do the complex-to-complex imaging FFT with the correct shifts and correct inverse thingy

@@ -14,7 +14,7 @@ import logging
 import warnings
 from astropy.io import fits
 from . import craco
-from .craco import bl2ant
+from .craco import bl2ant,get_max_uv
 from astropy import units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
@@ -142,9 +142,7 @@ class UvFits(object):
         '''
         fmax = self.channel_frequencies.max()
         baselines = self.baselines
-        ulam_max = max([abs(bldata['UU'])*fmax for bldata in list(baselines.values())])
-        vlam_max = max([abs(bldata['VV'])*fmax for bldata in list(baselines.values())])
-        return (ulam_max, vlam_max)
+        return get_max_uv(baselines, fmax)
 
     
     def plot_baselines(self):
@@ -184,6 +182,10 @@ class UvFits(object):
         return tstart
 
     @property
+    def tstart(self):
+        return self.get_tstart()
+
+    @property
     def source_table_entry(self):
         f = self
         source_table = f.hdulist[3].data
@@ -216,10 +218,20 @@ class UvFits(object):
         return (ra, dec)
 
     def get_target_skycoord(self):
+        '''
+        Returns skycoord of phase center
+        Leave this for posterity
+        '''
         (ra, dec) = self.get_target_position()
         coord = SkyCoord(ra, dec, frame='icrs')
         return coord
-        
+
+    @property
+    def target_skycoord(self):
+        '''
+        Return skycorod of phase center. Nicer version.
+        '''
+        return self.get_target_skycoord()
 
     @property
     def target_name(self, targidx=0):

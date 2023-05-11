@@ -722,11 +722,11 @@ class PipelinePlan(object):
 
         # Could get RA/DeC from fits table, or header. Header is easier, but maybe less correct
 
-        target_skycoord = f.get_target_skycoord()
+        target_skycoord = f.target_skycoord
         self.phase_center = target_skycoord
         self.ra = target_skycoord.ra
         self.dec = target_skycoord.dec
-        self.tstart = f.get_tstart()
+        self.tstart = f.tstart
         craco_wcs = CracoWCS.from_plan(self)
         self.craco_wcs = craco_wcs
         self.wcs = craco_wcs.wcs2 # The 2D WCS for images
@@ -736,11 +736,14 @@ class PipelinePlan(object):
         
         uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix, values.show)
         if umax > UVMAX or vmax > UVMAX:
-            raise ValueError('Maximum basline larger than ASKAP umax={umax} vmax={vmax} UVMAX={UVMAX}')
+            raise ValueError(f'Maximum basline larger than ASKAP umax={umax} vmax={vmax} UVMAX={UVMAX}')
+        if umax < 200/0.1 or vmax < 200/0.1:
+            raise ValueError(f'Maximum baseline is unreasonably small. wrong units? umax={umax} vmax={vmax} in km={umax_km}/{vmax_km}')
                   
         log.info('Got Ncells=%d uvcells', len(uvcells))
         d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.int32)
-        np.savetxt(self.values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
+        if self.values.uv is not None:
+            np.savetxt(self.values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
 
         self.uvcells = uvcells
         self.nt = self.values.nt
@@ -807,9 +810,10 @@ class PipelinePlan(object):
 
         
     def save_lut(self, data, lutname, header, fmt='%d'):
-        filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
-        log.info('Saving {lutname} shape={d.shape} type={d.dtype} to {filename} header={header}'.format(lutname=lutname, d=data, filename=filename, header=header))
-        np.savetxt(filename, data, fmt=fmt, header=header)
+        if self.values.uv is not None:
+            filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
+            log.info('Saving {lutname} shape={d.shape} type={d.dtype} to {filename} header={header}'.format(lutname=lutname, d=data, filename=filename, header=header))
+            np.savetxt(filename, data, fmt=fmt, header=header)
 
     def save_fdmt_plan_lut(self):
         fruns = self.fdmt_plan.runs
