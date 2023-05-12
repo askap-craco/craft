@@ -176,6 +176,15 @@ class UvFits(object):
         # IF max_nbl has been set
         return craco.time_blocks(self.vis, nt, self.flagant, self.ignore_autos, mask=self.mask)
     
+    def time_block_with_uvw_range(self, trange):
+        """
+        return a block of data and uvw within a given index range
+        """
+        return craco.time_block_with_uvw_range(
+            vis=self.vis, trange=trange, flagant=self.flagant,
+            flag_autos=self.ignore_autos, mask=self.mask
+        )
+
     def get_tstart(self):
         '''
         return tstart as astropy Time from header otherwise first row of fits table
