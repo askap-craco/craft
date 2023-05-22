@@ -495,11 +495,14 @@ def time_block_with_uvw_range(
         visilibity data extracted from the vis 
     uvw: numpy.ndarray
         uvw values for the corresponding time range
+    (_sstart, _ssend): two integers, tuple
+
 
     Notes
     ----------
-    We don't care about any __nstart in this case, 
+    1) We don't care about any __nstart in this case, 
     the indices in the timestamp are all referring to the index in the vis data 
+    2) this run as fast as the generator with next function, I will not remove this...
     """
     ### we need to figure out how many baselines are actually there in vis data...
     nbl = _vis2nbl(vis)
@@ -552,7 +555,7 @@ def time_block_with_uvw_range(
             tdiff = row['DATE'] - d0
             d0 = row['DATE']
             # if t is greater than nt, jump out of the loop
-            if t >= nt: return d, uvws
+            if t >= nt: return d, uvws, (_sstart, _send)
             logging.debug('Time change or baseline change irow=%d, len(d)=%d t=%d d0=%s rowdate=%s tdiff=%0.2f millisec. First bl again? %s date changed? %s', irow, len(d), t, d0, row['DATE'], tdiff*86400*1e3, first_blid_again, date_changed)
         if blid not in list(d.keys()):
             dvalue = np.zeros(shape, dtype=np.complex64)
@@ -579,7 +582,7 @@ def time_block_with_uvw_range(
         if fetch_uvws:
             uvws[blid][..., t] = row['UU'], row['VV'], row['WW']
 
-    return d, uvws
+    return d, uvws, (_sstart, _send)
 
 def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
     d_uvw = time_blocks_with_uvws(vis, nt, flagant, flag_autos, mask, fetch_uvws = False)
