@@ -456,6 +456,136 @@ def time_blocks_with_uvws(vis, nt, flagant=[], flag_autos=True, mask=False, fetc
             assert t == nt -1
             yield d, uvws
 
+def _vis2nbl(vis):
+    """
+    functions to infer the number of the baselines based on the visibility data from uvfits.
+    This don't consider any flagging etc as we don't care about that
+    """
+    d0 = vis[0]["DATE"]
+
+    nbl = 0
+    for visrow in vis:
+        d = visrow["DATE"]
+        if d > d0: return nbl
+        nbl += 1
+
+
+def time_block_with_uvw_range(
+        vis, trange, flagant=[], flag_autos=True, mask=False, fetch_uvws=True,
+    ):
+    """
+    function to fetch a range of vis data based on the trange
+
+    Params
+    ----------
+    vis: astropy.io.fits.hdu.groups.GroupData (craco.uvfits.vis)
+        visibility data loaded from the uvfits data
+    trange: tuple => (int, int)
+        starting sample index and ending sample index
+    flagant: list
+        a list of antenna to be flagged
+    flag_autos: bool, True by default
+        returned time block does not contain auto correlation if True
+    mask: bool, default False
+        mask out zero values if True 
+    fetch_uvws: bool, default True
+        fetch uvw values from the vis file if True
+
+    Returns
+    ----------
+    d: numpy.ndarray or numpy.ma.core.MaskedArray
+        visilibity data extracted from the vis 
+    uvw: numpy.ndarray
+        uvw values for the corresponding time range
+    (_sstart, _ssend): two integers, tuple
+
+
+    Notes
+    ----------
+    1) We don't care about any __nstart in this case, 
+    the indices in the timestamp are all referring to the index in the vis data 
+    2) this run as fast as the generator with next function, I will not remove this...
+    """
+    ### we need to figure out how many baselines are actually there in vis data...
+    nbl = _vis2nbl(vis)
+    tt = vis.size // nbl # timesample in total
+
+    ### perform some initial checking on trange...
+    _sstart, _send = trange
+
+    if _sstart < 0:
+        warnings.warn(f"wrong starting sample index - {_sstart}, change it to zero...")
+        _sstart = 0
+    if _send > tt:
+        warnings.warn(f"wrong ending sample index - {_send}, change it to the final integration {tt}")
+        _send = tt
+
+    ### only consider the data after this time stamp
+    nrows = vis.size
+    inshape = vis[0].data.shape
+    nchan = inshape[-3]
+    npol = inshape[-2]
+    nt = _send - _sstart + 1 # include both starting and ending
+
+    shape = (nchan, npol, nt)
+    uvw_shape = (3, nt)
+    logging.info('returning blocks for nrows=%s rows nt=%s visshape=%s', nrows, nt, vis[0].data.shape)
+    d = {}
+    uvws = {}
+    t = 0
+    d0 = vis[0]['DATE']
+    first_blid = None
+    for irow in range(_sstart * nbl, nrows):
+        row = vis[irow]
+        blid = row['BASELINE']
+
+        a1,a2 = bl2ant(blid)
+        if a1 in flagant or a2 in flagant or (flag_autos and a1 == a2):
+            continue
+
+        if first_blid is None:
+            first_blid = vis[0]['BASELINE']
+            first_blid_again = False
+        else:
+            first_blid_again = blid == first_blid
+            
+        date_changed = row['DATE'] > d0
+        
+        #logging.(irow, blid, bl2ant(blid), row['DATE'], d0, t)
+        if first_blid_again or date_changed: # integration finifhsed when we see first blid again. date doesnt have enough resolution
+            t += 1
+            tdiff = row['DATE'] - d0
+            d0 = row['DATE']
+            # if t is greater than nt, jump out of the loop
+            if t >= nt: return d, uvws, (_sstart, _send)
+            logging.debug('Time change or baseline change irow=%d, len(d)=%d t=%d d0=%s rowdate=%s tdiff=%0.2f millisec. First bl again? %s date changed? %s', irow, len(d), t, d0, row['DATE'], tdiff*86400*1e3, first_blid_again, date_changed)
+        if blid not in list(d.keys()):
+            dvalue = np.zeros(shape, dtype=np.complex64)
+            if fetch_uvws:
+                uvw_value = np.zeros(uvw_shape, dtype=np.float64)
+                uvws[blid] = uvw_value
+
+            if mask:
+                dvalue = np.ma.masked_array(dvalue, mask=np.zeros(shape, dtype=bool), copy=False, fill_value=0+0j)
+            
+            d[blid] = dvalue
+
+        db = d[blid]
+
+        if mask:
+            # mask values if input row weight is zero
+            db[..., t].data.real = row.data[...,0]
+            db[..., t].data.imag = row.data[...,1]
+            db[..., t].mask = row.data[...,2] == 0
+        else:
+            db[..., t].real = row.data[...,0]
+            db[..., t].imag = row.data[...,1]
+
+        if fetch_uvws:
+            uvws[blid][..., t] = row['UU'], row['VV'], row['WW']
+
+    return d, uvws, (_sstart, _send)
+
 def time_blocks(vis, nt, flagant=[], flag_autos=True, mask=False):
     d_uvw = time_blocks_with_uvws(vis, nt, flagant, flag_autos, mask, fetch_uvws = False)
     for d in d_uvw:
