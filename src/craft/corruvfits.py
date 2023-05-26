@@ -244,6 +244,9 @@ class CorrUvFitsFile(object):
         return tbhdu
 
     def close(self):
+        if self.fout is None:
+            return
+        
         fout = self.fout
         hdr = self.hdr
         currbytes = fout.tell()
@@ -272,6 +275,7 @@ class CorrUvFitsFile(object):
         su = self.su_table(self.sources)
         hdu.append(su)
         hdu.close()
+        self.fout = None
 
     def add_type(self, typeno, comment=None, **args):
         hdr = self.hdr
