@@ -252,6 +252,8 @@ def get_max_uv(baselines, fmax):
     '''
     ulam_max = max([abs(bldata['UU'])*fmax for bldata in list(baselines.values())])
     vlam_max = max([abs(bldata['VV'])*fmax for bldata in list(baselines.values())])
+
+    assert ulam_max > 0 and vlam_max > 0, f'Shouldnt have 0 uv. {ulam_max} {vlam_max} {fmax} {baselines}'
     
     return (ulam_max, vlam_max)
 
