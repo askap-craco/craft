@@ -111,8 +111,13 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=False, fftshift=True, trans
             warnings.warn(f'Maximum UV is larger than ASKAP for {a1}-{a2}. UVMAX={UVMAX} ulam={ulam.max()} vlam={vlam.max()}')
 
         pix_offset = float(Npix)/2.0
-        
-        upix = np.round(ulam/ucell + pix_offset).astype(int)
+
+        # OK - so the UV plane is looking down on the telescope
+        # with east to the right, but we wan tot make the image
+        # with east to the left as though we're looking up at it.
+        # so we apply a minus sign to U to make it negative.
+        # hopfully this works
+        upix = np.round(-ulam/ucell + pix_offset).astype(int)
         vpix = np.round(vlam/vcell + pix_offset).astype(int)
         if np.any((upix < 0) | (upix >= Npix) | (vpix < 0) | (vpix >= Npix)):
             warnings.warn('Pixel coordinates out of range')
@@ -681,6 +686,14 @@ class PipelinePlan(object):
         values = self.values
         if values.flag_ants:
             f.set_flagants(values.flag_ants)
+            
+        try:
+            beamid = f.beamid
+        except:
+            log.info('Unknown beamid')
+            beamid = -1
+
+        self.beamid = beamid
         
         log.info('making Plan values=%s', self.values)
         self.__tsamp = f.tsamp
@@ -737,7 +750,7 @@ class PipelinePlan(object):
         uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix, values.show)
         if umax > UVMAX or vmax > UVMAX:
             raise ValueError(f'Maximum basline larger than ASKAP umax={umax} vmax={vmax} UVMAX={UVMAX}')
-        if umax < 200/0.1 or vmax < 200/0.1:
+        if umax < 00/0.2 or vmax < 100/0.2:
             raise ValueError(f'Maximum baseline is unreasonably small. wrong units? umax={umax} vmax={vmax} in km={umax_km}/{vmax_km}')
                   
         log.info('Got Ncells=%d uvcells', len(uvcells))
