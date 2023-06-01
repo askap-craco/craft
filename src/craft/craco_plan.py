@@ -242,11 +242,17 @@ def split_cells(cells, minchan, ncin):
 class FdmtRun(object):
     def __init__(self, cells, plan):
         self.plan = plan
-        mincell = min(cells, key=lambda cell:cell.chan_start)
         self.cells = cells
-        self.chan_start = mincell.chan_start
-        self.fch1 = mincell.fch1
         self.total_overlap = 0
+        
+        if len(cells) > 0:
+            mincell = min(cells, key=lambda cell:cell.chan_start)
+            self.chan_start = mincell.chan_start
+            self.fch1 = mincell.fch1
+        else: # An empty FDMT run is used if we need to add an extra zero cell
+            self.chan_start = 0
+            self.fch1 = plan.pipeline_plan.fmin # set fch1 to the botom channel so it produces sensible LUTs
+
         for uv in cells:
             overlap = calc_overlap(uv, self.chan_start, plan.pipeline_plan.ncin)
             log.debug('Cell chan_start %s %s %s-%s overlap=%d', self.chan_start, uv, uv.chan_start, uv.chan_end, overlap)
@@ -256,6 +262,10 @@ class FdmtRun(object):
         assert self.max_idm <= plan.pipeline_plan.ndout, f'NDOUT ={plan.pipeline_plan.ndout} is too small - needs to be at least {self.max_idm} for fch1={self.fch1} fmin={plan.pipeline_plan.fmin} fmax={plan.pipeline_plan.fmax} dmax={self.plan.pipeline_plan.dmax}'
 
 
+    @property
+    def ncell(self):
+        return len(self.cells)
+    
     @property
     def offset_cff(self):
         return craco_kernels.offset_cff(self.fch1, self.plan.pipeline_plan)
@@ -275,7 +285,7 @@ class FdmtRun(object):
         return int(np.ceil(dmax*self.offset_cff))
 
     def __str__(self):
-        ncells = len(self.cells)
+        ncells = self.ncell
         return 'ncells={ncells} fch1={self.fch1} chan_start={self.chan_start} total_overlap={self.total_overlap}'.format(self=self, ncells=ncells)
 
     __repr__ = __str__
@@ -288,9 +298,6 @@ class FdmtPlan(object):
         nuvwide = self.pipeline_plan.nuvwide
         ncin = self.pipeline_plan.ncin
         uvcells_remaining = uvcells[:] # copy array
-        fdmt_runs = []
-        run_chan_starts = []
-        run_fch1 = []
         runs = []
         while len(uvcells_remaining) > 0:
             log.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
@@ -306,9 +313,6 @@ class FdmtPlan(object):
             used_cells = best_cells[0:min(nuvwide, len(best_cells))]
             full_cells, leftover_cells = split_cells(used_cells, minchan, ncin)
             run = FdmtRun(full_cells, self)
-            run_chan_starts.append(run.chan_start)
-            run_fch1.append(run.fch1)
-            fdmt_runs.append(full_cells)
             runs.append(run)
             # create lookup table for each run
             
@@ -321,10 +325,33 @@ class FdmtPlan(object):
 
             # Add split cells
             uvcells_remaining.extend(leftover_cells)
-            
-        nruns = len(fdmt_runs)
-        nuvtotal = nruns*nuvwide
 
+
+        # find a cell with zero in it
+        self.zero_cell = None
+        for irun, run in enumerate(runs):
+            if len(run.cells) < nuvwide:
+                self.zero_cell = (irun, len(run.cells))
+                break
+
+        # If we still haven't foudn another UVCell, we need to add another FDMT run
+        # Which seems an aweful waste, but go figure.
+        if self.zero_cell is None:
+            runs.append(FdmtRun([], self)) # Add FDmt Run
+            self.zero_cell = (len(runs)-1, 0)
+            
+        log.info("FDMT zero cell is %s=%s", self.zero_cell, self.zero_cell[0]*nuvwide+self.zero_cell[1])
+
+        self.runs = runs
+        assert self.zero_cell != None
+        assert self.zero_cell[0] < self.pipeline_plan.nuvrest_max, 'Not enough room for FDMT zero cell'
+        assert self.zero_cell[1] < nuvwide
+        assert self.zero_cell[0] < self.nruns, f'Zero Cell unexpected {self.zero_cell}[0] should be less than {self.nruns}'
+        assert self.zero_cell[1] < ncin
+        assert self.get_cell(self.zero_cell) is None
+
+        nruns = self.nruns
+        nuvtotal = nruns*nuvwide
         ndout = self.pipeline_plan.ndout
         nd = self.pipeline_plan.nd
         nt = self.pipeline_plan.nt
@@ -335,10 +362,7 @@ class FdmtPlan(object):
         required_efficiency = float(nuvtotal)/8192.0
         
         log.info('FDMT plan has ntotal=%d of %d runs with packing efficiency %f. Grid read requires efficiency of > %f of NUV=8192. History size square=%d minimal=%d =%d 256MB HBM banks', nuvtotal, nruns, efficiency, required_efficiency, square_history_size, minimal_history_size, minimal_history_size*4/256/1024/1024)
-        self.fdmt_runs = fdmt_runs
-        self.run_chan_starts = run_chan_starts
-        self.run_fch1 = run_fch1
-        self.runs = runs
+
 
         # create an FDMT object for each run so  we can use it to calculate the lookup tbales
         #     def __init__(self, f_min, f_off, n_f, max_dt, n_t, history_dtype=None):
@@ -347,7 +371,7 @@ class FdmtPlan(object):
         # do_correction = False basically doubles the width which makes the whole thing very wide and noisey
         # SEe "Testing image pipeline with impulses.ipynb.
         do_correction = True
-        fdmts = [fdmt.Fdmt(fch1-self.pipeline_plan.foff/2.0, self.pipeline_plan.foff, ncin, ndout, 1, do_correction=do_correction) for fch1 in self.run_fch1]
+        fdmts = [fdmt.Fdmt(run.fch1-self.pipeline_plan.foff/2.0, self.pipeline_plan.foff, ncin, ndout, 1, do_correction=do_correction) for run in self.runs]
         fdmt_luts = np.array([thefdmt.calc_lookup_table() for thefdmt in fdmts])
         niter = int(np.log2(ncin))
         # final LUTs we need to copy teh same LUT for every NUVWIDE
@@ -356,28 +380,8 @@ class FdmtPlan(object):
         expected_lut_shape = (nruns, ncin-1, nuvwide, 2)
         assert self.fdmt_lut.shape == expected_lut_shape, 'Incorrect shape for LUT=%s expected %s' % (self.fdmt_lut.shape, expected_lut_shape)
 
-        self.nruns = nruns
         self.nuvtotal = nuvtotal
-        self.total_nuvcells = sum([len(p) for p in fdmt_runs])
-
-        # find a cell with zero in it
-        self.zero_cell = None
-        for irun, run in enumerate(self.runs):
-            if len(run.cells) < nuvwide:
-                self.zero_cell = (irun, len(run.cells))
-
-        if self.zero_cell is None:
-            self.zero_cell = (len(self.runs), 0)
-
-        assert self.zero_cell != None
-        assert self.zero_cell[0] < self.pipeline_plan.nuvrest_max, 'Not enough room for FDMT zero cell'
-        assert self.zero_cell[1] < nuvwide
-
-        assert self.zero_cell[0] < self.nruns
-        assert self.zero_cell[1] < ncin
-        #assert self.get_cell(self.zero_cell) != None
-
-        log.info("FDMT zero cell is %s=%s", self.zero_cell, self.zero_cell[0]*nuvwide+self.zero_cell[1])
+        self.total_nuvcells = sum([run.ncell for run in runs])
 
         uvmap = {}
         for irun, run in enumerate(self.runs):
@@ -387,6 +391,11 @@ class FdmtPlan(object):
                 uvmap[cell.uvpix_upper].append(irc)
 
         self.__uvmap = uvmap
+
+    @property
+    def nruns(self):
+        return len(self.runs)
+
 
     def cell_iter(self):
         '''
@@ -430,6 +439,10 @@ class FdmtPlan(object):
         return cell_coords2
 
     def get_cell(self, cell_coord):
+        '''
+        Returns baseline cell of given FDMT run and cell cell coord (run, cell)
+        if cell coord is the zero cell, it returns None
+        '''
         irun, icell = cell_coord
         if cell_coord == self.zero_cell:
             return None
