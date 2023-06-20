@@ -192,7 +192,70 @@ class Gridder(Kernel):
 
         return g
     
-    
+    def grid_with_uvws(self, block, uvws):
+        '''
+        Performs complex to complex gridding of the visibility data, taking into account the changing uvw of each time sample
+        
+        Params
+        ------
+        block: np.ndarray or numpy.ma.core.MaskedArray or dict
+                Block containing [nbl, nf, nt] complex visibility data (if array)
+                Dict containing [nf, nt] complex visibility data (keyed by blid) for nbl baselines (if dict)
+        uvws: dict
+                Dict containing UVW values (keyed by blid) as an numpy array of shape [3, nt]
+        '''
+        if type(block) not in [np.ndarray, np.ma.core.MaskedArray, dict]:
+            raise Exception(f"I expected a np.ndarray/masked_array/dict, but got {type(block)}")
+        
+        if type(block) == dict:
+            expected_nbl = self.plan.nbl
+            assert len(block) == expected_nbl, "Vis dict did not have expected no. of baselines"
+            blids = list(block.keys())
+            data0 = block[blids[0]]
+            assert data0.ndim == 2, f"Expected a 2-D array for each baseline, got-{data0.ndim}"
+            assert data0.shape[0] == self.plan.nf
+            nt = data0.shape[-1]
+
+        else:
+            assert block.ndim == 3, "block needs to have [nbl, nf, nt] shape"
+            assert block.shape[:2] == (self.plan.nbl, self.plan.nf)
+            nt = block.shape[-1]
+
+        if type(uvws) != dict:
+            raise Exception(f"I expected UVWs to be passed as a dict, but got {type(uvws)}")
+        
+        first_blid = list(uvws.keys())[0]
+        uvws_shape = uvws[first_blid].shape
+        assert uvws_shape == (3, nt), f"UVWs shape needs to be (3, {nt}), got {uvws_shape}"
+
+        npix = self.plan.npix
+        assert nt >= 2, "Block needs to have atleast 2 time samples to perform CPLX to CPLX gridding"
+        assert nt%2 == 0, "Block needs to have even number of samples"
+        
+        g = np.zeros((npix, npix, nt//2), dtype=self.plan.dtype)
+        for t in range(nt//2):
+            this_uvw = {}
+            for blid, uvw_data in list(uvws.items()):
+                this_uvw[blid] = np.array(tuple(uvw_data[:, t]), dtype=[('UU', 'f8'), ('VV', 'f8'), ('WW', 'f8')])
+            current_uvcells = craco_plan.get_uvcells(baselines=this_uvw, uvcell=self.plan.uvcell, freqs = self.plan.freqs, Npix = self.values.npix)
+            nuv = len(current_uvcells)
+
+            for iuv in range(nuv):
+                cell = current_uvcells[iuv]
+                upix, vpix = cell.uvpix
+
+                if type(block) == dict:
+                    v1 = block[cell.blid][cell.chan_slice, t].sum(axis=0)
+                    v2 = block[cell.blid][cell.chan_slice, t+1].sum(axis=0) * 1j
+                else:
+                    bl_idx = np.where(self.plan.baseline_order == cell.blid)[0][0]
+                    v1 = block[bl_idx, cell.chan_slice, t].sum(axis=0)
+                    v2 = block[bl_idx, cell.chan_slice, t+1].sum(axis=0) * 1j
+
+                g[vpix, upix, t] += v1 + v2
+                g[-vpix, -upix, t] += np.conj(v1) - np.conj(v2)
+
+        return g
 
 def idm_cff(fch1, plan):
     '''
