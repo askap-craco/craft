@@ -24,6 +24,43 @@ log = logging.getLogger(__name__)
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+class VisView:
+    def __init__(self, uvfitsfile, start_idx):
+        '''
+        Allows you to read and seek rather than memory map
+        '''
+        self.uvfitsfile = uvfitsfile
+        self.dtype = uvfitsfile.hdulist[0].data.dtype
+        self.hdrsize = len(str(self.uvfitsfile.hdulist[0].header))
+        assert self.hdrsize % 2880 == 0
+        self.start_idx = start_idx
+        self.fin = self.uvfitsfile.raw_fin
+
+    @property
+    def size(self):
+        sz = self.uvfitsfile.hdulist[0].header['GCOUNT'] - start_idx
+        assert sz >= 0
+        return sz
+        
+    def __getitem__(self, sidx: slice):
+        '''
+        Slices data from UV fitsfile
+        '''
+        
+        if isinstance(sidx, int):
+            sidx = slice(sidx, sidx+1, 1)
+            
+        assert sidx.step is None or sidx.step == 1, 'np.fromfile cant to strided access'
+        assert sidx.stop >= sidx.start, 'Cant read backwards'
+        
+        start_byte  = self.hdrsize + (sidx.start + self.start_idx)*self.dtype.itemsize
+        nelements = sidx.stop - sidx.start
+        assert nelements >= 0
+        
+        self.fin.seek(start_byte)
+        dout = np.fromfile(self.fin, count=nelements, dtype=self.dtype)
+
+        return dout
 
 class UvFits(object):
 
@@ -38,6 +75,7 @@ class UvFits(object):
         self.flagant = []
         self.ignore_autos = True
         self.mask = mask
+        self.raw_fin = open(self.hdulist.filename, 'rb')
 
         # first we calculate the number of baselines in a block
         assert skip_blocks >= 0, f'Invalid skip_blocks={skip_blocks}'
@@ -63,6 +101,10 @@ class UvFits(object):
         return self
 
     @property
+    def filename(self):
+        return self.hdulist.filename()
+
+    @property
     def header(self):
         return self.hdulist[0].header
 
@@ -73,7 +115,7 @@ class UvFits(object):
         if skip_blocks is > in teh constructor, then that number of blocks will have been skipped and you won't see them
 
         '''
-        return self.hdulist[0].data[self.__nstart:]
+        return VisView(self, self.__nstart)
 
     @property
     def start_date(self):
@@ -262,6 +304,8 @@ class UvFits(object):
         return src
 
     def close(self):
+        self.raw_fin.close()
+        self.raw_fin = None
         return self.hdulist.close()
 
 def open(*args, **kwargs):
