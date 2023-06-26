@@ -18,7 +18,7 @@ from .craco import bl2ant,get_max_uv
 from astropy import units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
-
+import builtins
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class VisView:
 
     @property
     def size(self):
-        sz = self.uvfitsfile.hdulist[0].header['GCOUNT'] - start_idx
+        sz = self.uvfitsfile.hdulist[0].header['GCOUNT'] - self.start_idx
         assert sz >= 0
         return sz
         
@@ -75,7 +75,7 @@ class UvFits(object):
         self.flagant = []
         self.ignore_autos = True
         self.mask = mask
-        self.raw_fin = open(self.hdulist.filename, 'rb')
+        self.raw_fin = builtins.open(self.hdulist.filename(), 'rb')
 
         # first we calculate the number of baselines in a block
         assert skip_blocks >= 0, f'Invalid skip_blocks={skip_blocks}'
@@ -125,7 +125,7 @@ class UvFits(object):
         row = self.vis[0]
         d0 = row['DATE']
         try:
-            d0 += row['_DATE'] # FITS standard says add these two columns together
+            d0 += row['DATE'] # FITS standard says add these two columns together
         except KeyError:
             pass
 
