@@ -47,6 +47,7 @@ class VisView:
         Slices data from UV fitsfile
         '''
         
+        sidx_ = sidx # keep a copy of the input slice...
         if isinstance(sidx, int):
             sidx = slice(sidx, sidx+1, 1)
             
@@ -60,6 +61,7 @@ class VisView:
         self.fin.seek(start_byte)
         dout = np.fromfile(self.fin, count=nelements, dtype=self.dtype)
 
+        if isinstance(sidx_, int): return dout[0]
         return dout
 
 class UvFits(object):
@@ -124,10 +126,11 @@ class UvFits(object):
         '''
         row = self.vis[0]
         d0 = row['DATE']
-        try:
-            d0 += row['DATE'] # FITS standard says add these two columns together
-        except KeyError:
-            pass
+        # seems like if you read it from the raw data... don't do that!!!
+        # try:
+        #     d0 += row['DATE'] # FITS standard says add these two columns together
+        # except KeyError:
+        #     pass
 
         return d0
 

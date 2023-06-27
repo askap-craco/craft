@@ -379,13 +379,13 @@ def time_blocks_with_uvws(vis, nt, flagant=[], flag_autos=True, mask=False, fetc
     '''
 
     nrows = vis.size
-    inshape = vis[0].data.shape
+    inshape = vis[0]["DATA"].shape
     nchan = inshape[-3]
     npol = inshape[-2]
 
     shape = (nchan, npol, nt)
     uvw_shape = (3, nt)
-    logging.info('returning blocks for nrows=%s rows nt=%s visshape=%s', nrows, nt, vis[0].data.shape)
+    logging.info('returning blocks for nrows=%s rows nt=%s visshape=%s', nrows, nt, vis[0]["DATA"].shape)
     d = {}
     uvws = {}
     t = 0
@@ -438,12 +438,12 @@ def time_blocks_with_uvws(vis, nt, flagant=[], flag_autos=True, mask=False, fetc
 
         if mask:
             # mask values if input row weight is zero
-            db[..., t].data.real = row.data[...,0]
-            db[..., t].data.imag = row.data[...,1]
-            db[..., t].mask = row.data[...,2] == 0
+            db[..., t].data.real = row["DATA"][...,0]
+            db[..., t].data.imag = row["DATA"][...,1]
+            db[..., t].mask = row["DATA"][...,2] == 0
         else:
-            db[..., t].real = row.data[...,0]
-            db[..., t].imag = row.data[...,1]
+            db[..., t].real = row["DATA"][...,0]
+            db[..., t].imag = row["DATA"][...,1]
 
         if fetch_uvws:
             uvws[blid][..., t] = row['UU'], row['VV'], row['WW']
@@ -522,14 +522,14 @@ def time_block_with_uvw_range(
 
     ### only consider the data after this time stamp
     nrows = vis.size
-    inshape = vis[0].data.shape
+    inshape = vis[0]["DATA"].shape
     nchan = inshape[-3]
     npol = inshape[-2]
     nt = _send - _sstart + 1 # include both starting and ending
 
     shape = (nchan, npol, nt)
     uvw_shape = (3, nt)
-    logging.info('returning blocks for nrows=%s rows nt=%s visshape=%s', nrows, nt, vis[0].data.shape)
+    logging.info('returning blocks for nrows=%s rows nt=%s visshape=%s', nrows, nt, vis[0]["DATA"].shape)
     d = {}
     uvws = {}
     t = 0
@@ -574,12 +574,12 @@ def time_block_with_uvw_range(
 
         if mask:
             # mask values if input row weight is zero
-            db[..., t].data.real = row.data[...,0]
-            db[..., t].data.imag = row.data[...,1]
-            db[..., t].mask = row.data[...,2] == 0
+            db[..., t].data.real = row["DATA"][...,0]
+            db[..., t].data.imag = row["DATA"][...,1]
+            db[..., t].mask = row["DATA"][...,2] == 0
         else:
-            db[..., t].real = row.data[...,0]
-            db[..., t].imag = row.data[...,1]
+            db[..., t].real = row["DATA"][...,0]
+            db[..., t].imag = row["DATA"][...,1]
 
         if fetch_uvws:
             uvws[blid][..., t] = row['UU'], row['VV'], row['WW']
@@ -694,7 +694,7 @@ def get_freqs(hdul):
     #assert ch1 == 1.0, f'Unexpected initial frequency: {ch1}'
     assert foff > 0, 'cant handle negative frequencies anywhere athe moment foff=%f' % foff
     vis = hdul[0].data
-    nchan = vis[0].data.shape[-3]
+    nchan = vis[0]["DATA"].shape[-3]
 
     # Need to add 1 due to stupid FITS convention. Grr.
     freqs = (np.arange(nchan, dtype=np.float) - ch1 + 1)*foff + fch1 # Hz
