@@ -304,7 +304,7 @@ def coord2lm(coord:SkyCoord, phase_center:SkyCoord):
     :returns: lenght 2 numpy array of direction cosines (l,m)
     '''
     theta = coord.dec.rad - phase_center.dec.rad
-    psi = np.cos(coord.dec.rad)*(phase_center.ra.rad - coord.ra.rad)
+    psi = np.cos(coord.dec.rad)*(coord.ra.rad - phase_center.ra.rad)
     lm = np.sin([psi, theta])
     return lm
 

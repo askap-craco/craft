@@ -61,6 +61,16 @@ class VisView:
         self.fin.seek(start_byte)
         dout = np.fromfile(self.fin, count=nelements, dtype=self.dtype)
 
+        ### update date to float64
+        dtype_store = [
+            (field, np.dtype(">f8")) if field == "DATE" 
+            else (field, self.dtype.fields[field][0])
+            for field in self.dtype.fields
+        ]
+
+        dout = dout.astype(dtype_store)
+        dout["DATE"] += self.uvfitsfile.hdulist[0].header["PZERO4"]
+
         if isinstance(sidx_, int): return dout[0]
         return dout
 
