@@ -522,18 +522,18 @@ def time_block_with_uvw_range(
 
     ### only consider the data after this time stamp
     nrows = vis.size
-    inshape = vis[0]["DATA"].shape
+    inshape = vis[_sstart * nbl]["DATA"].shape
     nchan = inshape[-3]
     npol = inshape[-2]
     nt = _send - _sstart + 1 # include both starting and ending
 
     shape = (nchan, npol, nt)
     uvw_shape = (3, nt)
-    logging.info('returning blocks for nrows=%s rows nt=%s visshape=%s', nrows, nt, vis[0]["DATA"].shape)
+    logging.info('returning blocks for nrows=%s rows nt=%s visshape=%s', nrows, nt, vis[_sstart * nbl]["DATA"].shape)
     d = {}
     uvws = {}
     t = 0
-    d0 = vis[0]['DATE']
+    d0 = vis[_sstart * nbl]['DATE']
     first_blid = None
     for irow in range(_sstart * nbl, nrows):
         row = vis[irow]
@@ -544,7 +544,7 @@ def time_block_with_uvw_range(
             continue
 
         if first_blid is None:
-            first_blid = vis[0]['BASELINE']
+            first_blid = vis[_sstart * nbl]['BASELINE']
             first_blid_again = False
         else:
             first_blid_again = blid == first_blid
