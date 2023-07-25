@@ -177,6 +177,8 @@ class UvFits(object):
         vis = self.vis
         for i in range(self.vis.size):
             row = vis[i]
+            if row['DATE'] != d0 or (self.max_nbl is not None and i > self.max_nbl):
+                break
             blid = row['BASELINE']
             a1, a2 = bl2ant(blid)
             if a1 in self.flagant or a2 in self.flagant:
@@ -186,8 +188,6 @@ class UvFits(object):
                 continue
             
             baselines[blid] = row
-            if row['DATE'] != d0 or (self.max_nbl is not None and i > self.max_nbl):
-                break
 
         return baselines
 
