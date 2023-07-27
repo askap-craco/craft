@@ -255,12 +255,12 @@ class Gridder(Kernel):
                 upix, vpix = cell.uvpix
 
                 if type(block) == dict:
-                    v1 = block[cell.blid][cell.chan_slice, t].sum(axis=0)
-                    v2 = block[cell.blid][cell.chan_slice, t+1].sum(axis=0) * 1j
+                    v1 = block[cell.blid][cell.chan_slice, 2*t].sum(axis=0)
+                    v2 = block[cell.blid][cell.chan_slice, 2*t+1].sum(axis=0) * 1j
                 else:
                     bl_idx = np.where(self.plan.baseline_order == cell.blid)[0][0]
-                    v1 = block[bl_idx, cell.chan_slice, t].sum(axis=0)
-                    v2 = block[bl_idx, cell.chan_slice, t+1].sum(axis=0) * 1j
+                    v1 = block[bl_idx, cell.chan_slice, 2*t].sum(axis=0)
+                    v2 = block[bl_idx, cell.chan_slice, 2*t+1].sum(axis=0) * 1j
 
                 g[vpix, upix, t] += v1 + v2
                 g[-vpix, -upix, t] += np.conj(v1) - np.conj(v2)
