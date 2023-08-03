@@ -804,8 +804,16 @@ class PipelinePlan(object):
             dms = np.arange(self.values.ndm, dtype=np.uint32)
 
         self.__set_dms(dms)
+        self.__fdmt_plan = None
 
-        self.fdmt_plan = FdmtPlan(uvcells, self)
+
+    @property
+    def fdmt_plan(self):
+        if self.__fdmt_plan is not None:
+            return self.__fdmt_plan
+
+        uvcells = self.uvcells
+        self.__fdmt_plan = FdmtPlan(uvcells, self)
         self.save_fdmt_plan_lut()
         
         if self.fdmt_plan.nuvtotal >= self.values.nuvmax:
@@ -833,6 +841,9 @@ class PipelinePlan(object):
         # concatenate bytes of DMS and ddreader config
         self.ddreader_lut = np.frombuffer(self.dms.tobytes() + self.ddreader_config.tobytes(), dtype=np.uint32)
         self.save_lut(self.ddreader_lut, 'ddreader', 'value')
+
+
+        return self.__fdmt_plan
 
         
     def save_lut(self, data, lutname, header, fmt='%d'):
