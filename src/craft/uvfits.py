@@ -18,7 +18,7 @@ from .craco import bl2ant,get_max_uv
 from astropy import units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
-
+import builtins
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class VisView:
 
     @property
     def size(self):
-        sz = self.uvfitsfile.hdulist[0].header['GCOUNT'] - start_idx
+        sz = self.uvfitsfile.hdulist[0].header['GCOUNT'] - self.start_idx
         assert sz >= 0
         return sz
         
@@ -47,6 +47,7 @@ class VisView:
         Slices data from UV fitsfile
         '''
         
+        sidx_ = sidx # keep a copy of the input slice...
         if isinstance(sidx, int):
             sidx = slice(sidx, sidx+1, 1)
             
@@ -60,6 +61,17 @@ class VisView:
         self.fin.seek(start_byte)
         dout = np.fromfile(self.fin, count=nelements, dtype=self.dtype)
 
+        ### update date to float64
+        dtype_store = [
+            (field, np.dtype(">f8")) if field == "DATE" 
+            else (field, self.dtype.fields[field][0])
+            for field in self.dtype.fields
+        ]
+
+        dout = dout.astype(dtype_store)
+        dout["DATE"] += self.uvfitsfile.hdulist[0].header["PZERO4"]
+
+        if isinstance(sidx_, int): return dout[0]
         return dout
 
 class UvFits(object):
@@ -75,7 +87,7 @@ class UvFits(object):
         self.flagant = []
         self.ignore_autos = True
         self.mask = mask
-        self.raw_fin = open(self.hdulist.filename, 'rb')
+        self.raw_fin = builtins.open(self.hdulist.filename(), 'rb')
 
         # first we calculate the number of baselines in a block
         assert skip_blocks >= 0, f'Invalid skip_blocks={skip_blocks}'
@@ -124,10 +136,11 @@ class UvFits(object):
         '''
         row = self.vis[0]
         d0 = row['DATE']
-        try:
-            d0 += row['_DATE'] # FITS standard says add these two columns together
-        except KeyError:
-            pass
+        # seems like if you read it from the raw data... don't do that!!!
+        # try:
+        #     d0 += row['DATE'] # FITS standard says add these two columns together
+        # except KeyError:
+        #     pass
 
         return d0
 
@@ -164,6 +177,8 @@ class UvFits(object):
         vis = self.vis
         for i in range(self.vis.size):
             row = vis[i]
+            if row['DATE'] != d0 or (self.max_nbl is not None and i > self.max_nbl):
+                break
             blid = row['BASELINE']
             a1, a2 = bl2ant(blid)
             if a1 in self.flagant or a2 in self.flagant:
@@ -173,8 +188,6 @@ class UvFits(object):
                 continue
             
             baselines[blid] = row
-            if row['DATE'] != d0 or (self.max_nbl is not None and i > self.max_nbl):
-                break
 
         return baselines
 

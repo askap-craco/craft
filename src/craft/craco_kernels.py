@@ -226,7 +226,15 @@ class Gridder(Kernel):
         
         first_blid = list(uvws.keys())[0]
         uvws_shape = uvws[first_blid].shape
-        assert uvws_shape == (3, nt), f"UVWs shape needs to be (3, {nt}), got {uvws_shape}"
+        assert uvws[first_blid].ndim == 2, "The uvws ndim needs to be 2"
+        assert uvws_shape[0] == 3, "UVWs needs to have U, V and W values as the first 3 axes"
+        if uvws_shape[1] == nt:
+            update_uvws = True
+        elif uvws_shape[1] == 1:
+            update_uvws = False
+        else:
+            raise ValueError("uvws_shape needs to be either (3, nt) or (3, 1). Given - {0}".format(uvws_shape))
+    
 
         npix = self.plan.npix
         assert nt >= 2, "Block needs to have atleast 2 time samples to perform CPLX to CPLX gridding"
@@ -234,23 +242,25 @@ class Gridder(Kernel):
         
         g = np.zeros((npix, npix, nt//2), dtype=self.plan.dtype)
         for t in range(nt//2):
-            this_uvw = {}
-            for blid, uvw_data in list(uvws.items()):
-                this_uvw[blid] = np.array(tuple(uvw_data[:, t]), dtype=[('UU', 'f8'), ('VV', 'f8'), ('WW', 'f8')])
-            current_uvcells = craco_plan.get_uvcells(baselines=this_uvw, uvcell=self.plan.uvcell, freqs = self.plan.freqs, Npix = self.values.npix)
-            nuv = len(current_uvcells)
+            
+            if t==0 or update_uvws:
+                this_uvw = {}
+                for blid, uvw_data in list(uvws.items()):
+                    this_uvw[blid] = np.array(tuple(uvw_data[:, t]), dtype=[('UU', 'f8'), ('VV', 'f8'), ('WW', 'f8')])
+                current_uvcells = craco_plan.get_uvcells(baselines=this_uvw, uvcell=self.plan.uvcell, freqs = self.plan.freqs, Npix = self.values.npix)
+                nuv = len(current_uvcells)
 
             for iuv in range(nuv):
                 cell = current_uvcells[iuv]
                 upix, vpix = cell.uvpix
 
                 if type(block) == dict:
-                    v1 = block[cell.blid][cell.chan_slice, t].sum(axis=0)
-                    v2 = block[cell.blid][cell.chan_slice, t+1].sum(axis=0) * 1j
+                    v1 = block[cell.blid][cell.chan_slice, 2*t].sum(axis=0)
+                    v2 = block[cell.blid][cell.chan_slice, 2*t+1].sum(axis=0) * 1j
                 else:
                     bl_idx = np.where(self.plan.baseline_order == cell.blid)[0][0]
-                    v1 = block[bl_idx, cell.chan_slice, t].sum(axis=0)
-                    v2 = block[bl_idx, cell.chan_slice, t+1].sum(axis=0) * 1j
+                    v1 = block[bl_idx, cell.chan_slice, 2*t].sum(axis=0)
+                    v2 = block[bl_idx, cell.chan_slice, 2*t+1].sum(axis=0) * 1j
 
                 g[vpix, upix, t] += v1 + v2
                 g[-vpix, -upix, t] += np.conj(v1) - np.conj(v2)
