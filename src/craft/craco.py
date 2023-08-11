@@ -26,6 +26,7 @@ except:
           
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
+log = logging.getLogger(__name__)
 
 
 def triangular(n):
@@ -885,7 +886,8 @@ class FastBaseline2Uv:
         :plan:PipelinePLan to operate on
         :conjugate_lower_uvs: If True, conjugate lower UV data
         '''
-        self.plan = plan
+        self.__plan = plan
+        log.info('Making fastBaseline2UV with plan %s', self.plan)
         # initialise with -1 - if those values are -1 in the execution code, then we quite the loop
         self.lut = np.ones((len(plan.fdmt_plan.runs), plan.nuvwide, 6), np.int16)*-1
         blids = sorted(plan.baselines.keys())
@@ -912,6 +914,10 @@ class FastBaseline2Uv:
                 do_conj = int(conjugate_lower_uvs and uv.is_lower)
                 self.lut[irun, iuv, :] = [blidx, cstart, cend, out_cstart, out_cend, do_conj]
 
+    @property
+    def plan(self):
+        return self.__plan
+
     def __call__(self, baseline_data, uv_data):
         '''
         Convert baselines to UV data
@@ -920,6 +926,8 @@ class FastBaseline2Uv:
         :uv_data: output uv data shape  (nurest, nt, ncin, nuvwide)
         '''
 
+        log.info('In call %s %s  %s', uv_data.shape, type(self.plan), self.plan)
+        log.info('plan shape %s', self.plan.uv_shape)
         assert uv_data.shape == self.plan.uv_shape, f'Invalid uv_data shape. Was {uv_data.shape} expected {self.uv_shape}'
         assert baseline_data.shape == self.plan.baseline_shape, f'Invalid baseline_data shape. Was {baseline_data.shape} expected {self.plan.baseline_shape}'
 

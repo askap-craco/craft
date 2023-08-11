@@ -714,6 +714,10 @@ class PipelinePlan(object):
         lres, mres = 1./umax, 1./vmax
         baselines = f.baselines
         self.baselines = baselines
+        # List of basleine IDs sorted
+        # THis is the ordering of baselines once you've done bl2array
+        self.baseline_order = sorted(self.baselines.keys())
+
         nbl = len(baselines)
         freqs = f.channel_frequencies
         self.target_name = f.target_name
@@ -788,6 +792,8 @@ class PipelinePlan(object):
         self.dtype = np.complex64 # working data type
         self.threshold = self.values.threshold
         self.nbl = nbl
+        self.baseline_shape = (self.nbl, self.nf, self.nt)
+
         self.fdmt_scale = self.values.fdmt_scale
         self.fft_scale  = self.values.fft_scale
         
@@ -804,21 +810,32 @@ class PipelinePlan(object):
             dms = np.arange(self.values.ndm, dtype=np.uint32)
 
         self.__set_dms(dms)
+        self.__fdmt_plan = None
 
-        self.fdmt_plan = FdmtPlan(uvcells, self)
+    @property
+    def nuvrest(self):
+        return self.fdmt_plan.nuvtotal // self.nuvwide
+
+    @property
+    def uv_shape(self):
+        return (self.nuvrest, self.nt, self.ncin, self.nuvwide)
+
+
+    @property
+    def fdmt_plan(self):
+        '''
+        Lazy evanluate FDMT plan
+        '''
+        if self.__fdmt_plan is not None:
+            return self.__fdmt_plan
+
+        uvcells = self.uvcells
+        self.__fdmt_plan = FdmtPlan(uvcells, self)
         self.save_fdmt_plan_lut()
         
         if self.fdmt_plan.nuvtotal >= self.values.nuvmax:
             raise ValueError("Too many UVCELLS")
 
-        self.nuvrest = self.fdmt_plan.nuvtotal // self.nuvwide
-        self.uv_shape = (self.nuvrest, self.nt, self.ncin, self.nuvwide)
-        self.baseline_shape = (self.nbl, self.nf, self.nt)
-
-        # List of basleine IDs sorted
-        # THis is the ordering of baselines once you've done bl2array
-        self.baseline_order = sorted(self.baselines.keys())
-        
         self.upper_instructions = calc_grid_luts(self, True)
         self.lower_instructions = calc_grid_luts(self, False)
         self.save_grid_instructions(self.upper_instructions, 'upper')
@@ -833,6 +850,9 @@ class PipelinePlan(object):
         # concatenate bytes of DMS and ddreader config
         self.ddreader_lut = np.frombuffer(self.dms.tobytes() + self.ddreader_config.tobytes(), dtype=np.uint32)
         self.save_lut(self.ddreader_lut, 'ddreader', 'value')
+
+
+        return self.__fdmt_plan
 
         
     def save_lut(self, data, lutname, header, fmt='%d'):
