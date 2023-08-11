@@ -121,7 +121,7 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=False, fftshift=True, trans
         vpix = np.round(vlam/vcell + pix_offset).astype(int)
         if np.any((upix < 0) | (upix >= Npix) | (vpix < 0) | (vpix >= Npix)):
             warnings.warn('Pixel coordinates out of range')
-            raise ValueError('Pixel coordinates out of range')
+            raise ValueError(f'Pixel coordinates out of range, upix = {upix}, vpix = {vpix}')
 
         if fftshift:
             upix = fftshift_coordinates(upix, Npix)
