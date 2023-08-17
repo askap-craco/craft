@@ -99,9 +99,10 @@ class UvFits(object):
         self.skip_blocks = skip_blocks
         nrows = len(self.hdulist[0].data)
         log.debug('File contains %d baselines. Skipping %d blocks with nstart=%d', self.nbl, skip_blocks, self.__nstart)
+        self.nblocks = nrows // self.nbl
 
-        if self.__nstart >= nrows:
-            raise ValueError(f'Requested skip {skip_blocks} larger than file. nrows={nrows} nbl={self.nbl} nstart={self.__nstart}')
+        if skip_blocks >= self.nblocks:
+            raise ValueError(f'Requested skip {skip_blocks} larger than file. nblocks = {self.nblocks} nrows={nrows} nbl={self.nbl} nstart={self.__nstart}')
 
         
 

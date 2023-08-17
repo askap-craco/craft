@@ -178,7 +178,7 @@ class Fdmt(object):
         self.niter = int(np.ceil(np.log2(n_f)))
         self.max_dt = int(max_dt)
         self.n_t = int(n_t)
-        freqs = np.arange(n_f)*self.d_f + self.f_min
+        self.freqs = np.arange(n_f)*self.d_f + self.f_min
         self.init_delta_t = self._calc_delta_t(self.f_min, self.f_min + self.d_f)
         self._state_shape = np.array([self.n_f, self.init_delta_t, self.n_t])
         self.hist_delta_t = [self.init_delta_t]
