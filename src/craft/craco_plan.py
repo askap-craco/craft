@@ -525,7 +525,15 @@ class PipelinePlan(object):
             return self.__fdmt_plan
 
         uvcells = self.uvcells
-        self.__fdmt_plan = FdmtPlan(uvcells, self)
+
+        #runs = greedy_create_fdmt_runs(self, uvcells, nuvwide, ncin)
+
+        ncin = self.ncin
+        chan_positions = np.arange(0,self.nf,ncin) # just need to have more than enough channesl
+        runs = fixed_algorithm(uvcells, chan_positions, chan_width=ncin, nuvwide=self.nuvwide):
+        
+        self.__fdmt_plan = FdmtPlan(uvcells, runs, self)
+
         self.save_fdmt_plan_lut()
         
         if self.fdmt_plan.nuvtotal >= self.values.nuvmax:

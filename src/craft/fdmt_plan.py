@@ -24,16 +24,12 @@ __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
 def find_cells(uvcells, blid):
     '''
-    Returns a list of cells with teh given baseline ID
+    Returns a list of cells with th given baseline ID
     Sorted by channel_start
-    Throws error if blid not found
+    Returns empty list if blid not found which can happen for U=0 V=0 bug
     '''
-    
     cells =[cell for cell in uvcells if cell is not None and cell.blid == blid] 
     cells.sort(key=lambda c:c.chan_start)
-    # seomtimes you get length(0) if some cells aren't added due to flagging or U=0, V=0 discards
-    #if len(cells) == 0:
-    #    raise ValueError(f'BLID {blid} not found')
     
     return cells
 
@@ -48,7 +44,10 @@ def flat_cell_iter(runs):
                     yield cell
                         
 
-def quickstr(c):
+def baselinestr(c):
+    '''
+    Print summary of a baselineCell
+    '''
     if c is None:
         s = f'------ (--,--)'
     else:
@@ -61,10 +60,14 @@ def rangestr(i, cells):
         s = 'XXX-XXX (XXX,XXX)'
     else:
         c = cells[i]
-        s = quickstr(c) 
+        s = baselinestr(c) 
     return s
 
 def channel_overlap(c1_start, c1_end, c2_start, c2_end):
+    '''
+    Returns the overlap of 2 intervals: c1_start:c1_end (inclusive) and c2_start:c2_end (inclusive)
+    Returns 0 if disjoint
+    '''
     cstart = max(c1_start, c2_start)
     cend = min(c1_end, c2_end)    
     overlap = max(cend - cstart + 1, 0)
@@ -261,45 +264,97 @@ def split_cells(cells, minchan, ncin):
 
     return full_cells, leftover_cells
 
+def greedy_create_fdmt_runs(theplan, uvcells, nuvwide, ncin):
+    uvcells_remaining = uvcells[:] # copy array
+    runs = []
+    while len(uvcells_remaining) > 0:
+        log.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
+        minchan = min(uvcells_remaining, key=lambda uv:(uv.chan_start, uv.blid)).chan_start
+        possible_cells = [uv for uv in uvcells_remaining if calc_overlap(uv, minchan, ncin) > 0]
+
+        # Do not know how to get a length of iterator in python3, comment it out here
+        #log.debug('Got %d possible cells', len(possible_cells))
+
+        # sort as best we can so that it's stable - I.e. we get hte same answer every time
+        best_cells = sorted(possible_cells, key=lambda uv:(calc_overlap(uv, minchan, ncin), uv.blid, uv.upper_idx), reverse=True)
+        log.debug('Got %d best cells. Best=%s overlap=%s', len(best_cells), best_cells[0], calc_overlap(best_cells[0], minchan, ncin))
+        used_cells = best_cells[0:min(nuvwide, len(best_cells))]
+        full_cells, leftover_cells = split_cells(used_cells, minchan, ncin)
+        run = FdmtRun.from_cells(full_cells, theplan)
+        runs.append(run)
+        # create lookup table for each run
+            
+        total_overlap = run.total_overlap
+        # Do not know how to get a length of iterator in python3, comment it out here
+        #log.debug('minchan=%d npossible=%d used=%d full=%d leftover=%d total_overlap=%d', minchan, len(possible_cells), len(used_cells), len(full_cells), len(leftover_cells), total_overlap)
+            
+        # Remove used cells
+        uvcells_remaining = [cell for cell in uvcells_remaining if cell not in used_cells]
+
+        # Add split cells
+        uvcells_remaining.extend(leftover_cells)
+
+    return runs
+
+
 class FdmtPlanContainer:
-    def __init__(self, plan, runs, prev_plan):
-        self.__runs = [None for r in range(plan.nuvmax)]
+    '''
+    This is a utility class to help organise my brain. it matains a list of plan.NUVMAX FdmtRuns.
+    If the run is active the list contains the run, otherwise it contains None
+    If the container is initialised from a previous container, it sets up empty runs with the same chan_start
+    at all the previous locations and expects to be poked and prodded until it's full
+    I'm not entirely happy with the design of this (In particular, i painted myself into a corner to working out 
+    how to create a new Run - it needs extra parameters) - so it isn't generic. It relised on the fixed algorithm
+    way of allocating runs. I'm sure it can be improved.
+    
+    '''
+    def __init__(self, plan:'FdmtPlan', runs:list, prev_plan:'FdmtPlanContainer'):
+        '''
+        Creates the container. If prev_plan is None, it uses the list of FdmtRuns to intiialise the internal list
+        If prev_plan is not None it uses the runs from the previous plan but it creates new ones with the same bottom channel
+        but no baseline cells, so they can be added later.
+        '''
+        self.nuvmax = plan.pipeline_plan.nuvrest_max
+        self.nuvwide = plan.nuvwide
+        self.__runs = [None for r in range(self.nuvmax)]
         self.plan = plan
         self.uvcells = list(flat_cell_iter(runs))
         self.prev_plan = prev_plan
-        self.nuvmax = plan.nuvmax
-        self.nuvwide = plan.nuvwide
         self.total_overlap = 0
         self.chan_positions = np.arange(0,32*12,32)
         self.chan_width = 32
-
-        
         
         # Setup chan start for all the runs
-        if prev_plan is not None:
+        if prev_plan is None:
+            self.set_runs(runs)
+        else:
             for irun, run in enumerate(prev_plan.__runs):
                 if run is not None:
                     self.set_run(irun, run.chan_start)                    
                     
     def set_runs(self, runs):
-        #self.__runs = runs # assume this is a list of runs        
-        # if there aren't enough then the remaining runs will be None
+        '''
+        Initialise with the given runs
+        '''
         for irun, run in enumerate(runs):
             self.__runs[irun] = run
             
         assert len(self.__runs) == self.nuvmax
-                    
-    def copy_runs(self, runs):
-        for irun, run in enumerate(runs):
-            if run is None:
-                continue
-                
-            newrun = self.set_run(irun, run.chan_start)
-            for icell, cell in enumerate(run.cells):
-                new_cell, leftover_cell = self.set_cell_coord(cell, (irun, icell))
-                #When copying over, we should have  no leftovers because it's already split nicely
-                assert leftover_cell is None
-        
+
+    @property
+    def nchan_array(self):
+        a = np.zeros((self.nuvmax, self.nuvwide))
+        for u in range(self.nuvmax):
+            for w in range(self.nuvwide):
+                c = self.cell_at((u,w))
+                n = np.nan if c is None else c.nchan
+                a[u,w] = n
+
+        return a
+
+    @property
+    def start_chan_array(self):
+        return np.array([np.nan if r is None else r.chan_start for r in self.__runs])
                     
     @property
     def runs(self):
@@ -310,7 +365,10 @@ class FdmtPlanContainer:
     
     @property
     def nruns(self):
-        return len(self.__runs)
+        '''
+        Returns the number of valid runs - will be <= nuvmax
+        '''
+        return sum(r is not None for r in self.__runs)
     
     def cell_iter(self):
         return flat_cell_iter(self.__runs)        
@@ -318,6 +376,13 @@ class FdmtPlanContainer:
     @property
     def blids(self):
         return set([uv.blid for uv in self.uvcells])
+
+    @property
+    def nchan(self):
+        '''
+        Returns the total number of channels allocated in allcells
+        '''
+        return sum(c.nchan for c in self.cell_iter())
         
     def uvcells_of(self, blid):
         '''
@@ -325,35 +390,46 @@ class FdmtPlanContainer:
         '''
         return find_cells(self.cell_iter(), blid)
         
-    def run_at(self, irun) -> 'FdmtRun':
+    def run_at(self, irun:int) -> 'FdmtRun':
+        '''
+        Returns the run at the given index
+        '''
+        
         if irun >= len(self.__runs):
-            raise ValueError(f'Invalid index {irun} of {len(self.__runs)}')
+            raise IndexError(f'Invalid index {irun} of {len(self.__runs)}')
     
         return self.__runs[irun]
     
     def cell_at(self, coord) -> BaselineCell:
+        '''
+        Returns the BaselineCell at the given coordinate. 
+        Coordinate is the (irun, icell) as a tuple
+        If the run or cell are None it returns None
+        '''
         irun, icell = coord
         
         run = self.run_at(irun)
         cell = None
         if run is not None:
             if icell >= len(run.cells):
-                raise ValueError(f'Invalid cell index {icell} of {len(run.cells)} {run.cells}')
+                raise IndexError(f'Invalid cell index {icell} of {len(run.cells)} {run.cells}')
                 
             cell = run.cells[icell]
                                                          
         return cell
     
-    @property
-    def nchan(self):
-        return sum(c.nchan for c in self.cell_iter())
     
     def set_run(self, irun, chan_start):
+        '''
+        Create a new run at the given index with the given chan_start
+        If there's already a run at that index with the given chan_start it does nothing
+        If the run has a different chan_start it throws an exception
+        '''
         r = self.run_at(irun)
         if r is None:
             r = FdmtRun(self.plan, chan_start)
             self.__runs[irun] = r
-            print(f'Added run at {irun} with chan_start={chan_start} prev={None if self.prev_plan is None else self.prev_plan.run_at(irun)}')
+            log.debug(f'Added run at {irun} with chan_start={chan_start} prev={None if self.prev_plan is None else self.prev_plan.run_at(irun)}')
         else:
             assert r.chan_start == chan_start
             
@@ -361,9 +437,13 @@ class FdmtPlanContainer:
     
     @property
     def last_valid_run_index(self):
+        '''
+        Returns the index of the last valid run
+        Equivalent to the number of UVWIDE we need to compute - 1
+        '''
         idx = None
-        for i in range(len(self.__runs)):
-            if self.__runs[i] is not None:
+        for irun, run in enumerate(self.__runs):
+            if run is not None:
                 idx = i
         
         assert idx is None or self.__runs[idx] is not None
@@ -372,22 +452,14 @@ class FdmtPlanContainer:
     
     @property
     def next_empty_run_index(self):
+        '''
+        Returns the index where a new run can be allocated.
+        If there's a previous plan, then a run can be allocated where there is no current run and no previously planned run
+        '''
         for i in range(len(self.__runs)):
             if self.run_at(i) is None and self.prev_plan is not None and self.prev_plan.run_at(i) is None:
                 break
         return i
-    
-    
-    def append_run(self, chan_start):
-        '''
-        Create a new run at the last valid run index + 1
-        '''
-        idx = self.last_valid_run_idx
-        newidx = idx+1
-        assert newidx < self.nuvmax, f'No runs left. idx={idx} newidx={newidx}'
-        r = self.set_run(idx, chan_start)
-    
-        return r, newidx
     
     def add_run(self, chan_start):
         '''
@@ -399,6 +471,11 @@ class FdmtPlanContainer:
         return r, idx
     
     def set_cell_coord(self, cell, coord):
+        '''
+        Insert a baselineCell at the given coordinate. Coordinate is (irun, icell)
+        If there's  aprevious plan it will check if the previous cell had the same baseline ID
+        and the new cell has an overlap of >0
+        '''
         prev_cell = None
         overlap = 0
         if self.prev_plan is not None: # that it's sensible to assign this cell to this fdmt run/index
@@ -406,21 +483,21 @@ class FdmtPlanContainer:
             if prev_cell is not None: # It's OK to run over an empty cell
                 assert cell.blid == prev_cell.blid, 'Trying to set run for different BLID'
                 overlap = cell_channel_overlap(cell, prev_cell)
+                
                 # There can sometimes be zero overlap, I guess we can't do much about that
-                #assert overlap > 0, f'Zero overlap for {coord} new={cell} old={prev_cell}'
+                assert overlap > 0, f'Zero overlap for {coord} new={cell} old={prev_cell}'
             
         self.total_overlap += overlap
         
         irun, ioff = coord
         run = self.run_at(irun)
-        print(f'Assigning coord={coord} overlap={overlap} nc={"X" if prev_cell is None else prev_cell.nchan}->{cell.nchan} old={quickstr(prev_cell)} requested={quickstr(cell)}')
+        log.debug(f'Assigning coord={coord} overlap={overlap} nc={"X" if prev_cell is None else prev_cell.nchan}->{cell.nchan} old={baselinestr(prev_cell)} requested={baselinestr(cell)}')
 
         assert run is not None
         assert self.cell_at(coord) is None, f'Expected empty cell at {coord} but got {self.cell_at(coord)}'
 
         inserted_cell, new_cell = run.insert_cell(ioff, cell)
 
-            
         return inserted_cell, new_cell
     
     def chan_start_for_new_cell(self, cell):
@@ -435,44 +512,51 @@ class FdmtPlanContainer:
         '''
         Find a run to put the given cell in.
         If none exists, add a new run
-        Returns the coord of the new cell
+        Returns the a tuple (newcell, leftover_cell) - the leftover_cell is always none.
         '''
+        # let's just assume prev_plan is defined for now
+        assert self.prev_plan is not None
         target_run = None
+
         for irun, run in enumerate(self.__runs):
             if run is None:
                 continue
                 
             run_overlap = channel_overlap(cell.chan_start, cell.chan_end, run.chan_start, run.chan_end)
-            # let's just assume prev_run is defined for now
             prev_run = self.prev_plan.run_at(irun)
-            if prev_run is None:
-                continue
             
-            # if we overlap nicely
-            if run_overlap == cell.nchan:
-                # loop through cells find the index where both are empty
+            # TODO - we might consider adding a cell to an existing run if it has less overlap
+            # but it probably isn't important
+            # for now we require full overlap
+            # If this cell overlaps with the run, then let's see if we cean put it in.
+            if run_overlap == cell.nchan:            # if we overlap nicely
+
                 target_icell = -1
-                for icell, (c1, c2) in enumerate(zip(prev_run.cells, run.cells)):
-                    if c1 is None and c2 is None:
-                        target_icell = icell
-                        break
+                if prev_run is None:
+                    # this is a new run that we've added to contain new stuff. I think we just keep using it
+                    if run.ncell < self.nuvwide:# We can only add to this new cell if it isn't full
+                        target_icell = run.next_empty_index
+                else:
+                    # loop through cells of current and previous run and find the index where both are empty
+                    for icell, (c1, c2) in enumerate(zip(prev_run.cells, run.cells)):
+                        if c1 is None and c2 is None:
+                            target_icell = icell
+                            break
                         
                 # if there is such an index, then we're good
                 # otherwise, we drop out of the IF and keep going
                 if target_icell >= 0:
                     target_irun = irun
                     target_run = run 
-
-                    print(f'Found spare cell in {prev_run} at {target_icell}')
-                    print('current cells', run.cells)
-                    print('prev cells', prev_run.cells)
+                    log.debug(f'Found spare cell in irun={target_irun} {prev_run} at icell={target_icell}')
                     break
 
+        # No available run. make a new one.
         if target_run is None:
-            # No available run. make a new one.
             cstart = self.chan_start_for_new_cell(cell)
             target_run, target_irun = self.add_run(cstart)
             target_icell = 0
+            log.debug('No space for cell. Created new run idx=%d for %s at cstart=%s', target_irun, cell, cstart)
         
         target_coord =  (target_irun, target_icell)
         
@@ -485,13 +569,16 @@ class FdmtPlanContainer:
         '''
         Remove runs that are empty after all the planning
         '''
-        for i in range(len(self.__runs)):
-            run = self.__runs[i]
+        for irun, run in enumerate(self.__runs):
             if run is not None and run.ncell == 0:
                 self.__runs[i] = None
             
         
-    def get_cell_coord(self, cell):
+    def get_cell_coord(self, cell:BaselineCell):
+        '''
+        Returns the coordinate of the given BaselineCell
+        Raises ValueError if the BaselineCell is not found
+        '''
         coord = None
         for irun, run in enumerate(self.__runs):
             if run is None:
@@ -516,10 +603,19 @@ class FdmtPlanContainer:
         assert self.cell_at(coord) is None
         if self.prev_plan is not None:
             assert self.prev_plan.cell_at(coord) is not None
+
+    def __str__(self):
+        s = f'FdmtPlanContainer nruns={self.nruns} nc={self.nchan} overlap={self.total_overlap}'
+        return s
+
+    __repr__ = __str__
             
             
     
 def print_cell_diffs(p1cells, p2cells):
+    '''
+    Debug print function
+    '''
     print('BLID', p1cells[0].blid)
     for i in range(max(len(p1cells), len(p2cells))):       
         print(i,rangestr(i, p1cells), rangestr(i, p2cells))
@@ -541,8 +637,8 @@ def migrate_plan(plan1, plan2, blids=None):
     for blid in blids:
         p1cells = plan1.uvcells_of(blid)
         p2cells = find_cells(plan2.uvcells, blid)
-        print(f'Plan2 nchan={plan2.nchan} overlap={plan2.total_overlap} next run={plan2.next_empty_run_index}')
-        print_cell_diffs(p1cells, p2cells)
+        log.debug(f'Plan2 nchan={plan2.nchan} overlap={plan2.total_overlap} next run={plan2.next_empty_run_index}')
+        #print_cell_diffs(p1cells, p2cells)
         extra_p2_cells = []
         
         # assign as many of plan2 cells to their coordinates as we can in plan1
@@ -558,7 +654,7 @@ def migrate_plan(plan1, plan2, blids=None):
             #print(f"best overlap of {p2c} with n={len(p1cells)}={p1cells} is {p1c} overlap={overlap}")
             
             if overlap == 0:
-                # Remove there's nothing to overlap. We should save it to add to new runs
+                # Remove. there's nothing to overlap. We should save it to add to new runs
                 # we need to remove from p2cells otherwise the loop never ends, but add it later
                 # so it gets added to new runs.
                 extra_p2_cells.append(p2c)
@@ -571,7 +667,7 @@ def migrate_plan(plan1, plan2, blids=None):
             
         # we might end up with leftover p2cells. In which case we need to add them as new cells to the plan
         p2cells.extend(extra_p2_cells)
-        print(f'There are {len(p2cells)} cells that need to be added: {p2cells}')
+        log.debug(f'There are {len(p2cells)} cells that need to be added: {p2cells}')
 
         while len(p2cells) > 0:            
             p2c = max(p2cells, key=lambda c:c.nchan)
@@ -581,7 +677,7 @@ def migrate_plan(plan1, plan2, blids=None):
                 p2cells.append(new_p2c)
             
         # for p1 cells that don't have assignments we need to delete them
-        print(f'There are {len(p1cells)} cells that need to be deleted: {p1cells}')
+        log.debug(f'There are {len(p1cells)} cells that need to be deleted: {p1cells}')
 
         for p1c in p1cells:
             p1coord = plan1.get_cell_coord(p1c)
@@ -589,6 +685,9 @@ def migrate_plan(plan1, plan2, blids=None):
             
             
     plan2.delete_empty_runs()
+    log.info('Migrated plan. from %s to %s', plan1, plan2)
+
+    assert plan2.nchan == sum(c.nchan for c in plan2.uvcells)
             
     return plan2
 
@@ -661,8 +760,8 @@ class FdmtRun:
     @property
     def next_empty_index(self):
         cellidx = -1
-        for icell in range(len(self.__cells)):
-            if self.__cells[icell] is None:
+        for icell, cell in enumerate(self.__cells):
+            if cell is None:
                 cellidx = icell
                 break
 
@@ -771,40 +870,9 @@ class FdmtRun:
     __repr__ = __str__
 
     
-def greedy_create_fdmt_runs(theplan, uvcells, nuvwide, ncin):
-    uvcells_remaining = uvcells[:] # copy array
-    runs = []
-    while len(uvcells_remaining) > 0:
-        log.debug('Got %d/%d uvcells remaining', len(uvcells_remaining), len(uvcells))
-        minchan = min(uvcells_remaining, key=lambda uv:(uv.chan_start, uv.blid)).chan_start
-        possible_cells = [uv for uv in uvcells_remaining if calc_overlap(uv, minchan, ncin) > 0]
-
-        # Do not know how to get a length of iterator in python3, comment it out here
-        #log.debug('Got %d possible cells', len(possible_cells))
-
-        # sort as best we can so that it's stable - I.e. we get hte same answer every time
-        best_cells = sorted(possible_cells, key=lambda uv:(calc_overlap(uv, minchan, ncin), uv.blid, uv.upper_idx), reverse=True)
-        log.debug('Got %d best cells. Best=%s overlap=%s', len(best_cells), best_cells[0], calc_overlap(best_cells[0], minchan, ncin))
-        used_cells = best_cells[0:min(nuvwide, len(best_cells))]
-        full_cells, leftover_cells = split_cells(used_cells, minchan, ncin)
-        run = FdmtRun.from_cells(full_cells, theplan)
-        runs.append(run)
-        # create lookup table for each run
-            
-        total_overlap = run.total_overlap
-        # Do not know how to get a length of iterator in python3, comment it out here
-        #log.debug('minchan=%d npossible=%d used=%d full=%d leftover=%d total_overlap=%d', minchan, len(possible_cells), len(used_cells), len(full_cells), len(leftover_cells), total_overlap)
-            
-        # Remove used cells
-        uvcells_remaining = [cell for cell in uvcells_remaining if cell not in used_cells]
-
-        # Add split cells
-        uvcells_remaining.extend(leftover_cells)
-
-    return runs
 
 class FdmtPlan(object):
-    def __init__(self, uvcells, pipeline_plan):
+    def __init__(self, uvcells, runs, pipeline_plan):
         self.pipeline_plan = pipeline_plan
         nuvwide = self.pipeline_plan.nuvwide
         ncin = self.pipeline_plan.ncin
@@ -812,7 +880,6 @@ class FdmtPlan(object):
         self.ncin = ncin
         self.nuvmax = self.pipeline_plan.nuvmax
         
-        runs = greedy_create_fdmt_runs(self, uvcells,nuvwide, ncin)
 
         # find a cell with zero in it
         self.zero_cell = None
