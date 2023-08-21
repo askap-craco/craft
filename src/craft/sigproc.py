@@ -31,10 +31,11 @@ INT_FORMAT = 'i'
 STRING_FORMAT = 's'
 DOUBLE_FORMAT = 'd'
 
-def sigproc_sex2deg(x):
+def sigproc_sex2deg(xs):
     '''
     Computes a decimal number in degrees from a rediculous sigproc number in the form
     ddmmss.s
+    Throws an exception if mm or ss is > 60
 
     >>> '{:0.5f}'.format(sigproc_sex2deg(123456.789))
     '12.58244'
@@ -42,17 +43,29 @@ def sigproc_sex2deg(x):
     '-12.58244'
     >>> sigproc_sex2deg(0)
     0.0
+    >>> sigproc_sex2deg(126400.00)
+    Traceback (most recent call last):
+    ...
+    ValueError: Invalid sexagesimal value: 126400.0 dd=12.0 mm=64.0 ss=0.0 dout=13.066666666666666
+
+    >>> sigproc_sex2deg(125960.00)
+    Traceback (most recent call last):
+      ...
+    ValueError: Invalid sexagesimal value: 125960.0 dd=12.0 mm=59.0 ss=60.0 dout=13.0
+    
     '''
     sign = 1.
-    if x < 0:
+    if xs < 0:
         sign = -1.
 
-    x = abs(x)
+    x = abs(xs)
     
     dd = float(int(x/10000))
     mm = float(int((x - dd*10000)/100))
     ss = x - dd*10000 - mm*100
     dout = sign*(dd + mm/60.0 + ss/3600.0)
+    if mm < 0 or ss < 0 or mm >= 60.0 or ss >= 60.0:
+        raise ValueError(f'Invalid sexagesimal value: {xs} dd={dd} mm={mm} ss={ss} dout={dout}')
     
     return dout
 
@@ -146,9 +159,13 @@ class SigprocFile(object):
 
         if 'src_raj' in self.header:
             self.src_raj_deg = sigproc_sex2deg(self.header['src_raj'])*15.0
+            if not 0 <= self.src_raj_deg < 360.0:
+                raise ValueError(f'Invalid RA: {self.src_raj_deg}')
             
         if 'src_dej' in self.header:
             self.src_dej_deg = sigproc_sex2deg(self.header['src_dej'])
+            if not -90 <= self.src_dej_deg <= 90:
+                raise ValueError(f'Invalid Dec: {self.src_dej_deg}')
 
     def _write_header(self, header):
         f = self.fin
