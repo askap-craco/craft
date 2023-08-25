@@ -264,6 +264,14 @@ def split_cells(cells, minchan, ncin):
 
     return full_cells, leftover_cells
 
+def fixed_create_fdmt_runs(pipeline_plan, fdmt_plan, uvcells, nuvwide, ncin):
+        ncin = pipeline_plan.ncin
+        chan_positions = np.arange(0,pipeline_plan.nf+ncin,ncin) # just need to have more than enough channels
+        run_cells = fixed_algorithm(pipeline_plan.uvcells, chan_positions, chan_width=32)
+        runs = [FdmtRun.from_cells(cells, fdmt_plan, chan_start) for (chan_start, cells) in run_cells]
+
+        return runs
+        
 def greedy_create_fdmt_runs(theplan, uvcells, nuvwide, ncin):
     uvcells_remaining = uvcells[:] # copy array
     runs = []
@@ -324,13 +332,12 @@ class FdmtPlanContainer:
         self.chan_positions = np.arange(0,32*12,32)
         self.chan_width = 32
         
-        # Setup chan start for all the runs
         if prev_plan is None:
-            self.set_runs(runs)
+            self.set_runs(runs) # copy runs and cells configured
         else:
             for irun, run in enumerate(prev_plan.__runs):
                 if run is not None:
-                    self.set_run(irun, run.chan_start)                    
+                    self.set_run(irun, run.chan_start) # make empty run for every cell where appropriate          
                     
     def set_runs(self, runs):
         '''
@@ -341,20 +348,27 @@ class FdmtPlanContainer:
             
         assert len(self.__runs) == self.nuvmax
 
-    @property
-    def nchan_array(self):
+    def cell_array_of(self, func):
         a = np.zeros((self.nuvmax, self.nuvwide))
         for u in range(self.nuvmax):
             for w in range(self.nuvwide):
                 c = self.cell_at((u,w))
-                n = np.nan if c is None else c.nchan
+                n = np.nan if c is None else func(c)
                 a[u,w] = n
 
         return a
 
     @property
+    def nchan_array(self):
+        return self.cell_array_of(lambda c:c.nchan)
+
+    @property
     def start_chan_array(self):
         return np.array([np.nan if r is None else r.chan_start for r in self.__runs])
+
+    @property
+    def ncell_array(self):
+        return np.array([np.nan if r is None else r.ncell for r in self.__runs])
                     
     @property
     def runs(self):
@@ -362,6 +376,13 @@ class FdmtPlanContainer:
         Returns a copy of the list so people dont meddle with it
         '''
         return list(self.__runs)
+
+    @property
+    def valid_runs(self):
+        '''
+        Returns a list of runs but only up the last valid run index
+        '''
+        return self.__runs[:self.last_valid_run_index+1]
     
     @property
     def nruns(self):
@@ -444,7 +465,7 @@ class FdmtPlanContainer:
         idx = None
         for irun, run in enumerate(self.__runs):
             if run is not None:
-                idx = i
+                idx = irun
         
         assert idx is None or self.__runs[idx] is not None
         
@@ -605,7 +626,8 @@ class FdmtPlanContainer:
             assert self.prev_plan.cell_at(coord) is not None
 
     def __str__(self):
-        s = f'FdmtPlanContainer nruns={self.nruns} nc={self.nchan} overlap={self.total_overlap}'
+        pcoverlap = self.total_overlap / self.nchan * 100
+        s = f'FdmtPlanContainer nruns={self.nruns} nc={self.nchan} overlap={self.total_overlap}={pcoverlap:0.1f}%'
         return s
 
     __repr__ = __str__
@@ -685,12 +707,28 @@ def migrate_plan(plan1, plan2, blids=None):
             
             
     plan2.delete_empty_runs()
-    log.info('Migrated plan. from %s to %s', plan1, plan2)
+    log.info('Migrated plan from %s to %s', plan1, plan2)
 
     assert plan2.nchan == sum(c.nchan for c in plan2.uvcells)
             
     return plan2
 
+def migrate_pipeline_plans(plan1, plan2, new_runs):
+    log.info('MIgrate plan')
+    container1 = FdmtPlanContainer(plan1.fdmt_plan, plan1.fdmt_plan.runs, None)
+    container2 = FdmtPlanContainer(plan2.fdmt_plan, new_runs, container1)
+    container2 = migrate_plan(container1, container2)
+    migrated_runs = container2.valid_runs # only up the last valid index
+    return migrated_runs
+
+def migrate_fdmt_plans(plan1, plan2, new_runs):
+    log.info('MIgrate plan')
+    container1 = FdmtPlanContainer(plan1, plan1.runs, None)
+    container2 = FdmtPlanContainer(plan2, new_runs, container1)
+    container2 = migrate_plan(container1, container2)
+    migrated_runs = container2.valid_runs
+    # shorten to make it only as long as it needs to be
+    return migrated_runs
 
 
 class FdmtRun:
@@ -869,34 +907,52 @@ class FdmtRun:
 
     __repr__ = __str__
 
-    
-
 class FdmtPlan(object):
-    def __init__(self, uvcells, runs, pipeline_plan):
+    def __init__(self, uvcells, pipeline_plan, prev_pipeline_plan=None):
         self.pipeline_plan = pipeline_plan
         nuvwide = self.pipeline_plan.nuvwide
         ncin = self.pipeline_plan.ncin
         self.nuvwide = nuvwide
         self.ncin = ncin
         self.nuvmax = self.pipeline_plan.nuvmax
+        self.uvcells = uvcells
+        #runs = greedy_create_fdmt_runs(self, uvcells, nuvwide, ncin)
+        runs = fixed_create_fdmt_runs(pipeline_plan, self, uvcells, nuvwide, ncin) # even for migrated data we need initial runs
+
+        self.prev_pipeline_plan = prev_pipeline_plan
+        if prev_pipeline_plan is None:
+            self.set_runs(runs)
+        else:
+            migrated_runs = migrate_fdmt_plans(prev_pipeline_plan.fdmt_plan, self, runs)
+            self.set_runs(migrated_runs)
         
 
+    def set_runs(self, runs):
+        uvcells = self.uvcells
+        nuvwide = self.nuvwide
+        ncin = self.ncin
+        nuvmax = self.nuvmax
+
+        self.runs = runs
+        
         # find a cell with zero in it
         self.zero_cell = None
         for irun, run in enumerate(runs):
+            if run is None:
+                continue
+            
             if len(run.cells) < nuvwide:
                 self.zero_cell = (irun, len(run.cells))
                 break
 
         # If we still haven't foudn another UVCell, we need to add another FDMT run
         # Which seems an aweful waste, but go figure.
-        if self.zero_cell is None:
+        if self.zero_cell is None: 
             runs.append(FdmtRun(self, 0)) # Add FDmt Run
             self.zero_cell = (len(runs)-1, 0)
             
         log.info("FDMT zero cell is %s=%s", self.zero_cell, self.zero_cell[0]*nuvwide+self.zero_cell[1])
 
-        self.runs = runs
         assert self.zero_cell != None
         assert self.zero_cell[0] < self.pipeline_plan.nuvrest_max, 'Not enough room for FDMT zero cell'
         assert self.zero_cell[1] < nuvwide

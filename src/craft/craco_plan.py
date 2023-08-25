@@ -398,7 +398,16 @@ def calc_pad_lut(plan, ssr=16):
 
 
 class PipelinePlan(object):
-    def __init__(self, f, values=None, dms=None):
+    def __init__(self, f, values=None, dms=None, prev_plan=None):
+        '''
+        Creates a pipeline plan
+        :f: object that contains lots of juicy info like baselines, frequency, tsamp etc. See uvfits.py and search_pipeline_sink:Adapter
+        :values: command line arguments
+        :dms: list of dispersion measures
+        :prev_plan: previous plan in time - todo check this makes sense, but mainly use to work out new FdmtPlan based on old FDMT plan
+        
+        '''
+
         if values is None:
             print('Creating default values')
             self.values = get_parser().parse_args()
@@ -408,6 +417,8 @@ class PipelinePlan(object):
         else:
             self.values = values
 
+        self.prev_plan = prev_plan
+        
         values = self.values
         if values.flag_ants:
             f.set_flagants(values.flag_ants)
@@ -420,7 +431,7 @@ class PipelinePlan(object):
 
         self.beamid = beamid
         
-        log.info('making Plan values=%s', self.values)
+        log.info('making Plan values=%s prev plan:%s', self.values, self.prev_plan)
         self.__tsamp = f.tsamp
         umax, vmax = f.get_max_uv()
         lres, mres = 1./umax, 1./vmax
@@ -525,14 +536,10 @@ class PipelinePlan(object):
             return self.__fdmt_plan
 
         uvcells = self.uvcells
-
-        #runs = greedy_create_fdmt_runs(self, uvcells, nuvwide, ncin)
-
+        nuvwide = self.nuvwide
         ncin = self.ncin
-        chan_positions = np.arange(0,self.nf,ncin) # just need to have more than enough channesl
-        runs = fixed_algorithm(uvcells, chan_positions, chan_width=ncin, nuvwide=self.nuvwide):
-        
-        self.__fdmt_plan = FdmtPlan(uvcells, runs, self)
+
+        self.__fdmt_plan = FdmtPlan(uvcells, self, prev_pipeline_plan=self.prev_plan)
 
         self.save_fdmt_plan_lut()
         
