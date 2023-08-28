@@ -246,8 +246,9 @@ class Gridder(Kernel):
             if t==0 or update_uvws:
                 this_uvw = {}
                 for blid, uvw_data in list(uvws.items()):
-                    this_uvw[blid] = np.array(tuple(uvw_data[:, t]), dtype=[('UU', 'f8'), ('VV', 'f8'), ('WW', 'f8')])
+                    this_uvw[blid] = np.array(tuple(uvw_data[:, 2*t]), dtype=[('UU', 'f8'), ('VV', 'f8'), ('WW', 'f8')])
                 current_uvcells = craco_plan.get_uvcells(baselines=this_uvw, uvcell=self.plan.uvcell, freqs = self.plan.freqs, Npix = self.values.npix)
+                print(f"t is {t}, and I am updating uvw values now.")
                 nuv = len(current_uvcells)
 
             for iuv in range(nuv):

@@ -122,7 +122,7 @@ def get_uvcells(baselines, uvcell, freqs, Npix, plot=False, fftshift=True, trans
         vpix = np.round(vlam/vcell + pix_offset).astype(int)
         if np.any((upix < 0) | (upix >= Npix) | (vpix < 0) | (vpix >= Npix)):
             warnings.warn('Pixel coordinates out of range')
-            raise ValueError('Pixel coordinates out of range')
+            raise ValueError(f'Pixel coordinates out of range, upix = {upix}, vpix = {vpix}')
 
         if fftshift:
             upix = fftshift_coordinates(upix, Npix)
@@ -437,6 +437,10 @@ class PipelinePlan(object):
         lres, mres = 1./umax, 1./vmax
         baselines = f.baselines
         self.baselines = baselines
+        # List of basleine IDs sorted
+        # THis is the ordering of baselines once you've done bl2array
+        self.baseline_order = sorted(self.baselines.keys())
+
         nbl = len(baselines)
         freqs = f.channel_frequencies
         self.target_name = f.target_name
@@ -511,6 +515,8 @@ class PipelinePlan(object):
         self.dtype = np.complex64 # working data type
         self.threshold = self.values.threshold
         self.nbl = nbl
+        self.baseline_shape = (self.nbl, self.nf, self.nt)
+
         self.fdmt_scale = self.values.fdmt_scale
         self.fft_scale  = self.values.fft_scale
         
@@ -529,9 +535,20 @@ class PipelinePlan(object):
         self.__set_dms(dms)
         self.__fdmt_plan = None
 
+    @property
+    def nuvrest(self):
+        return self.fdmt_plan.nuvtotal // self.nuvwide
+
+    @property
+    def uv_shape(self):
+        return (self.nuvrest, self.nt, self.ncin, self.nuvwide)
+
 
     @property
     def fdmt_plan(self):
+        '''
+        Lazy evanluate FDMT plan
+        '''
         if self.__fdmt_plan is not None:
             return self.__fdmt_plan
 
@@ -546,14 +563,6 @@ class PipelinePlan(object):
         if self.fdmt_plan.nuvtotal >= self.values.nuvmax:
             raise ValueError("Too many UVCELLS")
 
-        self.nuvrest = self.fdmt_plan.nuvtotal // self.nuvwide
-        self.uv_shape = (self.nuvrest, self.nt, self.ncin, self.nuvwide)
-        self.baseline_shape = (self.nbl, self.nf, self.nt)
-
-        # List of basleine IDs sorted
-        # THis is the ordering of baselines once you've done bl2array
-        self.baseline_order = sorted(self.baselines.keys())
-        
         self.upper_instructions = calc_grid_luts(self, True)
         self.lower_instructions = calc_grid_luts(self, False)
         self.save_grid_instructions(self.upper_instructions, 'upper')
