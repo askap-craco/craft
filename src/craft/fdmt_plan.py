@@ -591,7 +591,7 @@ class FdmtPlanContainer:
         '''
         for irun, run in enumerate(self.__runs):
             if run is not None and run.ncell == 0:
-                self.__runs[i] = None
+                self.__runs[irun] = None
             
         
     def get_cell_coord(self, cell:BaselineCell):
@@ -651,10 +651,14 @@ def migrate_plan(plan1, plan2, blids=None):
     If there are extra cells it will add them to plan2
     Leftover UVs will be deleted
     '''
-    assert plan1.blids == plan2.blids, 'Baselines cant change between plans'
+    bl1 = plan1.blids
+    bl2 = plan2.blids
+    if bl1 != bl2:
+        log.warning(f'Baselines changed between plans: {len(bl1)} =? {len(bl2)} - d1={bl1 - bl2} d2={bl2 - bl1} d12={bl1 ^ bl2}. Probably due to U=0 V=0 bug')
+        
     if blids is None:
-        blids = plan1.blids
-    
+        blids = plan1.blids.union(plan2.blids) # set union  - some blids can be in ond and not the other
+
     for blid in blids:
         p1cells = plan1.uvcells_of(blid)
         p2cells = find_cells(plan2.uvcells, blid)
@@ -708,7 +712,9 @@ def migrate_plan(plan1, plan2, blids=None):
     plan2.delete_empty_runs()
     log.info('Migrated plan from %s to %s', plan1, plan2)
 
-    assert plan2.nchan == sum(c.nchan for c in plan2.uvcells)
+    if plan1.blids == plan2.blids: # all bets are off if the blids changed
+        expected_nchan = sum(c.nchan for c in plan2.uvcells)
+        assert plan2.nchan == expected_nchan, f'Didnt plan all cells. Expected={expected_nchan} actual={plan2.nchan}'
             
     return plan2
 
@@ -1063,6 +1069,8 @@ class FdmtPlan(object):
         #print(uvpix, 'Version1', cell_coords, 'Verion2', cell_coords2)
         #assert cell_coords == cell_coords2
         #assert cell_coords2 is not None, f'No coordinates in UVMAP at uvpix={uvpix}'
+        if cell_coords2 is None:
+            log.warning('Could not find UV for uvpix: %s', uvpix)
 
         return cell_coords2
 
