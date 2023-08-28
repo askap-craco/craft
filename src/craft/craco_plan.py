@@ -330,8 +330,8 @@ def calc_pad_lut(plan, ssr=16):
     lower_registers.extend(next(lower_inputs))
     lower_registers.extend(next(lower_inputs))
 
-    print('Upper registers', upper_registers)
-    print('Lower registers', lower_registers)
+    log.debug('Upper registers: %s', upper_registers)
+    log.debug('Lower registers: %s', lower_registers)
     
     upper_shifts = []
     lower_shifts = []

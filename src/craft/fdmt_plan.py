@@ -156,8 +156,7 @@ def fixed_algorithm(cells, chan_positions, chan_width=32, nuvwide=8):
         
     cells_left = cells[:] # copy list
     minimum_nruns = (len(cells) + 8 - 1) // 8 # // in python means integer division
-    print(f'Started with {len(cells)} cells which would need at least {minimum_nruns} runs')      
-        
+    log.info(f'Started with {len(cells)} cells which would need at least {minimum_nruns} runs')      
     while len(cells_left) > 0:
         # Find start channel from list of chan_positions that has. We have to start somewhere.
         mincell = min(cells_left, key=lambda cell:cell.chan_start)        
@@ -228,7 +227,7 @@ def fixed_algorithm(cells, chan_positions, chan_width=32, nuvwide=8):
                 
 
     increase = len(runs)/minimum_nruns
-    print(f'With {len(chan_positions)} channels at {chan_positions} we needed {len(runs)} runs. An increase of {increase} ')
+    log.info(f'With {len(chan_positions)} channels at {chan_positions} we needed {len(runs)} runs. An increase of {increase:0.3f} ')
             
     return runs
 
@@ -722,13 +721,13 @@ def migrate_pipeline_plans(plan1, plan2, new_runs):
     return migrated_runs
 
 def migrate_fdmt_plans(plan1, plan2, new_runs):
-    log.info('MIgrate plan')
+    log.info('Migrate plan from %s to %s with %d new runs', plan1, plan2, len(new_runs))
     container1 = FdmtPlanContainer(plan1, plan1.runs, None)
     container2 = FdmtPlanContainer(plan2, new_runs, container1)
     container2 = migrate_plan(container1, container2)
-    migrated_runs = container2.valid_runs
+    #migrated_runs = container2.valid_runs
     # shorten to make it only as long as it needs to be
-    return migrated_runs
+    return container1, container2
 
 
 class FdmtRun:
@@ -872,7 +871,7 @@ class FdmtRun:
         over = 0
         for uv in self.defined_cells:
             overlap = calc_overlap(uv, self.chan_start,self.plan.pipeline_plan.ncin)
-            log.debug('Cell chan_start %s %s %s-%s overlap=%d', self.chan_start, uv, uv.chan_start, uv.chan_end, overlap)
+            #log.debug('Cell chan_start %s %s %s-%s overlap=%d', self.chan_start, uv, uv.chan_start, uv.chan_end, overlap)
             assert overlap > 0
             over += overlap
         return over
@@ -916,15 +915,26 @@ class FdmtPlan(object):
         self.ncin = ncin
         self.nuvmax = self.pipeline_plan.nuvmax
         self.uvcells = uvcells
+        self.prev_pipeline_plan = prev_pipeline_plan
+        self.zero_cell = None
+        self.runs = []
+        
         #runs = greedy_create_fdmt_runs(self, uvcells, nuvwide, ncin)
         runs = fixed_create_fdmt_runs(pipeline_plan, self, uvcells, nuvwide, ncin) # even for migrated data we need initial runs
 
-        self.prev_pipeline_plan = prev_pipeline_plan
+        log.info('Creating FdmtPlan for %d cells plan=%s prev_plan=%s We have %d initial runs', len(uvcells), pipeline_plan, prev_pipeline_plan, len(runs))
+        
         if prev_pipeline_plan is None:
             self.set_runs(runs)
         else:
-            migrated_runs = migrate_fdmt_plans(prev_pipeline_plan.fdmt_plan, self, runs)
+            self.container1, self.container2 = migrate_fdmt_plans(prev_pipeline_plan.fdmt_plan, self, runs)
+            migrated_runs = self.container2.valid_runs
             self.set_runs(migrated_runs)
+
+    def __str__(self):
+        return f'FdmtPlan ncell={len(self.uvcells)} zero cell={self.zero_cell} nruns={len(self.runs)}'
+
+    __repr__ = __str__
         
 
     def set_runs(self, runs):
@@ -941,8 +951,9 @@ class FdmtPlan(object):
             if run is None:
                 continue
             
-            if len(run.cells) < nuvwide:
-                self.zero_cell = (irun, len(run.cells))
+            if run.ncell < nuvwide - 1:
+                self.zero_cell = (irun, run.next_empty_index)
+                log.info('Found zero cell among runs: %s', self.zero_cell)
                 break
 
         # If we still haven't foudn another UVCell, we need to add another FDMT run
@@ -950,6 +961,7 @@ class FdmtPlan(object):
         if self.zero_cell is None: 
             runs.append(FdmtRun(self, 0)) # Add FDmt Run
             self.zero_cell = (len(runs)-1, 0)
+            log.info('Had to add new run just for zero cell: %s', self.zero_cell)
             
         log.info("FDMT zero cell is %s=%s", self.zero_cell, self.zero_cell[0]*nuvwide+self.zero_cell[1])
 
@@ -958,6 +970,7 @@ class FdmtPlan(object):
         assert self.zero_cell[1] < nuvwide
         assert self.zero_cell[0] < self.nruns, f'Zero Cell unexpected {self.zero_cell}[0] should be less than {self.nruns}'
         assert self.zero_cell[1] < ncin
+        assert runs[self.zero_cell[0]].cells[self.zero_cell[1]] is None
         assert self.get_cell(self.zero_cell) is None
 
         nruns = self.nruns
