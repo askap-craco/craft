@@ -985,8 +985,9 @@ class FdmtPlan(object):
         nd = self.pipeline_plan.nd
         nt = self.pipeline_plan.nt
         #square_history_size = ndout*nuvtotal*(nt + nd)
+        valid_runs = [run for run in runs if run is not None]
         square_history_size = sum(nuvwide*(nd + nt)*ndout for run in runs)
-        minimal_history_size = sum(nuvwide*(run.max_offset+ nt)*run.max_idm for run in runs)
+        minimal_history_size = sum(nuvwide*(run.max_offset+ nt)*run.max_idm for run in valid_runs)
         efficiency = float(len(uvcells))/float(nuvtotal)
         required_efficiency = float(nuvtotal)/8192.0
         
@@ -1000,7 +1001,13 @@ class FdmtPlan(object):
         # do_correction = False basically doubles the width which makes the whole thing very wide and noisey
         # SEe "Testing image pipeline with impulses.ipynb.
         do_correction = True
-        fdmts = [fdmt.Fdmt(run.fch1-self.pipeline_plan.foff/2.0, self.pipeline_plan.foff, ncin, ndout, 1, do_correction=do_correction) for run in self.runs]
+
+        # fill in a list of channels from the runs
+        # if the run is none just use the fch1 from the pipeline
+        # The FDMT will execute but zeros will be in there anyway
+        # Those FDMTs will be executed by they'll have zero
+        freqs = [self.pipeline_plan.fmin if run is None else run.fch1 for run in runs]
+        fdmts = [fdmt.Fdmt(freq-self.pipeline_plan.foff/2.0, self.pipeline_plan.foff, ncin, ndout, 1, do_correction=do_correction) for freq in freqs]
         fdmt_luts = np.array([thefdmt.calc_lookup_table() for thefdmt in fdmts])
         niter = int(np.log2(ncin))
         # final LUTs we need to copy teh same LUT for every NUVWIDE
@@ -1010,11 +1017,14 @@ class FdmtPlan(object):
         assert self.fdmt_lut.shape == expected_lut_shape, 'Incorrect shape for LUT=%s expected %s' % (self.fdmt_lut.shape, expected_lut_shape)
 
         self.nuvtotal = nuvtotal
-        self.total_nuvcells = sum([run.ncell for run in runs])
+        self.total_nuvcells = sum([run.ncell for run in valid_runs])
 
         # create UVMAP for more rapid lookups 
         uvmap = {}
         for irun, run in enumerate(self.runs):
+            if run is None:
+                continue
+            
             for icell, cell in enumerate(run.cells):
                 if cell is None:
                     continue

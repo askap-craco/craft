@@ -58,8 +58,12 @@ def make_ddreader_configs(plan):
     configs = np.zeros((plan.nuvrest_max, 2), dtype=np.uint16)
     for irun, run in enumerate(plan.fdmt_plan.runs):
         # now convert to integers
-        configs[irun, 0] = fdmt.cff_to_word(run.idm_cff)
-        configs[irun, 1] = fdmt.cff_to_word(run.offset_cff)
+        if run is None: # I'm not sure whether 0 makes sense but we'll work it out for now
+            configs[irun, 0] = 0
+            configs[irun, 1] = 0
+        else:
+            configs[irun, 0] = fdmt.cff_to_word(run.idm_cff)
+            configs[irun, 1] = fdmt.cff_to_word(run.offset_cff)
 
     return configs
 
@@ -219,7 +223,8 @@ def calc_grid_luts(plan, upper=True):
     fruns = fplan.runs
     remaining_fdmt_cells = [] # this is an array we keep for self-testing to make sure we used everything
     for run in fruns:
-        remaining_fdmt_cells.extend(run.defined_cells)
+        if run is not None:
+            remaining_fdmt_cells.extend(run.defined_cells)
 
     ngridreg = plan.ngridreg
     all_instructions = []
@@ -592,6 +597,9 @@ class PipelinePlan(object):
         fruns = self.fdmt_plan.runs
         d = []
         for irun, run in enumerate(fruns):
+            if run is None:
+                continue
+            
             for icell, cell in enumerate(run.cells):
                 if cell is None:
                     continue
