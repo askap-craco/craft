@@ -890,12 +890,14 @@ def baseline2uv_numba(lut, baseline_data, uv_data):
         for iuv in prange(nuvwide):
             blidx, cstart, cend, out_cstart, out_cend, do_conj = lut[irun, iuv, :]
             if blidx == -1:
-                break
-
-            if do_conj:
-                uv_data[irun, :, out_cstart:out_cend, iuv] = np.conj(baseline_data[blidx, cstart:cend, :].T)
+                # this is a safety thing - probably dont need it but we'll have it and remove it's too slow
+                uv_data[irun, :, :, iuv] = 0 
             else:
-                uv_data[irun, :, out_cstart:out_cend, iuv] = baseline_data[blidx, cstart:cend, :].T
+                din = baseline_data[blidx, cstart:cend, :].T
+                if do_conj:
+                    din =  np.conj(din)
+
+                uv_data[irun, :, out_cstart:out_cend, iuv] = din
 
 class FastBaseline2Uv:
     def __init__(self, plan, conjugate_lower_uvs=False):
@@ -907,12 +909,17 @@ class FastBaseline2Uv:
         '''
         self.__plan = plan
         log.info('Making fastBaseline2UV with plan %s', self.plan)
-        # initialise with -1 - if those values are -1 in the execution code, then we quite the loop
+        # initialise with -1 - if those values are -1 in the execution code, then we quit the loop
         self.lut = np.ones((len(plan.fdmt_plan.runs), plan.nuvwide, 6), np.int16)*-1
         blids = sorted(plan.baselines.keys())
 
         for irun, run in enumerate(plan.fdmt_plan.runs):
+            if run is None:
+                continue
             for iuv, uv in enumerate(run.cells):
+                if uv is None:
+                    continue
+                
                 #print(f'run {irun}/{len(plan.fdmt_plan.runs)}')
                 blid = uv.blid
                 cstart = uv.chan_start
