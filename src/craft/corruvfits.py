@@ -282,6 +282,68 @@ class CorrUvFitsFile(object):
         for k,v, in args.items():
             hdr['{}{}'.format(k,typeno).upper()] = (v, comment)
 
+    def put_data_block(self, uvw, mjd, blids, inttim, data, weights=None, source=1, t=None):
+        '''
+        Puts a whole block of data into the file
+        UVW, mjd, source is and time is the same for the whole block
+        :uvw: should have shape (nbl, 3)
+        blids is the baseline IDs - should be len(nbl)
+        :data: shoudl have shape (nbl, nchan, npol) if its complex or (nbl, nchan, npol, 2) if its not complex
+        :weights: should broadcast to (nbl, nchan, npol) but can be none
+
+        '''
+        assert 1<= source <= len(self.sources), f'Invalid source ID={source}. Source table has {len(self.sources)}'
+        if weights is None:
+            weights = 7.71604973e-05 #???
+
+        nbl = len(blids)
+        nchan = self.nchan
+        npol = self.npol
+        
+        dshape = data.shape
+        if np.iscomplexobj(data):
+            expected_shape = (nbl, nchan, npol)
+        else:
+            expected_shape = (nbl, nchan, npol,2)
+            
+        assert dshape == expected_shape, f'Invalid data shape. Was {dshape} but expected {expected_shape}'
+        assert nbl > 0
+        assert uvw.shape == (nbl, 3), f'Invalid UVW shape. Was {uvw.shape}'
+
+        visdata = np.recarray(nbl, dtype=self.dtype)
+        jd = mjd + 2400000.5
+        day = np.floor(jd)
+        dayfrac = jd - day
+
+        if t is None:
+            assert self.time_scale == 1*u.day
+            visdata['DATE'] = mjd - self.mjd0
+        else:
+            visdata['DATE'] = t
+
+        uvws = uvw*self.uvw_scale
+        visdata['UU'] = uvws[:, 0]
+        visdata['VV'] = uvws[:, 1]
+        visdata['WW'] = uvws[:, 2]
+        visdata['BASELINE'] = blids
+        visdata['INTTIM'] = inttim
+        visdata['FREQSEL'] = 1
+        visdata['SOURCE'] = source
+        d = visdata['DATA']
+        
+        if np.iscomplexobj(data):
+            d[:,0,0,0,:,:,0] = data.real
+            d[:,0,0,0,:,:,1] = data.imag
+        else:
+            d[:,0,0,0,:,:,0] = data[...,0]
+            d[:,0,0,0,:,:,1] = data[...,1]
+            
+        d[:,0,0,0,:,:,2] = weights
+        self.fout.write(visdata.tobytes())
+
+        self.ngroups += nbl
+        
+
     def put_data(self, uvw, mjd ,ia1, ia2, inttim, data, weights=None, source=1, t=None):
         '''
         :uvw: UVW in meters
@@ -291,7 +353,7 @@ class CorrUvFitsFile(object):
         '''
         assert ia1 >= 0
         assert ia2 >= 0
-        assert 1<= source <= len(self.sources), f'Invaoid source ID={source}. Source table has {len(self.sources)}'
+        assert 1<= source <= len(self.sources), f'Invalid source ID={source}. Source table has {len(self.sources)}'
 
         visdata_all = np.recarray(1, dtype=self.dtype)
         visdata = visdata_all[0]
