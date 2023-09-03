@@ -135,7 +135,7 @@ class UvfitsSnippet:
             copy_data_and_masks(new_data, desired_data)
 
         elif new_data.shape == expected_complex_block_shape:
-            assert gd_nonzero_ndim == 4, "Data axes besides nbl*nt, nf, npol, ncmplx are not empty! I won't know how to create those"
+            assert gd_nonzero_ndim != 4, f"Data axes besides nbl*nt, nf, npol, ncmplx are not empty! I won't know how to create those, new_data.shape = {new_data.shape}, expected_complex_block_shape = {expected_complex_block_shape}, gd_nonzero_ndim = {gd_nonzero_ndim}"
             desired_data = np.zeros(gd_shape)
             new_data = new_data.transpose((3, 0, 1, 2)).reshape(-1, nf, npol)
             copy_data_and_masks(new_data, desired_data)
