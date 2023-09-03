@@ -719,9 +719,28 @@ class BaselineCell(object):
         self.chan_end = chan_end
         assert self.chan_end >= self.chan_start
         self.freqs = freqs
-        assert len(freqs) == self.chan_end - self.chan_start + 1, 'Invalid frequency mapping channels=%d-%d nfreq=%d'% (chan_start, chan_end, len(freqs))
+        assert len(freqs) == self.nchan, 'Invalid frequency mapping channels=%d-%d nfreq=%d'% (chan_start, chan_end, len(freqs))
         self.a1, self.a2 = bl2ant(blid)
         self.npix = npix
+
+    def split_at(self, end_chan):
+        '''
+        Returns 2 baseline cells split at the given channel
+        the first cell has chanels (chan_start, end_chan) and the second has (chan_start+1, self.chan_end)
+        '''
+        assert self.chan_start <= end_chan <= self.chan_end, f'Cannot split blid={self.blid} c={self.chan_start}-{self.chan_end} at channel {end_chan}'
+        n = end_chan - self.chan_start +1
+        assert n >= 1
+        freqs1 = self.freqs[:n]
+        freqs2 = self.freqs[n:]
+
+        assert len(freqs1) + len(freqs2) == self.nchan
+        
+        c1 = BaselineCell(self.blid, self.uvpix, self.chan_start, end_chan, freqs1, self.npix)
+        c2 = BaselineCell(self.blid, self.uvpix, end_chan+1, self.chan_end, freqs2, self.npix)
+
+        return c1, c2
+    
 
     @property
     def chan_slice(self):
@@ -817,7 +836,7 @@ class BaselineCell(object):
         return padded_d
 
     def __str__(self):
-        s = 'Cell blid=%s chan=%d-%d freq=%f-%f uvpix=%s upper_idx=%s uvpix_upper=%s' % (self.blid, self.chan_start, self.chan_end, self.freqs[0], self.freqs[-1], self.uvpix, self.upper_idx, self.uvpix_upper)
+        s = 'Cell blid=%s chan=%d-%d freq=%0.2f-%0.2f uvpix=%s upper_idx=%s uvpix_upper=%s' % (self.blid, self.chan_start, self.chan_end, self.freqs[0]/1e6, self.freqs[-1]/1e6, self.uvpix, self.upper_idx, self.uvpix_upper)
         return s
 
     __repr__ = __str__
@@ -871,12 +890,14 @@ def baseline2uv_numba(lut, baseline_data, uv_data):
         for iuv in prange(nuvwide):
             blidx, cstart, cend, out_cstart, out_cend, do_conj = lut[irun, iuv, :]
             if blidx == -1:
-                break
-
-            if do_conj:
-                uv_data[irun, :, out_cstart:out_cend, iuv] = np.conj(baseline_data[blidx, cstart:cend, :].T)
+                # this is a safety thing - probably dont need it but we'll have it and remove it's too slow
+                uv_data[irun, :, :, iuv] = 0 
             else:
-                uv_data[irun, :, out_cstart:out_cend, iuv] = baseline_data[blidx, cstart:cend, :].T
+                din = baseline_data[blidx, cstart:cend, :].T
+                if do_conj:
+                    din =  np.conj(din)
+
+                uv_data[irun, :, out_cstart:out_cend, iuv] = din
 
 class FastBaseline2Uv:
     def __init__(self, plan, conjugate_lower_uvs=False):
@@ -888,12 +909,17 @@ class FastBaseline2Uv:
         '''
         self.__plan = plan
         log.info('Making fastBaseline2UV with plan %s', self.plan)
-        # initialise with -1 - if those values are -1 in the execution code, then we quite the loop
+        # initialise with -1 - if those values are -1 in the execution code, then we quit the loop
         self.lut = np.ones((len(plan.fdmt_plan.runs), plan.nuvwide, 6), np.int16)*-1
         blids = sorted(plan.baselines.keys())
 
         for irun, run in enumerate(plan.fdmt_plan.runs):
+            if run is None:
+                continue
             for iuv, uv in enumerate(run.cells):
+                if uv is None:
+                    continue
+                
                 #print(f'run {irun}/{len(plan.fdmt_plan.runs)}')
                 blid = uv.blid
                 cstart = uv.chan_start
