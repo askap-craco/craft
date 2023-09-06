@@ -26,6 +26,7 @@ from . import craco
 from . import fdmt
 from .fdmt_plan import *
 from .cmdline import strrange
+from collections import namedtuple
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +37,93 @@ FREQMAX = 1.8e9 # max frequency Hz
 C = 3e8 # m/s
 LAMMIN = C/FREQMAX # smallest wavelength
 UVMAX = BMAX/LAMMIN # largest UV point
+
+def splitn(s, delim, n=2):
+    '''
+    Splits by the  delimiter. If there's only one value, repeat it by n
+    '''
+    bits = s.split(delim)
+    if len(bits) == 1:
+        bits = bits*n
+
+    return bits
+
+class ImageParams1d:
+    def __init__(self, bmax:float, npix:int, os:float, fov:Angle, imgpix=None):
+        '''
+        Calculates image parameters for a given axis
+        normally: Tries to achieve the desired Field of View. If it can't it produces an 
+        FoV that has the desired oversampling. 
+        If image pixel cell size (in arcseconds) is specified, then it just uses that
+    
+        :bmax: max baseline length in units of lambda
+        :npix: image size pixels
+        :os: desired minimum oversampling of pixels per synthesized beam
+        :fov: desired FoV as an Angle
+        :imgpix: Image pixel size (Angle). Default=None
+        '''
+
+        synth_beam = Angle(1/bmax, u.radian) # Synthesized beam size in units of lambda
+    
+        if imgpix is not None: # use image pixel size directly
+            img_pix_size = imgpix
+            actual_os = synth_beam.deg / img_pix_size.deg
+            if actual_os < os:
+                raise ValueError('Given imgpix cant achieve desired oversampling')
+        else:
+            actual_os = synth_beam.deg * npix / fov.deg
+            if actual_os < os: # could not achieve desired FoV
+                actual_os = os # set the actual oversampling
+                
+            img_pix_size = synth_beam / actual_os
+
+        actual_fov = img_pix_size * npix
+        uv_cell_size = 1/actual_fov
+
+        self.fov = actual_fov
+        self.requested_fov = fov
         
+        self.os = actual_os
+        self.requested_os = os
+
+        self.requested_img_pix_size = imgpix
+        self.img_pix_size = img_pix_size
+        self.uv_cell_size = uv_cell_size
+        self.synth_beam = synth_beam
+        self.bmax = bmax
+
+    def __str__(self):
+        s = f'ImageParms1D fov={self.fov.deg:0.2f}({self.requested_fov.deg:0.2f})deg os={self.os:0.2f}({self.requested_os:0.2f}) imgpix={self.img_pix_size.arcsec:0.1f} arcsec synth beam={self.synth_beam.arcsec:0.1f} arcsec uvcell={self.uv_cell_size.value:0.1f} lambda'
+        return s
+
+class ImageParams2d:
+    def __init__(self, uvmax, npix, os_str, fov_str):
+        self.uvmax = uvmax
+        self.npix = npix
+        requested_os = list(map(float, splitn(os_str, ',', 2)))
+        requested_fov = list(map(Angle, splitn(fov_str, ',', 2)))
+        self.lparams = ImageParams1d(uvmax[0], npix, requested_os[0], requested_fov[0])
+        self.mparams = ImageParams1d(uvmax[1], npix, requested_os[1], requested_fov[1])
+
+    @property
+    def lmcell(self):
+        '''
+        Returns 2-Angle with units in arcsec
+        '''
+        return Angle([self.lparams.img_pix_size, self.mparams.img_pix_size], u.arcsec)
+
+    @property
+    def uvcell(self):
+        '''
+        Returns 2-tuple as raw values in lambda
+        '''
+        return (self.lparams.uv_cell_size.value, self.mparams.uv_cell_size.value)
+
+    def __str__(self):
+        s = f'ImageParams2d lparams={self.lparams} mparams={self.mparams}'
+        return s
+    
+    
 def dump_plan(plan, pickle_fname):
     filehandler = open(pickle_fname, 'wb') 
     pickle.dump(plan, filehandler)
@@ -439,7 +526,7 @@ class PipelinePlan(object):
         log.info('making Plan values=%s prev plan:%s', self.values, self.prev_plan)
         self.__tsamp = f.tsamp
         umax, vmax = f.get_max_uv()
-        lres, mres = 1./umax, 1./vmax
+        uvmax = (umax,vmax)
         baselines = f.baselines
         self.baselines = baselines
         # List of basleine IDs sorted
@@ -455,22 +542,9 @@ class PipelinePlan(object):
         assert freqs.max() == freqs[-1]
         Npix = self.values.npix
         self.npix = Npix
-
-        if self.values.cell is not None:
-            lcell, mcell = list(map(craco.arcsec2rad, self.values.cell.split(',')))
-            los, mos = lres/lcell, mres/mcell
-        else:
-            los, mos = list(map(float, self.values.os.split(',')))
-            lcell = lres/los
-            mcell = mres/mos
-
-        lmcell = Angle([lcell*u.rad, mcell*u.rad])
-        self.lmcell = lmcell
-            
-        lfov = lcell*Npix
-        mfov = mcell*Npix
-        ucell, vcell = 1./lfov, 1./mfov
-        self.uvcell = (ucell, vcell)
+        self.image_params = ImageParams2d(uvmax, self.npix, self.values.os, self.values.fov)
+        self.lmcell = self.image_params.lmcell
+        self.uvcell = self.image_params.uvcell
 
         fmax = freqs.max()
         foff = freqs[1] - freqs[0]
@@ -489,10 +563,11 @@ class PipelinePlan(object):
         self.craco_wcs = craco_wcs
         self.wcs = craco_wcs.wcs2 # The 2D WCS for images
 
-        log.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%s max baseline=%s resolution=%sarcsec uvcell=%s arcsec uvcell= %s lambda FoV=%s deg oversampled=%s wcs=%s',
-                 nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), np.degrees([lres, mres])*3600, np.degrees([lcell, mcell])*3600., (ucell, vcell), np.degrees([lfov, mfov]), (los, mos), self.wcs)
+        log.info('Nbl=%d Fch1=%f foff=%f nchan=%d lambdamin=%f uvmax=%slambda max baseline=%skm wcs=%s image_params=%s',
+                 nbl, freqs[0], foff, len(freqs), lambdamin, (umax, vmax), (umax_km, vmax_km), self.wcs,
+                 self.image_params)
         
-        uvcells = get_uvcells(baselines, (ucell, vcell), freqs, Npix, values.show)
+        uvcells = get_uvcells(baselines, self.uvcell, freqs, Npix, values.show)
         if umax > UVMAX or vmax > UVMAX:
             raise ValueError(f'Maximum basline larger than ASKAP umax={umax} vmax={vmax} UVMAX={UVMAX}')
         if umax < 00/0.2 or vmax < 100/0.2:
@@ -752,8 +827,9 @@ def add_arguments(parser):
     parser.add_argument('--uv', help='Load antenna UVW coordinates from this UV file', default='uv_data')
     parser.add_argument('--pickle_fname', default='pipeline.pickle', help='File to dump and load pickle file')
     parser.add_argument('--npix', help='Number of pixels in image', type=int, default=256)
-    parser.add_argument('--os', help='Number of pixels per beam', default='2.1,2.1')
-    parser.add_argument('--cell', help='Image cell size (arcsec). Overrides --os')
+    parser.add_argument('--fov', help='Target field of view (angle with unit) - opttionally comma separated for 2d. e.g. 0.9d or 1.1deg,0.9deg', default='1.1d')
+    parser.add_argument('--os', help='Minimum number of pixels per beam. Optionaly comma separated for 2D e.g. 2.1 or 2.1,2.1', default='2.1')
+    #parser.add_argument('--cell', help='Image cell size (arcsec). Overrides --os - possibly doesnt work')
     parser.add_argument('--nt', help='Number of times per block', type=int, default=256)
     parser.add_argument('--ndm', help='Number of DM trials', type=int, default=2)
     parser.add_argument('--max-ndm', help='Maximum number of DM trials. MUST AGREE WITH FIRMWARE', type=int, default=1024)
