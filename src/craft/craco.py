@@ -883,7 +883,7 @@ def baseline2uv(plan, baseline_data, uv_data):
 
     return uv_data
 
-@njit
+@njit(parallel=True,cache=True)
 def baseline2uv_numba(lut, baseline_data, uv_data):
     nrun, nuvwide, _ = lut.shape
     for irun in prange(nrun):
