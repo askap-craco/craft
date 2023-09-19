@@ -34,7 +34,7 @@ def _main():
     calcfile.writeto(foutname)
 
 def load_parset(fcmfile, prefix='common.antenna.ant'):
-    f = open(fcmfile, 'rU')
+    f = open(fcmfile, 'rt')
     ant_data = {}
     for line in f:
         line = line.strip()

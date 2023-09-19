@@ -386,7 +386,7 @@ class ResultsFile(OrderedDict):
         self.scans = []
         curr_scan = None
 
-        with open(self.fname, 'rU') as f:
+        with open(self.fname, 'rt') as f:
             for line in f:
                 if ':' not in line:
                     continue
