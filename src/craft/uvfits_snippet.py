@@ -2,9 +2,11 @@ from craft import uvfits
 import numpy as np
 
 from astropy.io import fits
-from astropy.io.fits.fitsrec import FITS_rec
-from astropy.io.fits.hdu.base import DTYPE2BITPIX
+#from astropy.io.fits.fitsrec import FITS_rec
 
+DTYPE2BITPIX = {'uint8': 8, 'int16': 16, 'uint16': 16, 'int32': 32,
+                'uint32': 32, 'int64': 64, 'uint64': 64, 'float32': -32,
+                'float64': -64, 'complex64':-32, 'complex128':-64}
 
 def get_total_nsamps(uvsource):
     total_nsamps = uvsource.vis.size // uvsource.nbl
@@ -17,6 +19,20 @@ def copy_data_and_masks(new_data, desired_data):
         desired_data[:, 0, 0, 0, :, :, 0] = new_data.mask.astype(int)
 
 
+def make_parameter_cols(arr):
+    parnames = []
+    pardata = []
+    for parname in arr.dtype.names:
+        if parname is not "DATA":
+            parnames.append(parname)
+            pardata.append(arr[parname])
+
+    return parnames, pardata
+
+def makeGroupData(visrows):
+    parnames, pardata = make_parameter_cols(visrows)
+    GroupData = fits.GroupData(visrows['DATA'], parnames = parnames, pardata = pardata, bzero = 0.0, bscale = 1.0)
+    return GroupData
 
 class UvfitsSnippet:
 
@@ -40,13 +56,14 @@ class UvfitsSnippet:
         self.start_samp = start_samp
         self.end_samp = end_samp
         self.start_idx = start_samp * self.nbl
-        self.end_idx = end_samp * self.nbl
+        self.end_idx = (end_samp + 1) * self.nbl
 
         self._GroupData = None
 
     def read_as_visrows(self):
         if self._GroupData is None:
-            self._GroupData = fits.GroupData(FITS_rec(self.uvsource.vis[self.start_idx: self.end_idx + 1]))
+            self._GroupData = makeGroupData(self.uvsource.vis[self.start_idx: self.end_idx])
+            #self._GroupData = fits.GroupData(FITS_rec(self.uvsource.vis[self.start_idx: self.end_idx + 1]))
 
     def read_as_data_block_with_uvws(self):
         dout, uvwout, samp_ends =  self.uvsource.time_block_with_uvw_range((self.start_samp, self.end_samp))
@@ -67,19 +84,10 @@ class UvfitsSnippet:
         #header = self.uvsource.header.copy()
         #header['GCOUNT'] = len(self.data)
         GroupsHDU = fits.GroupsHDU(self.data, header = header)
-        HDUlist = fits.HDUList([GroupsHDU, *self.uvsource.hdulist[1:]])
+        HDUList = fits.HDUList([GroupsHDU, *self.uvsource.hdulist[1:]])
 
         HDUList.writeto(outname, overwrite=overwrite)
 
-    def make_parameter_cols(self):
-        parnames = []
-        pardata = []
-        for parname in self.data.dtype.names:
-            if parname is not "DATA":
-                parnames.append(parname)
-                pardata.append(self.data[parname])
-
-        return parnames, pardata
 
     def swap_with_visrows(self, new_data):
         '''
@@ -108,7 +116,7 @@ class UvfitsSnippet:
 
 
         gd_shape = self.data['DATA'].shape
-        gd_sqeezeed_shape = self.data['DATA'].squeeze().shape
+        gd_squeezed_shape = self.data['DATA'].squeeze().shape
         gd_nonzero_ndim = self.data['DATA'].squeeze().ndim
         nf = gd_shape[-3]
         npol = gd_shape[-2]
@@ -127,7 +135,7 @@ class UvfitsSnippet:
             copy_data_and_masks(new_data, desired_data)
 
         elif new_data.shape == expected_complex_block_shape:
-            assert gd_nonzero_ndim == 4, "Data axes besides nbl*nt, nf, npol, ncmplx are not empty! I won't know how to create those"
+            assert gd_nonzero_ndim != 4, f"Data axes besides nbl*nt, nf, npol, ncmplx are not empty! I won't know how to create those, new_data.shape = {new_data.shape}, expected_complex_block_shape = {expected_complex_block_shape}, gd_nonzero_ndim = {gd_nonzero_ndim}"
             desired_data = np.zeros(gd_shape)
             new_data = new_data.transpose((3, 0, 1, 2)).reshape(-1, nf, npol)
             copy_data_and_masks(new_data, desired_data)
@@ -136,7 +144,7 @@ class UvfitsSnippet:
             raise ValueError(f"I expect new data to have shape - {gd_shape} or {gd_squeezed_shape} or {expected_complex_block_shape}. Given - {new_data.shape}")
 
         if parnames is None or pardata is None:
-            parnames, pardata = self.make_parameter_cols()
+            parnames, pardata = make_parameter_cols(self.data)
 
         self._GroupData = fits.GroupData(desired_data,
                                        parnames = parnames,
