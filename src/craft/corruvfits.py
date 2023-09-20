@@ -27,7 +27,7 @@ dtype_to_bitpix = {np.dtype('>i2'):16,
                    np.dtype('>f8'):-64}
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT', output_dtype=np.dtype('>f4'), bmax=None, time_scale=1.0*u.day):
+    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT', output_dtype=np.dtype('>f4'), bmax=None, time_scale=1.0*u.day, include_weights=True):
         '''
         Make a correlator UV fits file
         :fname: file name
@@ -42,6 +42,7 @@ class CorrUvFitsFile(object):
         :telescop: Put into header
         :instrume: put into header
         :origin: put into header
+        :include_weights: if True, put weights in file (default) if False no weights will be added. Makes file 33% smaller but possibly non-compliant with UVFITS
         :output_dtype: Dtype of output. According to fits standard: https://archive.stsci.edu/fits/fits_standard/node39.html - valid values are (np.int16, np.int32, np.float32, np.float64)
         :bmax: Astropy unit of distance that is the longest baseline in teh array. If set, UVW values are scale for dtype=int16 and dtype=int32 to get decent dynamic range
         :time_scale: Set to an astropy unit that converts to days, it will be used to specify the scale in FITS headers for the DATE and INTTIM columns. Can be used so the version on disk is in units of "integrations". THis might not be very sensible. If you set this to the integration time, you can use put_data(..t=integration_number) and get sensile output
@@ -53,7 +54,6 @@ class CorrUvFitsFile(object):
             uvw_scale = 1.0
         else:
             tmax = bmax.to(u.meter).value/scipy.constants.c # maximum baseline - seconds
-            print('tmax', tmax, 'bmax', bmax, 'bmax to meter', bmax.to(u.meter))
             if output_dtype == np.dtype('int16'):
                 vmax = 1<<15 # largerst value of a 16 bit signed number, if that's what we want to use for uvw
                 uvw_scale = vmax/tmax
@@ -85,7 +85,6 @@ class CorrUvFitsFile(object):
         if bitpix is None:
             raise ValueError(f'Invalid output_dtype={output_dtype}. Must be one of {dtype_to_bitpix.keys()}')
 
-        print(f'Bitpix {bitpix}')
         self.output_dtype = output_dtype
         self.bitpix = bitpix
 
@@ -101,6 +100,7 @@ class CorrUvFitsFile(object):
         hdr['BSCALE'] = 1.0
         hdr['BZERO'] = 0.0
         hdr['BUNIT'] = 'UNCALIB'
+        hdr['INCLUDE_WEIGHTS'] = include_weights
         refchan = float(nchan)/2. + 0.5 # half a channel because it's centered on DC 
         # CTYPES
         self.add_type(2, ctype='COMPLEX', crval=1.0, cdelt=1.0, crpix=1.0)
@@ -148,10 +148,14 @@ class CorrUvFitsFile(object):
         # aaah, craparooney - dthe data type for the whole row has to be the same. This means you can't
         # just have 165 bit data and 32 bit UVWs, which means it's rubbisharooney, unless I can
         # be bothered ot do somethign with BZERO and BSCALE (Maybe?)
+
+        self.include_weights = include_weights
+        
+        self.ncomplex = 3 if include_weights else 2
         self.dtype = np.dtype([('UU', dt), ('VV', dt), ('WW', dt), \
             ('DATE', dt), ('BASELINE', dt), \
             ('FREQSEL', dt), ('SOURCE', dt), ('INTTIM', dt), \
-            ('DATA', dt, (1, 1, 1, nchan, npol, 3))])
+            ('DATA', dt, (1, 1, 1, nchan, npol, self.ncomplex))])
 
         log.debug('Dtype size is %s', self.dtype.itemsize)
 
@@ -337,8 +341,10 @@ class CorrUvFitsFile(object):
         else:
             d[:,0,0,0,:,:,0] = data[...,0]
             d[:,0,0,0,:,:,1] = data[...,1]
+
+        if self.include_weights:
+            d[:,0,0,0,:,:,2] = weights
             
-        d[:,0,0,0,:,:,2] = weights
         self.fout.write(visdata.tobytes())
 
         self.ngroups += nbl
@@ -385,8 +391,10 @@ class CorrUvFitsFile(object):
         else:
             d[0,0,0,:,:,0] = data[...,0]
             d[0,0,0,:,:,1] = data[...,1]
+
+        if self.include_weights:
+            d[0,0,0,:,:,2] = weights
             
-        d[0,0,0,:,:,2] = weights
         self.fout.write(visdata_all.tobytes())
         self.ngroups += 1
 
