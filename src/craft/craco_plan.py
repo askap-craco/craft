@@ -593,7 +593,6 @@ class PipelinePlan(object):
         self.ndout = self.values.ndout
         self.foff = foff
         self.dtype = np.complex64 # working data type
-        self.threshold = self.values.threshold
         self.nbl = nbl
         self.baseline_shape = (self.nbl, self.nf, self.nt)
 
@@ -602,7 +601,6 @@ class PipelinePlan(object):
         
         self.fft_ssr = 16 # number of FFT pixels per clock - "super sample rate"
         self.ngridreg = 16 # number of grid registers to do
-        assert self.threshold >= 0, 'Invalid threshold'
 
         # calculate DMs and DD grid reader LUT
         # DMS is in units of samples
@@ -840,7 +838,6 @@ def add_arguments(parser):
     parser.add_argument('--nuvmax', help='Maximum number of UV allowed.', type=int, default=8192-8+8) # For some reason NUREST is 1023 in craco_pybind11 but setting this to 8192 - 8 makes it hang - so put it back for now and be very very bloody careful.
     parser.add_argument('--ncin', help='Numer of channels for sub fdmt', type=int, default=32)
     parser.add_argument('--ndout', help='Number of DM for sub fdmt', type=int, default=186)
-    parser.add_argument('-T', '--threshold', action='store', type=float, help='Threshold for pipeline S/N units. Converted to integer when pipeline executed')
     parser.add_argument('--fdmt_scale', type=float, help='Scale FDMT output by this amount', default=1.0)
     parser.add_argument('--fft_scale', type=float, help='Scale FFT output by this amount. If both scales are 1, the output equals the value of frb_amp for crauvfrbsim.py', default=10.0)
     parser.add_argument('--show-image', action='store_true', help='Show image plots', default=False)
@@ -850,7 +847,7 @@ def add_arguments(parser):
     parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
     parser.add_argument('-s', '--show', action='store_true', help='Show plots')
     parser.add_argument('--target-input-rms', type=float, default=512, help='Target input RMS')
-    parser.add_argument('--calibration', help='Calibration .bin file or root of Miriad files to apply calibration')
+    parser.add_argument('--calibration', bhelp='Calibration .bin file or root of Miriad files to apply calibration')
 
 
 
