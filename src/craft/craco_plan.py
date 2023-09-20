@@ -850,6 +850,12 @@ def add_arguments(parser):
     parser.add_argument('--calibration', bhelp='Calibration .bin file or root of Miriad files to apply calibration')
 
 
+    # raelly only needed for pipeline
+    parser.add_argument('--dflag-fradius', help='Dynamic flagging frequency radius. >0 to enable flagging', default=0, type=float)
+    parser.add_argument('--dflag-tradius', help='Dynamic flagging time radius. >0 to enable flagging', default=0, type=float)
+    parser.add_argument('--dflag-threshold', help='Dynamic flagging threshold. >0 to enable flagging', default=0, type=float)
+    parser.add_argument('--dflag-tblk', help='Dynamif flagging block size. Must divide evenly into the block size (256 usually)', default=None, type=int)
+
 
 def get_parser():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
