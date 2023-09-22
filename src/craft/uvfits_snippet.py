@@ -55,7 +55,7 @@ class UvfitsSnippet:
         self.nbl = self.uvsource.nbl
 
         if end_samp == -1:
-            end_samp = self.total_nsamps
+            end_samp = self.total_nsamps - 1
 
         assert isinstance(start_samp, int) and start_samp <= self.total_nsamps
         assert isinstance(end_samp, int) and end_samp <= self.total_nsamps
