@@ -22,16 +22,24 @@ def copy_data_and_masks(new_data, desired_data):
 def make_parameter_cols(arr):
     parnames = []
     pardata = []
+    parbzeros = []
+    first_date = arr['DATE'][0]
     for parname in arr.dtype.names:
-        if parname is not "DATA":
+        if parname != "DATA":
             parnames.append(parname)
-            pardata.append(arr[parname])
+            
+            if parname == 'DATE':
+                pardata.append(arr[parname] - first_date)
+                parbzeros.append(first_date)
+            else:
+                pardata.append(arr[parname])
+                parbzeros.append(0)
 
-    return parnames, pardata
+    return parnames, pardata, parbzeros
 
 def makeGroupData(visrows):
-    parnames, pardata = make_parameter_cols(visrows)
-    GroupData = fits.GroupData(visrows['DATA'], parnames = parnames, pardata = pardata, bzero = 0.0, bscale = 1.0)
+    parnames, pardata, parbzeros= make_parameter_cols(visrows)
+    GroupData = fits.GroupData(visrows['DATA'], parnames = parnames, pardata = pardata, bzero = 0.0, bscale = 1.0, parbzeros=parbzeros)
     return GroupData
 
 class UvfitsSnippet:
@@ -125,7 +133,7 @@ class UvfitsSnippet:
 
         expected_complex_block_shape = (self.nbl, nf, npol, nt_nbl // self.nbl)
 
-        assert DTYPE2BITPIX[new_data.dtype.name] == self.uvsource.header['BITPIX'], "data dtype mismatch with bitpix in header"
+        assert DTYPE2BITPIX[new_data.dtype.name] == self.uvsource.header['BITPIX'], f"data dtype mismatch with bitpix in header, {new_data.dtype.name}-{DTYPE2BITPIX[new_data.dtype.name]} vs {self.uvsource.header['BITPIX']}"
 
         if new_data.shape == gd_shape:
             desired_data = new_data
@@ -136,7 +144,7 @@ class UvfitsSnippet:
 
         elif new_data.shape == expected_complex_block_shape:
             assert gd_nonzero_ndim != 4, f"Data axes besides nbl*nt, nf, npol, ncmplx are not empty! I won't know how to create those, new_data.shape = {new_data.shape}, expected_complex_block_shape = {expected_complex_block_shape}, gd_nonzero_ndim = {gd_nonzero_ndim}"
-            desired_data = np.zeros(gd_shape)
+            desired_data = np.zeros(gd_shape, dtype=self.data['DATA'].dtype)
             new_data = new_data.transpose((3, 0, 1, 2)).reshape(-1, nf, npol)
             copy_data_and_masks(new_data, desired_data)
 
@@ -144,11 +152,12 @@ class UvfitsSnippet:
             raise ValueError(f"I expect new data to have shape - {gd_shape} or {gd_squeezed_shape} or {expected_complex_block_shape}. Given - {new_data.shape}")
 
         if parnames is None or pardata is None:
-            parnames, pardata = make_parameter_cols(self.data)
+            parnames, pardata, parbzeros = make_parameter_cols(self.data)
 
         self._GroupData = fits.GroupData(desired_data,
                                        parnames = parnames,
                                        pardata = pardata,
                                        bzero = bzero,
-                                       bscale = bscale)
+                                       bscale = bscale, 
+                                       parbzeros = parbzeros)
 
