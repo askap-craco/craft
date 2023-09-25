@@ -16,7 +16,7 @@ def copy_data_and_masks(new_data, desired_data):
     desired_data[:, 0, 0, 0, :, :, 0] = new_data.real
     desired_data[:, 0, 0, 0, :, :, 1] = new_data.imag
     if isinstance(new_data, np.ma.core.MaskedArray):
-        desired_data[:, 0, 0, 0, :, :, 0] = new_data.mask.astype(int)
+        desired_data[:, 0, 0, 0, :, :, 2] = 1 - new_data.mask.astype(int)
 
 
 def make_parameter_cols(arr):
