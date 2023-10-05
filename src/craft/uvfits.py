@@ -175,6 +175,9 @@ class UvFits(object):
             
         d0 = self.start_date
         baselines = {}
+        internal_baseline_order = []
+        baseline_indices = []
+        raw_nbl = 0
         vis = self.vis
         for i in range(self.vis.size):
             row = vis[i]
@@ -182,6 +185,7 @@ class UvFits(object):
                 break
             blid = row['BASELINE']
             a1, a2 = bl2ant(blid)
+            raw_nbl += 1
             if a1 in self.flagant or a2 in self.flagant:
                 continue
 
@@ -189,7 +193,13 @@ class UvFits(object):
                 continue
             
             baselines[blid] = row
+            internal_baseline_order.append(blid)
+            baseline_indices.append(i)
 
+
+        self.internal_baseline_order = np.array(internal_baseline_order)
+        self.baseline_indices = np.array(baseline_indices)
+        self.raw_nbl = raw_nbl
         return baselines
 
     def get_max_uv(self):
@@ -213,6 +223,53 @@ class UvFits(object):
         pylab.xlabel('U (klambda)')
         pylab.ylabel('V (klambda)')
         #pylab.show()
+
+
+    def fast_time_blocks(self, nt, fetch_uvws=False):
+        '''
+        Reads raw data from uvfits file as an array and returns a block of nt samples
+        '''
+        samps_returned = 0
+        self.vis.fin.seek(self.vis.hdrsize)
+        samps_to_read = nt
+        uvws = []
+
+        while True:
+            samps_left = self.vis.size // self.raw_nbl - samps_returned
+
+            if samps_left < nt:
+                samps_to_read = samps_left
+
+            if samps_left < 1:
+                break
+
+            self.vis.fin.seek(self.vis.hdrsize + samps_returned * self.raw_nbl * self.vis.dtype.itemsize)
+            dout = np.fromfile(self.vis.fin, count = samps_to_read * self.raw_nbl, dtype=self.vis.dtype).reshape(samps_to_read, -1)
+            samps_returned += samps_to_read
+            
+            dout_data = dout['DATA'].transpose((*np.arange(1, dout['DATA'].ndim), 0))[self.baseline_indices]
+            dout_complex_data = dout_data[..., 0, :] + 1j*dout_data[..., 1, :]
+
+            if self.mask:
+                mask_vals = (1 - dout_data[..., 2, :]).astype('int')
+                dout_complex_data = np.ma.MaskedArray(data = dout_complex_data, mask = mask_vals)
+
+            if fetch_uvws:
+                for it in range(samps_to_read):
+                    this_uvw = {}
+
+                    for ibl in self.baseline_indices:
+                        blid = self.internal_baseline_order[ibl]
+                        this_uvw[blid] = np.array([
+                                            dout['UU'][it, ibl], 
+                                            dout['VV'][it, ibl], 
+                                            dout['WW'][it, ibl]
+                                            ])
+
+                    uvws.append(this_uvw)
+
+            yield dout_complex_data, uvws
+
 
     def time_blocks_with_uvws(self, nt):
         '''
