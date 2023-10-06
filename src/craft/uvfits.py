@@ -232,7 +232,6 @@ class UvFits(object):
         samps_returned = 0
         self.vis.fin.seek(self.vis.hdrsize)
         samps_to_read = nt
-        uvws = []
 
         while True:
             samps_left = self.vis.size // self.raw_nbl - samps_returned
@@ -255,6 +254,7 @@ class UvFits(object):
                 dout_complex_data = np.ma.MaskedArray(data = dout_complex_data, mask = mask_vals)
 
             if fetch_uvws:
+                uvws = []
                 for it in range(samps_to_read):
                     this_uvw = {}
 
