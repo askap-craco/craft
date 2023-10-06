@@ -232,6 +232,7 @@ class UvFits(object):
         samps_returned = 0
         self.vis.fin.seek(self.vis.hdrsize)
         samps_to_read = nt
+        uvws = []
 
         while True:
             samps_left = self.vis.size // self.raw_nbl - samps_returned
