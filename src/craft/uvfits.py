@@ -261,11 +261,16 @@ class UvFits(object):
 
                     for ibl in self.baseline_indices:
                         blid = self.internal_baseline_order[ibl]
-                        this_uvw[blid] = np.array([
+                        this_uvw[blid] = np.array([(
                                             dout['UU'][it, ibl], 
                                             dout['VV'][it, ibl], 
                                             dout['WW'][it, ibl]
-                                            ])
+                                            )],
+                                            dtype=[('UU', dout['UU'].dtype),
+                                                   ('VV', dout['VV'].dtype),
+                                                   ('WW', dout['WW'].dtype)
+                                                ]
+                                            )
 
                     uvws.append(this_uvw)
 
