@@ -232,7 +232,7 @@ class Gridder(Kernel):
             raise ValueError("len(uvws) needs to be either nt={1} or 1. Given - {0}".format(uvws_shape, nt))
         
         first_samp_uvws = uvws[0]
-        assert type(first_samp_uvws) == 'dict', f"UVWs need to be a list of dicts - found a list of {type(first_samp_uvws)} instead"
+        assert type(first_samp_uvws) == dict, f"UVWs need to be a list of dicts - found a list of {type(first_samp_uvws)} instead"
         uvw_keys = list(fits_samp_uvws.keys())
         assert len(uvw_keys) == self.plan.nbl, f"Expecting {self.plan.nbl} keys in the UVW dictionary, got {len(uvw_keys)}"
         assert len(first_samp_uvws[uvw_keys[0]]) == 3, f"Expected 3 values (U, V, W) for each baseline, got {len(first_samp_uvws[uvws_keys[0]])}"
