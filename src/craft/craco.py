@@ -463,12 +463,19 @@ def _vis2nbl(vis):
     This don't consider any flagging etc as we don't care about that
     """
     d0 = vis[0]["DATE"]
+    first_blid = None
+    first_blid_again = False
 
     nbl = 0
     for visrow in vis:
         d = visrow["DATE"]
-        if d > d0: return nbl
+        ### check baseline as well
+        if first_blid is None: first_blid = vis[0]["BASELINE"]
+        else: first_blid_again = visrow["BASELINE"] == first_blid
+
+        if d > d0 or first_blid_again: return nbl
         nbl += 1
+    return nbl
 
 
 def time_block_with_uvw_range(

@@ -201,8 +201,8 @@ class Gridder(Kernel):
         block: np.ndarray or numpy.ma.core.MaskedArray or dict
                 Block containing [nbl, nf, nt] complex visibility data (if array)
                 Dict containing [nf, nt] complex visibility data (keyed by blid) for nbl baselines (if dict)
-        uvws: dict
-                Dict containing UVW values (keyed by blid) as an numpy array of shape [3, nt]
+        uvws: list
+                List containing UVW values as dicts of len nbl keyed by blid
         '''
         if type(block) not in [np.ndarray, np.ma.core.MaskedArray, dict]:
             raise Exception(f"I expected a np.ndarray/masked_array/dict, but got {type(block)}")
@@ -221,20 +221,21 @@ class Gridder(Kernel):
             assert block.shape[:2] == (self.plan.nbl, self.plan.nf)
             nt = block.shape[-1]
 
-        if type(uvws) != dict:
-            raise Exception(f"I expected UVWs to be passed as a dict, but got {type(uvws)}")
+        if type(uvws) != list:
+            raise Exception(f"I expected UVWs to be passed as a list, but got {type(uvws)}")
         
-        first_blid = list(uvws.keys())[0]
-        uvws_shape = uvws[first_blid].shape
-        assert uvws[first_blid].ndim == 2, "The uvws ndim needs to be 2"
-        assert uvws_shape[0] == 3, "UVWs needs to have U, V and W values as the first 3 axes"
-        if uvws_shape[1] == nt:
+        if len(uvws) == nt:
             update_uvws = True
-        elif uvws_shape[1] == 1:
+        elif len(uvws) == 1:
             update_uvws = False
         else:
-            raise ValueError("uvws_shape needs to be either (3, nt) or (3, 1). Given - {0}".format(uvws_shape))
-    
+            raise ValueError("len(uvws) needs to be either nt={1} or 1. Given - {0}".format(uvws_shape, nt))
+        
+        first_samp_uvws = uvws[0]
+        assert type(first_samp_uvws) == dict, f"UVWs need to be a list of dicts - found a list of {type(first_samp_uvws)} instead"
+        uvw_keys = list(first_samp_uvws.keys())
+        assert len(uvw_keys) == self.plan.nbl, f"Expecting {self.plan.nbl} keys in the UVW dictionary, got {len(uvw_keys)}"
+        assert len(first_samp_uvws[uvw_keys[0]][0]) == 3, f"Expected 3 values (U, V, W) for each baseline, got {len(first_samp_uvws[uvw_keys[0]])}"
 
         npix = self.plan.npix
         assert nt >= 2, "Block needs to have atleast 2 time samples to perform CPLX to CPLX gridding"
@@ -244,11 +245,8 @@ class Gridder(Kernel):
         for t in range(nt//2):
             
             if t==0 or update_uvws:
-                this_uvw = {}
-                for blid, uvw_data in list(uvws.items()):
-                    this_uvw[blid] = np.array(tuple(uvw_data[:, 2*t]), dtype=[('UU', 'f8'), ('VV', 'f8'), ('WW', 'f8')])
+                this_uvw = uvws[2*t]
                 current_uvcells = craco_plan.get_uvcells(baselines=this_uvw, uvcell=self.plan.uvcell, freqs = self.plan.freqs, Npix = self.values.npix)
-                print(f"t is {t}, and I am updating uvw values now.")
                 nuv = len(current_uvcells)
 
             for iuv in range(nuv):
