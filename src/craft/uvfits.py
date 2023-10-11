@@ -14,6 +14,7 @@ import logging
 import warnings
 from astropy.io import fits
 from . import craco
+from .freq_config import FrequencyConfig
 from .craco import bl2ant,get_max_uv
 from astropy import units as u
 from astropy.time import Time
@@ -100,6 +101,7 @@ class UvFits(object):
         nrows = len(self.hdulist[0].data)
         log.debug('File contains %d baselines. Skipping %d blocks with nstart=%d', self.nbl, skip_blocks, self.__nstart)
         self.nblocks = nrows // self.nbl
+        self._freq_config = FrequencyConfig.from_hdu(self.hdulist[0])
 
         if skip_blocks >= self.nblocks:
             raise ValueError(f'Requested skip {skip_blocks} larger than file. nblocks = {self.nblocks} nrows={nrows} nbl={self.nbl} nstart={self.__nstart}')
@@ -160,8 +162,14 @@ class UvFits(object):
 
     @property
     def channel_frequencies(self):
-        return craco.get_freqs(self.hdulist)
+        '''
+        Returns channel frequencies in Hz
+        '''
+        return self.freq_config.channel_frequencies*1e6
 
+    @property
+    def freq_config(self):
+        return self._freq_config
 
     @property
     def baselines(self):
