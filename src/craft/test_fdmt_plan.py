@@ -31,6 +31,17 @@ def test_fdmt_plan():
     f2 = uvfits.open(fin, skip_blocks=300)
     plan2 = PipelinePlan(f2, '--ndm 40')
 
+def test_make_fdmt_lut():
+    nruns= 1024
+    freqs = np.ones(nruns)*800e6
+    foff = 1e6
+    ncin = 32
+    ndout = 186
+    nuvwide = 8
+
+    lut = make_fdmt_lut(freqs, foff, ncin, ndout, nuvwide, do_correction=True)
+    assert lut is not None
+    
 def _main():
     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
     parser = ArgumentParser(description='Script description', formatter_class=ArgumentDefaultsHelpFormatter)

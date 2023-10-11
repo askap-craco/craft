@@ -303,6 +303,37 @@ def greedy_create_fdmt_runs(theplan, uvcells, nuvwide, ncin):
 
     return runs
 
+def make_fdmt_lut(freqs, foff, ncin, ndout, nuvwide, do_correction=True):
+    '''
+    Make FDMT lookup tables suitable for hardware for given list of frequencies for each run
+    :freqs: center chanenlf frequencies
+    :foff:channel interval
+    :ncin: number of channels per FDMT
+    :ndout: output number of dm trials
+    :nuvwide: number of FDMTs per run
+    :do_correction: true if you want to the the clever FDMT correaction (you want True)
+    '''
+    
+    # fill in a list of channels from the runs
+    # if the run is none just use the fch1 from the pipeline
+    # The FDMT will execute but zeros will be in there anyway
+    # Those FDMTs will be executed by they'll have zero
+    # do_correction = True makes the DM track pretty thign
+    # do_correction = False basically doubles the width which makes the whole thing very wide and noisey
+    # SEe "Testing image pipeline with impulses.ipynb.
+
+    #freqs = [self.pipeline_plan.fmin if run is None else run.fch1 for run in runs]
+    fdmts = [fdmt.Fdmt(freq-foff/2.0, foff, ncin, ndout, 1, do_correction=do_correction) for freq in freqs]
+    fdmt_luts = np.array([thefdmt.calc_lookup_table() for thefdmt in fdmts])
+    niter = int(np.log2(ncin))
+    # final LUTs we need to copy teh same LUT for every NUVWIDE
+    nruns = len(freqs)
+    assert fdmt_luts.shape == (nruns, ncin-1, 2)
+    fdmt_lut = np.repeat(fdmt_luts[:,:,np.newaxis, :], nuvwide, axis=2)
+    expected_lut_shape = (nruns, ncin-1, nuvwide, 2)
+    assert fdmt_lut.shape == expected_lut_shape, f'Incorrect shape for LUT={self.fdmt_lut.shape}  expected {expected_lut_shape}'
+
+    return fdmt_lut
 
 class FdmtPlanContainer:
     '''
@@ -918,6 +949,7 @@ class FdmtPlan(object):
         nuvwide = self.pipeline_plan.nuvwide
         ncin = self.pipeline_plan.ncin
         self.nuvwide = nuvwide
+        self.ndout = self.pipeline_plan.ndout
         self.ncin = ncin
         self.nuvmax = self.pipeline_plan.nuvmax
         self.uvcells = uvcells
@@ -948,7 +980,9 @@ class FdmtPlan(object):
         nuvwide = self.nuvwide
         ncin = self.ncin
         nuvmax = self.nuvmax
+        nuvrest_max = self.pipeline_plan.nuvrest_max
 
+        self.nuvrest_valid = len(runs)
         self.runs = runs
         
         # find a cell with zero in it
@@ -992,30 +1026,8 @@ class FdmtPlan(object):
         required_efficiency = float(nuvtotal)/8192.0
         
         log.info('FDMT plan has ntotal=%d of %d runs with packing efficiency %f. Grid read requires efficiency of > %f of NUV=8192. History size square=%d minimal=%d =%d 256MB HBM banks', nuvtotal, nruns, efficiency, required_efficiency, square_history_size, minimal_history_size, minimal_history_size*4/256/1024/1024)
-
-
-        # create an FDMT object for each run so  we can use it to calculate the lookup tbales
-        #     def __init__(self, f_min, f_off, n_f, max_dt, n_t, history_dtype=None):
-
-        # do_correction = True makes the DM track pretty thign
-        # do_correction = False basically doubles the width which makes the whole thing very wide and noisey
-        # SEe "Testing image pipeline with impulses.ipynb.
-        do_correction = True
-
-        # fill in a list of channels from the runs
-        # if the run is none just use the fch1 from the pipeline
-        # The FDMT will execute but zeros will be in there anyway
-        # Those FDMTs will be executed by they'll have zero
         freqs = [self.pipeline_plan.fmin if run is None else run.fch1 for run in runs]
-        fdmts = [fdmt.Fdmt(freq-self.pipeline_plan.foff/2.0, self.pipeline_plan.foff, ncin, ndout, 1, do_correction=do_correction) for freq in freqs]
-        fdmt_luts = np.array([thefdmt.calc_lookup_table() for thefdmt in fdmts])
-        niter = int(np.log2(ncin))
-        # final LUTs we need to copy teh same LUT for every NUVWIDE
-        assert fdmt_luts.shape == (nruns, ncin-1, 2)
-        self.fdmt_lut = np.repeat(fdmt_luts[:,:,np.newaxis, :], nuvwide, axis=2)
-        expected_lut_shape = (nruns, ncin-1, nuvwide, 2)
-        assert self.fdmt_lut.shape == expected_lut_shape, 'Incorrect shape for LUT=%s expected %s' % (self.fdmt_lut.shape, expected_lut_shape)
-
+        self.fdmt_lut = self.make_fdmt_lut(freqs)
         self.nuvtotal = nuvtotal
         self.total_nuvcells = sum([run.ncell for run in valid_runs])
 
@@ -1038,6 +1050,25 @@ class FdmtPlan(object):
     @property
     def nruns(self):
         return len(self.runs)
+
+    @property
+    def default_fdmt_lut(self):
+        '''
+        Returns an FDMT LUT that can be programmed into the hardware for the at the
+        minimum frequency of the plan. Setup for NUVREST_MAX = all runs
+        Useful for clearing memory on the card
+        '''
+        freqs = np.ones(self.pipeline_plan.nuvrest_max)*self.pipeline_plan.fmin
+        lut = self.make_fdmt_lut(freqs)
+        return lut
+
+
+    def make_fdmt_lut(self, freqs):
+        '''
+        Make and FDMT LUT for the given frequencies
+        '''
+        lut = make_fdmt_lut(freqs, self.pipeline_plan.foff, self.ncin, self.ndout, self.nuvwide)
+        return lut
 
 
     def cell_iter(self):
