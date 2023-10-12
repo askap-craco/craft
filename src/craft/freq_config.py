@@ -160,23 +160,27 @@ class FrequencyConfig:
         
         freqs = np.array(freqs)
         card_masks = np.array(card_masks)
+        assert freqs.shape[0] == card_masks.shape[0], f'Incongruent freqs of card masksfreqs= {freqs.shape} masks={card_masks.shape}'
         nfiles, nfpga_per_file, nchan = freqs.shape
         assert len(card_masks) == nfiles
         assert nchan == 4, 'Weird number of chanenls in a file'
         expected_nchan = freqs.size
-        if sum(card_masks) == len(card_masks):
+        if np.all(card_masks):
             warnings.warn('All with freqs {freqs} were masked. Returning dummy frequency config')
             return FrequencyConfig(1,1,expected_nchan, np.ones(expected_nchan,dtype=bool))
 
 
-        ncards = nfiles // nfpga_per_file
-        assert ncards > 0
-        
+        # reshape to make it have the FPGA shape so we can reshape it back
+        # neatly
         if nfpga_per_file == 1:
             freqs = freqs.reshape(-1, 6, 4)
             card_masks = card_masks.reshape(-1,6)
+        else:
+            card_masks = card_masks[:, np.newaxis]
+
 
         mask = np.zeros(freqs.shape, dtype=bool)
+        log.info('mask shape %s card_mask shape %s', mask.shape, card_masks.shape)
         mask[:,:,:] = card_masks[:, :, np.newaxis]
         fmask = np.ma.masked_array(freqs, mask=mask)
 
