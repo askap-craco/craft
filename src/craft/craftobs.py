@@ -34,14 +34,17 @@ def load_beams(path, tstart, ntimes, pattern='*.fil', return_files=False):
         sigfiles.append(f)
         tend = tstart + ntimes
         nelements = ntimes*f.nifs*f.nchans
-        
+        if f.nbits < 8:
+            nelements /= (8/f.nbits)
+
         f.seek_data(f.bytes_per_element*tstart)
         if (f.nbits == 8):
             dtype = np.uint8
         elif (f.nbits == 32):
             dtype = np.float32
 
-        v = np.fromfile(f.fin, dtype=dtype, count=nelements )
+        #v = np.fromfile(f.fin, dtype=dtype, count=nelements )
+        v = f.get_data(slice(tstart, tend, 1))
         v.shape = (-1, f.nifs, f.nchans)
         
 

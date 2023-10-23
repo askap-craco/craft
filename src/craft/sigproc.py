@@ -289,10 +289,13 @@ class SigprocFile(object):
         elif self.nbits == 2:
             dtype = np.uint8
             samps_per_element = 4
+        elif self.nbits == 1:
+            dtype = np.uint8
+            samps_per_element = 8
         else:
             raise NotImplementedError("Can't handle nbits: %d" % self.nbits)
         
-        if time_slice.step is not None:
+        if time_slice.step not in [1, None]:
             raise NotImplementedError("Can only handle contiguous slices")
         
         if time_slice.start is None:
@@ -323,7 +326,10 @@ class SigprocFile(object):
 
         data = np.fromfile(self.fin, dtype=dtype, count=num_dtypes)
         assert len(data) == num_dtypes, "Didn't get count dtypes %d" % num_dtypes
-        if self.nbits == 2:
+        if self.nbits == 1:
+            data = np.unpackbits(data, bitorder='big')
+
+        elif self.nbits == 2:
             data2 = np.zeros(num_elements*samps_per_element, dtype=np.int8)
 
             print('samp', num_samples, 'nelem', num_elements, 'ndtypes', num_dtypes, len(data), len(data2))
