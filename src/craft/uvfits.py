@@ -25,6 +25,18 @@ log = logging.getLogger(__name__)
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
+def parse_beam_id_from_filename(fname):
+    '''
+    return beamID as an int from a filebame that looks like bXX.uvfits
+    '''
+    fname = os.path.basename(fname)
+    if fname.startswith('b') and fname.endswith('.uvfits'):
+        b  = int(fname.split('.uvfits')[0][1:])
+    else:
+        raise ValueError(f'Filename {fname} doesnt contain beam')
+
+    return b
+
 class VisView:
     def __init__(self, uvfitsfile, start_idx):
         '''
@@ -93,7 +105,7 @@ class UvFits(object):
         # first we calculate the number of baselines in a block
         assert skip_blocks >= 0, f'Invalid skip_blocks={skip_blocks}'
         self.__nstart = 0
-        startbl = self.baselines
+        startbl = self._find_baseline_order()
         self.nbl = len(startbl)
         # next we set the start block for the rest of time
         self.__nstart = self.nbl*skip_blocks
@@ -106,7 +118,6 @@ class UvFits(object):
         if skip_blocks >= self.nblocks:
             raise ValueError(f'Requested skip {skip_blocks} larger than file. nblocks = {self.nblocks} nrows={nrows} nbl={self.nbl} nstart={self.__nstart}')
 
-        
 
     def set_flagants(self, flagant):
         '''
@@ -114,6 +125,26 @@ class UvFits(object):
         '''
         self.flagant = flagant
         return self
+
+    @property
+    def valid_ants(self):
+        '''
+        Return list of valid antennas
+        It's 36 antennas less the antennas that are listed in flagant
+        1-based
+        TODO: Load up antenna table
+        '''
+        all_ants = set([a+1 for a in range(36)])
+        va = sorted(list(all_ants - set(self.flagant)))
+        return va
+
+    @property
+    def valid_ants_0based(self):
+        '''
+        Returns np array of valid ants (0 based)
+        '''
+        return np.array(self.valid_ants) - 1
+        
 
     @property
     def filename(self):
@@ -171,11 +202,12 @@ class UvFits(object):
     def freq_config(self):
         return self._freq_config
 
-    @property
-    def baselines(self):
+    
+    def _find_baseline_order(self):
         '''
         Returns all data from first integration
         Doesn't include baselines containing flagant
+        Set up internal baseline ordering thigns for fast_time_blocks
         
         :returns: dictionary, keyed by baseline ID of all basesline data with a timestamp
         equal to the first timestamp in the file
@@ -209,6 +241,11 @@ class UvFits(object):
         self.baseline_indices = np.array(baseline_indices)
         self.raw_nbl = raw_nbl
         return baselines
+
+    @property
+    def baselines(self):
+        d, uvw = next(self.fast_time_blocks(1, fetch_uvws=True))
+        return uvw[0]
 
     def get_max_uv(self):
         ''' 
@@ -269,6 +306,11 @@ class UvFits(object):
 
                     for ibl in self.baseline_indices:
                         blid = self.internal_baseline_order[ibl]
+
+                        # add the [0] index to get the scalar type
+                        # so it exactly matches what you with the original
+                        # .baselines numpy data
+                        # There might be a better way to do it but I don't know how
                         this_uvw[blid] = np.array([(
                                             dout['UU'][it, ibl], 
                                             dout['VV'][it, ibl], 
@@ -278,7 +320,7 @@ class UvFits(object):
                                                    ('VV', dout['VV'].dtype),
                                                    ('WW', dout['WW'].dtype)
                                                 ]
-                                            )
+                                            )[0]
 
                     uvws.append(this_uvw)
 
@@ -315,10 +357,15 @@ class UvFits(object):
         return tstart as astropy Time from header otherwise first row of fits table
         '''
         f = self
-        first_sample_date = Time(f.start_date, format='jd', scale='utc')
+
+        # early version of MPIPIPELINE before 10 Nov wrote TAI
+        # rather than UTC scale to the timestamps
+        # now we write a 'TSCALE' header
+        scale = f.header.get('TSCALE', 'TAI').lower()
+        first_sample_date = Time(f.start_date, format='jd', scale=scale)
 
         if 'DATE-OBS' in f.header:
-            tstart = Time(f.header['DATE-OBS'], format='isot', scale='utc')
+            tstart = Time(f.header['DATE-OBS'], format='isot', scale=scale)
             assert self.skip_blocks == 0, f'This date will be be incorrect if skip_blocks={self.skip_blocks} is nonzero - header={tstart} but first integration is {first_sample_date}. This code needs ot be fixed if you neeed it'
         else:
             tstart = first_sample_date
@@ -387,6 +434,21 @@ class UvFits(object):
             src = row['SOURCE']
             
         return src
+
+    @property
+    def beamid(self):
+        '''
+        Returns beamId from header or from filename if filename is bXX.uvfits
+        '''
+        
+        b = self.header.get('BEAMID', -1)
+        if b == -1:
+            try:
+                b = parse_beam_id_from_filename(self.hdulist.filename())
+            except ValueError:
+                b = 0
+                warnings.warn('No BeamID in header. Filename not useful. Returning 0')
+        return b
 
     def close(self):
         self.raw_fin.close()

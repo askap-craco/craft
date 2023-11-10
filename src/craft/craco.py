@@ -221,6 +221,53 @@ def bl2array(baselines):
 
     return d
 
+class BaselineIndex:
+    def __init__(self, blidx, a1, a2, ia1, ia2):
+        '''
+        blidx - index into an array that's had flagged antenans removed
+        a1 - 1 based antenna number
+        a2 - 1 based antenna number
+        ia1 = index into an array of antennas that's had the flagged antennas removed
+        ia2 = index into an array of antennas that's had the flagged antennas removed
+        '''
+        assert a1 > 0 and a2 > 0
+        self.blidx = blidx
+        self.a1 = a1
+        self.a2 = a2
+        self.ia1 = ia1
+        self.ia2 = ia2
+
+    @property
+    def blid(self):
+        '''
+        Returns the baseline ID (FITS formatted) of this index
+        '''
+        return ant2bl((self.a1, self.a2))
+
+    def __str__(self):
+        s = f'BaselineIndex blidx={self.blidx} ak{self.a1}-ak{self.a2} idx={self.ia1}-{self.ia2} blid={self.blid}'
+        return s
+
+    __repr__ = __str__
+
+def baseline_iter(valid_ants_0based):
+    '''
+    Returns an iterator over the valid baselines returning a BaselineIndex
+    object for each baseline
+    :valid_ants_0based: list of valid antennas, 0 based indices
+    :returns: an iterator returning
+    BaselineIndex whichis info on which baselines are present
+    No autocorrelations are returned
+    :see: BaselineIndex
+    '''
+    blidx = 0
+    for ia1, a1 in enumerate(valid_ants_0based):
+        for a2 in valid_ants_0based[ia1+1:]:
+            ia2 = list(valid_ants_0based).index(a2)
+            b = BaselineIndex(blidx, a1+1, a2+1, ia1, ia2)
+            yield b
+            blidx += 1
+
 def get_bl_length(baselines, blid):
     '''
     Gets the baseline distance for a given baseline

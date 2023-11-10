@@ -27,7 +27,7 @@ dtype_to_bitpix = {np.dtype('>i2'):16,
                    np.dtype('>f8'):-64}
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT', output_dtype=np.dtype('>f4'), bmax=None, time_scale=1.0*u.day, include_weights=True):
+    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT', output_dtype=np.dtype('>f4'), bmax=None, time_scale=1.0*u.day, include_weights=True, extra_header=None):
         '''
         Make a correlator UV fits file
         :fname: file name
@@ -42,6 +42,7 @@ class CorrUvFitsFile(object):
         :telescop: Put into header
         :instrume: put into header
         :origin: put into header
+        :extra_header: Dictionary of extra stuff to put into header
         :include_weights: if True, put weights in file (default) if False no weights will be added. Makes file 33% smaller but possibly non-compliant with UVFITS
         :output_dtype: Dtype of output. According to fits standard: https://archive.stsci.edu/fits/fits_standard/node39.html - valid values are (np.int16, np.int32, np.float32, np.float64)
         :bmax: Astropy unit of distance that is the longest baseline in teh array. If set, UVW values are scale for dtype=int16 and dtype=int32 to get decent dynamic range
@@ -139,6 +140,10 @@ class CorrUvFitsFile(object):
 
         histstr = 'Created on {} by {}'.format(datetime.datetime.now().isoformat(), ' '.join(sys.argv))
         hdr['HISTORY'] = histstr
+
+        for k,v in extra_header.items():
+            assert k not in hdr, f'Extra header card {k} is already in header'
+            hdr[k] = v
 
         self.fout = open(fname, 'w+b')
         self.fout.write(bytes(hdr.tostring(), 'utf-8'))
