@@ -50,7 +50,7 @@ def run_fring(aipsdata, refant=1):
 aipsfile = AIPSUVData(name, aipsclass, aipsDisk, int(seq))
 
 if not aipsfile.exists():
-    print(args.aipsfile, "does not exists! Aborting")
+    print args.aipsfile, "does not exists! Aborting"
     sys.exit()
 
 run_fring(aipsfile, args.refant)

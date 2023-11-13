@@ -44,7 +44,7 @@ if fitsfileoutname is not None:
     if not fitsfileoutname[0] == '/':
         fitsfileoutname = os.getcwd() + '/' + args.fitsfileoutname
         if os.path.exists(fitsfileoutname):
-            print("Warning: {} already exists. Aborting".format(fitsfileoutname))
+            print "Warning: {} already exists. Aborting".format(fitsfileoutname)
             sys.exit()
 
 ################################################################################
@@ -55,7 +55,7 @@ def fitld_uvfits(uvfitsfile, aipsdata, antlist=None, specAv=None):
     if specAv is None: specAv = 18 # Amount of channels to average
 
     if not os.path.exists(uvfitsfile):
-        print(uvfitsfile + " does not exist! Aborting.")
+        print uvfitsfile + " does not exist! Aborting."
         sys.exit()
 
     if specAv==0:
@@ -88,12 +88,12 @@ def fitld_uvfits(uvfitsfile, aipsdata, antlist=None, specAv=None):
                 break
 
         if FreqCol is None:
-            print("Error: Could not find FREQ column in UV data")
+            print "Error: Could not find FREQ column in UV data"
             exit()
 
         num_freq = loadUV.header['naxis'][FreqCol]
         if num_freq%specAv:
-            print("Error: Cannot divide {} into {}. Aborting".format(specAv,num_freq))
+            print "Error: Cannot divide {} into {}. Aborting".format(specAv,num_freq)
             exit()
 
         avspc = AIPSTask('avspc', version = aipsver)
@@ -111,7 +111,7 @@ def gluUV(card_uvdata, glu_uvdata):
 
     nfits =  len(card_uvdata)
     if nfits<2:
-        print("Glu'ing a single datfile makes no sense. Aborting")
+        print "Glu'ing a single datfile makes no sense. Aborting"
         sys.exit()
 
     lastMerge = None
@@ -174,7 +174,7 @@ def mergeIF(inuv, outData):
             break
         
     if IFcol==-1:
-        print("Error: Could not find IF column in UV data")
+        print "Error: Could not find IF column in UV data"
         exit()
 
     num_if = inuv.header['naxis'][IFcol]
@@ -214,7 +214,7 @@ for c, fits in enumerate(args.fitsfile):
         if uvdata.exists(): uvdata.zap()
 
     if not os.path.exists(fits):
-        print("{} does not exist. Aborting".format(fits))
+        print "{} does not exist. Aborting".format(fits)
         sys.exit()
     
     # Load up the FITS file into AIPS

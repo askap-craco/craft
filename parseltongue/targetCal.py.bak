@@ -34,13 +34,13 @@ aipsdisk        = 1
 (name, aipsclass, seq) = args.aipscalfile.split('.')
 caldata = AIPSUVData(name, aipsclass, aipsdisk, int(seq))
 if not caldata.exists():
-    print(args.aipscalfile, "does not exists! Aborting")
+    print args.aipscalfile, "does not exists! Aborting"
     sys.exit()
 
 (name, aipsclass, seq) = args.aipstargetfile.split('.')
 targetdata = AIPSUVData(name, aipsclass, aipsdisk, int(seq))
 if not targetdata.exists():
-    print(args.aipstargetfile, "does not exists! Aborting")
+    print args.aipstargetfile, "does not exists! Aborting"
     sys.exit()
     
 ################# AIPS TASKS ################

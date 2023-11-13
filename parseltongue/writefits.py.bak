@@ -48,7 +48,7 @@ def run_fittp(aipsdata, fitsfile):
         fitsfile = os.getcwd() + '/' + fitsfile
     
     if os.path.exists(fitsfile):
-        print("Warning: {} already exists. Aborting".format(fitsfile))
+        print "Warning: {} already exists. Aborting".format(fitsfile)
         sys.exit()
 
     fittp = AIPSTask("fittp")
@@ -80,7 +80,7 @@ def run_splat(aipsdata, outdata, clver=None, bpver=None, fgver=None):
 (name, aipsclass, seq) = args.aipsfile.split('.')
 aipsdata = AIPSUVData(name, aipsclass, aipsDisk, int(seq))
 if not aipsdata.exists():
-    print(args.aipsfile, "does not exists! Aborting")
+    print args.aipsfile, "does not exists! Aborting"
     sys.exit()
 
 if args.calib: # Need to apply calibration

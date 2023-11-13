@@ -37,7 +37,7 @@ aipsdisk        = 1
 caldata = AIPSUVData(name, aipsclass, aipsdisk, int(seq))
 
 if not caldata.exists():
-    print(args.aipsfile, "does not exists! Aborting")
+    print args.aipsfile, "does not exists! Aborting"
     sys.exit()
 
 ################# AIPS TASKS ################
@@ -84,7 +84,7 @@ def run_bpass(uvdataset, srcname, clversion, refant=1):
     bpass.bpassprm[5] = 1
     bpass.bpassprm[9] = 1
     bpass.bpassprm[10] = 1
-    print("CL version is " + str(clversion) + ", calsour is " + str(bpass.calsour[1]))
+    print "CL version is " + str(clversion) + ", calsour is " + str(bpass.calsour[1])
     bpass()
 
                                                                                                     

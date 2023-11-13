@@ -48,7 +48,7 @@ def fitld_uvfits(uvfitsfile, aipsdata):
     fitld.ncount = 1
     fitld.outdata = aipsdata
     if not os.path.exists(uvfitsfile):
-        print(uvfitsfile + " does not exist! Aborting.")
+        print uvfitsfile + " does not exist! Aborting."
         sys.exit()
     tempinfits = os.getcwd() + "/templink.uvfits"
     os.system("rm -f " + tempinfits)
@@ -61,7 +61,7 @@ def gluUV(card_uvdata, glu_uvdata):
     vbglu = AIPSTask('vbglu', version = aipsver)
 
     if len(card_uvdata)!=4:
-        print("Must supply 4 UVdata files to merge")
+        print "Must supply 4 UVdata files to merge"
         exit()
 
     vbglu.indata = card_uvdata[0]
@@ -87,17 +87,17 @@ def mergeIF(inuv, outname):
             FreqCol = i
 
     if IFcol==-1:
-        print("Error: Could not find IF column in UV data")
+        print "Error: Could not find IF column in UV data"
         exit()
     if FreqCol==-1:
-        print("Error: Could not find FREQ column in UV data")
+        print "Error: Could not find FREQ column in UV data"
         exit()
 
     num_if = inuv.header['naxis'][IFcol]
     num_freq = inuv.header['naxis'][FreqCol]
 
     if num_freq%SpecAv:
-        print("Error: Cannot divide {} into {}. Aborting".format(SpecAv,num_freq))
+        print "Error: Cannot divide {} into {}. Aborting".format(SpecAv,num_freq)
         exit()
 
     avUV = AIPSUVData("TMPAV{}".format(pid), "UVDATA", 1,1)
@@ -147,7 +147,7 @@ for c, fits in enumerate(fitsfile):
 
     #    inputfitsfile = "CRAFT_CARD{}.FITS".format(str(c))
     if not os.path.exists(fits):
-        print("{} does not exist. Aborting".format(fits))
+        print "{} does not exist. Aborting".format(fits)
         sys.exit()
     
     # Load up the FITS file into AIPS

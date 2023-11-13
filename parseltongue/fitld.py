@@ -41,7 +41,7 @@ def fitld_uvfits(uvfitsfile, aipsdata):
     # Load FITS file using FITLD
 
     if not os.path.exists(uvfitsfile):
-        print uvfitsfile + " does not exist! Aborting."
+        print(uvfitsfile + " does not exist! Aborting.")
         sys.exit()
     infits = os.path.abspath(uvfitsfile)
 
@@ -62,7 +62,7 @@ def fitld_uvfits(uvfitsfile, aipsdata):
         seq = tmp[2]
         dataout = AIPSUVData(outname, AIPSclass, aipsDisk, seq)
         if not dataout.exists():
-            print "Error: {} already exists".format(aipsdata)
+            print("Error: {} already exists".format(aipsdata))
             sys.exit()
             
     fitld = AIPSTask('fitld', version = aipsver)

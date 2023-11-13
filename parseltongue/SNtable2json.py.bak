@@ -40,7 +40,7 @@ def fitld_uvfits(uvfitsfile, aipsdata, sources):
         else:
             sys.exit()
     if not os.path.exists(uvfitsfile):
-        print(uvfitsfile + " does not exist! Aborting.")
+        print uvfitsfile + " does not exist! Aborting."
         sys.exit()
     tempinfits = os.getcwd() + "/templink.uvfits"
     os.system("rm -f " + tempinfits)
@@ -55,7 +55,7 @@ def fitld_uvfits(uvfitsfile, aipsdata, sources):
 
 # Check invocation
 if not len(sys.argv) == 3:
-    print("Usage: %s <fits file> <json delay/phase file>" % sys.argv[0])
+    print "Usage: %s <fits file> <json delay/phase file>" % sys.argv[0]
     sys.exit()
 
 snversion = 1
@@ -92,7 +92,7 @@ num_if = sntable.keywords['NO_IF']
 num_pol = sntable.keywords['NO_POL']
 num_snterms = num_if*num_pol
 for row in sntable:
-    if not annames[row.antenna_no-1] in list(delays1.keys()):
+    if not annames[row.antenna_no-1] in delays1.keys():
         delays1[annames[row.antenna_no-1]] = {}
         phases1[annames[row.antenna_no-1]] = {}
         if num_pol > 1:
@@ -116,4 +116,4 @@ with open(outputfile, 'w') as output:
      output.write(json.dumps(delays2,sort_keys=True) + "\n") # use `json.loads` to do the reverse
      output.write(json.dumps(phases2,sort_keys=True) + "\n") # use `json.loads` to do the reverse
 
-print("Done")
+print "Done"

@@ -40,7 +40,7 @@ def fitld_uvfits(uvfitsfile, aipsdata):
     fitld.ncount = 1
     fitld.outdata = aipsdata
     if not os.path.exists(uvfitsfile):
-        print(uvfitsfile + " does not exist! Aborting.")
+        print uvfitsfile + " does not exist! Aborting."
         sys.exit()
     tempinfits = os.getcwd() + "/templink.uvfits"
     os.system("rm -f " + tempinfits)
@@ -131,7 +131,7 @@ if avgIf:
         if delaysN[ant]>0:
             FPGAdelay = delays1[ant][0]/delaysN[ant]*1e9/6750.0
             if abs(FPGAdelay)>0.1:
-                print("{} {:3.0f}".format(ant, FPGAdelay))
+                print "{} {:3.0f}".format(ant, FPGAdelay)
                 if args.outfile is not None:
                     delayfile.write("{} {} {:3.0f}\n".format(ant, fpga, FPGAdelay))
         if args.outfile is not None:
@@ -140,11 +140,11 @@ if avgIf:
 else:
     for ant in sorted(delays1):
         if delaysN[ant]==0:
-            print(ant, 0)
+            print ant, 0
         else:
-            print(ant, end=' ')
+            print ant,
             for i in range(num_if):
-                print("{:4.1f}".format(delays1[ant][i]/delaysN[ant]*1e9/6750.0),",", end=' ')
+                print "{:4.1f}".format(delays1[ant][i]/delaysN[ant]*1e9/6750.0),",",
                 if num_pol>1:
-                    print("{:4.1f}".format(delays2[ant][i]/delaysN[ant]*1e9/6750.0),",", end=' ')
-            print()
+                    print "{:4.1f}".format(delays2[ant][i]/delaysN[ant]*1e9/6750.0),",",
+            print
