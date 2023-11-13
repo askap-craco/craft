@@ -61,7 +61,7 @@ def fitld_uvfits(uvfitsfile, aipsdata, antlist=None, specAv=None):
     if specAv==0:
         loadUV = aipsdata
     else:
-        loadUV = AIPSUVData("TMPLOAD{}".format(pid), "UVDATA", aipsDisk, 1)
+        loadUV = AIPSUVData("T{}".format(pid), "UVDATA", aipsDisk, 1)
     if loadUV.exists(): loadUV.zap()
         
     fitld = AIPSTask('fitld', version = aipsver)
@@ -151,7 +151,7 @@ def gluUV(card_uvdata, glu_uvdata):
             vbglu.outdata = glu_uvdata
             thisout = None
         else:
-            thisout = AIPSUVData("GLU{}-{}".format(pid, ntmp), "UVDATA", aipsDisk, 1)
+            thisout = AIPSUVData("G{}-{}".format(pid, ntmp), "UVDATA", aipsDisk, 1)
             if thisout.exists(): thisout.zap()
             vbglu.outdata = thisout
             ntmp += 1
@@ -210,7 +210,7 @@ for c, fits in enumerate(args.fitsfile):
     if single and args.nomerge:
         uvdata = outdata
     else:
-        uvdata = AIPSUVData("TMPUV{}_{}".format(c+1, pid), "UVDATA", aipsDisk, 1)
+        uvdata = AIPSUVData("T{}_{}".format(c+1, pid), "UVDATA", aipsDisk, 1)
         if uvdata.exists(): uvdata.zap()
 
     if not os.path.exists(fits):
@@ -224,7 +224,7 @@ for c, fits in enumerate(args.fitsfile):
 if single:
     gluUVdata = card_uvdata[0]    
 else:
-    gluUVdata = AIPSUVData("TMPGLU{}".format(pid), "UVDATA", aipsDisk, 1)
+    gluUVdata = AIPSUVData("T{}".format(pid), "UVDATA", aipsDisk, 1)
     if gluUVdata.exists(): glUVdata.zap()
     gluUV(card_uvdata, gluUVdata)
 
