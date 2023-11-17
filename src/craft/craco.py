@@ -221,6 +221,34 @@ def bl2array(baselines):
 
     return d
 
+def uvwbl2array(baselines):
+    '''
+    Convert UVW baselines dictionary into nparray
+    :returns: (nbl, 3) array of UVW coordinates in whaterver the input data was
+    '''
+    blids = sorted(baselines.keys())
+    nbl = len(blids)
+    d = np.zeros((nbl, 3))
+    for idx, blid in enumerate(blids):
+        for i, x in enumerate(('UU','VV','WW')):
+            d[idx, i] = baselines[blid][x]
+            
+    return d
+
+uvw_dtype = [ ('UU', 'f4'), ('VV', 'f4'), ('WW','f4')]
+
+def to_uvw(uvwin):
+    '''
+    converts a normal array of 3 values into a uvw dtype
+    '''
+    assert len(uvwin) == 3
+    uvwout =  np.array([tuple(uvwin)], dtype=uvw_dtype)[0]
+    return uvwout
+
+def uvw_to_array(uvw):
+    return np.array([uvw['UU'], uvw['VV'], uvw['WW']])
+
+
 class BaselineIndex:
     def __init__(self, blidx, a1, a2, ia1, ia2):
         '''

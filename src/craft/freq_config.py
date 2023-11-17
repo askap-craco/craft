@@ -122,6 +122,14 @@ class FrequencyConfig:
         
         return self.fch1 + ichan*self.foff
 
+    def __eq__(self, other):
+        iseq =  self.fch1 == other.fch1 \
+                and self.foff == other.foff \
+                and self.nchan == other.nchan \
+                and np.all(self.channel_mask == other.channel_mask) 
+                
+        return iseq
+
 
     def __str__(self):
         s = f'FreqConfig fch1={self.fch1} foff={self.foff} nc={self.nchan} nmasked={self.nmasked_channels}'

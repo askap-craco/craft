@@ -16,6 +16,7 @@ from astropy.io import fits
 from . import craco
 from .freq_config import FrequencyConfig
 from .craco import bl2ant,get_max_uv
+from craft.vis_metadata import VisMetadata
 from astropy import units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
@@ -125,6 +126,7 @@ class UvFits(object):
         '''
         self.flagant = flagant
         return self
+        
 
     @property
     def valid_ants(self):
@@ -244,7 +246,10 @@ class UvFits(object):
 
     @property
     def baselines(self):
-        d, uvw = next(self.fast_time_blocks(1, fetch_uvws=True))
+        return self.get_uvw_at_isamp(0)
+
+    def get_uvw_at_isamp(self, isamp:int):
+        d, uvw = next(self.fast_time_blocks(1, fetch_uvws=True, istart=isamp))
         return uvw[0]
 
     def get_max_uv(self):
@@ -254,7 +259,6 @@ class UvFits(object):
         fmax = self.channel_frequencies.max()
         baselines = self.baselines
         return get_max_uv(baselines, fmax)
-
     
     def plot_baselines(self):
         baselines = self.baselines
@@ -270,12 +274,13 @@ class UvFits(object):
         #pylab.show()
 
 
-    def fast_time_blocks(self, nt, fetch_uvws=False):
+    def fast_time_blocks(self, nt, fetch_uvws=False, istart=0):
         '''
         Reads raw data from uvfits file as an array and returns a block of nt samples
+        :istart: Sample number to start at. Doesnt have to be a multiple of nt
         '''
-        samps_returned = 0
-        self.vis.fin.seek(self.vis.hdrsize)
+        assert istart >= 0, f'Invalid istart={istart}'
+        samps_returned = istart
         samps_to_read = nt
         uvws = []
 
@@ -288,8 +293,14 @@ class UvFits(object):
             if samps_left < 1:
                 break
 
-            self.vis.fin.seek(self.vis.hdrsize + samps_returned * self.raw_nbl * self.vis.dtype.itemsize)
+            byte_offset = self.vis.hdrsize + samps_returned * self.raw_nbl * self.vis.dtype.itemsize
+
+            self.vis.fin.seek(byte_offset)
+
+            log.debug('Reading %d bytes from %s at offset %d', samps_to_read*self.raw_nbl*self.vis.dtype.itemsize, self.filename, byte_offset)
             dout = np.fromfile(self.vis.fin, count = samps_to_read * self.raw_nbl, dtype=self.vis.dtype).reshape(samps_to_read, -1)
+            log.debug('read complete')
+            
             samps_returned += samps_to_read
             
             dout_data = dout['DATA'].transpose((*np.arange(1, dout['DATA'].ndim), 0))[self.baseline_indices]
@@ -380,7 +391,7 @@ class UvFits(object):
     def source_table_entry(self):
         f = self
         source_table = f.hdulist[3].data
-        first_datarow = next(iter(self.baselines.values()))
+        first_datarow = self.vis[0]
         first_targetidx = int(first_datarow['SOURCE'])
         row = source_table[first_targetidx-1] # FITS convention is 1 based
         
@@ -449,6 +460,26 @@ class UvFits(object):
                 b = 0
                 warnings.warn('No BeamID in header. Filename not useful. Returning 0')
         return b
+
+    def vis_metadata(self, isamp:int):
+        '''
+        Return a vis info adapter for the given sample number
+        '''
+        tstart = self.tstart + self.tsamp*isamp
+        uvw = self.get_uvw_at_isamp(isamp)
+        m = VisMetadata(
+            uvw,
+            self.freq_config,
+            self.target_name,
+            self.target_skycoord,
+            self.beamid,
+            tstart,
+            self.tsamp,
+            tstart)
+        m.isamp = isamp
+
+        return m
+
 
     def close(self):
         self.raw_fin.close()
