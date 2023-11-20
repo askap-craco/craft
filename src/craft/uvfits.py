@@ -294,12 +294,17 @@ class UvFits(object):
                 break
 
             byte_offset = self.vis.hdrsize + samps_returned * self.raw_nbl * self.vis.dtype.itemsize
-
+            nbytes = samps_to_read*self.raw_nbl*self.vis.dtype.itemsize
+            next_byte_offset = byte_offset+nbytes
+            
             self.vis.fin.seek(byte_offset)
 
-            log.debug('Reading %d bytes from %s at offset %d', samps_to_read*self.raw_nbl*self.vis.dtype.itemsize, self.filename, byte_offset)
+            log.debug('Reading %d bytes from %s at offset %d', nbytes, self.filename, byte_offset)
             dout = np.fromfile(self.vis.fin, count = samps_to_read * self.raw_nbl, dtype=self.vis.dtype).reshape(samps_to_read, -1)
             log.debug('read complete')
+
+            # Tell Kernel we're going to need the next block. - doesnt seem to make much difference, but anyway.
+            os.posix_fadvise(self.vis.fin.fileno(), next_byte_offset, nbytes, os.POSIX_FADV_WILLNEED)
             
             samps_returned += samps_to_read
             
