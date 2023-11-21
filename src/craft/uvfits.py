@@ -274,6 +274,14 @@ class UvFits(object):
         #pylab.show()
 
 
+    @property
+    def nsamps(self):
+        '''
+        Returns number of samples in the file
+        '''
+        n =  self.vis.size // self.raw_nbl
+        return n
+    
     def fast_time_blocks(self, nt, fetch_uvws=False, istart=0):
         '''
         Reads raw data from uvfits file as an array and returns a block of nt samples
@@ -283,9 +291,11 @@ class UvFits(object):
         samps_returned = istart
         samps_to_read = nt
         uvws = []
+        if istart > nsamps - 1:
+            raise ValueError(f'Asked to start reading past the end of the file. istart={istart} nsamps={nsamps}')
 
         while True:
-            samps_left = self.vis.size // self.raw_nbl - samps_returned
+            samps_left = self.nsamps - samps_returned
 
             if samps_left < nt:
                 samps_to_read = samps_left
