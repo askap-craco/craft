@@ -284,8 +284,10 @@ class UvFits(object):
     
     def fast_time_blocks(self, nt, fetch_uvws=False, istart=0):
         '''
-        Reads raw data from uvfits file as an array and returns a block of nt samples
+        Reads raw data from uvfits file as an array and returns a block of nt samples, along with uvws as a list (which is empty if fetch_uvws is False)
         :istart: Sample number to start at. Doesnt have to be a multiple of nt
+
+        Returns a tuple - (dout, uvws)
         '''
         assert istart >= 0, f'Invalid istart={istart}'
         samps_returned = istart
@@ -330,8 +332,8 @@ class UvFits(object):
                 for it in range(samps_to_read):
                     this_uvw = {}
 
-                    for ibl in self.baseline_indices:
-                        blid = self.internal_baseline_order[ibl]
+                    for ii, ibl in enumerate(self.baseline_indices):
+                        blid = self.internal_baseline_order[ii]
 
                         # add the [0] index to get the scalar type
                         # so it exactly matches what you with the original
