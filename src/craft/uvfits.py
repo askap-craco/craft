@@ -291,7 +291,7 @@ class UvFits(object):
         samps_returned = istart
         samps_to_read = nt
         uvws = []
-        if istart > nsamps - 1:
+        if istart > self.nsamps - 1:
             raise ValueError(f'Asked to start reading past the end of the file. istart={istart} nsamps={nsamps}')
 
         while True:
