@@ -248,6 +248,14 @@ class UvFits(object):
     def baselines(self):
         return self.get_uvw_at_isamp(0)
 
+    def sample_to_time(self, isamp:int):
+        '''
+        Returns sample number to astropy time
+        '''
+        assert isamp >= 0, 'Invalid isamp'
+        t = self.tstart + isamp*self.tsamp
+        return t
+
     def get_uvw_at_isamp(self, isamp:int):
         d, uvw = next(self.fast_time_blocks(1, fetch_uvws=True, istart=isamp))
         return uvw[0]
@@ -355,7 +363,7 @@ class UvFits(object):
 
     def time_blocks_with_uvws(self, nt):
         '''
-        Returns a sequence of baseline data in blocks of nt
+        returns a numpy
         '''
         # WARNING TODO: ONLY RETURN BASELINES THAT HAVE BEEN RETURNED in .baselines
         # IF max_nbl has been set
@@ -372,6 +380,7 @@ class UvFits(object):
     def time_block_with_uvw_range(self, trange):
         """
         return a block of data and uvw within a given index range
+        :trange: tuple (istart,istop) samples
         """
         return craco.time_block_with_uvw_range(
             vis=self.vis, trange=trange, flagant=self.flagant,
