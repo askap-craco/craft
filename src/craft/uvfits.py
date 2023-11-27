@@ -39,13 +39,14 @@ def parse_beam_id_from_filename(fname):
     return b
 
 class VisView:
-    def __init__(self, uvfitsfile, start_idx):
+    def __init__(self, uvfitsfile):
         '''
         Allows you to read and seek rather than memory map
         '''
+        start_idx = uvfitsfile._nstart
         self.uvfitsfile = uvfitsfile
-        self.dtype = uvfitsfile.hdulist[0].data.dtype
-        self.hdrsize = len(str(self.uvfitsfile.hdulist[0].header))
+        self.hdrsize = uvfitsfile.hdrsize
+        self.dtype = uvfitsfile.dtype
         assert self.hdrsize % 2880 == 0
         self.start_idx = start_idx
         self.fin = self.uvfitsfile.raw_fin
@@ -102,22 +103,24 @@ class UvFits(object):
         self.ignore_autos = True
         self.mask = mask
         self.raw_fin = builtins.open(self.hdulist.filename(), 'rb')
+        self.hdrsize = len(str(self.hdulist[0].header))
+        self.dtype = self.hdulist[0].data.dtype
 
         # first we calculate the number of baselines in a block
         assert skip_blocks >= 0, f'Invalid skip_blocks={skip_blocks}'
-        self.__nstart = 0
+        self._nstart = 0
         startbl = self._find_baseline_order()
         self.nbl = len(startbl)
         # next we set the start block for the rest of time
-        self.__nstart = self.nbl*skip_blocks
+        self._nstart = self.nbl*skip_blocks
         self.skip_blocks = skip_blocks
         nrows = len(self.hdulist[0].data)
-        log.debug('File contains %d baselines. Skipping %d blocks with nstart=%d', self.nbl, skip_blocks, self.__nstart)
+        log.debug('File contains %d baselines. Skipping %d blocks with nstart=%d', self.nbl, skip_blocks, self._nstart)
         self.nblocks = nrows // self.nbl
         self._freq_config = FrequencyConfig.from_hdu(self.hdulist[0])
 
         if skip_blocks >= self.nblocks:
-            raise ValueError(f'Requested skip {skip_blocks} larger than file. nblocks = {self.nblocks} nrows={nrows} nbl={self.nbl} nstart={self.__nstart}')
+            raise ValueError(f'Requested skip {skip_blocks} larger than file. nblocks = {self.nblocks} nrows={nrows} nbl={self.nbl} nstart={self._nstart}')
 
 
     def set_flagants(self, flagant):
@@ -163,7 +166,7 @@ class UvFits(object):
         if skip_blocks is > in teh constructor, then that number of blocks will have been skipped and you won't see them
 
         '''
-        return VisView(self, self.__nstart)
+        return VisView(self)
 
     @property
     def start_date(self):
@@ -248,6 +251,14 @@ class UvFits(object):
     def baselines(self):
         return self.get_uvw_at_isamp(0)
 
+    def sample_to_time(self, isamp:int):
+        '''
+        Returns sample number to astropy time
+        '''
+        assert isamp >= 0, 'Invalid isamp'
+        t = self.tstart + isamp*self.tsamp
+        return t
+
     def get_uvw_at_isamp(self, isamp:int):
         d, uvw = next(self.fast_time_blocks(1, fetch_uvws=True, istart=isamp))
         return uvw[0]
@@ -284,10 +295,8 @@ class UvFits(object):
     
     def fast_time_blocks(self, nt, fetch_uvws=False, istart=0):
         '''
-        Reads raw data from uvfits file as an array and returns a block of nt samples, along with uvws as a list (which is empty if fetch_uvws is False)
+        Reads raw data from uvfits file as an array and returns a block of nt samples
         :istart: Sample number to start at. Doesnt have to be a multiple of nt
-
-        Returns a tuple - (dout, uvws)
         '''
         assert istart >= 0, f'Invalid istart={istart}'
         samps_returned = istart
@@ -295,6 +304,8 @@ class UvFits(object):
         uvws = []
         if istart > self.nsamps - 1:
             raise ValueError(f'Asked to start reading past the end of the file. istart={istart} nsamps={self.nsamps}')
+
+        vis = self.vis
 
         while True:
             samps_left = self.nsamps - samps_returned
@@ -305,18 +316,23 @@ class UvFits(object):
             if samps_left < 1:
                 break
 
-            byte_offset = self.vis.hdrsize + samps_returned * self.raw_nbl * self.vis.dtype.itemsize
-            nbytes = samps_to_read*self.raw_nbl*self.vis.dtype.itemsize
+            byte_offset = self.hdrsize + samps_returned * self.raw_nbl * self.dtype.itemsize
+            nbytes = samps_to_read*self.raw_nbl*self.dtype.itemsize
             next_byte_offset = byte_offset+nbytes
-            
-            self.vis.fin.seek(byte_offset)
 
             log.debug('Reading %d bytes from %s at offset %d', nbytes, self.filename, byte_offset)
-            dout = np.fromfile(self.vis.fin, count = samps_to_read * self.raw_nbl, dtype=self.vis.dtype).reshape(samps_to_read, -1)
+
+            #self.raw_fin.seek(byte_offset)
+            #dout1 = np.fromfile(self.raw_fin, count = samps_to_read * self.raw_nbl, dtype=self.dtype).reshape(samps_to_read, -1)
+            # By using the vis interface we get the UVW interpolation if we need
+
+            istart = samps_returned*self.raw_nbl
+            iend = istart + samps_to_read*self.raw_nbl
+            dout = vis[istart:iend].reshape(samps_to_read, -1)
             log.debug('read complete')
 
             # Tell Kernel we're going to need the next block. - doesnt seem to make much difference, but anyway.
-            os.posix_fadvise(self.vis.fin.fileno(), next_byte_offset, nbytes, os.POSIX_FADV_WILLNEED)
+            os.posix_fadvise(self.raw_fin.fileno(), next_byte_offset, nbytes, os.POSIX_FADV_WILLNEED)
             
             samps_returned += samps_to_read
             
@@ -332,8 +348,8 @@ class UvFits(object):
                 for it in range(samps_to_read):
                     this_uvw = {}
 
-                    for ii, ibl in enumerate(self.baseline_indices):
-                        blid = self.internal_baseline_order[ii]
+                    for ibl in self.baseline_indices:
+                        blid = self.internal_baseline_order[ibl]
 
                         # add the [0] index to get the scalar type
                         # so it exactly matches what you with the original
@@ -357,7 +373,7 @@ class UvFits(object):
 
     def time_blocks_with_uvws(self, nt):
         '''
-        Returns a sequence of baseline data in blocks of nt
+        returns a numpy
         '''
         # WARNING TODO: ONLY RETURN BASELINES THAT HAVE BEEN RETURNED in .baselines
         # IF max_nbl has been set
@@ -374,11 +390,17 @@ class UvFits(object):
     def time_block_with_uvw_range(self, trange):
         """
         return a block of data and uvw within a given index range
+        :trange: tuple (istart,istop) samples
         """
         return craco.time_block_with_uvw_range(
             vis=self.vis, trange=trange, flagant=self.flagant,
             flag_autos=self.ignore_autos, mask=self.mask
         )
+
+    @property
+    def tscale(self):
+        scale = self.header.get('TSCALE', 'TAI').lower()
+        return scale
 
     def get_tstart(self):
         '''
@@ -389,7 +411,7 @@ class UvFits(object):
         # early version of MPIPIPELINE before 10 Nov wrote TAI
         # rather than UTC scale to the timestamps
         # now we write a 'TSCALE' header
-        scale = f.header.get('TSCALE', 'TAI').lower()
+        scale = self.tscale
         first_sample_date = Time(f.start_date, format='jd', scale=scale)
 
         if 'DATE-OBS' in f.header:

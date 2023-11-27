@@ -198,7 +198,7 @@ def ant2bl(ants):
     return ibl
 
 
-def bl2array(baselines):
+def bl2array(baselines, dtype=np.complex64):
     '''
     Converts baseline dictionary into an array sorted by baseline id
     :returns: np array of shape [nbl, nf, nt]
@@ -211,7 +211,7 @@ def bl2array(baselines):
     fullshape = [nbl]
     fullshape.extend(tfshape)
 
-    d = np.zeros(fullshape, dtype=np.complex64)
+    d = np.zeros(fullshape, dtype=dtype)
 
     if np.ma.isMaskedArray(indata):
         d = np.ma.masked_array(d, mask=np.zeros(fullshape, dtype=bool), fill_value=indata.fill_value)
