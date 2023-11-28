@@ -348,8 +348,8 @@ class UvFits(object):
                 for it in range(samps_to_read):
                     this_uvw = {}
 
-                    for ibl in self.baseline_indices:
-                        blid = self.internal_baseline_order[ibl]
+                    for ii, ibl in enumerate(self.baseline_indices):
+                        blid = self.internal_baseline_order[ii]
 
                         # add the [0] index to get the scalar type
                         # so it exactly matches what you with the original
