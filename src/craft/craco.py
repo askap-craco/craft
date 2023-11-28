@@ -780,7 +780,7 @@ def get_freqs(hdul):
     nchan = vis[0]["DATA"].shape[-3]
 
     # Need to add 1 due to stupid FITS convention. Grr.
-    freqs = (np.arange(nchan, dtype=np.float) - ch1 + 1)*foff + fch1 # Hz
+    freqs = (np.arange(nchan, dtype=np.float64) - ch1 + 1)*foff + fch1 # Hz
 
     return freqs
 

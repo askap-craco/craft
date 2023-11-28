@@ -109,7 +109,7 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
 
     f.seek_data(f.bytes_per_element*tstart)
     v = np.fromfile(f.fin, dtype=dtype, count=nelements )
-    v = v.astype(np.float)
+    v = v.astype(np.float32)
     print('Nelements', nelements, 'Ntimes', ntimes, 'nchans', f.nchans, 'nifs', f.nifs, dtype, 'Actual length', len(v))
     
     v.shape = (ntimes, f.nifs, f.nchans)
@@ -211,7 +211,7 @@ def plot_spectra(f, tstart, ntimes, dtype, values):
         T = ntimes*f.tsamp*1e3
         #T = float(ntimes)
         times = np.arange(ntimes)*f.tsamp
-        periods = T/np.arange(ntimes, dtype=np.float)
+        periods = T/np.arange(ntimes, dtype=np.float32)
         funit='ms'
         pltharmonics = np.arange(2, 30)*f.tsamp*1e3
 
