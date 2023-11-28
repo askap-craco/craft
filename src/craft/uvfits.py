@@ -108,17 +108,22 @@ class UvFits(object):
 
         # first we calculate the number of baselines in a block
         assert skip_blocks >= 0, f'Invalid skip_blocks={skip_blocks}'
+
+        self.skip_blocks = skip_blocks
         self._nstart = 0
+        self._freq_config = FrequencyConfig.from_hdu(self.hdulist[0])
+        self._reset_baseline_setup()
+
+    def _reset_baseline_setup(self):
         startbl = self._find_baseline_order()
+        skip_blocks = self.skip_blocks
         self.nbl = len(startbl)
         # next we set the start block for the rest of time
         self._nstart = self.nbl*skip_blocks
         self.skip_blocks = skip_blocks
         nrows = len(self.hdulist[0].data)
         log.debug('File contains %d baselines. Skipping %d blocks with nstart=%d', self.nbl, skip_blocks, self._nstart)
-        self.nblocks = nrows // self.nbl
-        self._freq_config = FrequencyConfig.from_hdu(self.hdulist[0])
-
+        self.nblocks = nrows // self.raw_nbl
         if skip_blocks >= self.nblocks:
             raise ValueError(f'Requested skip {skip_blocks} larger than file. nblocks = {self.nblocks} nrows={nrows} nbl={self.nbl} nstart={self._nstart}')
 
@@ -128,6 +133,7 @@ class UvFits(object):
         set list of 1-based antennas to flag
         '''
         self.flagant = flagant
+        self._reset_baseline_setup()
         return self
         
 
@@ -477,11 +483,14 @@ class UvFits(object):
     @property
     def target_name(self, targidx=0):
         f = self
-        if 'OBJECT' in f.header:
-            src =f.header['OBJECT']
-        else:
+        try:
             row = self.source_table_entry
             src = row['SOURCE']
+        except:
+            if 'OBJECT' in f.header:
+                src =f.header['OBJECT']
+            else:
+                src = 'UNKNOWN'
             
         return src
 
