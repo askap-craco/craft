@@ -246,7 +246,7 @@ class FrequencyConfig:
         nchan = vis[0]["DATA"].shape[-3]
         # Need to add 1 due to stupid FITS convention. Grr.
 
-        freqs = (np.arange(nchan, dtype=np.float) - ch1 + 1)*foff + fch1 # Hz
+        freqs = (np.arange(nchan, dtype=np.float64) - ch1 + 1)*foff + fch1 # Hz
         actual_fch1 = fch1 - (ch1 - 1)*foff
         f = FrequencyConfig(actual_fch1/1e6, foff/1e6, nchan)
         assert np.all(abs(freqs/1e6 - f.channel_frequencies) < 1e-6)
