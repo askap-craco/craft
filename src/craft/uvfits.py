@@ -91,11 +91,14 @@ class VisView:
 
 class UvFits(object):
 
-    def __init__(self, hdulist, max_nbl=None, mask=True, skip_blocks=0):
+    def __init__(self, hdulist, max_nbl=None, mask=True, skip_blocks=0,
+                 start_mjd=None, end_mjd=None):
         '''
         @param hdulist FITS HDLISt typically got from pyfits.open
         @param max_nbl - if not none, only return this many baselines
         @param skip_blocks - number of time blocks to skip
+        @param start_mjd - if not None skip to start MJD - ignore skip_blocks
+        @param end_mjd - don't iterate past this mjd
         '''
         self.hdulist = hdulist
         self.max_nbl = max_nbl
@@ -105,12 +108,23 @@ class UvFits(object):
         self.raw_fin = builtins.open(self.hdulist.filename(), 'rb')
         self.hdrsize = len(str(self.hdulist[0].header))
         self.dtype = self.hdulist[0].data.dtype
+        self._nstart = 0
 
-        # first we calculate the number of baselines in a block
+        if start_mjd is not None:
+            assert skip_blocks == 0, 'cant do both. Very tricky'
+            skip_blocks = int(np.ceil(self.time_to_sample(start_mjd)))
+            
         assert skip_blocks >= 0, f'Invalid skip_blocks={skip_blocks}'
 
+        if end_mjd is not None:
+            iend = int(np.floor(self.time_to_sample(end_mjd)))
+            assert 0 <= iend,'Invalid end sample for {iend} for time {end_mjd}'
+        else:
+            iend = None
+
+        self.iend = iend
         self.skip_blocks = skip_blocks
-        self._nstart = 0
+
         self._freq_config = FrequencyConfig.from_hdu(self.hdulist[0])
         self._reset_baseline_setup()
 
@@ -123,9 +137,10 @@ class UvFits(object):
         self.skip_blocks = skip_blocks
         nrows = len(self.hdulist[0].data)
         log.debug('File contains %d baselines. Skipping %d blocks with nstart=%d', self.nbl, skip_blocks, self._nstart)
-        self.nblocks = nrows // self.raw_nbl
-        if skip_blocks >= self.nblocks:
-            raise ValueError(f'Requested skip {skip_blocks} larger than file. nblocks = {self.nblocks} nrows={nrows} nbl={self.nbl} nstart={self._nstart}')
+        self.nblocks_raw = nrows // self.raw_nbl
+        if skip_blocks >= self.nblocks_raw:
+            raise ValueError(f'Requested skip {skip_blocks} larger than file. nblocks = {self.nblocks_raw} nrows={nrows} nbl={self.nbl} nstart={self._nstart}')
+        self.nblocks = self.nblocks_raw - skip_blocks
 
 
     def set_flagants(self, flagant):
