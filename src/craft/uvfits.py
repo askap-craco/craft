@@ -155,7 +155,6 @@ class UvFits(object):
         Returns np array of valid ants (0 based)
         '''
         return np.array(self.valid_ants) - 1
-        
 
     @property
     def filename(self):
@@ -264,6 +263,16 @@ class UvFits(object):
         assert isamp >= 0, 'Invalid isamp'
         t = self.tstart + isamp*self.tsamp
         return t
+
+
+    def time_to_sample(self, time:Time)->float:
+        '''
+        Returns time in samples (can be float)
+        between supplied time and the start time in units of TSAMP
+        '''
+        tdiff = time - self.tstart
+        tdiff_samp = float(tdiff / self.tsamp)
+        return tdiff_samp
 
     def get_uvw_at_isamp(self, isamp:int):
         d, uvw = next(self.fast_time_blocks(1, fetch_uvws=True, istart=isamp))
@@ -470,7 +479,7 @@ class UvFits(object):
         Leave this for posterity
         '''
         (ra, dec) = self.get_target_position()
-        coord = SkyCoord(ra, dec, frame='icrs')
+        coord = SkyCoord(ra, dec, frame='icrs', equinox='J2000')
         return coord
 
     @property
