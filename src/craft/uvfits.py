@@ -113,12 +113,14 @@ class UvFits(object):
         if start_mjd is not None:
             assert skip_blocks == 0, 'cant do both. Very tricky'
             skip_blocks = int(np.ceil(self.time_to_sample(start_mjd)))
+            skip_blocks = max(skip_blocks, 0)
             
         assert skip_blocks >= 0, f'Invalid skip_blocks={skip_blocks}'
 
         if end_mjd is not None:
             iend = int(np.floor(self.time_to_sample(end_mjd)))
             assert 0 <= iend,'Invalid end sample for {iend} for time {end_mjd}'
+            iend = min(iend, self.nblocks)
         else:
             iend = None
 
