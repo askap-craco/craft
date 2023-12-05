@@ -417,8 +417,11 @@ def pointsource(amp, lm, freqs, baseline_order, baselines, noiseamp=0):
     dout = np.empty((nbl, nf), dtype=np.complex64)
     for ibl, blid in enumerate(baseline_order):       
         # baselines in seconds
-        uvw_sec = np.array(baselines[blid][:3])
-        
+        #import IPython
+        #IPython.embed()
+        #uvw_sec = np.array(baselines[blid][:3])
+        uvw_sec = baselines[blid]
+
         # convert UVW coordinates to wavelegths
         u = uvw_sec[0]*freqs
         v = uvw_sec[1]*freqs
