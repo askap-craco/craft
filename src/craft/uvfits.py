@@ -210,7 +210,7 @@ class UvFits(object):
         '''
         try:
             ts = self.vis[0]['INTTIM']*u.second # seconds
-        except KeyError:
+        except ValueError:
             warnings.warn('Unknown int time in file. returning 1ms')
             ts = 1e-3*u.second # seconds
 
@@ -322,6 +322,15 @@ class UvFits(object):
         '''
         n =  self.vis.size // self.raw_nbl
         return n
+
+    def _create_masked_data(self, dout_data, start_sampno):
+        mask_vals = (1 - dout_data[..., 2, :]).astype('int')
+        dout_complex_data = dout_data[..., 0, :] + 1j*dout_data[..., 1, :]
+
+        if self.mask:
+            dout_complex_data = np.ma.MaskedArray(data = dout_complex_data, mask = mask_vals)
+            
+        return dout_complex_data
     
     def fast_time_blocks(self, nt, fetch_uvws=False, istart=0):
         '''
@@ -367,11 +376,10 @@ class UvFits(object):
             samps_returned += samps_to_read
             
             dout_data = dout['DATA'].transpose((*np.arange(1, dout['DATA'].ndim), 0))[self.baseline_indices]
-            dout_complex_data = dout_data[..., 0, :] + 1j*dout_data[..., 1, :]
 
-            if self.mask:
-                mask_vals = (1 - dout_data[..., 2, :]).astype('int')
-                dout_complex_data = np.ma.MaskedArray(data = dout_complex_data, mask = mask_vals)
+            print(f'dout {dout_data.shape}')
+            
+            dout_complex_data = self._create_masked_data(dout_data, samps_returned)
 
             if fetch_uvws:
                 uvws = []
