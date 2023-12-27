@@ -40,6 +40,8 @@ def load_beams(path, tstart, ntimes, pattern='*.fil', return_files=False):
         f.seek_data(f.bytes_per_element*tstart)
         if (f.nbits == 8):
             dtype = np.uint8
+        elif f.nbits == 16:
+            dtype = np.int16
         elif (f.nbits == 32):
             dtype = np.float32
 
