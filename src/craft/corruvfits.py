@@ -65,8 +65,11 @@ class CorrUvFitsFile(object):
                 uvw_scale = 1.0
             
         self.uvw_scale = uvw_scale
+
+        self.include_weights = include_weights
+        self.ncomplex = 3 if include_weights else 2
         
-        self.dshape = [1,1,1,nchan, npol, 3]
+        self.dshape = [1,1,1,nchan, npol, self.ncomplex]
         hdr = pyfits.Header()
         self.hdr = hdr
         self.nchan = nchan
@@ -101,7 +104,7 @@ class CorrUvFitsFile(object):
         hdr['BSCALE'] = 1.0
         hdr['BZERO'] = 0.0
         hdr['BUNIT'] = 'UNCALIB'
-        hdr['INCLUDE_WEIGHTS'] = include_weights
+        hdr['INCWTS'] = (include_weights, 'If weights included in visibilities')
         refchan = float(nchan)/2. + 0.5 # half a channel because it's centered on DC 
         # CTYPES
         self.add_type(2, ctype='COMPLEX', crval=1.0, cdelt=1.0, crpix=1.0)
@@ -154,9 +157,6 @@ class CorrUvFitsFile(object):
         # just have 165 bit data and 32 bit UVWs, which means it's rubbisharooney, unless I can
         # be bothered ot do somethign with BZERO and BSCALE (Maybe?)
 
-        self.include_weights = include_weights
-        
-        self.ncomplex = 3 if include_weights else 2
         self.dtype = np.dtype([('UU', dt), ('VV', dt), ('WW', dt), \
             ('DATE', dt), ('BASELINE', dt), \
             ('FREQSEL', dt), ('SOURCE', dt), ('INTTIM', dt), \
