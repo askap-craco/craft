@@ -39,7 +39,7 @@ def parse_beam_id_from_filename(fname):
     return b
 
 class VisView:
-    def __init__(self, uvfitsfile, update_date=False):
+    def __init__(self, uvfitsfile, update_date=True):
         '''
         Allows you to read and seek rather than memory map
         '''
