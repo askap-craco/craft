@@ -403,8 +403,8 @@ class UvFits(object):
             dout_data = dout['DATA'].transpose((*np.arange(1, dout['DATA'].ndim), 0))[self.baseline_indices]
             dout_complex_data = self._create_masked_data(dout_data, 0)
 
+            uvws = []
             if fetch_uvws:
-                uvws = []
                 for it in range(nt):
                     this_uvw = {}
 
