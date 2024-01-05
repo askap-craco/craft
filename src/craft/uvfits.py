@@ -344,7 +344,10 @@ class UvFits(object):
         if nsamp is None:
             nsamp = self.nsamps
 
+        
         assert nsamp > 0
+        endsamp = istart + nsamp
+
 
         if istart > self.nsamps - 1:
             raise ValueError(f'Asked to start reading past the end of the file. istart={istart} nsamps={self.nsamps}')
@@ -352,9 +355,11 @@ class UvFits(object):
         vis = self.vis
 
         while True:
-            samps_left = nsamp - startsamp
+            samps_left = endsamp - startsamp
             if samps_left < nt:
                 samps_to_read = samps_left
+            else:
+                samps_to_read = nt
 
             if samps_left < 1:
                 break
@@ -369,7 +374,7 @@ class UvFits(object):
 
             # Using the vis interface should set UVW from metdata and flags??
             dout = vis[ix:iy].reshape(samps_to_read, -1)
-            log.debug('read complete')
+            log.debug('read complete of visidx [%d:%d]. Pre-reading willneed %d for %d bytes', ix, iy, next_byte_offset, nbytes)
 
             # Tell Kernel we're going to need the next block. - doesnt seem to make much difference, but anyway.
             os.posix_fadvise(self.raw_fin.fileno(), next_byte_offset, nbytes, os.POSIX_FADV_WILLNEED)
