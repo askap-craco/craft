@@ -39,7 +39,7 @@ def parse_beam_id_from_filename(fname):
     return b
 
 class VisView:
-    def __init__(self, uvfitsfile):
+    def __init__(self, uvfitsfile, update_date=True):
         '''
         Allows you to read and seek rather than memory map
         '''
@@ -50,6 +50,7 @@ class VisView:
         assert self.hdrsize % 2880 == 0
         self.start_idx = start_idx
         self.fin = self.uvfitsfile.raw_fin
+        self.update_date = update_date
 
     @property
     def size(self):
@@ -77,14 +78,16 @@ class VisView:
         dout = np.fromfile(self.fin, count=nelements, dtype=self.dtype)
 
         ### update date to float64
-        dtype_store = [
-            (field, np.dtype(">f8")) if field == "DATE" 
-            else (field, self.dtype.fields[field][0])
-            for field in self.dtype.fields
-        ]
 
-        dout = dout.astype(dtype_store)
-        dout["DATE"] += self.uvfitsfile.hdulist[0].header["PZERO4"]
+        if self.update_date:
+            dtype_store = [
+                (field, np.dtype(">f8")) if field == "DATE" 
+                else (field, self.dtype.fields[field][0])
+                for field in self.dtype.fields
+            ]
+
+            dout = dout.astype(dtype_store)
+            dout["DATE"] += self.uvfitsfile.hdulist[0].header["PZERO4"]
 
         if isinstance(sidx_, int): return dout[0]
         return dout
@@ -212,7 +215,7 @@ class UvFits(object):
         '''
         try:
             ts = self.vis[0]['INTTIM']*u.second # seconds
-        except KeyError:
+        except ValueError:
             warnings.warn('Unknown int time in file. returning 1ms')
             ts = 1e-3*u.second # seconds
 
@@ -324,60 +327,80 @@ class UvFits(object):
         '''
         n =  self.vis.size // self.raw_nbl
         return n
-    
-    def fast_time_blocks(self, nt, fetch_uvws=False, istart=0):
-        '''
-        Reads raw data from uvfits file as an array and returns a block of nt samples
-        :istart: Sample number to start at. Doesnt have to be a multiple of nt
-        '''
+
+    def _create_masked_data(self, dout_data, start_sampno):
+        mask_vals = (1 - dout_data[..., 2, :]).astype('int')
+        dout_complex_data = dout_data[..., 0, :] + 1j*dout_data[..., 1, :]
+
+        if self.mask:
+            dout_complex_data = np.ma.MaskedArray(data = dout_complex_data, mask = mask_vals)
+            
+        return dout_complex_data
+
+    def fast_raw_blocks(self, istart=0, nsamp=None, nt=1, raw_date=False):
         assert istart >= 0, f'Invalid istart={istart}'
-        samps_returned = istart
+        startsamp = istart
         samps_to_read = nt
-        uvws = []
+        if nsamp is None:
+            nsamp = self.nsamps
+
+        assert nsamp > 0
+
         if istart > self.nsamps - 1:
             raise ValueError(f'Asked to start reading past the end of the file. istart={istart} nsamps={self.nsamps}')
 
         vis = self.vis
 
         while True:
-            samps_left = self.nsamps - samps_returned
-
+            samps_left = nsamp - startsamp
             if samps_left < nt:
                 samps_to_read = samps_left
 
             if samps_left < 1:
                 break
 
-            byte_offset = self.hdrsize + samps_returned * self.raw_nbl * self.dtype.itemsize
+            ix = startsamp*self.raw_nbl
+            iy = ix + samps_to_read*self.raw_nbl
+            byte_offset = self.hdrsize + ix * self.dtype.itemsize
             nbytes = samps_to_read*self.raw_nbl*self.dtype.itemsize
             next_byte_offset = byte_offset+nbytes
 
             log.debug('Reading %d bytes from %s at offset %d', nbytes, self.filename, byte_offset)
 
-            #self.raw_fin.seek(byte_offset)
-            #dout1 = np.fromfile(self.raw_fin, count = samps_to_read * self.raw_nbl, dtype=self.dtype).reshape(samps_to_read, -1)
-            # By using the vis interface we get the UVW interpolation if we need
-
-            istart = samps_returned*self.raw_nbl
-            iend = istart + samps_to_read*self.raw_nbl
-            dout = vis[istart:iend].reshape(samps_to_read, -1)
+            # Using the vis interface should set UVW from metdata and flags??
+            dout = vis[ix:iy].reshape(samps_to_read, -1)
             log.debug('read complete')
 
             # Tell Kernel we're going to need the next block. - doesnt seem to make much difference, but anyway.
             os.posix_fadvise(self.raw_fin.fileno(), next_byte_offset, nbytes, os.POSIX_FADV_WILLNEED)
-            
-            samps_returned += samps_to_read
-            
-            dout_data = dout['DATA'].transpose((*np.arange(1, dout['DATA'].ndim), 0))[self.baseline_indices]
-            dout_complex_data = dout_data[..., 0, :] + 1j*dout_data[..., 1, :]
+            startsamp += samps_to_read
 
-            if self.mask:
-                mask_vals = (1 - dout_data[..., 2, :]).astype('int')
-                dout_complex_data = np.ma.MaskedArray(data = dout_complex_data, mask = mask_vals)
+            # dout has had it's ['DATE'] field converted to float64 and added ['PZERO4'] toit
+            # so it can beused in baseline interpolation. Here we convert it back
+            if raw_date:
+                dtype_out = [
+                    (field, np.dtype(">f4")) if field == "DATE" 
+                    else (field, self.dtype.fields[field][0])
+                    for field in self.dtype.fields
+                ]
+                dout["DATE"] -= self.hdulist[0].header["PZERO4"]
+                dout = dout.astype(dtype_out)
+            
+            yield dout
+    
+    def fast_time_blocks(self, nt, fetch_uvws=False, istart=0):
+        '''
+        Reads raw data from uvfits file as an array and returns a block of nt samples
+        :istart: Sample number to start at. Doesnt have to be a multiple of nt
+        '''
+
+        for dout in self.fast_raw_blocks(istart, nt=nt):
+            dout_data = dout['DATA'].transpose((*np.arange(1, dout['DATA'].ndim), 0))[self.baseline_indices]
+            dout_complex_data = self._create_masked_data(dout_data, 0)
 
             if fetch_uvws:
                 uvws = []
-                for it in range(samps_to_read):
+                for it in range(nt):
                     this_uvw = {}
 
                     for ii, ibl in enumerate(self.baseline_indices):
