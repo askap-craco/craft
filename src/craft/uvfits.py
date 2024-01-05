@@ -138,7 +138,7 @@ class UvFits(object):
         skip_blocks = self.skip_blocks
         self.nbl = len(startbl)
         # next we set the start block for the rest of time
-        self._nstart = self.nbl*skip_blocks
+        self._nstart = self.raw_nbl*skip_blocks
         self.skip_blocks = skip_blocks
         nrows = len(self.hdulist[0].data)
         log.debug('File contains %d baselines. Skipping %d blocks with nstart=%d', self.nbl, skip_blocks, self._nstart)
