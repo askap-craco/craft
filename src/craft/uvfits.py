@@ -329,7 +329,8 @@ class UvFits(object):
         return n
 
     def _create_masked_data(self, dout_data, start_sampno):
-        mask_vals = (1 - dout_data[..., 2, :]).astype('int')
+        mask_vals = dout_data[..., 2, :] <= 0
+        #mask_vals = (1 - dout_data[..., 2, :]).astype('int')
         dout_complex_data = dout_data[..., 0, :] + 1j*dout_data[..., 1, :]
 
         if self.mask:
