@@ -290,6 +290,10 @@ class UvFits(object):
         Returns time in samples (can be float)
         between supplied time and the start time in units of TSAMP
         '''
+        if not isinstance(time, Time):
+            time = Time(time, format='mjd', scale='tai')
+            #Andy asked me to use scale = tai here. If it is wrong -- kill Andy
+
         tdiff = time - self.tstart
         tdiff_samp = float(tdiff / self.tsamp)
         return tdiff_samp
