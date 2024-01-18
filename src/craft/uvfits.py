@@ -246,6 +246,7 @@ class UvFits(object):
         d0 = self.start_date
         baselines = {}
         internal_baseline_order = []
+        raw_baseline_order = []
         baseline_indices = []
         raw_nbl = 0
         vis = self.vis
@@ -256,6 +257,7 @@ class UvFits(object):
             blid = row['BASELINE']
             a1, a2 = bl2ant(blid)
             raw_nbl += 1
+            raw_baseline_order.append(blid)
             if a1 in self.flagant or a2 in self.flagant:
                 continue
 
@@ -268,6 +270,7 @@ class UvFits(object):
 
 
         self.internal_baseline_order = np.array(internal_baseline_order)
+        self.raw_baseline_order = np.array(raw_baseline_order)
         self.baseline_indices = np.array(baseline_indices)
         self.raw_nbl = raw_nbl
         return baselines
