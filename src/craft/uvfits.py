@@ -248,6 +248,7 @@ class UvFits(object):
         internal_baseline_order = []
         raw_baseline_order = []
         baseline_indices = []
+        raw_baseline_indices = []
         raw_nbl = 0
         vis = self.vis
         for i in range(self.vis.size):
@@ -258,6 +259,7 @@ class UvFits(object):
             a1, a2 = bl2ant(blid)
             raw_nbl += 1
             raw_baseline_order.append(blid)
+            raw_baseline_indices.append(i)
             if a1 in self.flagant or a2 in self.flagant:
                 continue
 
@@ -272,6 +274,7 @@ class UvFits(object):
         self.internal_baseline_order = np.array(internal_baseline_order)
         self.raw_baseline_order = np.array(raw_baseline_order)
         self.baseline_indices = np.array(baseline_indices)
+        self.raw_baseline_indices = np.array(raw_baseline_indices)
         self.raw_nbl = raw_nbl
         return baselines
 
@@ -397,14 +400,21 @@ class UvFits(object):
             
             yield dout
     
-    def fast_time_blocks(self, nt, fetch_uvws=False, istart=0):
+    def fast_time_blocks(self, nt, fetch_uvws=False, istart=0, return_all_baselines=False):
         '''
         Reads raw data from uvfits file as an array and returns a block of nt samples
         :istart: Sample number to start at. Doesnt have to be a multiple of nt
         '''
 
         for dout in self.fast_raw_blocks(istart, nt=nt):
-            dout_data = dout['DATA'].transpose((*np.arange(1, dout['DATA'].ndim), 0))[self.baseline_indices]
+            if return_all_baselines:
+                bl_selector = self.raw_baseline_indices
+                bl_order = self.raw_baseline_order
+            else:
+                bl_selector = self.baseline_indices
+                bl_order = self.internal_baseline_order
+
+            dout_data = dout['DATA'].transpose((*np.arange(1, dout['DATA'].ndim), 0))[bl_selector]
             dout_complex_data = self._create_masked_data(dout_data, 0)
 
             uvws = []
@@ -412,8 +422,8 @@ class UvFits(object):
                 for it in range(nt):
                     this_uvw = {}
 
-                    for ii, ibl in enumerate(self.baseline_indices):
-                        blid = self.internal_baseline_order[ii]
+                    for ii, ibl in enumerate(bl_selector):
+                        blid = bl_order[ii]
 
                         # add the [0] index to get the scalar type
                         # so it exactly matches what you with the original
