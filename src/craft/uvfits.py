@@ -415,6 +415,15 @@ class UvFits(object):
         return dout_complex_data
     
     def convert_block_into_visrows(self, block, add_back_removed_baslines = True):
+        
+        def compare_shapes(shape1, shape2):
+            # Remove dimensions with length 1
+            shape1_filtered = tuple(dim for dim in shape1 if dim != 1)
+            shape2_filtered = tuple(dim for dim in shape2 if dim != 1)
+    
+            # Compare shapes
+            return shape1_filtered == shape2_filtered
+        
         if add_back_removed_baslines:
             nbl = self.raw_nbl
             block_nbl = block.shape[0]
@@ -432,7 +441,7 @@ class UvFits(object):
         dout = np.empty(nrows, dtype=self.dtype)
         
         expected_row_shape = dout.dtype['DATA'].shape[:-1]      #:-1 because the last axis is cmplx
-        assert expected_row_shape == block[0, ..., 0].shape, f"{expected_row_shape}, {block[0, ..., 0].shape}, {block.shape}"
+        assert compare_shapes(expected_row_shape, block[0, ..., 0].shape), f"{expected_row_shape}, {block[0, ..., 0].shape}, {block.shape}"
 
         unity_weigths_array = np.ones(expected_row_shape)
         
@@ -446,25 +455,31 @@ class UvFits(object):
                 dout[irow]['DATA'][..., 1] = block[ii, ..., it].imag.reshape(expected_row_shape)
 
                 if isinstance(block, np.ma.core.MaskedArray):
-                    weights = 1 - block[ibl, ..., it].mask.reshape(expected_row_shape)
+                    weights = 1 - block[ii, ..., it].mask.reshape(expected_row_shape)
                 else:
                     weights = unity_weigths_array
             
                 dout[irow]['DATA'][..., 2] = weights
-
         return dout
 
-    def fast_time_blocks(self, nt, fetch_uvws=False, istart=0):
+    def fast_time_blocks(self, nt, fetch_uvws=False, istart=0, keep_all_baselines = False):
         '''
         Reads raw data from uvfits file as an array and returns a block of nt samples
         :istart: Sample number to start at. Doesnt have to be a multiple of nt
         '''
 
         for dout in self.fast_raw_blocks(istart, nt=nt):
-            dout_complex_data = self.convert_visrows_into_block(dout)
+            dout_complex_data = self.convert_visrows_into_block(dout, keep_all_baselines = keep_all_baselines)
             #dout_data = dout['DATA'].transpose((*np.arange(1, dout['DATA'].ndim), 0))[self.baseline_indices]
             #dout_complex_data = self._create_masked_data(dout_data, 0)
 
+            if keep_all_baselines:
+                bl_selector = np.arange(self.raw_nbl).astype('int')
+                bl_order = self.raw_baseline_order
+            else:
+                bl_selector = self.baseline_indices
+                bl_order = self.internal_baseline_order
+        
             uvws = []
             if fetch_uvws:
                 for it in range(nt):
