@@ -142,8 +142,16 @@ int main( int argc, char **argv )
             {
                 sInputName  = Parameters[ 0 ];
                 sOutputName = Parameters[ 1 ];
-            }
-        }
+            } else {
+	      printf("Must pass exactly 2 files (Not %lu)\n", Parameters.size());
+	      printf("Usage:  <VCRAFTINPUT> <CODIFOUTPUT>\n");
+	      return eReturnCodeFailure;
+	    }
+	} else {
+	  printf("No files passed\n");
+	  printf("Usage:  <VCRAFTINPUT> <CODIFOUTPUT>\n");
+	  return eReturnCodeFailure;
+	}
     }
 
     // If we are successfull thus far, we can process the files else return with

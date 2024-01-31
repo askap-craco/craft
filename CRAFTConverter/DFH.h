@@ -23,15 +23,15 @@
 #pragma pack ( push, 1 )                    // Set single byte alignment.
 
 #if defined(__GNUC__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wunused-parameter"
-    #pragma GCC diagnostic ignored "-Wunused-variable"
-    #pragma GCC diagnostic ignored "-Wtype-limits"
-    #pragma GCC diagnostic ignored "-Wsign-compare"
-    #include "codifio.h"
-    #pragma GCC diagnostic pop
+      #pragma GCC diagnostic push
+      #pragma GCC diagnostic ignored "-Wunused-parameter"
+//    #pragma GCC diagnostic ignored "-Wunused-variable"
+//    #pragma GCC diagnostic ignored "-Wtype-limits"
+//    #pragma GCC diagnostic ignored "-Wsign-compare"
+      #include <codifio.h>
+      #pragma GCC diagnostic pop
 #else
-    #include "codifio.h"
+      #include <codifio.h>
 #endif
 
 #pragma pack ( pop )                        // Restore the previous byte alignment.

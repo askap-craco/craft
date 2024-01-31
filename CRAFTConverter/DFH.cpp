@@ -31,7 +31,7 @@ namespace NCodec        // Part of the Codec namespace.
 {
     CDFH::CDFH( void )
     {
-        memset( this, 0x00, iDFHSize_c );
+        memset( (void*)this, 0x00, iDFHSize_c );
 
         m_uMaxDataFramePlusOne = 0;
     }
@@ -42,7 +42,7 @@ namespace NCodec        // Part of the Codec namespace.
     CDFH::~CDFH( void )
     {
         m_uMaxDataFramePlusOne = 0;
-        memset( this, 0x00, iDFHSize_c );
+        memset( (void*)this, 0x00, iDFHSize_c );
     }
 
     //////////
@@ -52,7 +52,7 @@ namespace NCodec        // Part of the Codec namespace.
     {
         if ( &rRhs != this )
         {
-            memcpy( this, &rRhs, iDFHSize_c );
+	    memcpy( (void*)this, (void*)&rRhs, iDFHSize_c );
             m_uMaxDataFramePlusOne = rRhs.m_uMaxDataFramePlusOne;
         }
     }
@@ -64,7 +64,7 @@ namespace NCodec        // Part of the Codec namespace.
     {
         if ( &rRhs != this )
         {
-            memcpy( this, &rRhs, iDFHSize_c );
+	    memcpy( (void*)this, (void*)&rRhs, iDFHSize_c );
             m_uMaxDataFramePlusOne = rRhs.m_uMaxDataFramePlusOne;
         }
 
@@ -76,7 +76,7 @@ namespace NCodec        // Part of the Codec namespace.
 
     void CDFH::Reset( void )
     {
-        memset( this, 0x00, iDFHSize_c );
+        memset( (void*)this, 0x00, iDFHSize_c );
         m_uMaxDataFramePlusOne = 0;
     }
 
@@ -111,7 +111,7 @@ namespace NCodec        // Part of the Codec namespace.
 
     void CDFH::NextFrame( void )
     {
-      nextCODIFHeader(this, m_uMaxDataFramePlusOne-1);
+        nextCODIFHeader(this, m_uMaxDataFramePlusOne-1);
     }
 
     //////////

@@ -35,7 +35,7 @@ namespace
     // Aliases and constants.
 
     using DFH_t = CCodecVDIF1::VDIF1DFH_t;
-    constexpr size_t iDFHSize_c = sizeof( DFH_t );
+  //constexpr size_t iDFHSize_c = sizeof( DFH_t );
 
     // Helper class to simplify manipulation of the VDIF1 data frame header.
 

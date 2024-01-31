@@ -259,7 +259,6 @@ namespace NCodec        // Part of the Codec namespace.
 	      std::fstream batfile(".bat0", std::ios_base::in);
 	      batfile >> std::hex >> m_ullBAT0 >> std::dec >> m_ullFrame0;
 	    } else {
-	      printf("DEBUG: No .bat0 file\n");
 	      unsigned long long startBAT = m_ullTriggerWriteBAT - (m_ullTriggerFrameId * (27.0/32.0));
 	      m_ullBAT0 = ((startBAT + 999999)/ 1e6); // Round up full second
 	      m_ullBAT0 *= 1e6;  // Need to do in two lines as compiler is too clever it seems (optimises it away)
@@ -271,9 +270,6 @@ namespace NCodec        // Part of the Codec namespace.
 	      batfile.close();
 	    }
 	    
-	    printf("DEBUG: BAT0  =0x%llX\n", m_ullBAT0);
-	    printf("DEBUG: FRAME0=%lld\n", m_ullFrame0);
-	      
             if ( ! ConfigureDFH() )
             {
                 throw string{ "Error forming the Data Frame Header (DFH)" };
@@ -516,8 +512,7 @@ namespace NCodec        // Part of the Codec namespace.
                                         ui16GroupId, m_iBitsPerSample,
                                             ui16Channels*m_iNumberofPol, m_iSampleBlockSize,
                                                 iTimeForIntegerSamples_c,
-                                                    uiSampleIntervalsPerPeriod,
-                                                        iIsComplex, caStationId )
+                                                    uiSampleIntervalsPerPeriod, iIsComplex, caStationId, 0)
                                   != CODIF_NOERROR )
             {
                 throw string { "createCODIFHeader() failed" };
