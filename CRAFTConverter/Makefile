@@ -27,7 +27,7 @@ all: $(OBJ) CRAFTConverter
 
 
 CRAFTConverter: $(OBJ) $(INCS)
-	$(CXX) -o CRAFTConverter $(CODIFIO_LIB) $(OBJ)
+	$(CXX) -o CRAFTConverter $(OBJ) $(CODIFIO_LIB)
 
 clean:
 	rm -rf *.o *~ $(OBJ) CRAFTConverter
