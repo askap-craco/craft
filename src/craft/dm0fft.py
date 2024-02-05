@@ -79,7 +79,7 @@ def _main():
         elif (f.nbits == 32):
             dtype = np.float32
         v = np.fromfile(f.fin, dtype=dtype, count=nelements )
-        v = v.astype(np.float)
+        v = v.astype(np.float32)
         print('Nelements', nelements, 'Ntimes', ntimes, 'nchans', f.nchans, 'nifs', f.nifs, dtype, 'Actual length', len(v), 'Tsamp', f.tsamp)
     
         v.shape = (ntimes, f.nifs, f.nchans)

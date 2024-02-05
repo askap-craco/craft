@@ -149,7 +149,7 @@ class Plotter(object):
         beams, files = load_beams(filenames, tstart, ntimes=1, return_files=True)
         self.total_samples = min([f.nsamples for f in files])
         ntimes, self.nbeams, self.nfreq = beams.shape
-        self.freq_flags = np.ones(self.nfreq, dtype=np.bool)
+        self.freq_flags = np.ones(self.nfreq, dtype=bool)
         f0 = files[0]
         self.bnames = [f.filename.split('.')[-2] for f in files]
         nbeams = len(self.files)

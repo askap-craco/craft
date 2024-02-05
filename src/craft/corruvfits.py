@@ -27,7 +27,7 @@ dtype_to_bitpix = {np.dtype('>i2'):16,
                    np.dtype('>f8'):-64}
 
 class CorrUvFitsFile(object):
-    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT', output_dtype=np.dtype('>f4'), bmax=None, time_scale=1.0*u.day):
+    def __init__(self, fname, fcent, foff, nchan, npol, mjd0, sources, antennas, sideband=1, telescop='ASKAP', instrume='VCRAFT', origin='CRAFT', output_dtype=np.dtype('>f4'), bmax=None, time_scale=1.0*u.day, include_weights=True, extra_header=None):
         '''
         Make a correlator UV fits file
         :fname: file name
@@ -42,6 +42,8 @@ class CorrUvFitsFile(object):
         :telescop: Put into header
         :instrume: put into header
         :origin: put into header
+        :extra_header: Dictionary of extra stuff to put into header
+        :include_weights: if True, put weights in file (default) if False no weights will be added. Makes file 33% smaller but possibly non-compliant with UVFITS
         :output_dtype: Dtype of output. According to fits standard: https://archive.stsci.edu/fits/fits_standard/node39.html - valid values are (np.int16, np.int32, np.float32, np.float64)
         :bmax: Astropy unit of distance that is the longest baseline in teh array. If set, UVW values are scale for dtype=int16 and dtype=int32 to get decent dynamic range
         :time_scale: Set to an astropy unit that converts to days, it will be used to specify the scale in FITS headers for the DATE and INTTIM columns. Can be used so the version on disk is in units of "integrations". THis might not be very sensible. If you set this to the integration time, you can use put_data(..t=integration_number) and get sensile output
@@ -53,7 +55,6 @@ class CorrUvFitsFile(object):
             uvw_scale = 1.0
         else:
             tmax = bmax.to(u.meter).value/scipy.constants.c # maximum baseline - seconds
-            print('tmax', tmax, 'bmax', bmax, 'bmax to meter', bmax.to(u.meter))
             if output_dtype == np.dtype('int16'):
                 vmax = 1<<15 # largerst value of a 16 bit signed number, if that's what we want to use for uvw
                 uvw_scale = vmax/tmax
@@ -64,8 +65,11 @@ class CorrUvFitsFile(object):
                 uvw_scale = 1.0
             
         self.uvw_scale = uvw_scale
+
+        self.include_weights = include_weights
+        self.ncomplex = 3 if include_weights else 2
         
-        self.dshape = [1,1,1,nchan, npol, 3]
+        self.dshape = [1,1,1,nchan, npol, self.ncomplex]
         hdr = pyfits.Header()
         self.hdr = hdr
         self.nchan = nchan
@@ -85,7 +89,6 @@ class CorrUvFitsFile(object):
         if bitpix is None:
             raise ValueError(f'Invalid output_dtype={output_dtype}. Must be one of {dtype_to_bitpix.keys()}')
 
-        print(f'Bitpix {bitpix}')
         self.output_dtype = output_dtype
         self.bitpix = bitpix
 
@@ -101,6 +104,7 @@ class CorrUvFitsFile(object):
         hdr['BSCALE'] = 1.0
         hdr['BZERO'] = 0.0
         hdr['BUNIT'] = 'UNCALIB'
+        hdr['INCWTS'] = (include_weights, 'If weights included in visibilities')
         refchan = float(nchan)/2. + 0.5 # half a channel because it's centered on DC 
         # CTYPES
         self.add_type(2, ctype='COMPLEX', crval=1.0, cdelt=1.0, crpix=1.0)
@@ -140,6 +144,10 @@ class CorrUvFitsFile(object):
         histstr = 'Created on {} by {}'.format(datetime.datetime.now().isoformat(), ' '.join(sys.argv))
         hdr['HISTORY'] = histstr
 
+        for k,v in extra_header.items():
+            assert k not in hdr, f'Extra header card {k} is already in header'
+            hdr[k] = v
+
         self.fout = open(fname, 'w+b')
         self.fout.write(bytes(hdr.tostring(), 'utf-8'))
         self.ngroups = 0
@@ -148,10 +156,11 @@ class CorrUvFitsFile(object):
         # aaah, craparooney - dthe data type for the whole row has to be the same. This means you can't
         # just have 165 bit data and 32 bit UVWs, which means it's rubbisharooney, unless I can
         # be bothered ot do somethign with BZERO and BSCALE (Maybe?)
+
         self.dtype = np.dtype([('UU', dt), ('VV', dt), ('WW', dt), \
             ('DATE', dt), ('BASELINE', dt), \
             ('FREQSEL', dt), ('SOURCE', dt), ('INTTIM', dt), \
-            ('DATA', dt, (1, 1, 1, nchan, npol, 3))])
+            ('DATA', dt, (1, 1, 1, nchan, npol, self.ncomplex))])
 
         log.debug('Dtype size is %s', self.dtype.itemsize)
 
@@ -282,6 +291,70 @@ class CorrUvFitsFile(object):
         for k,v, in args.items():
             hdr['{}{}'.format(k,typeno).upper()] = (v, comment)
 
+    def put_data_block(self, uvw, mjd, blids, inttim, data, weights=None, source=1, t=None):
+        '''
+        Puts a whole block of data into the file
+        UVW, mjd, source is and time is the same for the whole block
+        :uvw: should have shape (nbl, 3)
+        blids is the baseline IDs - should be len(nbl)
+        :data: shoudl have shape (nbl, nchan, npol) if its complex or (nbl, nchan, npol, 2) if its not complex
+        :weights: should broadcast to (nbl, nchan, npol) but can be none
+
+        '''
+        assert 1<= source <= len(self.sources), f'Invalid source ID={source}. Source table has {len(self.sources)}'
+        if weights is None:
+            weights = 7.71604973e-05 #???
+
+        nbl = len(blids)
+        nchan = self.nchan
+        npol = self.npol
+        
+        dshape = data.shape
+        if np.iscomplexobj(data):
+            expected_shape = (nbl, nchan, npol)
+        else:
+            expected_shape = (nbl, nchan, npol,2)
+            
+        assert dshape == expected_shape, f'Invalid data shape. Was {dshape} but expected {expected_shape}'
+        assert nbl > 0
+        assert uvw.shape == (nbl, 3), f'Invalid UVW shape. Was {uvw.shape}'
+
+        visdata = np.recarray(nbl, dtype=self.dtype)
+        jd = mjd + 2400000.5
+        day = np.floor(jd)
+        dayfrac = jd - day
+
+        if t is None:
+            assert self.time_scale == 1*u.day
+            visdata['DATE'] = mjd - self.mjd0
+        else:
+            visdata['DATE'] = t
+
+        uvws = uvw*self.uvw_scale
+        visdata['UU'] = uvws[:, 0]
+        visdata['VV'] = uvws[:, 1]
+        visdata['WW'] = uvws[:, 2]
+        visdata['BASELINE'] = blids
+        visdata['INTTIM'] = inttim
+        visdata['FREQSEL'] = 1
+        visdata['SOURCE'] = source
+        d = visdata['DATA']
+        
+        if np.iscomplexobj(data):
+            d[:,0,0,0,:,:,0] = data.real
+            d[:,0,0,0,:,:,1] = data.imag
+        else:
+            d[:,0,0,0,:,:,0] = data[...,0]
+            d[:,0,0,0,:,:,1] = data[...,1]
+
+        if self.include_weights:
+            d[:,0,0,0,:,:,2] = weights
+            
+        self.fout.write(visdata.tobytes())
+
+        self.ngroups += nbl
+        
+
     def put_data(self, uvw, mjd ,ia1, ia2, inttim, data, weights=None, source=1, t=None):
         '''
         :uvw: UVW in meters
@@ -291,7 +364,7 @@ class CorrUvFitsFile(object):
         '''
         assert ia1 >= 0
         assert ia2 >= 0
-        assert 1<= source <= len(self.sources), f'Invaoid source ID={source}. Source table has {len(self.sources)}'
+        assert 1<= source <= len(self.sources), f'Invalid source ID={source}. Source table has {len(self.sources)}'
 
         visdata_all = np.recarray(1, dtype=self.dtype)
         visdata = visdata_all[0]
@@ -323,8 +396,10 @@ class CorrUvFitsFile(object):
         else:
             d[0,0,0,:,:,0] = data[...,0]
             d[0,0,0,:,:,1] = data[...,1]
+
+        if self.include_weights:
+            d[0,0,0,:,:,2] = weights
             
-        d[0,0,0,:,:,2] = weights
         self.fout.write(visdata_all.tobytes())
         self.ngroups += 1
 

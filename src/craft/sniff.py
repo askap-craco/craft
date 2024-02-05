@@ -183,7 +183,7 @@ def freddachecker(hdrf,freddafof,dmerr=10,beamradius=5,beam=1):
     candidates=FileOperations(freddafof)
     print((freddafof,hdrf))
     candidates.collect_multibeam()
-    cand_beams=candidates.getparams(6).astype(np.int)
+    cand_beams=candidates.getparams(6).astype(np.int32)
     cand_dms=candidates.getparams(5)
     header=hdrfiles(hdrf)
     coords=header.get_beampos(cand_beams)

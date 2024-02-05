@@ -73,7 +73,9 @@ if __name__ == '__main__':
                                'filadd=craft.filadd:_main',
                                'pltcalc11=craft.calc11:_main',
                                'sigprochdr=craft.sigproc:_main',
-                               'pltuvfits=craft.uvfits:_main'
+                               'pltuvfits=craft.uvfits:_main',
+                               'fcm2calc=craft.fcm2calc:_main',
+                               'calc11=craft.calc11:_main'
                                
             ]
             },

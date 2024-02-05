@@ -198,7 +198,7 @@ def ant2bl(ants):
     return ibl
 
 
-def bl2array(baselines):
+def bl2array(baselines, dtype=np.complex64):
     '''
     Converts baseline dictionary into an array sorted by baseline id
     :returns: np array of shape [nbl, nf, nt]
@@ -211,7 +211,7 @@ def bl2array(baselines):
     fullshape = [nbl]
     fullshape.extend(tfshape)
 
-    d = np.zeros(fullshape, dtype=np.complex64)
+    d = np.zeros(fullshape, dtype=dtype)
 
     if np.ma.isMaskedArray(indata):
         d = np.ma.masked_array(d, mask=np.zeros(fullshape, dtype=bool), fill_value=indata.fill_value)
@@ -220,6 +220,81 @@ def bl2array(baselines):
         d[idx, ...] = baselines[blid]
 
     return d
+
+def uvwbl2array(baselines):
+    '''
+    Convert UVW baselines dictionary into nparray
+    :returns: (nbl, 3) array of UVW coordinates in whaterver the input data was
+    '''
+    blids = sorted(baselines.keys())
+    nbl = len(blids)
+    d = np.zeros((nbl, 3))
+    for idx, blid in enumerate(blids):
+        for i, x in enumerate(('UU','VV','WW')):
+            d[idx, i] = baselines[blid][x]
+            
+    return d
+
+uvw_dtype = [ ('UU', 'f4'), ('VV', 'f4'), ('WW','f4')]
+
+def to_uvw(uvwin):
+    '''
+    converts a normal array of 3 values into a uvw dtype
+    '''
+    assert len(uvwin) == 3
+    uvwout =  np.array([tuple(uvwin)], dtype=uvw_dtype)[0]
+    return uvwout
+
+def uvw_to_array(uvw):
+    return np.array([uvw['UU'], uvw['VV'], uvw['WW']])
+
+
+class BaselineIndex:
+    def __init__(self, blidx, a1, a2, ia1, ia2):
+        '''
+        blidx - index into an array that's had flagged antenans removed
+        a1 - 1 based antenna number
+        a2 - 1 based antenna number
+        ia1 = index into an array of antennas that's had the flagged antennas removed
+        ia2 = index into an array of antennas that's had the flagged antennas removed
+        '''
+        assert a1 > 0 and a2 > 0
+        self.blidx = blidx
+        self.a1 = a1
+        self.a2 = a2
+        self.ia1 = ia1
+        self.ia2 = ia2
+
+    @property
+    def blid(self):
+        '''
+        Returns the baseline ID (FITS formatted) of this index
+        '''
+        return ant2bl((self.a1, self.a2))
+
+    def __str__(self):
+        s = f'BaselineIndex blidx={self.blidx} ak{self.a1}-ak{self.a2} idx={self.ia1}-{self.ia2} blid={self.blid}'
+        return s
+
+    __repr__ = __str__
+
+def baseline_iter(valid_ants_0based):
+    '''
+    Returns an iterator over the valid baselines returning a BaselineIndex
+    object for each baseline
+    :valid_ants_0based: list of valid antennas, 0 based indices
+    :returns: an iterator returning
+    BaselineIndex whichis info on which baselines are present
+    No autocorrelations are returned
+    :see: BaselineIndex
+    '''
+    blidx = 0
+    for ia1, a1 in enumerate(valid_ants_0based):
+        for a2 in valid_ants_0based[ia1+1:]:
+            ia2 = list(valid_ants_0based).index(a2)
+            b = BaselineIndex(blidx, a1+1, a2+1, ia1, ia2)
+            yield b
+            blidx += 1
 
 def get_bl_length(baselines, blid):
     '''
@@ -342,8 +417,11 @@ def pointsource(amp, lm, freqs, baseline_order, baselines, noiseamp=0):
     dout = np.empty((nbl, nf), dtype=np.complex64)
     for ibl, blid in enumerate(baseline_order):       
         # baselines in seconds
-        uvw_sec = np.array(baselines[blid][:3])
-        
+        #import IPython
+        #IPython.embed()
+        #uvw_sec = np.array(baselines[blid][:3])
+        uvw_sec = baselines[blid]
+
         # convert UVW coordinates to wavelegths
         u = uvw_sec[0]*freqs
         v = uvw_sec[1]*freqs
@@ -463,12 +541,19 @@ def _vis2nbl(vis):
     This don't consider any flagging etc as we don't care about that
     """
     d0 = vis[0]["DATE"]
+    first_blid = None
+    first_blid_again = False
 
     nbl = 0
     for visrow in vis:
         d = visrow["DATE"]
-        if d > d0: return nbl
+        ### check baseline as well
+        if first_blid is None: first_blid = vis[0]["BASELINE"]
+        else: first_blid_again = visrow["BASELINE"] == first_blid
+
+        if d > d0 or first_blid_again: return nbl
         nbl += 1
+    return nbl
 
 
 def time_block_with_uvw_range(
@@ -698,7 +783,7 @@ def get_freqs(hdul):
     nchan = vis[0]["DATA"].shape[-3]
 
     # Need to add 1 due to stupid FITS convention. Grr.
-    freqs = (np.arange(nchan, dtype=np.float) - ch1 + 1)*foff + fch1 # Hz
+    freqs = (np.arange(nchan, dtype=np.float64) - ch1 + 1)*foff + fch1 # Hz
 
     return freqs
 
@@ -883,19 +968,21 @@ def baseline2uv(plan, baseline_data, uv_data):
 
     return uv_data
 
-@njit
+@njit(parallel=True,cache=True)
 def baseline2uv_numba(lut, baseline_data, uv_data):
     nrun, nuvwide, _ = lut.shape
     for irun in prange(nrun):
         for iuv in prange(nuvwide):
             blidx, cstart, cend, out_cstart, out_cend, do_conj = lut[irun, iuv, :]
             if blidx == -1:
-                break
-
-            if do_conj:
-                uv_data[irun, :, out_cstart:out_cend, iuv] = np.conj(baseline_data[blidx, cstart:cend, :].T)
+                # this is a safety thing - probably dont need it but we'll have it and remove it's too slow
+                uv_data[irun, :, :, iuv] = 0 
             else:
-                uv_data[irun, :, out_cstart:out_cend, iuv] = baseline_data[blidx, cstart:cend, :].T
+                din = baseline_data[blidx, cstart:cend, :].T
+                if do_conj:
+                    din =  np.conj(din)
+
+                uv_data[irun, :, out_cstart:out_cend, iuv] = din
 
 class FastBaseline2Uv:
     def __init__(self, plan, conjugate_lower_uvs=False):
@@ -907,12 +994,17 @@ class FastBaseline2Uv:
         '''
         self.__plan = plan
         log.info('Making fastBaseline2UV with plan %s', self.plan)
-        # initialise with -1 - if those values are -1 in the execution code, then we quite the loop
+        # initialise with -1 - if those values are -1 in the execution code, then we quit the loop
         self.lut = np.ones((len(plan.fdmt_plan.runs), plan.nuvwide, 6), np.int16)*-1
         blids = sorted(plan.baselines.keys())
 
         for irun, run in enumerate(plan.fdmt_plan.runs):
+            if run is None:
+                continue
             for iuv, uv in enumerate(run.cells):
+                if uv is None:
+                    continue
+                
                 #print(f'run {irun}/{len(plan.fdmt_plan.runs)}')
                 blid = uv.blid
                 cstart = uv.chan_start

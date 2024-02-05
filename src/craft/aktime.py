@@ -35,7 +35,7 @@ import datetime
 import pytz
 
 mjdRefDt = datetime.datetime(1858, 11, 17, tzinfo=pytz.utc)
-DUTC0 = 35.0  # leap seconds - correct as of 30 June 2012
+DUTC0 = 37.0  # leap seconds - correct as of 31 Dec 2016 and nothign in 2023
 
 # Leap seconds definition, [UTC datetime, MJD, DUTC]
 LEAPSECONDS = [

@@ -172,7 +172,7 @@ class AntennaSource(object):
 
         for c in range(corr.ncoarse_chan):
             cfreq = corr.freqs[c]
-            freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw
+            freqs = (np.arange(nfine, dtype=np.float64) - float(nfine)/2.0)*corr.fine_chanbw
             if corr.sideband == -1:
                 freqs = -freqs
                 
@@ -255,7 +255,7 @@ class AntennaSource(object):
 
         for c in range(corr.ncoarse_chan):
             cfreq = corr.freqs[c]
-            freqs = (np.arange(nfine, dtype=np.float) - float(nfine)/2.0)*corr.fine_chanbw
+            freqs = (np.arange(nfine, dtype=np.float64) - float(nfine)/2.0)*corr.fine_chanbw
             if corr.sideband == -1:
                 freqs = -freqs
 

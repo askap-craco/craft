@@ -78,7 +78,7 @@ def _main():
     nslots = 8
     currslot = 0
     vdata = np.zeros((nslots, nchan, npol), dtype=dtype)
-    vints = np.zeros(nslots, dtype=np.int)
+    vints = np.zeros(nslots, dtype=np.int32)
     
     for hdr, address, rawdata, pktdate in f:
         if address[0] in ignore_cards:
