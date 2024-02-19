@@ -297,7 +297,8 @@ class UvFits(object):
         '''
         if not isinstance(time, Time):
             time = Time(time, format='mjd', scale='tai')
-            #Andy asked me to put this format = mjd, scale = tai 
+            #Andy asked me to use scale = tai here. If it is wrong -- kill Andy
+
         tdiff = time - self.tstart
         tdiff_samp = float(tdiff / self.tsamp)
         return tdiff_samp
