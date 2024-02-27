@@ -490,7 +490,7 @@ def calc_pad_lut(plan, ssr=16):
 
 
 class PipelinePlan(object):
-    def __init__(self, f, values=None, dms=None, prev_plan=None):
+    def __init__(self, f, values=None, dms=None, prev_plan=None, save_luts=False):
         '''
         Creates a pipeline plan
         :f: object that contains lots of juicy info like baselines, frequency, tsamp etc. See uvfits.py and search_pipeline_sink:Adapter
@@ -510,6 +510,7 @@ class PipelinePlan(object):
             self.values = values
 
         self.prev_plan = prev_plan
+        self.save_luts = save_luts
         
         values = self.values
         if values.flag_ants:
@@ -575,7 +576,7 @@ class PipelinePlan(object):
                   
         log.info('Got Ncells=%d uvcells', len(uvcells))
         d = np.array([(v.a1, v.a2, v.uvpix[0], v.uvpix[1], v.chan_start, v.chan_end) for v in uvcells], dtype=np.int32)
-        if self.values.uv is not None:
+        if self.values.uv is not None and self.save_luts:
             np.savetxt(self.values.uv+'.uvgrid.txt', d, fmt='%d',  header='ant1, ant2, u(pix), v(pix), chan1, chan2')
 
         self.uvcells = uvcells
@@ -661,7 +662,7 @@ class PipelinePlan(object):
 
         
     def save_lut(self, data, lutname, header, fmt='%d'):
-        if self.values.uv is not None:
+        if self.values.uv is not None and self.save_luts:
             filename = '{uvfile}.{lutname}.txt'.format(uvfile=self.values.uv, lutname=lutname)
             log.info('Saving {lutname} shape={d.shape} type={d.dtype} to {filename} header={header}'.format(lutname=lutname, d=data, filename=filename, header=header))
             np.savetxt(filename, data, fmt=fmt, header=header)

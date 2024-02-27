@@ -142,7 +142,6 @@ class UvFits(object):
         self._nstart = self.raw_nbl*skip_blocks
         self.skip_blocks = skip_blocks
         nrows = len(self.hdulist[0].data)
-        log.debug('File contains %d baselines. Skipping %d blocks with nstart=%d', self.nbl, skip_blocks, self._nstart)
         self.nblocks_raw = nrows // self.raw_nbl
         if skip_blocks >= self.nblocks_raw:
             raise ValueError(f'Requested skip {skip_blocks} larger than file. nblocks = {self.nblocks_raw} nrows={nrows} nbl={self.nbl} nstart={self._nstart}')
@@ -257,7 +256,9 @@ class UvFits(object):
         d0 = self.start_date
         baselines = {}
         internal_baseline_order = []
+        raw_baseline_order = []
         baseline_indices = []
+        raw_baseline_indices = []
         raw_nbl = 0
         vis = self.vis
         for i in range(self.vis.size):
@@ -267,6 +268,8 @@ class UvFits(object):
             blid = row['BASELINE']
             a1, a2 = bl2ant(blid)
             raw_nbl += 1
+            raw_baseline_order.append(blid)
+            raw_baseline_indices.append(i)
             if a1 in self.flagant or a2 in self.flagant:
                 continue
 
@@ -279,7 +282,9 @@ class UvFits(object):
 
 
         self.internal_baseline_order = np.array(internal_baseline_order)
+        self.raw_baseline_order = np.array(raw_baseline_order)
         self.baseline_indices = np.array(baseline_indices)
+        self.raw_baseline_indices = np.array(raw_baseline_indices)
         self.raw_nbl = raw_nbl
         return baselines
 
@@ -301,6 +306,10 @@ class UvFits(object):
         Returns time in samples (can be float)
         between supplied time and the start time in units of TSAMP
         '''
+        if not isinstance(time, Time):
+            time = Time(time, format='mjd', scale='tai')
+            #Andy asked me to use scale = tai here. If it is wrong -- kill Andy
+
         tdiff = time - self.tstart
         tdiff_samp = float(tdiff / self.tsamp)
         return tdiff_samp
@@ -340,7 +349,8 @@ class UvFits(object):
         return n
 
     def _create_masked_data(self, dout_data, start_sampno):
-        mask_vals = (1 - dout_data[..., 2, :]).astype('int')
+        mask_vals = dout_data[..., 2, :] <= 0
+        #mask_vals = (1 - dout_data[..., 2, :]).astype('int')
         dout_complex_data = dout_data[..., 0, :] + 1j*dout_data[..., 1, :]
 
         if self.mask:
@@ -404,23 +414,91 @@ class UvFits(object):
             
             yield dout
     
-    def fast_time_blocks(self, nt, fetch_uvws=False, istart=0):
+    def convert_visrows_into_block(self, data, keep_all_baselines = False):
+        if keep_all_baselines:
+            bl_selector = np.arange(self.raw_nbl).astype('int')
+        else:
+            bl_selector = self.baseline_indices
+        
+        #TODO - I should take away the .reshape in fast_raw_blocks() and put it here instead
+
+        dout_data = data['DATA'].transpose((*np.arange(1, data['DATA'].ndim), 0))[bl_selector]
+        dout_complex_data = self._create_masked_data(dout_data, 0)
+        return dout_complex_data
+    
+    def convert_block_into_visrows(self, block, add_back_removed_baslines = True):
+        
+        def compare_shapes(shape1, shape2):
+            # Remove dimensions with length 1
+            shape1_filtered = tuple(dim for dim in shape1 if dim != 1)
+            shape2_filtered = tuple(dim for dim in shape2 if dim != 1)
+    
+            # Compare shapes
+            return shape1_filtered == shape2_filtered
+        
+        if add_back_removed_baslines:
+            nbl = self.raw_nbl
+            block_nbl = block.shape[0]
+            if block_nbl < nbl:
+                bl_indices = self.baseline_indices
+            else:
+                bl_indices = np.arange(nbl)
+        else:
+            nbl = self.nbl
+            bl_indices = np.arange(nbl)
+
+        nt = block.shape[-1]
+        nrows = nbl * nt
+        
+        dout = np.empty(nrows, dtype=self.dtype)
+        
+        expected_row_shape = dout.dtype['DATA'].shape[:-1]      #:-1 because the last axis is cmplx
+        assert compare_shapes(expected_row_shape, block[0, ..., 0].shape), f"{expected_row_shape}, {block[0, ..., 0].shape}, {block.shape}"
+
+        unity_weigths_array = np.ones(expected_row_shape)
+        
+        for it in range(nt):
+            for ii, ibl in enumerate(bl_indices):
+                if add_back_removed_baslines:
+                    irow = it*nbl + ibl
+                else:
+                    irow = it*nbl + ii
+                dout[irow]['DATA'][..., 0] = block[ii, ..., it].real.reshape(expected_row_shape)
+                dout[irow]['DATA'][..., 1] = block[ii, ..., it].imag.reshape(expected_row_shape)
+
+                if isinstance(block, np.ma.core.MaskedArray):
+                    weights = 1 - block[ii, ..., it].mask.reshape(expected_row_shape)
+                else:
+                    weights = unity_weigths_array
+            
+                dout[irow]['DATA'][..., 2] = weights
+        return dout
+
+    def fast_time_blocks(self, nt, fetch_uvws=False, istart=0, keep_all_baselines = False):
         '''
         Reads raw data from uvfits file as an array and returns a block of nt samples
         :istart: Sample number to start at. Doesnt have to be a multiple of nt
         '''
 
         for dout in self.fast_raw_blocks(istart, nt=nt):
-            dout_data = dout['DATA'].transpose((*np.arange(1, dout['DATA'].ndim), 0))[self.baseline_indices]
-            dout_complex_data = self._create_masked_data(dout_data, 0)
+            dout_complex_data = self.convert_visrows_into_block(dout, keep_all_baselines = keep_all_baselines)
+            #dout_data = dout['DATA'].transpose((*np.arange(1, dout['DATA'].ndim), 0))[self.baseline_indices]
+            #dout_complex_data = self._create_masked_data(dout_data, 0)
 
+            if keep_all_baselines:
+                bl_selector = np.arange(self.raw_nbl).astype('int')
+                bl_order = self.raw_baseline_order
+            else:
+                bl_selector = self.baseline_indices
+                bl_order = self.internal_baseline_order
+        
             uvws = []
             if fetch_uvws:
                 for it in range(nt):
                     this_uvw = {}
 
-                    for ii, ibl in enumerate(self.baseline_indices):
-                        blid = self.internal_baseline_order[ii]
+                    for ii, ibl in enumerate(bl_selector):
+                        blid = bl_order[ii]
 
                         # add the [0] index to get the scalar type
                         # so it exactly matches what you with the original
