@@ -21,6 +21,7 @@ from astropy import units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
 import builtins
+from collections import OrderedDict
 
 log = logging.getLogger(__name__)
 
@@ -206,6 +207,16 @@ class UvFits(object):
         # except KeyError:
         #     pass
 
+        return d0
+    
+    @property
+    def end_date(self):
+        '''
+        Returns MJD float of final (skipped) sample in the file
+        '''
+        # Note: the final row int the table is occasionally corrupted for some reason
+        # so we'll just calculate it from tstart + nsamp
+        d0 = self.sample_to_time(self.nsamps)
         return d0
 
     @property
@@ -485,6 +496,11 @@ class UvFits(object):
     @property
     def tstart(self):
         return self.get_tstart()
+    
+    @property
+    def tend(self):
+        last_sample_date = Time(self.end_date, format='jd', scale=self.tscale)
+        return last_sample_date
 
     @property
     def source_table_entry(self):
@@ -581,7 +597,21 @@ class UvFits(object):
         m.isamp = isamp
 
         return m
-
+    
+    @property
+    def antenna_positions(self):
+        '''
+        Converts FITS antenna table to a collection suitable for UVW source
+        
+        :returns: Ordered dict keyed by antenna name and value is positions [3] vector in IERS coordinate frame in meters
+        '''
+        anttab = self.hdulist['AIPS AN']
+        antdata = OrderedDict()
+        nant = len(anttab.data)
+        
+        for iant, row in enumerate(anttab.data):
+            antdata[row['ANNAME']] = row['STABXYZ']
+        return antdata
 
     def close(self):
         self.raw_fin.close()

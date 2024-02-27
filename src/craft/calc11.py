@@ -129,6 +129,24 @@ FLAG FILENAME:      /fred/oz002/adeller/askap/frb190608/0407/data/c1_f0/craftfrb
             self.addtel('Z (m)', 'location.itrf', 2)
             self.addtel('SHELF', default='NONE')
 
+    def add_antennas(self, antdata):
+        '''
+        A more sane API than add_antdata - which is mind-bogglingly dumb and designed to handle something parsed from an FCM.
+        :antdata: A list returning (antname, position), where position is a 3-vector  of X,Y,Z in meters in ITRF coordinate system.
+        '''
+        self += ('NUM TELESCOPES', len(antdata))
+        for iant, (antname, (x,y,z)) in enumerate(antdata):
+            def addant(self, key, value):
+                self += f'TELESCOPE {iant} {key}', value
+           
+            addant(self, 'NAME', antname)
+            addant(self, 'MOUNT', 'AZEL')
+            addant(self, 'OFFSET (m)', '0.00000')
+            addant(self, 'X (m)', x)
+            addant(self, 'Y (m)', y)
+            addant(self, 'Z (m)', z)
+            addant(self, 'SHELF', 'NONE')
+
     def add_eops(self, eoptab=None, toff=3):
         '''
         Add entries from the given EOP table to this CalcFile
