@@ -513,9 +513,7 @@ class PipelinePlan(object):
         self.save_luts = save_luts
         
         values = self.values
-        if values.flag_ants:
-            f.set_flagants(values.flag_ants)
-            
+
         try:
             beamid = f.beamid
         except:
@@ -873,6 +871,9 @@ def _main():
 
     log.info('Loading UV coordinates from file %s ', values.uv)
     f = uvfits.open(values.uv)
+    if values.flag_ants:
+        f.set_flagants(values.flag_ants)
+            
     plan = PipelinePlan(f, values)
 
     if values.show:
