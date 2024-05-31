@@ -128,6 +128,7 @@ def dump_plan(plan, pickle_fname):
     filehandler = open(pickle_fname, 'wb') 
     pickle.dump(plan, filehandler)
     filehandler.close()
+    log.info('Plan size was %d bytes', os.path.getsize(pickle_fname))
 
 def load_plan(pickle_fname):        
     filehandler = open(pickle_fname, 'rb')
@@ -612,6 +613,43 @@ class PipelinePlan(object):
         self.__set_dms(dms)
         self.__fdmt_plan = None
 
+    def useful_info(self, iblk=None):
+        now = Time.now()
+        plan = self
+        useful_info = {
+                'NCHAN': plan.nf,
+                'TSAMP': plan.tsamp_s.value,
+                'FCH1_Hz': plan.freqs[0],
+                'CH_BW_Hz': plan.foff,
+                'NANT': plan.nant,
+                'NBL': plan.nbl,
+                'BEAM': plan.beamid,
+                'STARTMJD': plan.tstart.mjd,
+                'TARGET': plan.target_name,
+                'UV': str(plan.values.uv),
+                'BSCALE': 1.0,
+                'BZERO': 0.0,
+                'BUNIT': "UNCALIB",
+                'NOWTAI': now.tai.mjd,
+                'EPOCH': 2000,
+                'NPIX':plan.npix,
+                'NAXIS1':plan.npix, # candidate pipeline needs NAXS1 and NAXIS2
+                'NAXIS2':plan.npix
+                }
+        if iblk is not None:
+            useful_info['IBLK'] = iblk
+
+        return useful_info
+    
+    
+    def fits_header(self, iblk=None):
+        hdr = self.wcs.to_header()
+        useful = self.useful_info(iblk)
+        for k,v in useful.items():
+            hdr[k] = v
+
+        return hdr
+
     @property
     def nuvrest(self):
         return self.fdmt_plan.nuvtotal // self.nuvwide
@@ -886,8 +924,11 @@ def _main():
 
         pylab.show()
 
-    #dump_plan(plan, values.pickle_fname) # Large plans don't work - need to not serialise the bad bits
-    #print((load_plan(values.pickle_fname)))
+    plan.fdmt_plan # make fdmt values
+    if values.pickle_fname:
+        
+        dump_plan(plan, values.pickle_fname) # Large plans don't work - need to not serialise the bad bits
+        print((load_plan(values.pickle_fname)))
     
 if __name__ == '__main__':
     _main()
