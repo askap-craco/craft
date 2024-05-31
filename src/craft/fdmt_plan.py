@@ -482,7 +482,7 @@ class FdmtPlanContainer:
             self.__runs[irun] = r
             log.debug(f'Added run at {irun} with chan_start={chan_start} prev={None if self.prev_plan is None else self.prev_plan.run_at(irun)}')
         else:
-            assert r.chan_start == chan_start
+            assert r.chan_start == chan_start, f'Inavlid chan start {r.chan_start} != {chan_start} {r}'
             
         return r
     
