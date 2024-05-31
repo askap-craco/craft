@@ -104,7 +104,6 @@ FLAG FILENAME:      /fred/oz002/adeller/askap/frb190608/0407/data/c1_f0/craftfrb
         else:
             value = antdata.get(vkey, default)
 
-        logging.debug('%s %s %s', vkey, self.telno, value)
         assert value is not None, 'Unknown value for ant {} key {} {}'.format(self.telno, cname, vkey)
         if index is not None:
             bits = value.replace('[','').replace(']','').split(',')
@@ -323,7 +322,11 @@ class Scan(object):
         else:
             the_poly = max(after_polys, key=lambda p:p.mjdfull)
 
-    
+
+        secs = (mjd - the_poly.mjdfull)*86400.
+        max_secs = float(self.resfile['INTERVAL (SECS)'])
+        assert 0 <= secs <= max_secs, f'No polynomial with requested MJD. MJD={mjd} startmjd {the_poly.mjdfull} offset_sec={secs} max offset={max_secs} first={self.polys[0].mjdfull} last={self.polys[0].mjdfull}'
+            
         return the_poly
 
     def eval_src0_poly(self, mjd):
@@ -336,7 +339,7 @@ class Scan(object):
         if secs < 0.:
             warnings.warn('ERR Dodgey offset. mjd={} polymjd ={} secoffset={}'.format(mjd, poly.mjdfull, secs))
         assert secs >= 0
-            
+    
         ant_results = {}
         for ant, polys in poly.source0antpolys.items():
             antname = self.resfile.telnames[ant]
@@ -486,7 +489,8 @@ def plot_polys_range(rfile, mjdstart, tmax):
             secoffs = [val['secoff'] for val in values]
             delays = [val[a1]['DELAY (us)'] - val[a2]['DELAY (us)']for val in values]
             u,v,w,secoffs, delays = list(map(np.array, (u,v,w, secoffs, delays)))
-            print('{} u={} v={} w={} el={} secoff={} delay={:0.9f}us'.format(lbl, u[0], v[0], w[0], el[0], secoffs[0], float(delays[0])))
+            r = np.sqrt(u[0]**2 + v[0]**2)
+            print('{} u={} v={} w={} r={} el={} secoff={} delay={:0.9f}us'.format(lbl, u[0], v[0], w[0], r, el[0], secoffs[0], float(delays[0])))
             if np.any(abs(u) > 1e5):
                 bad_times = np.where(abs(u) > 1e5)[0]
                 print('BAD TIMES',bad_times, mjds[bad_times])
@@ -513,14 +517,14 @@ def plot_polys_range(rfile, mjdstart, tmax):
     ax5.set_ylabel('Elevation')
     ax6.set_ylabel('Delay (us)')
     ax6.set_xlabel('Seconds from MJD {:.5f}'.format(mjdstart))
-    fig.legend(lines, labels, 'upper right')
+    fig.legend(lines, labels, loc='upper right')
 
     fig.savefig(rfile.fname + '.uvt.png')
     pylab.xlabel('U (m)')
     pylab.ylabel('V (m)')
     pylab.grid(True)
     pylab.savefig(rfile.fname + '.uv.png')
-    pylab.figlegend(lines, labels, 'upper right')
+    pylab.figlegend(lines, labels, loc='upper right')
     pylab.show()
 
     
