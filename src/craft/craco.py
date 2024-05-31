@@ -984,6 +984,27 @@ def baseline2uv_numba(lut, baseline_data, uv_data):
 
                 uv_data[irun, :, out_cstart:out_cend, iuv] = din
 
+@njit(parallel=True,cache=True)
+def baseline2uv_real_numba(lut, baseline_data, uv_data, scale):
+    nrun, nuvwide, _ = lut.shape
+    nt = uv_data.shape[1]
+    for irun in prange(nrun):
+        for iuv in prange(nuvwide):
+            blidx, cstart, cend, out_cstart, out_cend, do_conj = lut[irun, iuv, :]
+            if blidx == -1:
+                # this is a safety thing - probably dont need it but we'll have it and remove it's too slow
+                uv_data[irun, :, :, iuv] = 0 
+            else:
+                din = baseline_data[blidx, cstart:cend, :]
+                if do_conj:
+                    din =  np.conj(din)
+                
+                for t in range(nt):
+                    for c in range(cend - cstart):
+                        dval = din[c,t]
+                        uv_data[irun, t, out_cstart + c, iuv, 0] = np.round(dval.real*scale)
+                        uv_data[irun, t, out_cstart + c, iuv, 1] = np.round(dval.imag*scale)
+
 class FastBaseline2Uv:
     def __init__(self, plan, conjugate_lower_uvs=False):
         '''
@@ -1029,7 +1050,7 @@ class FastBaseline2Uv:
     def plan(self):
         return self.__plan
 
-    def __call__(self, baseline_data, uv_data):
+    def __call__(self, baseline_data, uv_data, scale=1):
         '''
         Convert baselines to UV data
 
@@ -1039,10 +1060,13 @@ class FastBaseline2Uv:
 
         log.info('In call %s %s  %s', uv_data.shape, type(self.plan), self.plan)
         log.info('plan shape %s', self.plan.uv_shape)
-        assert uv_data.shape == self.plan.uv_shape, f'Invalid uv_data shape. Was {uv_data.shape} expected {self.uv_shape}'
         assert baseline_data.shape == self.plan.baseline_shape, f'Invalid baseline_data shape. Was {baseline_data.shape} expected {self.plan.baseline_shape}'
 
-        baseline2uv_numba(self.lut, baseline_data, uv_data)
+        if np.iscomplexobj(uv_data):           
+            assert uv_data.shape == self.plan.uv_shape, f'Invalid uv_data shape. Was {uv_data.shape} expected {self.plan.uv_shape}'
+            baseline2uv_numba(self.lut, baseline_data, uv_data)
+        else:
+            baseline2uv_real_numba(self.lut, baseline_data, uv_data, scale=scale)
 
 
     
