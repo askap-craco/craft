@@ -20,6 +20,8 @@ from astropy import units as u
 #iers.conf.auto_download = False
 from numpy import sin,cos,tan,arccos,arctan
 
+class BelowHorizonException(Exception):
+    pass
 
 __author__ = "Keith Bannister <keith.bannister@csiro.au>"
 
@@ -72,6 +74,8 @@ class CracoWCS:
             except:
                 # stupid old versions of stupid astropy don't stupid have askap
                 # stupid
+                #  ak01 from FCM = [-2556088.476234, 5097405.971301, -2848428.398018]
+                # No idea where this came from
                 site = EarthLocation.from_geocentric(-2556084.65961682,
                                                      5097398.3818179,
                                                      -2848424.06141933,
@@ -81,7 +85,9 @@ class CracoWCS:
         
         lst = time.sidereal_time('apparent', site.lon)
         altaz = target.transform_to(AltAz(obstime=time, location=site))
-        assert altaz.alt.deg > 12, f'target is below ASKAP horizon {altaz} {lst}'
+        if altaz.alt.deg <= 12:
+            raise BelowHorizonException(f'target is below ASKAP horizon {altaz} {lst} time={time} site={site} target={target}')
+        
         hour_angle = lst - target.ra
         a,b = calc_ab(hour_angle.rad, target.dec.rad, site.lat.rad)
 
