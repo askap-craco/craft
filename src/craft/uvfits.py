@@ -360,46 +360,34 @@ class UvFits(object):
 
     def fast_raw_blocks(self, istart=0, nsamp=None, nt=1, raw_date=False):
         assert istart >= 0, f'Invalid istart={istart}'
-        startsamp = istart
-        samps_to_read = nt
         if nsamp is None:
             nsamp = self.nsamps
 
-        
         assert nsamp > 0
-        endsamp = istart + nsamp
-
+        endsamp = min(istart + nsamp, self.nsamps)
 
         if istart > self.nsamps - 1:
             raise ValueError(f'Asked to start reading past the end of the file. istart={istart} nsamps={self.nsamps}')
 
         vis = self.vis
+        
 
-        while True:
-            samps_left = endsamp - startsamp
-            if samps_left < nt:
-                samps_to_read = samps_left
-            else:
-                samps_to_read = nt
-
-            if samps_left < 1:
-                break
-
+        for startsamp in range(istart, endsamp):           
             ix = startsamp*self.raw_nbl
-            iy = ix + samps_to_read*self.raw_nbl
+            iy = ix + nt*self.raw_nbl
             byte_offset = self.hdrsize + ix * self.dtype.itemsize
-            nbytes = samps_to_read*self.raw_nbl*self.dtype.itemsize
+            nbytes = nt*self.raw_nbl*self.dtype.itemsize
             next_byte_offset = byte_offset+nbytes
 
             log.debug('Reading %d bytes from %s at offset %d', nbytes, self.filename, byte_offset)
 
             # Using the vis interface should set UVW from metdata and flags??
-            dout = vis[ix:iy].reshape(samps_to_read, -1)
+            dout = vis[ix:iy].reshape(nt, -1)
+
             log.debug('read complete of visidx [%d:%d]. Pre-reading willneed %d for %d bytes', ix, iy, next_byte_offset, nbytes)
 
             # Tell Kernel we're going to need the next block. - doesnt seem to make much difference, but anyway.
             os.posix_fadvise(self.raw_fin.fileno(), next_byte_offset, nbytes, os.POSIX_FADV_WILLNEED)
-            startsamp += samps_to_read
 
             # dout has had it's ['DATE'] field converted to float64 and added ['PZERO4'] toit
             # so it can beused in baseline interpolation. Here we convert it back
