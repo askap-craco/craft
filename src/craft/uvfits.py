@@ -372,7 +372,7 @@ class UvFits(object):
         vis = self.vis
         
 
-        for startsamp in range(istart, endsamp):           
+        for startsamp in range(istart, endsamp, nt):           
             ix = startsamp*self.raw_nbl
             iy = ix + nt*self.raw_nbl
             byte_offset = self.hdrsize + ix * self.dtype.itemsize
