@@ -465,6 +465,9 @@ class UvFits(object):
     def fast_time_blocks(self, nt, fetch_uvws=False, istart=0, keep_all_baselines = False):
         '''
         Reads raw data from uvfits file as an array and returns a block of nt samples
+        :nt: number of times to get
+        :fetch_uvws: True if you want to return uvws in teh second parameter
+        
         :istart: Sample number to start at. Doesnt have to be a multiple of nt
         '''
 
