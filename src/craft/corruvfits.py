@@ -15,6 +15,7 @@ import warnings
 import sys
 import datetime
 import scipy
+import fcntl
 
 log = logging.getLogger(__name__)
 
@@ -149,6 +150,9 @@ class CorrUvFitsFile(object):
             hdr[k] = v
 
         self.fout = open(fname, 'w+b')
+        # obtain an exclusive lock so fixuvfits doesn't corrupt this mid stream.
+        fcntl.flock(self.fout, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
         self.fout.write(bytes(hdr.tostring(), 'utf-8'))
         self.ngroups = 0
         dt = self.output_dtype
