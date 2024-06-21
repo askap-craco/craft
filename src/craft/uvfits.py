@@ -68,8 +68,10 @@ class VisView:
         if isinstance(sidx, int):
             sidx = slice(sidx, sidx+1, 1)
             
-        assert sidx.step is None or sidx.step == 1, 'np.fromfile cant to strided access'
+        assert sidx.step is None or sidx.step == 1, 'np.fromfile cant do strided access'
         assert sidx.stop >= sidx.start, 'Cant read backwards'
+        if sidx.start is None:
+            sidx.start = 0
         
         start_byte  = self.hdrsize + (sidx.start + self.start_idx)*self.dtype.itemsize
         nelements = sidx.stop - sidx.start
@@ -77,6 +79,8 @@ class VisView:
         
         self.fin.seek(start_byte)
         dout = np.fromfile(self.fin, count=nelements, dtype=self.dtype)
+        if len(dout) != nelements:
+            raise EOFError(f'Read past the end of the file slice={sidx} start_byte={start_byte} count={nelements} actual={len(dout)} dtype={self.dtype}')
 
         ### update date to float64
 
@@ -183,6 +187,9 @@ class UvFits(object):
     @property
     def header(self):
         return self.hdulist[0].header
+
+    def gcount(self):
+        return self.header['GCOUNT']
 
     @property
     def vis(self):
@@ -364,9 +371,9 @@ class UvFits(object):
             nsamp = self.nsamps
 
         assert nsamp > 0
-        endsamp = min(istart + nsamp, self.nsamps)
+        endsamp = min(istart + nsamp, self.nsamps - nt)
 
-        if istart > self.nsamps - 1:
+        if istart > self.nsamps - nt:
             raise ValueError(f'Asked to start reading past the end of the file. istart={istart} nsamps={self.nsamps}')
 
         vis = self.vis
@@ -379,9 +386,8 @@ class UvFits(object):
             nbytes = nt*self.raw_nbl*self.dtype.itemsize
             next_byte_offset = byte_offset+nbytes
 
-            log.debug('Reading %d bytes from %s at offset %d', nbytes, self.filename, byte_offset)
+            log.debug('Reading %d bytes from %s at offset %d', nbytes, self.filename, byte_offset)            
 
-            # Using the vis interface should set UVW from metdata and flags??
             dout = vis[ix:iy].reshape(nt, -1)
 
             log.debug('read complete of visidx [%d:%d]. Pre-reading willneed %d for %d bytes', ix, iy, next_byte_offset, nbytes)
