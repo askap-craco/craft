@@ -705,7 +705,7 @@ class MiriadGainSolutions(object):
             nant = g_real.shape[1]
             assert bp_real.shape[1] == nant, 'Unequal number of antennas in gain and bandpass files'
             self.nant = nant
-            self.freqs = np.array(freqs1).astype(np.float) # convert to float
+            self.freqs = np.array(freqs1).astype(np.float64) # convert to float
             self.times = times1 # TODO: Parse times.
             if len(times1) > 1:
                 warnings.warn('MiriadSolution can only handle 1 time step')
