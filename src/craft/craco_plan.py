@@ -854,6 +854,19 @@ class PipelinePlan(object):
 
         ps = craco.pointsource(amp, lm, self.freqs, self.baseline_order, self.baselines, noiseamp)
         return ps
+    
+
+    def save(plan, plan_fout):
+        # Also write plan to disk - 
+        plan.fdmt_plan # lazy evaluate fdmt_plan
+        plan.prev_plan = None # Don't send previous plan - otherwise we maek a nice linked list to all the plans!!!!
+        plan.fdmt_plan.prev_pipeline_plan = None # Same for this! Yikes
+        plan.fdmt_plan.container1 = None
+        plan.fdmt_plan.container2 = None
+        with open(plan_fout, 'wb') as f:
+            pickle.dump(plan,f)
+            sz = os.path.getsize(plan_fout)
+            log.info('Wrote plan to %s. Size %d', plan_fout, sz)
         
 def add_arguments(parser):
     '''
