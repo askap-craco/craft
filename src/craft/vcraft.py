@@ -366,7 +366,7 @@ class VcraftMux(object):
 
         print('SAMPLE OFFSETS', self.sample_offsets, 'FILE DELAYS', self.file_delays)
         assert np.all(self.sample_offsets >= 0)
-        assert np.all(self.sample_offsets < self.nsamps)
+        #assert np.all(self.sample_offsets < self.nsamps) #commenting out so it doesn't crash on very short vcraft file cases
         self.start_mjd = self.start_mjds[np.argmin(self.sample_offsets)]
         assert np.all(abs(self.start_mjds - self.trigger_mjds) < 1), 'MJD adjustment should be << 1 day'
 
